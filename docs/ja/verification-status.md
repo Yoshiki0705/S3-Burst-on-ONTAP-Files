@@ -22,7 +22,7 @@
 | S3 Access Point 経由で書いたオブジェクトが **同一ボリューム**の NFS でどう見えるか | 検証済み | [検証記録](verification/s3ap-nfs-visibility.md)。2026-08-09、ap-northeast-1、SINGLE_AZ_1 / 128 MBps、UNIX、NFSv3、`actimeo=0`、n=30。S3 → NFS は p50 9 ms、NFS → S3 は p50 873 ms（64 B）。**ONTAP バージョンは特定できず**（同記録に理由） |
 | マルチパートアップロード中の部分オブジェクトがファイル側に見えるか | 検証済み | 同記録。`CompleteMultipartUpload` まで NFS 側に現れない |
 | NFS クライアントのマウントオプションが可視性に与える影響 | 検証済み | 同記録。削除の反映が `actimeo=0` で 7 ms、既定マウントで 2,171 ms。既定は `acdirmin=30` / `acdirmax=60` |
-| S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | 未検証 | この構成の中核。最優先で検証する。**上の同一ボリュームの測定はこの問いの答えではない** |
+| S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | **検証済み** | [FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)。2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、VPC ピアリング経由、UNIX、NFSv3、`actimeo=0`、n=30。**S3 → FlexCache NFS は p50 14 ms**。部分マルチパートは `CompleteMultipartUpload` まで見えない。削除の反映は 9 ms |
 | セキュリティスタイルとファンアウト先プロトコルの対応、および Cache 作成時の継承 | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路で同じ規則が成り立つかは確かめていない（[最初に決めること](design-first-decisions.md)） |
 | FSx for ONTAP を Origin としたときの Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes の Cache 可否 | 未確認 | AWS の対応構成表に記載がない |
 | Origin あたりの Cache 数を増やしたときの挙動 | 未検証 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨しており、ファンアウト数の設計に影響する可能性がある |

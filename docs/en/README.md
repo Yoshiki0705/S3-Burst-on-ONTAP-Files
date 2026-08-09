@@ -1,6 +1,6 @@
 # S3 Burst on ONTAP Files
 
-![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-unverified-orange)
+![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-verified-brightgreen)
 
 <!-- lang-switcher:start -->
 🌐 [日本語](../../README.md) | [English](README.md)
@@ -61,12 +61,11 @@ nothing to lose if it does not. Detail and sources are in
 | Read the measured figures and their conditions | [Verification record](../ja/verification/s3ap-nfs-visibility.md) | 10 min |
 | Confirm it on real hardware | [PoC checklist](../ja/poc-checklist.md) | 10 min |
 
-> **The central claim of this architecture is unverified.** When and how an object written through
-> the S3 Access Point becomes visible on a **FlexCache cache volume** has not yet been confirmed on
-> real hardware. Reading and writing the *same* volume over both S3 and NFS has been measured — p50
-> 9 ms for S3 to NFS and p50 873 ms for the reverse
-> ([verification record](../ja/verification/s3ap-nfs-visibility.md), Japanese).
-> **That is not the FlexCache answer.** The difference between "unverified" and "unconfirmed" is stated explicitly in
+> **The central claim of this architecture is verified.** An object written to the origin through
+> the S3 Access Point is readable on the FlexCache cache volume over NFS in **p50 14 ms**
+> (ONTAP 9.18.1P3D1, same-Region VPC peering, `actimeo=0`, n=30). FlexCache adds approximately
+> +5 ms over reading the same volume directly.
+> Full results: [FlexCache verification record](../ja/verification/flexcache-s3ap-visibility.md) (Japanese). The difference between "unverified" and "unconfirmed" is stated explicitly in
 > [Verification status](../ja/verification-status.md). Performance and cost figures that were not
 > measured are not published here.
 

@@ -1,6 +1,6 @@
 # S3 Burst on ONTAP Files
 
-![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-unverified-orange)
+![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-verified-brightgreen)
 
 <!-- lang-switcher:start -->
 🌐 [日本語](README.md) | [English](docs/en/README.md)
@@ -62,11 +62,11 @@ Origin のセキュリティスタイルがファンアウト先のプロトコ�
 | 実測値と測定条件を見る | [検証記録](docs/ja/verification/s3ap-nfs-visibility.md) | 10 分 |
 | 実機で確かめる | [PoC チェックリスト](docs/ja/poc-checklist.md) | 10 分 |
 
-> **この構成の中核は未検証です。** S3 Access Point 経由で書いたオブジェクトが **FlexCache の
-> Cache ボリューム**でいつ・どう見えるかは、まだ実機で確かめていません。
-> 同一ボリュームを S3 と NFS の両方から読み書きする部分は実測済みで、S3 → NFS が p50 9 ms、
-> NFS → S3 が p50 873 ms でした（[検証記録](docs/ja/verification/s3ap-nfs-visibility.md)）。
-> **これは FlexCache の答えではありません。**
+> **この構成の中核は検証済みです。** S3 Access Point で Origin に書いたオブジェクトは、
+> FlexCache の Cache ボリューム上の NFS マウントから **p50 14 ms** で読めました
+> （ONTAP 9.18.1P3D1、同一リージョン VPC ピアリング、`actimeo=0`、n=30）。
+> FlexCache が加える遅延は同一ボリュームに対して約 +5 ms です。
+> 詳細は[FlexCache 検証記録](docs/ja/verification/flexcache-s3ap-visibility.md)にあります。
 > 未検証と未確認の区別は[検証状況](docs/ja/verification-status.md)に明示してあります。
 > 実測していない性能値・コスト値はこのリポジトリには書きません。
 
