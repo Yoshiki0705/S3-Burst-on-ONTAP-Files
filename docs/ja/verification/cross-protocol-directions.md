@@ -102,6 +102,22 @@ REST API では S3 ユーザー作成が拒否されますが、CLI では成功
 成功し、FlexCache ボリュームでは拒否されます。** ファイルの UNIX パーミッションを
 world-readable にしても結果は変わりません。
 
+#### 決定的な切り分け: 同一条件での比較
+
+同一セッション内で、FlexVol（通常）と FlexCache の両方にNAS バケットを作り、
+同一の S3 ユーザー・同一のワイルドカードポリシー・同一のデータ LIF で同時にテストしました。
+
+| 操作 | FlexVol NAS バケット（`getobj_flexvol`） | FlexCache NAS バケット（`duality_fc_fg`） |
+|---|---|---|
+| HeadBucket | ✅ | ✅ |
+| ListObjectsV2 | ✅（KeyCount=1） | ❌ AccessDenied |
+| GetObject | ✅ **SUCCESS**（`FLEXVOL-GETOBJECT-TEST`） | ❌ AccessDenied |
+| NFS での読み取り | ✅ | ✅ |
+
+ファイルはどちらも NFS 経由で書き込み、`chmod 644` で world-readable にしています。
+**問題は FlexCache ボリューム固有**であり、FlexGroup であるかどうかではありません
+（通常ボリュームのテストも FlexVol で成功しています）。
+
 ### 前回の結論からの訂正
 
 前回「S3 ユーザーが作れないためアクセス不可」と報告していました。これは REST API のみを

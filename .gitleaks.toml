@@ -27,7 +27,10 @@ regexes = [
 description = "Paths whose pattern literals are the rules, not secrets"
 paths = [
   '''\.gitleaks\.toml''',
+  '''(^|/)\.private/''',              # non-public working documents (gitignored)
   '''(^|/)tools/''',                  # validator regexes look like secret patterns
   '''(^|/)tests/''',                  # so do the fixtures that prove they fire
   '''(^|/)scripts/''',
+  '''(^|/)\.pytest_cache/''',         # pytest metadata references test IDs that contain fixture values
+  '''(^|/)__pycache__/''',
 ]
