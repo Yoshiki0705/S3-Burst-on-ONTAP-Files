@@ -61,26 +61,35 @@ persistent session を使い、接続を再利用しています。
 
 ## ONTAP S3 NAS バケット（FlexCache duality）の検証
 
-### 結果: FSx for ONTAP では利用できない
+### 結果: FSx for ONTAP では実質的に利用できない
 
 ONTAP 9.18.1 は FlexCache ボリュームに対する NAS バケット（S3 マルチプロトコル）を
-サポートしていますが、**FSx for ONTAP ではこの機能を利用できませんでした。**
+サポートしており、**NAS バケットの作成自体は成功しました。** ただし S3 ユーザーの作成が
+プラットフォーム制約で拒否されるため、**作成したバケットに ONTAP ネイティブの S3 経由で
+アクセスすることはできません。**
 
-| 操作 | 結果 |
-|---|---|
-| S3 サービスの作成 | `Only one object store server is supported per SVM`（FSx for ONTAP が内部で使用しているサービスが存在） |
-| 既存 S3 サービスの照会 | `entry doesn't exist`（内部サービスは fsxadmin から見えない） |
-| S3 ユーザーの作成 | `The user does not have permission to access the requested resource` |
-| NAS バケットの作成 | ジョブ投入は成功するが `not authorized for that command` で失敗 |
+| 操作 | S3 AP 有効 SVM | S3 AP 未使用 SVM |
+|---|---|---|
+| S3 サービスの確認・作成 | `Only one object store server is supported per SVM`（FSx for ONTAP が内部で使用） | 既存サービスが利用可能（`enabled: true`） |
+| S3 ユーザーの作成 | `The user does not have permission` | **同じエラー** |
+| NAS バケットの作成 | `not authorized for that command` | **成功** |
+| NAS バケット経由のアクセス | — | ユーザーが作れないためアクセス不可 |
+
+> **検証上の補足**: S3 AP 未使用の SVM（`snapmirror-s3-test`）では S3 サービスが存在し
+> NAS バケットの作成に成功しましたが（`type: nas`、`nas_path: /`）、S3 ユーザーの作成は
+> どの SVM でも `fsxadmin` から拒否されました。FSx for ONTAP では S3 の認証は AWS 側
+> （IAM + S3 Access Point ポリシー）で管理されるため、ONTAP ネイティブの S3 ユーザーは
+> 存在しない設計です。
 
 ### これはプラットフォーム制約です
 
 設定の誤りや手順の問題ではありません。FSx for ONTAP では:
 
-- S3 のオブジェクトアクセス機能は AWS 管理の **S3 Access Point** 機構としてのみ提供される
-- ONTAP ネイティブの S3 サービス（オブジェクトストアサーバ、S3 ユーザー、NAS バケット）は
-  `fsxadmin` から操作できない
-- FSx for ONTAP が内部的に S3 サービスを使用しているため、新規作成も許可されない
+- S3 AP **未使用**の SVM であれば S3 サービスは存在し、NAS バケットの作成も可能
+- ただし **S3 ユーザーの作成はどの SVM でも `fsxadmin` から拒否される**
+- S3 のオブジェクトアクセスに対する認証は AWS 管理の IAM + S3 Access Point ポリシーで行われるため、
+  ONTAP ネイティブの S3 ユーザーという概念自体が FSx for ONTAP には存在しない
+- 結果として、NAS バケットを作成できても ONTAP ネイティブ S3 クライアントからアクセスする手段がない
 
 ### この構成への影響
 
