@@ -92,7 +92,26 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 | S3 の料金モデルになる | ならない。課金はファイルストレージ側の容量とスループットに従う |
 | どのプラットフォームでも同じ手順 | 同じではない。対応構成と最小バージョンが異なる（[移植性](portability.md)） |
 
-## 代表ユースケース — Hardware-in-the-Loop (HiL) テスト
+## 代表ユースケース
+
+「クラウドの S3 API で収集し、現場の NFS/SMB で利用する」——この構造を持つワークロードは
+業種を問わず存在する。
+
+| 業種 | 収集側 | 利用側 | 参考 |
+|---|---|---|---|
+| 自動車（AV/ADAS） | 走行ログ・センサーデータを S3 に集約 | HiL テストベンチで NFS 再生 | [Hybrid Cloud HiL](https://aws.amazon.com/blogs/industries/accelerating-hil-testing-for-av-adas-with-a-hybrid-cloud-approach-aws-and-netapp/) |
+| 半導体（EDA） | 設計ジョブの入出力を S3 でステージ | NFS 上のツールチェーンで実行 | [EDA Scale with FSx for ONTAP](https://aws.amazon.com/cn/blogs/industries/eda-scale-with-fsx-for-netapp-ontap-and-ibm-lsf/) |
+| メディア・VFX | レンダリング素材を S3 で集約 | 制作端末が SMB/NFS でマウント | — |
+| 石油・ガス | 地震探査データを S3 にアップロード | 解釈ワークステーションで NFS マウント | [VDI for Subsurface O&G](https://docs.aws.amazon.com/solutions/deploying-vdi-for-subsurface-oil-and-gas-on-aws/index.html) |
+| ライフサイエンス | ゲノムシーケンサー出力を S3 に格納 | HPC が NFS で処理 | — |
+| 製造・品質検査 | 検査カメラ画像を S3 で収集 | ライン端末が NFS で読み取り | — |
+| リモートワーク | 中央データを S3 経由で更新 | リモート WorkSpaces が FlexCache でアクセス | [FlexCache in WorkSpaces](https://community.netapp.com/t5/Tech-ONTAP-Blogs/Accelerating-Remote-Work-Harnessing-FlexCache-in-AWS-WorkSpaces-for-Data/ba-p/451852) |
+| IoT・エッジ | センサーデータを S3 にストリーム | 現場の解析装置が NFS で読み取り | — |
+
+共通する構造: 書き込み拠点は少数（多くは 1 つ）、読み取り拠点は複数。書き込みはバースト的、
+読み取りは必要な範囲だけ。
+
+### HiL テストの対応付け（詳細）
 
 AV / ADAS 開発では、実車で記録した走行ログとセンサーデータを、実機の ECU を組み込んだ
 テストベンチで再生して検証する。AWS と NetApp によるハイブリッドクラウドでの取り組みが
