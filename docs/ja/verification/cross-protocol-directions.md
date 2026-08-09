@@ -150,6 +150,48 @@ S3 データアクセスが機能しません。** バケットの作成とメ�
 すべてのリソースは削除済みです（[FlexCache 検証記録](flexcache-s3ap-visibility.md)の
 「検証環境の作成と削除」節と同じ形式）。
 
+## SMB での追加検証
+
+### 検証環境（SMB 追加分）
+
+| 項目 | 値 |
+|---|---|
+| 計測日 | 2026-08-10（UTC） |
+| CIFS サーバー | `SMBTEST01`（SVM `snapmirror-s3-test`、ドメイン `s3burst.local`） |
+| Active Directory | AWS Managed AD（Standard）、`s3burst.local` |
+| マウント方法 | `mount -t cifs`、オプション `cache=none`、SMB 3.0 |
+| 比較対象 | 同一環境の NFS（`actimeo=0`）を並行測定 |
+
+### 結果: S3 AP PutObject → FlexCache 読み取り（プロトコル比較）
+
+| プロトコル | マウント方法 | p50 | p90 | max | n |
+|---|---|---|---|---|---|
+| **SMB** | `mount -t cifs`, `cache=none` | **7 ms** | 8 ms | 9 ms | 30 |
+| **NFS** | `mount -t nfs`, `actimeo=0` | **7 ms** | 8 ms | 15 ms | 30 |
+
+**持続接続では SMB と NFS は同等です。** プロトコルによる差はありません。
+
+### smbclient での測定（参考値）
+
+`smbclient`（毎回プロセス起動 + セッション確立）を使った場合：
+
+| プロトコル | 方法 | p50 | p90 | max |
+|---|---|---|---|---|
+| SMB | `smbclient`（毎回セッション確立） | 43 ms | 68 ms | 443 ms |
+| NFS（同一環境、参考） | `mount -t nfs`, `actimeo=0` | 7 ms | 17 ms | 28 ms |
+
+43 ms の大部分は SMB セッション確立のオーバーヘッドです。これは `aws s3api` CLI の
+コールドスタート問題（初回測定で NFS→S3 AP が 873 ms と出た原因）と同じ構造であり、
+**持続接続を使う本番環境では発生しません。**
+
+### 含意
+
+- この構成の「利用（読み取り）」層は NFS でも SMB でも同じパフォーマンスが得られます
+- プロトコル選択は性能ではなく、クライアント OS とセキュリティモデルで決まります
+- SMB を使う場合は Active Directory が必要です（FSx for ONTAP は workgroup モード非対応）
+- UNIX セキュリティスタイルの Origin に SMB でアクセスする場合、NTFS ACL ではなく
+  UNIX パーミッションに基づくアクセス制御が適用されます
+
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |
