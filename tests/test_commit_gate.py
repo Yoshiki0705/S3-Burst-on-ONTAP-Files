@@ -9,6 +9,7 @@ sets will drift and only one of them will be maintained.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -210,13 +211,24 @@ def test_a_malformed_command_does_not_raise() -> None:
 # --- the hook contract --------------------------------------------------------------------------
 
 
-def run_hook(payload: dict) -> subprocess.CompletedProcess:
+def run_hook(
+    payload: dict, branch: str = "docs/example"
+) -> subprocess.CompletedProcess:
+    """Invoke the hook with the branch pinned.
+
+    The branch is always set explicitly. Leaving it to whatever the working copy is checked out on
+    made one of these tests pass for a reason that had nothing to do with the hook: before the first
+    commit existed, `git rev-parse` failed, `current_branch()` returned None, and the branch rules
+    never ran. The test went red the moment the repository had a commit — on CI, not locally.
+    """
+    env = {**os.environ, "COMMIT_GATE_BRANCH": branch}
     return subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "commit_gate.py"), "--hook"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
         timeout=60,
+        env=env,
     )
 
 
@@ -227,8 +239,25 @@ def test_the_hook_blocks_with_exit_two() -> None:
     assert "commit gate" in proc.stderr
 
 
-def test_the_hook_allows_a_clean_commit() -> None:
+def test_the_hook_allows_a_clean_commit_on_a_compliant_branch() -> None:
     proc = run_hook({"command": 'git commit -m "docs: add the support matrix"'})
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_the_hook_blocks_a_clean_message_on_main() -> None:
+    """The branch half of the gate, asserted explicitly instead of inherited from the environment."""
+    proc = run_hook(
+        {"command": 'git commit -m "docs: add the support matrix"'}, branch="main"
+    )
+    assert proc.returncode == 2
+    assert "branch first" in proc.stderr
+
+
+def test_an_empty_branch_override_is_treated_as_unknown() -> None:
+    """An unset branch must not be read as a branch named "", which no rule would match."""
+    proc = run_hook(
+        {"command": 'git commit -m "docs: add the support matrix"'}, branch=""
+    )
     assert proc.returncode == 0, proc.stderr
 
 
