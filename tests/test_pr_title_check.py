@@ -29,7 +29,7 @@ BOTS = ("renovate[bot]", "dependabot[bot]", "github-actions[bot]", "pre-commit-c
 def script() -> str:
     """Extract the `run: |` block from the validation step."""
     text = WORKFLOW.read_text(encoding="utf-8")
-    match = re.search(r"^ +run: \|\n(?P<body>(?:.*\n)+?)(?=^\S|\Z)", text, re.M)
+    match = re.search(r"^ +run: \|\n(?P<body>(?:.*\n)+?)(?=^\S|\Z)", text, re.MULTILINE)
     assert match, "could not find the run: | block in the workflow"
     return textwrap.dedent(match.group("body"))
 
@@ -144,7 +144,7 @@ def test_the_job_is_not_conditionally_skipped() -> None:
     the moment this becomes a required status check — the opposite of the intent.
     """
     text = WORKFLOW.read_text(encoding="utf-8")
-    assert not re.search(r"^\s+if:", text, re.M), (
+    assert not re.search(r"^\s+if:", text, re.MULTILINE), (
         "the workflow gained a conditional; exempt bots inside the script with exit 0 instead, "
         "so the check reports success rather than skipped"
     )

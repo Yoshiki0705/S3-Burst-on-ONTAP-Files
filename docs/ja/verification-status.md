@@ -24,7 +24,7 @@
 | NFS クライアントのマウントオプションが可視性に与える影響 | 検証済み | 同記録。削除の反映が `actimeo=0` で 7 ms、既定マウントで 2,171 ms。既定は `acdirmin=30` / `acdirmax=60` |
 | NFS 書き込み（Origin）→ S3 AP 経由で読めるまで | 検証済み | [全方向比較](verification/cross-protocol-directions.md)。p50 44 ms（boto3 persistent session）。**初回の 873 ms は CLI 起動コストの誤計測であり撤回** |
 | NFS 書き込み（Origin）→ FlexCache Cache NFS で読めるまで | 検証済み | 同記録。p50 6 ms。NFS は Origin に直接コミットされるため S3 経由より速い |
-| ONTAP S3 NAS バケット（FlexCache duality — S3 Access Point とは別の機構）の FSx for ONTAP での利用可否 | **実質利用不可（プラットフォーム制約）** | [全方向比較](verification/cross-protocol-directions.md)。S3 AP 未使用 SVM で NAS バケットの**作成は成功**するが、S3 ユーザーの作成が `fsxadmin` から拒否されるためアクセス手段がない。ベアメタル ONTAP / ONTAP Select / CVO でのみ完全に利用可能 |
+| ONTAP S3 NAS バケット（FlexCache duality — S3 Access Point とは別の機構）の FSx for ONTAP での利用可否 | **通常ボリューム: 動作 / FlexCache: データアクセス不可** | [全方向比較](verification/cross-protocol-directions.md)。通常ボリュームでは NFS 書き込み → ONTAP S3 GetObject が成功（CLI 経由で S3 ユーザー作成可能）。FlexCache ボリュームでは NAS バケット作成と HeadBucket は成功するが GetObject / ListObjects は AccessDenied。ONTAP 9.18.1P3D1、FSx for ONTAP |
 | S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | **検証済み** | [FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)。2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、VPC ピアリング経由、UNIX、NFSv3、`actimeo=0`、n=30。**S3 → FlexCache NFS は p50 14 ms**。部分マルチパートは `CompleteMultipartUpload` まで見えない。削除の反映は 9 ms |
 | セキュリティスタイルとファンアウト先プロトコルの対応、および Cache 作成時の継承 | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路で同じ規則が成り立つかは確かめていない（[最初に決めること](design-first-decisions.md)） |
 | FSx for ONTAP を Origin としたときの Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes の Cache 可否 | 未確認 | AWS の対応構成表に記載がない |

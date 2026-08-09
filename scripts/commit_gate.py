@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-import audit_public_output as audit  # noqa: E402
+import audit_public_output as audit
 
 TYPES = (
     "feat",
