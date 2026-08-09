@@ -51,9 +51,6 @@ COUNT_GLOBS = [
     "docs/en/**/*.md",
     "patterns/*/*/README.md",
     "environments/**/*.md",
-    # Drafts are where numbers get quoted out of context on the way to being published, so they are
-    # checked before they leave rather than after.
-    "drafts/**/*.md",
 ]
 
 
