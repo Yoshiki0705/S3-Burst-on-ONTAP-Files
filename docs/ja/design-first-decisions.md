@@ -33,13 +33,29 @@ FlexCache 一般の仕様として AWS のドキュメントで裏を取れて�
 
 Azure NetApp Files のキャッシュボリューム要件が示している対応は次のとおり。
 
-| Origin のセキュリティスタイル | Cache のプロトコル | 結果 |
+| Origin のセキュリティスタイル | Cache のプロトコル | S3 AP 対応 |
 |---|---|---|
-| UNIX | NFS | UNIX |
-| NTFS | SMB | NTFS |
-| MIXED | NFS または SMB | 非対応 |
+| UNIX | NFS（SMB も可、name-mapping 必須） | ✅ 対応 |
+| NTFS | SMB（AD 参加 SVM が前提） | ✅ 対応（Windows 識別情報） |
+| MIXED | NFS または SMB | ⚠️ 非推奨（下記参照） |
 
-MIXED が非対応とされている点も設計に影響する。FSx for ONTAP 側で S3 Access Point に
+### MIXED セキュリティスタイルについて
+
+`mixed` は API 上は指定可能ですが、AWS の公式ガイダンスでは**上級者向け（advanced users only）として
+推奨されていません**
+（[Enabling multiprotocol workloads with Amazon FSx for NetApp ONTAP](https://aws.amazon.com/blogs/storage/enabling-multiprotocol-workloads-with-amazon-fsx-for-netapp-ontap/)）。
+FSx for ONTAP のボリューム作成ガイドでも選択肢は UNIX と NTFS の 2 択として案内されています。
+
+mixed の問題:
+
+- パーミッション型が「最後に書き込んだクライアントの種類」で決まるため、権限状態が予測しにくい
+- トラブルシューティングが NFS・SMB 両方のパーミッション体系を調べる必要があり複雑化する
+- NetApp 自身も disadvantages として「Complex Permission Management」「Troubleshooting Challenges」を
+  [KB で挙げている](https://kb.netapp.com/on-prem/ontap/da/NAS/NAS-KBs/What_are_the_disadvantages_of_the_Mixed_security_style)
+
+**この構成では mixed を使いません。** UNIX か NTFS のどちらかを選んでください。
+
+FSx for ONTAP 側で S3 Access Point に
 Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）と、UNIX 識別情報を使う構成の
 どちらを採るかが、そのままファンアウト先のプロトコル選択と結びつく。
 
@@ -62,7 +78,7 @@ Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）�
 ## 決める順序
 
 1. **利用拠点のプロトコルを決める** — NFS か SMB か。装置やアプリが決めているなら、それが答え
-2. **Origin のセキュリティスタイルを決める** — 1 に対応するものを選ぶ。MIXED は避ける
+2. **Origin のセキュリティスタイルを決める** — 1 に対応するものを選ぶ。UNIX（NFS 主体）か NTFS（SMB 主体）の 2 択。mixed は使わない
 3. **S3 Access Point の識別情報を決める** — 2 と整合させる。NTFS 側を選ぶなら SVM の
    Active Directory 参加が前提になり、AD 到達性が定常的な依存になる
 4. **Origin ボリュームを作る**

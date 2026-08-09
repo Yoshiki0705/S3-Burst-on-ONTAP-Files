@@ -47,8 +47,7 @@
 - [ ] Cache ボリュームを作成する
 - [ ] Origin のセキュリティスタイルが Cache に継承されるかを確認する
       （[最初に決めること](design-first-decisions.md)の未確認事項）
-- [ ] UNIX + NFS、NTFS + SMB のそれぞれで確認する
-- [ ] MIXED セキュリティスタイルの Origin に対して Cache を作れるかを確認する
+- [ ] UNIX + NFS、NTFS + SMB のそれぞれで確認する（mixed は非推奨のため検証対象外）
 - [ ] 実際に読まれた範囲だけが転送されることを確認する
 - [ ] 削除順序を確認する（Cache → SVM ピア → クラスタピアの順で解除できるか）
 

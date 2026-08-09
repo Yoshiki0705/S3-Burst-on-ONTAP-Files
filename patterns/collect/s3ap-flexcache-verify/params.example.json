@@ -1,0 +1,21 @@
+{
+  "OriginFileSystemId": "<ORIGIN_FS_ID>",
+  "OriginVpcId": "<ORIGIN_VPC_ID>",
+  "OriginVpcCidr": "<ORIGIN_VPC_CIDR>",
+  "OriginSubnetId": "<ORIGIN_SUBNET_ID>",
+  "OriginRouteTableId": "<ORIGIN_ROUTE_TABLE_ID>",
+  "OriginSecurityGroupId": "<ORIGIN_SG_ID>",
+  "OriginSvmId": "<ORIGIN_SVM_ID>",
+  "OriginSvmName": "svm1",
+  "CacheFileSystemId": "<CACHE_FS_ID>",
+  "CacheVpcId": "<CACHE_VPC_ID>",
+  "CacheVpcCidr": "<CACHE_VPC_CIDR>",
+  "CacheSubnetId": "<CACHE_SUBNET_ID>",
+  "CacheRouteTableId": "<CACHE_ROUTE_TABLE_ID>",
+  "CacheSecurityGroupId": "<CACHE_SG_ID>",
+  "CacheSvmName": "svm1",
+  "InstanceType": "t3.micro",
+  "OriginVolumeName": "s3burst_verify",
+  "OriginVolumeSizeMB": "5120",
+  "SecurityStyle": "UNIX"
+}
