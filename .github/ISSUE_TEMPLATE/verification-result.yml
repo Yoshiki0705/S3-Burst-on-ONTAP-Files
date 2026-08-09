@@ -1,0 +1,77 @@
+name: Verification result
+description: You confirmed something on real hardware — including a negative result.
+title: "docs: record the verification of "
+labels: [verification]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        This is the most useful thing anyone can contribute here. The central claim of the
+        architecture is unverified, and several rows in the support matrix are unconfirmed because no
+        public statement was found. **A negative result is as valuable as a positive one** — "this
+        combination does not work" is stronger information than "unconfirmed", and it is the harder
+        thing to find out.
+
+  - type: dropdown
+    id: item
+    attributes:
+      label: What did you verify
+      options:
+        - An object written through the S3 Access Point becoming visible over NFS / SMB on the cache
+        - FSx for ONTAP origin to on-premises ONTAP cache
+        - Security style inheritance at cache creation, and the protocol it permits
+        - Behaviour as the number of caches per origin grows
+        - Another platform as the cache (Cloud Volumes ONTAP, ONTAP Select, or another)
+        - A limit or size ceiling
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >-
+        Without this the result cannot be reproduced, so it cannot be published as verified.
+      value: |
+        - Date:
+        - Region:
+        - ONTAP version:
+        - File system generation / deployment type / throughput capacity:
+        - Volume security style:
+        - Protocol at the consuming site (NFS or SMB):
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened
+      description: >-
+        Describe what you did and what you observed. If it failed, the error message and where it
+        appeared is the useful part — several failures in this area report a cause that is not the
+        real one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: numbers
+    attributes:
+      label: Measurements, if any
+      description: >-
+        Include object size, concurrency, and whether you measured at the client or read a service
+        metric. Please do not round or normalise: a raw number with its conditions is usable, a tidy
+        number without them is not.
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before submitting
+      options:
+        - label: >-
+            No account IDs, real file system or SVM IDs, internal IPs or hostnames, personal names,
+            or unmasked screenshots. Use placeholders.
+          required: true
+        - label: >-
+            I am reporting what I observed, and I have said which parts I did not check.
+          required: true

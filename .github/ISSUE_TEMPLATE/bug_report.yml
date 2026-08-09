@@ -1,0 +1,65 @@
+name: Template or tooling problem
+description: A pattern template does not deploy, or a validator or script misbehaves.
+title: "fix: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        For a wrong statement in the documentation, use the documentation form instead. For anything
+        involving credentials or an over-permissive policy, use the private security report.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - A pattern template (patterns/)
+        - The pattern scaffolder (make new-pattern)
+        - A validator (make audit / links / counts / i18n-check / switcher-check / budget / pinning)
+        - The commit gate
+        - CI
+        - The Makefile
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Paste the command and its output. Redact identifiers before pasting.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - OS:
+        - Python (`python3 --version`):
+        - Installed versus pinned tool versions (`make python` prints a warning when they differ):
+        - Region, if deploying:
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: gate
+    attributes:
+      label: Before submitting
+      options:
+        - label: >-
+            I ran `make all` and included the relevant output. A local pass with tool versions other
+            than the pinned ones does not predict CI.
+          required: false
+        - label: No credentials, account IDs, internal IPs or hostnames in the pasted output.
+          required: true
