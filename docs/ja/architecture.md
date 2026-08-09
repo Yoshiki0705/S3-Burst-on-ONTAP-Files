@@ -138,6 +138,7 @@ AV / ADAS 開発では、実車で記録した走行ログとセンサーデー�
 |---|---|
 | [最初に決めること](design-first-decisions.md) | Origin 作成前に決める必要がある項目 |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 「ファイルを S3 で見せる」機能の呼び名と実装元の違い |
+| [S3 AP 設計ガイド](reference/limits/s3ap-design-guide.md) | 対応オペレーション、並行度設計、ディレクトリ設計、マルチプロトコル一貫性 |
 | [サポート状況](support-matrix.md) | 収集層・配布層の対応状況と最小バージョン |
 | [検証状況](verification-status.md) | 検証済みと未検証の区別 |
 | [移植性](portability.md) | 収集層・配布層をプラットフォームごとに置き換える場合 |
