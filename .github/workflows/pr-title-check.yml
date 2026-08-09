@@ -17,8 +17,28 @@ jobs:
           # Passed through the environment rather than interpolated into the script, so a title
           # containing shell metacharacters cannot break out of the string.
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
+
+          # Known bots are exempt. Their pull request titles are set by the app and cannot be
+          # renamed before the check runs — Renovate's onboarding pull request is titled
+          # "Configure Renovate", which no amount of convention will fix. Its ongoing pull requests
+          # are titled "chore(deps): …" and would pass anyway, so the exemption costs almost nothing.
+          #
+          # The exemption is keyed on the *author*, not on the title. Allowing a title pattern would
+          # let a human open "Configure Renovate" and skip the rule; allowing an account cannot.
+          #
+          # This exits 0 rather than skipping the job. A skipped check is not a passing check, so if
+          # this is ever made a required status check, skipping would block every bot pull request
+          # instead of exempting it.
+          case "$PR_AUTHOR" in
+            'renovate[bot]'|'dependabot[bot]'|'github-actions[bot]'|'pre-commit-ci[bot]')
+              echo "::notice::$PR_AUTHOR is a known bot; the title convention is not enforced."
+              exit 0
+              ;;
+          esac
+
           pattern='^(feat|fix|docs|chore|refactor|test|ci|perf|style|bench)(\([a-z0-9-]+\))?: .+'
           if ! printf '%s' "$PR_TITLE" | grep -qE "$pattern"; then
             echo "::error::PR title must follow conventional commits."
