@@ -1,0 +1,9 @@
+# Ruff configuration. Keep in sync with requirements-dev.txt.
+target-version = "py312"
+
+[lint]
+# Ignore rules that were added after the pinned version or that apply to patterns deliberately used.
+# PLW1510: subprocess.run without check= — intentional, the caller inspects returncode.
+# ISC004: implicit string concatenation in a list — used for readable multi-line error messages.
+# PIE810: merge startswith calls — readability preference, not a defect.
+ignore = ["PLW1510", "ISC004", "PIE810"]

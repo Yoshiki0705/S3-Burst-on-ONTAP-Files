@@ -61,51 +61,73 @@ persistent session を使い、接続を再利用しています。
 
 ## ONTAP S3 NAS バケット（FlexCache duality）の検証
 
-### 結果: FSx for ONTAP では実質的に利用できない
+### 結果: 通常ボリュームでは動作、FlexCache ボリュームでは S3 データアクセス不可
 
-ONTAP 9.18.1 は FlexCache ボリュームに対する NAS バケット（S3 マルチプロトコル）を
-サポートしており、**NAS バケットの作成自体は成功しました。** ただし S3 ユーザーの作成が
-プラットフォーム制約で拒否されるため、**作成したバケットに ONTAP ネイティブの S3 経由で
-アクセスすることはできません。**
+検証は段階的に進め、結論が各段階で変わりました。最終状態を先に述べ、経過を後に置きます。
 
-| 操作 | S3 AP 有効 SVM | S3 AP 未使用 SVM |
+**通常ボリュームの NAS バケット: 完全に動作**（NFS 書き込み → ONTAP S3 読み取り、内容一致）。
+**FlexCache ボリュームの NAS バケット: 作成は成功するが、S3 データ操作は `AccessDenied`。**
+
+#### 通常ボリューム（NAS バケット読み取り: 成功）
+
+S3 AP を一度も使っていない SVM（`snapmirror-s3-test`）で、ONTAP CLI（SSH）経由で操作しました。
+REST API では S3 ユーザー作成が拒否されますが、CLI では成功します。
+
+| 操作 | 方法 | 結果 |
 |---|---|---|
-| S3 サービスの確認・作成 | `Only one object store server is supported per SVM`（FSx for ONTAP が内部で使用） | 既存サービスが利用可能（`enabled: true`） |
-| S3 ユーザーの作成 | `The user does not have permission` | **同じエラー** |
-| NAS バケットの作成 | `not authorized for that command` | **成功** |
-| NAS バケット経由のアクセス | — | ユーザーが作れないためアクセス不可 |
+| S3 サービス確認 | CLI | ✅ 既存（`sm-s3-server`、HTTP port 80、`up`） |
+| S3 ユーザー作成 | REST API | ❌ `The user does not have permission to access the requested resource` |
+| S3 ユーザー作成 | CLI `vserver object-store-server user create` | ✅ access key + secret key 取得 |
+| NAS バケット作成 | CLI | ✅（`type: nas`、`nas-path: /duality_test`） |
+| バケットポリシー | CLI | ✅ |
+| NFS 書き込み → `GetObject` | boto3 → `http://<data-lif>:80` | ✅ **成功。内容一致** |
+| `ListObjectsV2` | 同上 | ✅ オブジェクト一覧取得 |
+| `PutObject` | 同上 | ❌ `AccessDenied`（NAS バケットは読み取り専用ビュー、仕様どおり） |
 
-> **検証上の補足**: S3 AP 未使用の SVM（`snapmirror-s3-test`）では S3 サービスが存在し
-> NAS バケットの作成に成功しましたが（`type: nas`、`nas_path: /`）、S3 ユーザーの作成は
-> どの SVM でも `fsxadmin` から拒否されました。FSx for ONTAP では S3 の認証は AWS 側
-> （IAM + S3 Access Point ポリシー）で管理されるため、ONTAP ネイティブの S3 ユーザーは
-> 存在しない設計です。
+#### FlexCache ボリューム（NAS バケット: 作成成功、データアクセス不可）
 
-### これはプラットフォーム制約です
+| 操作 | 結果 |
+|---|---|
+| FlexVol Origin → FlexCache → NAS バケット作成 | ❌ `Only FlexCache volumes with FlexGroup origin volumes support NAS buckets` |
+| FlexGroup Origin 作成（CLI `-auto-provision-as flexgroup`） | ❌ `No suitable storage... Aggregates not matching FabricPool requirements: aggr1` |
+| FlexGroup Origin 作成（FSx for ONTAP API `VolumeStyle: FLEXGROUP`、200 GiB、`ConstituentsPerAggregate: 2`） | ✅ |
+| FlexGroup Origin → FlexCache 作成（50 GB） | ✅ |
+| FlexCache 上に NAS バケット作成 | ✅（`type: nas`、`nas-path: /duality_fc_fg`） |
+| バケットポリシー（`* / *` ワイルドカード） | ✅ |
+| `HeadBucket` | ✅ |
+| `ListObjectsV2` | ❌ **`AccessDenied`** |
+| `GetObject`（ファイルは NFS 経由で書き込み済み、権限 `644`） | ❌ **`AccessDenied`** |
 
-設定の誤りや手順の問題ではありません。FSx for ONTAP では:
+**同じ SVM、同じ S3 ユーザー、同じバケットポリシーで、通常ボリュームでは `GetObject` が
+成功し、FlexCache ボリュームでは拒否されます。** ファイルの UNIX パーミッションを
+world-readable にしても結果は変わりません。
 
-- S3 AP **未使用**の SVM であれば S3 サービスは存在し、NAS バケットの作成も可能
-- ただし **S3 ユーザーの作成はどの SVM でも `fsxadmin` から拒否される**
-- S3 のオブジェクトアクセスに対する認証は AWS 管理の IAM + S3 Access Point ポリシーで行われるため、
-  ONTAP ネイティブの S3 ユーザーという概念自体が FSx for ONTAP には存在しない
-- 結果として、NAS バケットを作成できても ONTAP ネイティブ S3 クライアントからアクセスする手段がない
+### 前回の結論からの訂正
+
+前回「S3 ユーザーが作れないためアクセス不可」と報告していました。これは REST API のみを
+試した時点の結論で、**ONTAP CLI（SSH）経由では S3 ユーザーの作成に成功します。**
+REST API と CLI で `fsxadmin` の権限マッピングが異なることが原因でした。
+
+### FSx for ONTAP 固有の制約（まとめ）
+
+| 項目 | 状態 |
+|---|---|
+| S3 AP 有効 SVM で ONTAP S3 を操作 | ❌ 権限が AWS 側に移される |
+| S3 AP 未使用 SVM で ONTAP S3 を操作（CLI） | ✅ |
+| S3 AP 未使用 SVM で ONTAP S3 を操作（REST API） | ❌ ユーザー作成が拒否される |
+| 通常ボリュームに NAS バケット → S3 読み取り | ✅ |
+| FlexCache ボリュームに NAS バケット → S3 読み取り | ❌ データアクセス `AccessDenied` |
+| FlexGroup を CLI で作成 | ❌ FabricPool アグリゲートとの互換性エラー |
+| FlexGroup を FSx for ONTAP API で作成 | ✅（最小 100 GiB / constituent） |
 
 ### この構成への影響
 
-**FlexCache duality（ONTAP ネイティブ S3 を Cache ボリュームに付ける）は、
-ベアメタル ONTAP / ONTAP Select / Cloud Volumes ONTAP のように
-クラスタ管理者が完全な権限を持つ環境でのみ利用可能です。**
+**FlexCache duality は、FSx for ONTAP 9.18.1P3D1 時点では FlexCache ボリューム上で
+S3 データアクセスが機能しません。** バケットの作成とメタデータ操作（`HeadBucket`）までは
+動作しますが、それ以上は進みません。
 
-FSx for ONTAP で Cache ボリュームに S3 アクセスを提供する唯一の経路は、
-FSx for ONTAP 管理の S3 Access Point を FlexCache ボリュームに接続することです。
-これは本リポジトリの[サポート状況](../support-matrix.md)が**未確認**としている項目であり、
-この構成の設計では意図的に使っていません。
-
-この結果は、**2 つの機構がさらに明確に分かれている**ことを実証しています。
-「ONTAP 9.18.1 で NAS バケットが FlexCache をサポートした」という事実は、
-「FSx for ONTAP ユーザーが FlexCache ボリュームに NAS バケットを作れる」ことを意味しません。
-プラットフォームの制約がそれを分離しています。
+この構成の「Cache 側に S3 を出さない」という設計判断は、
+現時点では制約による唯一の動作する選択肢でもあることが確認されました。
 
 ## 検証環境の状態
 

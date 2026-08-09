@@ -34,7 +34,7 @@ def pinned_provider_version() -> str:
     `required_version` first, which is a Terraform CLI constraint and legitimately a range.
     """
     versions = onprem_files()["versions.tf"]
-    block = re.search(r"required_providers\s*\{(.*?)\n  \}", versions, re.S)
+    block = re.search(r"required_providers\s*\{(.*?)\n  \}", versions, re.DOTALL)
     assert block, "required_providers block not found in versions.tf"
     match = re.search(r'version\s*=\s*"([^"]+)"', block.group(1))
     assert match, "no provider version found inside required_providers"
@@ -165,10 +165,10 @@ def test_the_ami_is_resolved_rather_than_hardcoded() -> None:
 def test_the_export_client_list_has_no_default() -> None:
     """An export rule is an access control decision; a default would be wrong for everyone."""
     variables = onprem_files()["variables.tf"]
-    block = re.search(r'variable "allowed_clients" \{(.*?)\n\}', variables, re.S)
+    block = re.search(r'variable "allowed_clients" \{(.*?)\n\}', variables, re.DOTALL)
     assert block, "allowed_clients variable not found"
     # Match an assignment, not the word: the description explains *why* there is no default.
-    assert not re.search(r"^\s*default\s*=", block.group(1), re.M), (
+    assert not re.search(r"^\s*default\s*=", block.group(1), re.MULTILINE), (
         "allowed_clients must not have a default"
     )
 
@@ -196,7 +196,7 @@ def test_mixed_security_style_is_not_offered_on_the_origin() -> None:
     match = re.search(
         r"OriginVolumeSecurityStyle:.*?AllowedValues:\s*(\[[^\]]*\])",
         aws_template(),
-        re.S,
+        re.DOTALL,
     )
     assert match, "OriginVolumeSecurityStyle AllowedValues not found"
     assert "MIXED" not in match.group(1)
@@ -215,7 +215,7 @@ def test_the_parameter_example_uses_placeholders() -> None:
 def test_the_tfvars_example_holds_no_password() -> None:
     """Terraform writes variable values into state in clear text, sensitive or not."""
     text = (ONPREM / "terraform.tfvars.example").read_text(encoding="utf-8")
-    assert not re.search(r"^\s*cache_cluster_password\s*=", text, re.M)
+    assert not re.search(r"^\s*cache_cluster_password\s*=", text, re.MULTILINE)
     assert "TF_VAR_cache_cluster_password" in text, (
         "point the reader at the environment instead"
     )

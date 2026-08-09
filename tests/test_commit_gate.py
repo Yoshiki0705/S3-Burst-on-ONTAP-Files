@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 
 import commit_gate as gate
-from conftest import REAL_LOOKING_ACCOUNT
 import pytest
+from conftest import REAL_LOOKING_ACCOUNT
 
 ROOT = Path(__file__).resolve().parent.parent
 

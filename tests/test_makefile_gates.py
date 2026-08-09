@@ -45,20 +45,20 @@ def text() -> str:
 
 def targets() -> list[str]:
     """Every explicit target defined in the Makefile, in order of appearance."""
-    found = re.findall(r"^([A-Za-z0-9_.\-]+):(?!=)", text(), re.M)
+    found = re.findall(r"^([A-Za-z0-9_.\-]+):(?!=)", text(), re.MULTILINE)
     return [t for t in dict.fromkeys(found) if not t.startswith(IGNORED_PREFIXES)]
 
 
 def declared() -> set[str]:
     """Every name listed in the Makefile's `.PHONY` declaration."""
-    match = re.search(r"^\.PHONY:((?:[^\n\\]*\\\n)*[^\n]*)", text(), re.M)
+    match = re.search(r"^\.PHONY:((?:[^\n\\]*\\\n)*[^\n]*)", text(), re.MULTILINE)
     if not match:
         return set()
     return set(match.group(1).replace("\\", " ").split())
 
 
 def prerequisites(target: str) -> set[str]:
-    match = re.search(rf"^{re.escape(target)}:([^\n#]*)", text(), re.M)
+    match = re.search(rf"^{re.escape(target)}:([^\n#]*)", text(), re.MULTILINE)
     if not match:
         return set()
     return {word for word in match.group(1).split() if not word.startswith("$")}
