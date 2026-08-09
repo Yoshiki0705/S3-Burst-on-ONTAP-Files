@@ -31,9 +31,16 @@ Three extension axes, each independent — one can grow without the others:
 | `patterns/serve/` | Fan-out to NFS / SMB over FlexCache |
 | `patterns/pipelines/` | Collect and serve combined, per workload |
 
-`docs/ja/` is canonical. `docs/en/` carries the hub only. A document's language is its directory;
-the exception is the Japanese hub, which is the root `README.md`, so `docs/ja/README.md` does not
-exist.
+`environments/` holds the verification environment, split by where it runs: `aws-origin/` is
+CloudFormation because the collect side is entirely AWS, and `onprem-cache/` is Terraform against
+ONTAP because the cache side can be anywhere. Neither creates cluster or SVM peering — that is
+network topology owned outside this repository, and its absence is the most common reason a FlexCache
+creation fails.
+
+`docs/ja/` is canonical. `docs/en/` carries the hub and the deployment guides; the guides are
+translated because a reader follows them while creating billable resources and needs the teardown
+order in their own language. A document's language is its directory; the exception is the Japanese
+hub, which is the root `README.md`, so `docs/ja/README.md` does not exist.
 
 ## The fixed architecture — do not deviate
 
@@ -250,6 +257,9 @@ Automated checks catch syntax. These catch design-level problems.
 | [docs/ja/verification-status.md](docs/ja/verification-status.md) | The four stages and the current state of each claim |
 | [docs/ja/portability.md](docs/ja/portability.md) | Replacing either layer per platform, and what stays unconfirmed |
 | [docs/ja/poc-checklist.md](docs/ja/poc-checklist.md) | What to confirm, in the order that unblocks design |
+| [docs/ja/verification/s3ap-nfs-visibility.md](docs/ja/verification/s3ap-nfs-visibility.md) | The one measurement taken so far, its conditions, and what it does **not** answer |
+| [docs/ja/deployment/aws-cloudformation.md](docs/ja/deployment/aws-cloudformation.md) | Deploying the collect side, and the teardown order |
+| [docs/ja/deployment/onprem-terraform.md](docs/ja/deployment/onprem-terraform.md) | Deploying the serve side, and why peering is not created for you |
 | [docs/ja/reference/glossary/object-access-on-ontap.md](docs/ja/reference/glossary/object-access-on-ontap.md) | The mechanisms named "S3 over files", and which inferences do not hold |
 | [docs/ja/reference/comparison/alternatives.md](docs/ja/reference/comparison/alternatives.md) | Every option's suited and unsuited conditions, this one included |
 | [docs/ja/reference/decision-trees/choosing-this-architecture.md](docs/ja/reference/decision-trees/choosing-this-architecture.md) | Whether to adopt this architecture |

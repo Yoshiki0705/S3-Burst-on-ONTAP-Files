@@ -1,0 +1,544 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# Collect-side (origin) verification environment for S3 Burst on ONTAP Files.
+#
+# This deploys the AWS half of the architecture: the Amazon FSx for NetApp ONTAP file system that
+# holds the origin volume, an SVM, the origin volume itself, and a Linux host inside the same subnet
+# from which the verification is run.
+#
+# Why the host is part of the template rather than an afterthought:
+#
+#   * The ONTAP management endpoint is reachable only from inside the VPC. Every ONTAP REST or CLI
+#     step — including creating a FlexCache relationship, which has no AWS API at all — has to run
+#     from in-VPC. Without a host in the template, the first thing anybody does is improvise one.
+#   * Measuring when a write on one protocol becomes visible on the other requires the write and the
+#     read to share a clock. Two hosts means comparing two clocks, and at the millisecond scale that
+#     is not a measurement.
+#
+# The S3 Access Point is deliberately *not* here. CloudFormation has no native resource for
+# attaching one to an FSx for ONTAP volume, so it is created with the CLI after this stack settles.
+# See docs/ja/deployment/aws-cloudformation.md. Inventing a custom resource to hide that would put a
+# Lambda in the trust path of every deployment for one API call.
+Description: >-
+  S3 Burst on ONTAP Files — collect-side (origin) verification environment.
+  FSx for NetApp ONTAP file system, SVM, origin volume, and an in-VPC verification host.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Network
+        Parameters:
+          - VpcId
+          - SubnetId
+      - Label:
+          default: FSx for ONTAP
+        Parameters:
+          - FileSystemName
+          - StorageCapacityGiB
+          - ThroughputCapacityMBps
+          - SvmName
+          - OriginVolumeName
+          - OriginVolumeSizeMB
+          - OriginVolumeSecurityStyle
+      - Label:
+          default: Verification host
+        Parameters:
+          - DeployVerificationHost
+          - HostInstanceType
+          - HostVolumeSizeGiB
+      - Label:
+          default: Tagging
+        Parameters:
+          - ProjectName
+          - Environment
+    ParameterLabels:
+      OriginVolumeSecurityStyle:
+        default: Origin volume security style (decides the fan-out protocol)
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to deploy into.
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      Subnet for both the file system and the verification host. Deliberately one subnet: the host
+      has to reach the ONTAP management endpoint, and a single-AZ deployment keeps the measurement
+      free of cross-AZ latency.
+
+  FileSystemName:
+    Type: String
+    Default: s3burst-origin
+    AllowedPattern: "^[a-z][a-z0-9-]{1,30}[a-z0-9]$"
+    Description: Name tag for the file system.
+
+  StorageCapacityGiB:
+    Type: Number
+    Default: 1024
+    MinValue: 1024
+    MaxValue: 65536
+    Description: >-
+      SSD capacity. 1024 GiB is the documented minimum for a single HA pair. Note that SSD capacity
+      is billed on what is provisioned, not on what is used.
+
+  ThroughputCapacityMBps:
+    Type: Number
+    Default: 128
+    AllowedValues: [128, 256, 512, 1024, 2048, 4096]
+    Description: >-
+      Provisioned throughput, billed whether or not it is used. 128 is enough to observe visibility
+      behaviour; it is not enough to characterise throughput, and this stack is not sized for that.
+
+  SvmName:
+    Type: String
+    Default: origin_svm
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{1,46}$"
+    Description: >-
+      SVM name. ONTAP accepts only alphanumerics and underscores here, which is why this pattern
+      differs from the hyphenated names used elsewhere in the stack.
+
+  OriginVolumeName:
+    Type: String
+    Default: origin_vol
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{1,46}$"
+    Description: Origin volume name. Alphanumerics and underscores only.
+
+  OriginVolumeSizeMB:
+    Type: Number
+    Default: 10240
+    MinValue: 20
+    Description: Origin volume size in MiB.
+
+  OriginVolumeSecurityStyle:
+    Type: String
+    Default: UNIX
+    AllowedValues: [UNIX, NTFS]
+    Description: >-
+      UNIX pairs with NFS on the fan-out side, NTFS pairs with SMB. MIXED is deliberately not
+      offered: it is reported as unsupported for cache volumes, and the choice is treated as
+      inherited at cache creation time rather than settable on the cache. Decide this before the
+      volume exists — changing it later means rebuilding the serve layer. NTFS additionally requires
+      the SVM to be joined to Active Directory, which this template does not do.
+
+  DeployVerificationHost:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Set to false if you already have an in-VPC host. Without one, no ONTAP-level step and no
+      single-clock measurement is possible.
+
+  HostInstanceType:
+    Type: String
+    Default: t3.small
+    Description: >-
+      The host runs an NFS client and the AWS CLI. It is not in the measurement path for throughput,
+      so it does not need to be large.
+
+  HostVolumeSizeGiB:
+    Type: Number
+    Default: 20
+    MinValue: 8
+    Description: Root volume size for the verification host.
+
+  ProjectName:
+    Type: String
+    Default: s3-burst-on-ontap-files
+    Description: Applied as a tag to every resource.
+
+  Environment:
+    Type: String
+    Default: verify
+    AllowedValues: [verify, dev, stg]
+    Description: >-
+      Applied as a tag. There is no prod value on purpose — this stack builds a verification
+      environment and should not be mistaken for a production pattern.
+
+Conditions:
+  WantHost: !Equals [!Ref DeployVerificationHost, "true"]
+
+Resources:
+  # ---------------------------------------------------------------------------------------------
+  # ONTAP administrative credential
+  #
+  # Generated here and never printed. The gap this closes is concrete: in an existing verification
+  # account the fsxadmin secret named a file system that no longer existed, so the ONTAP-only steps
+  # could not be run at all and the FlexCache half of the verification stalled. A file system whose
+  # credential is created alongside it does not develop that problem.
+  # ---------------------------------------------------------------------------------------------
+  OntapAdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${FileSystemName}/fsxadmin"
+      Description: !Sub "fsxadmin credential for the ${FileSystemName} FSx for ONTAP file system."
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"fsxadmin"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        # ONTAP rejects several punctuation characters in this password, and the failure surfaces
+        # during file system creation rather than at validation time.
+        ExcludeCharacters: '"@/\:;,`$'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ---------------------------------------------------------------------------------------------
+  # FSx for ONTAP
+  # ---------------------------------------------------------------------------------------------
+  FileSystem:
+    Type: AWS::FSx::FileSystem
+    # A deletion policy of Delete is correct for a verification environment and wrong for anything
+    # else. Note that no immutability feature is enabled anywhere in this template: SnapLock,
+    # tamperproof snapshots and their retention parameters are absent on purpose, because enabling
+    # one makes the volume, its SVM and the whole file system undeletable for the retention period.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      FileSystemType: ONTAP
+      StorageType: SSD
+      StorageCapacity: !Ref StorageCapacityGiB
+      SubnetIds:
+        - !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref FileSystemSecurityGroup
+      OntapConfiguration:
+        DeploymentType: SINGLE_AZ_1
+        ThroughputCapacity: !Ref ThroughputCapacityMBps
+        PreferredSubnetId: !Ref SubnetId
+        FsxAdminPassword: !Sub "{{resolve:secretsmanager:${OntapAdminSecret}:SecretString:password}}"
+      Tags:
+        - Key: Name
+          Value: !Ref FileSystemName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  StorageVirtualMachine:
+    Type: AWS::FSx::StorageVirtualMachine
+    Properties:
+      FileSystemId: !Ref FileSystem
+      Name: !Ref SvmName
+      RootVolumeSecurityStyle: !Ref OriginVolumeSecurityStyle
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  OriginVolume:
+    Type: AWS::FSx::Volume
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Ref OriginVolumeName
+      VolumeType: ONTAP
+      OntapConfiguration:
+        StorageVirtualMachineId: !Ref StorageVirtualMachine
+        SizeInMegabytes: !Ref OriginVolumeSizeMB
+        SecurityStyle: !Ref OriginVolumeSecurityStyle
+        JunctionPath: !Sub "/${OriginVolumeName}"
+        StorageEfficiencyEnabled: true
+        OntapVolumeType: RW
+        SnapshotPolicy: default
+        TieringPolicy:
+          Name: SNAPSHOT_ONLY
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ---------------------------------------------------------------------------------------------
+  # Security groups
+  #
+  # Two groups referencing each other rather than a CIDR, so the rules stay correct if the subnet is
+  # re-addressed, and so nothing outside the stack gains access by being in the right range.
+  # ---------------------------------------------------------------------------------------------
+  FileSystemSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${FileSystemName} FSx for ONTAP. Ingress from the verification host only."
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: ONTAP needs outbound for its own service traffic.
+      Tags:
+        - Key: Name
+          Value: !Sub "${FileSystemName}-fsx"
+        - Key: Project
+          Value: !Ref ProjectName
+
+  HostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: WantHost
+    Properties:
+      GroupDescription: !Sub "${FileSystemName} verification host. No inbound, access is via SSM."
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: >-
+            Outbound for SSM, Secrets Manager, the S3 data path and package installation. No inbound
+            rule exists at all — the host is reached through Session Manager, so it needs no open
+            port and no key pair.
+      Tags:
+        - Key: Name
+          Value: !Sub "${FileSystemName}-verify-host"
+        - Key: Project
+          Value: !Ref ProjectName
+
+  FsxFromHostNfs:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: NFS data.
+
+  FsxFromHostPortmap:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 111
+      ToPort: 111
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: rpcbind, required by NFSv3.
+
+  FsxFromHostMount:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 635
+      ToPort: 635
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: mountd, required by NFSv3.
+
+  FsxFromHostNlm:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 4045
+      ToPort: 4046
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: NLM and NSM, required for NFSv3 locking.
+
+  FsxFromHostManagement:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: >-
+        ONTAP REST API. This is the only route to FlexCache, which has no AWS API, so a stack without
+        this rule cannot complete the serve side.
+
+  FsxFromHostSsh:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantHost
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      SourceSecurityGroupId: !Ref HostSecurityGroup
+      Description: ONTAP CLI over SSH, for the steps the REST API does not cover.
+
+  # ---------------------------------------------------------------------------------------------
+  # Verification host
+  # ---------------------------------------------------------------------------------------------
+  HostRole:
+    Type: AWS::IAM::Role
+    Condition: WantHost
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: read-ontap-credential
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Scoped to this stack's secret. The instance needs it because every ONTAP-level step
+              # runs from here; in an existing account the instance role could not read the fsxadmin
+              # secret at all, which is what stopped the FlexCache work.
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref OntapAdminSecret
+        - PolicyName: describe-this-file-system
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # The Describe* calls do not accept resource-level conditions, so they are granted on
+              # "*" and kept read-only. Nothing here can change or delete a file system.
+              - Effect: Allow
+                Action:
+                  - fsx:DescribeFileSystems
+                  - fsx:DescribeStorageVirtualMachines
+                  - fsx:DescribeVolumes
+                  - fsx:DescribeS3AccessPointAttachments
+                Resource: "*"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  HostProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: WantHost
+    Properties:
+      Roles:
+        - !Ref HostRole
+
+  VerificationHost:
+    Type: AWS::EC2::Instance
+    Condition: WantHost
+    Properties:
+      # Resolved from the SSM public parameter rather than a hardcoded AMI ID, which is Region- and
+      # date-specific and is the usual reason a template stops deploying months later.
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      InstanceType: !Ref HostInstanceType
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref HostProfile
+      SecurityGroupIds:
+        - !Ref HostSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref HostVolumeSizeGiB
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      MetadataOptions:
+        HttpTokens: required
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          dnf install -y nfs-utils jq >/dev/null 2>&1 || yum install -y nfs-utils jq >/dev/null 2>&1
+
+          # Two mount points, because the client cache decides what a reader sees and the difference
+          # is large. With Linux defaults (acdirmin=30, acdirmax=60) a file that appears in a
+          # directory the client has already listed can stay invisible for up to a minute — measured
+          # at over two seconds for a delete, and a completed multipart object was still absent
+          # after three. actimeo=0 shows what the storage is actually doing.
+          mkdir -p /mnt/origin-noac /mnt/origin-cached
+          cat >/etc/profile.d/s3burst.sh <<'PROFILE'
+          export S3BURST_NFS_NOAC=/mnt/origin-noac
+          export S3BURST_NFS_CACHED=/mnt/origin-cached
+          echo "mount with:"
+          echo "  sudo mount -t nfs -o nfsvers=3,actimeo=0 <svm-nfs-ip>:/${OriginVolumeName} /mnt/origin-noac"
+          echo "  sudo mount -t nfs -o nfsvers=3          <svm-nfs-ip>:/${OriginVolumeName} /mnt/origin-cached"
+          PROFILE
+      Tags:
+        - Key: Name
+          Value: !Sub "${FileSystemName}-verify-host"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  FileSystemId:
+    Description: FSx for ONTAP file system holding the origin volume.
+    Value: !Ref FileSystem
+
+  HowToReadTheOntapVersion:
+    Description: >-
+      Every published measurement has to state the ONTAP version, and CloudFormation cannot supply
+      it: AWS::FSx::FileSystem exposes only ResourceARN, Id, DNSName, RootVolumeId and
+      LustreMountName, so there is no attribute to output. The FSx for ONTAP API is not dependable
+      either — on
+      an existing file system DescribeFileSystems omitted FileSystemTypeVersion entirely. The
+      reliable source is ONTAP itself, which is why this stack ships the credential and the port to
+      reach it.
+    Value: !Sub >-
+      aws fsx describe-file-systems --region ${AWS::Region} --file-system-ids ${FileSystem}
+      --query 'FileSystems[0].FileSystemTypeVersion' ; if that is null, from the verification host:
+      curl -s -k -u fsxadmin:<secret> https://management.${FileSystem}.fsx.${AWS::Region}.amazonaws.com/api/cluster?fields=version
+
+  ManagementEndpoint:
+    Description: >-
+      ONTAP management endpoint, reachable from inside the VPC only. Composed rather than read from
+      an attribute, because the file system exposes no management-endpoint attribute.
+    Value: !Sub "management.${FileSystem}.fsx.${AWS::Region}.amazonaws.com"
+
+  HowToReadTheNfsEndpoint:
+    Description: >-
+      AWS::FSx::StorageVirtualMachine returns only ResourceARN, UUID and StorageVirtualMachineId, so
+      the NFS endpoint cannot be output either. Read it after the stack settles.
+    Value: !Sub >-
+      aws fsx describe-storage-virtual-machines --region ${AWS::Region}
+      --storage-virtual-machine-ids ${StorageVirtualMachine}
+      --query 'StorageVirtualMachines[0].Endpoints.Nfs.IpAddresses[0]' --output text
+
+  StorageVirtualMachineId:
+    Description: SVM that owns the origin volume.
+    Value: !Ref StorageVirtualMachine
+
+  OriginVolumeId:
+    Description: Origin volume. Attach the S3 Access Point to this one, and nothing else.
+    Value: !Ref OriginVolume
+
+  OriginJunctionPath:
+    Description: Junction path of the origin volume.
+    Value: !Sub "/${OriginVolumeName}"
+
+  SecurityStyle:
+    Description: >-
+      Security style of the origin volume, which bears on the protocol the fan-out side can use.
+    Value: !Ref OriginVolumeSecurityStyle
+
+  OntapAdminSecretArn:
+    Description: >-
+      Secret holding the fsxadmin credential. Only the verification host can read it. Never print the
+      value into a log, an issue or a commit.
+    Value: !Ref OntapAdminSecret
+
+  VerificationHostId:
+    Condition: WantHost
+    Description: >-
+      Verification host. Connect with Session Manager; it has no inbound rule and no key pair.
+    Value: !Ref VerificationHost
+
+  CreateAccessPointCommand:
+    Description: >-
+      CloudFormation has no resource for attaching an S3 Access Point to an FSx for ONTAP volume, so
+      it is created out of band. Pass a JSON file rather than positional arguments — the positional
+      form of --ontap-configuration parses unreliably.
+    Value: !Sub >-
+      aws fsx create-and-attach-s3-access-point --region ${AWS::Region}
+      --cli-input-json file://access-point.json
+      # set Name, OpenZFSConfiguration=null, and OntapConfiguration.VolumeId=${OriginVolume}
+
+  NextStep:
+    Description: What to do once this stack is CREATE_COMPLETE.
+    Value: >-
+      Follow docs/ja/deployment/aws-cloudformation.md: create the S3 Access Point, mount the origin
+      volume on the verification host, then deploy the serve side with
+      environments/onprem-cache/ before running the end-to-end checks in docs/ja/poc-checklist.md.
+

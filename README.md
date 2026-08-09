@@ -57,10 +57,16 @@ Origin のセキュリティスタイルがファンアウト先のプロトコ�
 | 何がどこまで確かめられているか知る | [検証状況](docs/ja/verification-status.md) | 5 分 |
 | 対応バージョンと制約を調べる | [サポート状況](docs/ja/support-matrix.md) | 10 分 |
 | 用語の違いを確認する | [用語の整理](docs/ja/reference/glossary/object-access-on-ontap.md) | 5 分 |
+| 検証環境をデプロイする（AWS 側） | [収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md) | 40 分 |
+| 検証環境をデプロイする（AWS 以外） | [配布側のデプロイ](docs/ja/deployment/onprem-terraform.md) | 40 分 |
+| 実測値と測定条件を見る | [検証記録](docs/ja/verification/s3ap-nfs-visibility.md) | 10 分 |
 | 実機で確かめる | [PoC チェックリスト](docs/ja/poc-checklist.md) | 10 分 |
 
-> **この構成の中核は未検証です。** S3 Access Point 経由で書いたオブジェクトが Cache 側の
-> NFS / SMB でいつ・どう見えるかは、まだ実機で確かめていません。
+> **この構成の中核は未検証です。** S3 Access Point 経由で書いたオブジェクトが **FlexCache の
+> Cache ボリューム**でいつ・どう見えるかは、まだ実機で確かめていません。
+> 同一ボリュームを S3 と NFS の両方から読み書きする部分は実測済みで、S3 → NFS が p50 9 ms、
+> NFS → S3 が p50 873 ms でした（[検証記録](docs/ja/verification/s3ap-nfs-visibility.md)）。
+> **これは FlexCache の答えではありません。**
 > 未検証と未確認の区別は[検証状況](docs/ja/verification-status.md)に明示してあります。
 > 実測していない性能値・コスト値はこのリポジトリには書きません。
 

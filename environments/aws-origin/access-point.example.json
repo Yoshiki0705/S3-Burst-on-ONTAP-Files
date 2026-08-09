@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "Input for: aws fsx create-and-attach-s3-access-point --cli-input-json file://access-point.json",
+    "",
+    "Pass a file rather than positional arguments. The positional form of --ontap-configuration",
+    "parses unreliably, and the resulting error does not point at the quoting as the cause.",
+    "",
+    "There is no CloudFormation resource for attaching an S3 Access Point to an FSx for ONTAP",
+    "volume, which is why this step sits outside the template instead of inside it.",
+    "",
+    "Copy to access-point.json, replace the placeholders, and delete this _comment key: the API",
+    "rejects unknown top-level members.",
+    "",
+    "Attach the access point to the ORIGIN volume only. This architecture serves the cache side over",
+    "NFS or SMB and puts no object access on it."
+  ],
+
+  "Name": "s3burst-origin-ap",
+
+  "OpenZFSConfiguration": null,
+
+  "OntapConfiguration": {
+    "VolumeId": "fsvol-0123456789abcdef0",
+
+    "_FileSystemIdentity_comment": [
+      "Every request through the access point is authorized as this one file system identity, so the",
+      "per-file ownership on the volume does not carry into anything reading through it. Scope access",
+      "with the access point policy and IAM, not with file permissions.",
+      "",
+      "UNIX pairs with a UNIX security style volume and NFS on the fan-out side. For NTFS and SMB use",
+      "a WINDOWS identity, which requires the SVM to be joined to Active Directory — and then every",
+      "data operation through the access point needs a reachable domain controller. HeadBucket still",
+      "succeeds when the controller is unreachable, so it cannot be used to check that.",
+      "",
+      "Delete the _comment keys before use."
+    ],
+    "FileSystemIdentity": {
+      "Type": "UNIX",
+      "UnixUser": {
+        "Uid": 0,
+        "Gid": 0
+      }
+    }
+  },
+
+  "S3AccessPoint": {
+    "_NetworkOrigin_comment": [
+      "Immutable after creation. VPC restricts the access point to a VPC; Internet makes it reachable",
+      "from outside and is NOT reachable through an S3 Gateway VPC endpoint.",
+      "",
+      "For a single-host measurement, VPC with the verification host's VPC keeps the write and the",
+      "read on one clock and off the public internet. Replace the whole VpcConfiguration block with",
+      "\"NetworkOrigin\": \"Internet\" only if you need to write from outside."
+    ],
+    "VpcConfiguration": {
+      "VpcId": "vpc-0123456789abcdef0"
+    },
+
+    "Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"AllowVerificationHost\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::123456789012:role/s3burst-verify-host-role\"},\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\",\"s3:ListBucket\",\"s3:AbortMultipartUpload\",\"s3:ListBucketMultipartUploads\",\"s3:ListMultipartUploadParts\"],\"Resource\":[\"arn:aws:s3:ap-northeast-1:123456789012:accesspoint/s3burst-origin-ap\",\"arn:aws:s3:ap-northeast-1:123456789012:accesspoint/s3burst-origin-ap/object/*\"]}]}"
+  }
+}

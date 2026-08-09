@@ -19,7 +19,10 @@
 | FSx for ONTAP の S3 Access Point の対応オペレーションと実測サイズ上限 | 検証済み | 姉妹リポジトリ [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) での実測。単一 `PutObject` 5 GiB、オブジェクト全体 50 GiB、上限は `CompleteMultipartUpload` の時点で判定される |
 | Active Directory 参加 SVM では S3 Access Point の全データ操作に AD ドメインコントローラー到達性が必要 | 検証済み | 同リポジトリ。`HeadBucket` は AD 到達不能でも成功するため偽陽性になる |
 | FSx for ONTAP を Origin、オンプレミス ONTAP を Cache とする FlexCache | ドキュメント記載 / 実機未検証 | AWS の[対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)に記載 |
-| S3 Access Point 経由で書いたオブジェクトが Cache 側の NFS / SMB でどう見えるか（反映の所要時間、多段アップロード中の可視性） | 未検証 | この構成の中核。最優先で検証する |
+| S3 Access Point 経由で書いたオブジェクトが **同一ボリューム**の NFS でどう見えるか | 検証済み | [検証記録](verification/s3ap-nfs-visibility.md)。2026-08-09、ap-northeast-1、SINGLE_AZ_1 / 128 MBps、UNIX、NFSv3、`actimeo=0`、n=30。S3 → NFS は p50 9 ms、NFS → S3 は p50 873 ms（64 B）。**ONTAP バージョンは特定できず**（同記録に理由） |
+| マルチパートアップロード中の部分オブジェクトがファイル側に見えるか | 検証済み | 同記録。`CompleteMultipartUpload` まで NFS 側に現れない |
+| NFS クライアントのマウントオプションが可視性に与える影響 | 検証済み | 同記録。削除の反映が `actimeo=0` で 7 ms、既定マウントで 2,171 ms。既定は `acdirmin=30` / `acdirmax=60` |
+| S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | 未検証 | この構成の中核。最優先で検証する。**上の同一ボリュームの測定はこの問いの答えではない** |
 | セキュリティスタイルとファンアウト先プロトコルの対応、および Cache 作成時の継承 | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路で同じ規則が成り立つかは確かめていない（[最初に決めること](design-first-decisions.md)） |
 | FSx for ONTAP を Origin としたときの Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes の Cache 可否 | 未確認 | AWS の対応構成表に記載がない |
 | Origin あたりの Cache 数を増やしたときの挙動 | 未検証 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨しており、ファンアウト数の設計に影響する可能性がある |
@@ -45,6 +48,22 @@
 > Cache 側の NFS から読めるまでの所要時間として測定値が記載されている。このリポジトリでは
 > 上表のとおり未検証として扱う。測定条件（クラスタ構成、キャッシュの設定、オブジェクトサイズ）が
 > この構成の主経路と一致するかを確かめていないためで、数値の正しさを否定するものではない。
+
+> **同一ボリュームの測定を FlexCache の答えとして読まないこと**: [検証記録](verification/s3ap-nfs-visibility.md)
+> の数値は、1 つのボリュームに S3 Access Point と NFS の両方からアクセスした場合のものである。
+> FlexCache を経由していない。前者は後者の前提条件だが、前者の数値を後者の答えとして
+> 引用することはできない。この 2 つを区別することが、この表がある理由の半分である。
+
+### ONTAP バージョンを併記できなかった件
+
+上の測定では ONTAP のバージョンを特定できなかった。FSx for ONTAP の `DescribeFileSystems` が対象の
+既存ファイルシステムに対して `FileSystemTypeVersion` を返さず、ONTAP の REST API は
+資格情報なしにバージョンを返さないためである。
+
+**この穴は環境を新しく作れば塞がる。**
+[収集側のテンプレート](../../environments/aws-origin/template.yaml)は `fsxadmin` の資格情報を
+ファイルシステムと同時に作り、検証ホストからそれを読めるようにし、ONTAP の 443 番ポートへの
+経路を用意している。既存環境を借りて測ると、この種の情報が後から手に入らないことがある。
 
 ## 段階を上げるとき
 

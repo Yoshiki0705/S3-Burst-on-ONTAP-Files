@@ -56,11 +56,17 @@ nothing to lose if it does not. Detail and sources are in
 | See how far each claim is confirmed | [Verification status](../ja/verification-status.md) | 5 min |
 | Look up versions and constraints | [Support matrix](../ja/support-matrix.md) | 10 min |
 | Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](../ja/reference/glossary/object-access-on-ontap.md) | 5 min |
+| Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
+| Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
+| Read the measured figures and their conditions | [Verification record](../ja/verification/s3ap-nfs-visibility.md) | 10 min |
 | Confirm it on real hardware | [PoC checklist](../ja/poc-checklist.md) | 10 min |
 
 > **The central claim of this architecture is unverified.** When and how an object written through
-> the S3 Access Point becomes visible over NFS / SMB on the cache side has not yet been confirmed on
-> real hardware. The difference between "unverified" and "unconfirmed" is stated explicitly in
+> the S3 Access Point becomes visible on a **FlexCache cache volume** has not yet been confirmed on
+> real hardware. Reading and writing the *same* volume over both S3 and NFS has been measured — p50
+> 9 ms for S3 to NFS and p50 873 ms for the reverse
+> ([verification record](../ja/verification/s3ap-nfs-visibility.md), Japanese).
+> **That is not the FlexCache answer.** The difference between "unverified" and "unconfirmed" is stated explicitly in
 > [Verification status](../ja/verification-status.md). Performance and cost figures that were not
 > measured are not published here.
 
