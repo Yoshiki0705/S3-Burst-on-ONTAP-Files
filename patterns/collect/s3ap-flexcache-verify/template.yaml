@@ -1,0 +1,340 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  S3 Burst on ONTAP Files — Verification Environment (Existing FS Pattern).
+  Creates VPC peering, security group rules, a test volume, and an EC2 host for
+  NFS/SMB/S3 AP visibility measurement. Requires two existing FSx for ONTAP file
+  systems (origin + cache) in separate VPCs within the same account and region.
+
+  Post-deploy steps (ONTAP CLI + aws fsx CLI) are required for FlexCache and S3 AP
+  because CloudFormation does not natively support these resources.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Origin File System
+        Parameters:
+          - OriginFileSystemId
+          - OriginVpcId
+          - OriginVpcCidr
+          - OriginSubnetId
+          - OriginRouteTableId
+          - OriginSecurityGroupId
+          - OriginSvmId
+          - OriginSvmName
+      - Label:
+          default: Cache File System
+        Parameters:
+          - CacheFileSystemId
+          - CacheVpcId
+          - CacheVpcCidr
+          - CacheSubnetId
+          - CacheRouteTableId
+          - CacheSecurityGroupId
+          - CacheSvmName
+      - Label:
+          default: Test Host
+        Parameters:
+          - InstanceType
+          - LatestAmiId
+      - Label:
+          default: Volume Configuration
+        Parameters:
+          - OriginVolumeName
+          - OriginVolumeSizeMB
+          - SecurityStyle
+
+Parameters:
+  # --- Origin ---
+  OriginFileSystemId:
+    Type: String
+    AllowedPattern: "^fs-[0-9a-f]{17}$"
+  OriginVpcId:
+    Type: AWS::EC2::VPC::Id
+  OriginVpcCidr:
+    Type: String
+    Description: "CIDR block of the origin VPC (e.g. 192.168.0.0/16)"  # allow:pii
+    AllowedPattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"
+  OriginSubnetId:
+    Type: AWS::EC2::Subnet::Id
+  OriginRouteTableId:
+    Type: String
+    Description: Route table ID for the origin subnet
+  OriginSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  OriginSvmId:
+    Type: String
+    Description: "SVM ID on the origin (e.g. svm-0123456789abcdef0)"
+  OriginSvmName:
+    Type: String
+    Default: svm1
+    Description: SVM name on the origin cluster
+
+  # --- Cache ---
+  CacheFileSystemId:
+    Type: String
+    AllowedPattern: "^fs-[0-9a-f]{17}$"
+  CacheVpcId:
+    Type: AWS::EC2::VPC::Id
+  CacheVpcCidr:
+    Type: String
+    Description: "CIDR block of the cache VPC (e.g. 10.128.0.0/16)"  # allow:pii
+    AllowedPattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"
+  CacheSubnetId:
+    Type: AWS::EC2::Subnet::Id
+  CacheRouteTableId:
+    Type: String
+    Description: Route table ID for the cache subnet
+  CacheSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  CacheSvmName:
+    Type: String
+    Default: svm1
+
+  # --- Test host ---
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+  # --- Volume ---
+  OriginVolumeName:
+    Type: String
+    Default: s3burst_verify
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]*$"
+  OriginVolumeSizeMB:
+    Type: Number
+    Default: 5120
+    MinValue: 1024
+  SecurityStyle:
+    Type: String
+    Default: UNIX
+    AllowedValues: [UNIX, NTFS]
+    Description: "UNIX for NFS + S3 AP (recommended). NTFS for SMB-primary."
+
+Resources:
+  # --- VPC Peering ---
+  VpcPeering:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref CacheVpcId
+      PeerVpcId: !Ref OriginVpcId
+      Tags:
+        - Key: Name
+          Value: !Sub s3burst-verify-${AWS::StackName}
+
+  CacheToOriginRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcPeering
+    Properties:
+      RouteTableId: !Ref CacheRouteTableId
+      DestinationCidrBlock: !Ref OriginVpcCidr
+      VpcPeeringConnectionId: !Ref VpcPeering
+
+  OriginToCacheRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcPeering
+    Properties:
+      RouteTableId: !Ref OriginRouteTableId
+      DestinationCidrBlock: !Ref CacheVpcCidr
+      VpcPeeringConnectionId: !Ref VpcPeering
+
+  # --- Security Group Rules ---
+  # Cache SG: allow from Origin VPC
+  CacheSgIntercluster:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CacheSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 10000
+      ToPort: 10000
+      CidrIp: !Ref OriginVpcCidr
+      Description: ONTAP intercluster
+  CacheSgInterclusterData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CacheSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 11104
+      ToPort: 11105
+      CidrIp: !Ref OriginVpcCidr
+      Description: ONTAP intercluster data
+  CacheSgNfs:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CacheSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      CidrIp: !Ref OriginVpcCidr
+      Description: NFS
+  CacheSgSmb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CacheSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 445
+      ToPort: 445
+      CidrIp: !Ref OriginVpcCidr
+      Description: SMB
+
+  # Origin SG: allow from Cache VPC
+  OriginSgIntercluster:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 10000
+      ToPort: 10000
+      CidrIp: !Ref CacheVpcCidr
+      Description: ONTAP intercluster
+  OriginSgInterclusterData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 11104
+      ToPort: 11105
+      CidrIp: !Ref CacheVpcCidr
+      Description: ONTAP intercluster data
+  OriginSgNfs:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      CidrIp: !Ref CacheVpcCidr
+      Description: NFS
+  OriginSgSmb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 445
+      ToPort: 445
+      CidrIp: !Ref CacheVpcCidr
+      Description: SMB
+  OriginSgOntapApi:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Ref CacheVpcCidr
+      Description: ONTAP REST API
+
+  # --- Test Host (in cache VPC, access via SSM) ---
+  TestHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: s3burst-verify
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3AP
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:HeadBucket
+                Resource: "*"
+              - Sid: Secrets
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*"
+      Tags:
+        - Key: Purpose
+          Value: s3burst-verification
+
+  TestHostProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref TestHostRole
+
+  TestHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      SubnetId: !Ref CacheSubnetId
+      IamInstanceProfile: !Ref TestHostProfile
+      SecurityGroupIds:
+        - !Ref CacheSecurityGroupId
+      Tags:
+        - Key: Name
+          Value: !Sub s3burst-verify-${AWS::StackName}
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          dnf install -y nfs-utils cifs-utils sshpass python3-pip
+          pip3 install boto3
+          mkdir -p /opt/s3burst
+          echo "Setup complete" > /opt/s3burst/.ready
+
+  # --- Origin Volume ---
+  OriginVolume:
+    Type: AWS::FSx::Volume
+    Properties:
+      Name: !Ref OriginVolumeName
+      VolumeType: ONTAP
+      OntapConfiguration:
+        JunctionPath: !Sub /${OriginVolumeName}
+        SizeInMegabytes: !Ref OriginVolumeSizeMB
+        StorageVirtualMachineId: !Ref OriginSvmId
+        StorageEfficiencyEnabled: true
+        SecurityStyle: !Ref SecurityStyle
+        TieringPolicy:
+          CoolingPeriod: 31
+          Name: AUTO
+      Tags:
+        - Key: Purpose
+          Value: s3burst-verification
+
+Outputs:
+  VpcPeeringId:
+    Value: !Ref VpcPeering
+  TestHostInstanceId:
+    Description: Connect via SSM Session Manager
+    Value: !Ref TestHost
+  OriginVolumeId:
+    Description: Attach S3 AP to this volume
+    Value: !Ref OriginVolume
+  PostDeploySteps:
+    Description: Steps to complete after stack creation
+    Value: !Sub |
+      1. Create S3 Access Point:
+         aws fsx create-and-attach-s3-access-point --name s3burst-verify-ap --type ONTAP \
+           --ontap-configuration '{"VolumeId":"${OriginVolume}","FileSystemIdentity":{"Type":"UNIX","UnixUser":{"Name":"root"}}}'
+      2. Create cluster peer (SSH to cache cluster management):
+         cluster peer create -peer-addrs <origin_intercluster_ip1>,<origin_intercluster_ip2>
+      3. Create SVM peer:
+         vserver peer create -vserver ${CacheSvmName} -peer-vserver ${OriginSvmName} \
+           -peer-cluster <origin_cluster_name> -applications flexcache
+      4. Create FlexCache:
+         volume flexcache create -vserver ${CacheSvmName} -volume s3burst_verify_fc \
+           -origin-vserver ${OriginSvmName} -origin-volume ${OriginVolumeName} \
+           -aggr-list aggr1 -size 5g -junction-path /s3burst_verify_fc
+      5. Run measurement script:
+         aws ssm start-session --target ${TestHost}
+         python3 /opt/s3burst/measure_visibility.py \
+           --s3ap-alias <S3_AP_ALIAS> \
+           --nfs-lif <CACHE_DATA_LIF> \
+           --fc-path /s3burst_verify_fc \
+           --origin-path /${OriginVolumeName}

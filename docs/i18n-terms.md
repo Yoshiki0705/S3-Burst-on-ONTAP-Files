@@ -40,7 +40,7 @@
 | 分岐 | divergence | コピー元から変えた点 |
 | 不可逆操作 | irreversible operation | 取り消せない操作 |
 | 二層認可 | dual-layer authorization | AWS 側と ONTAP 側の両方 |
-| セキュリティスタイル | security style | UNIX / NTFS / MIXED |
+| セキュリティスタイル | security style | UNIX / NTFS（mixed は非推奨） |
 | 削除順序 | teardown order | Cache → SVM ピア → クラスタピア |
 
 ## 段階の語を弱めない
