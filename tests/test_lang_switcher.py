@@ -155,6 +155,32 @@ def test_a_fallback_is_allowed_while_the_translation_does_not_exist(repo) -> Non
     assert switcher.check_language_links("docs/en/README.md") == []
 
 
+def test_linking_to_the_other_language_hub_is_allowed(repo) -> None:
+    """The Japanese landing page pointing English readers at the English hub is navigation.
+
+    The rule catches a page that kept pointing at another language's copy after its own was
+    written. A hub was never such a copy, so a hub-to-hub link is intent, not drift.
+    """
+    write(
+        repo,
+        "README.md",
+        "# Title\n\nEnglish hub: [docs/en/README.md](docs/en/README.md)\n",
+    )
+    write(repo, "docs/en/README.md")
+    assert switcher.check_language_links("README.md") == []
+
+
+def test_linking_to_another_language_below_hub_level_is_still_reported(repo) -> None:
+    """The exemption is scoped to the hub; everything else keeps the original behaviour."""
+    write(repo, "README.md")
+    write(
+        repo, "docs/en/README.md", "# Title\n\n[Design](../ja/design/architecture.md)\n"
+    )
+    write(repo, "docs/ja/design/architecture.md")
+    write(repo, "docs/en/design/architecture.md")
+    assert len(switcher.check_language_links("docs/en/README.md")) == 1
+
+
 def test_a_deliberately_bilingual_line_is_allowed(repo) -> None:
     """Pairing both languages on one line is how reference pages cite themselves."""
     write(repo, "README.md")

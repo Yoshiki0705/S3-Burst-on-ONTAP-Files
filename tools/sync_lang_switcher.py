@@ -249,6 +249,14 @@ def check_language_links(rel: str) -> list[str]:
             continue
 
         own_subpath = other[1]
+
+        # A link to the other language's *hub* is navigation, not a fallback. This check exists to
+        # catch a page that kept pointing at another language's copy after its own was written; the
+        # hub was never such a copy. Pointing English readers at the English hub from the Japanese
+        # landing page is the intended behaviour, and the generated switcher does the same thing.
+        if own_subpath == HUB:
+            continue
+
         own = path_for(lang, own_subpath)
         if not own.exists():
             continue  # legitimate fallback: this language has no such page

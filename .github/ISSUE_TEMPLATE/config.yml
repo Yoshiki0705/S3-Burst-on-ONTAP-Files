@@ -1,0 +1,20 @@
+# Blank issues are disabled so that every report arrives with the context that makes it actionable.
+# The forms below are short on purpose: a form nobody finishes produces no report at all.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security or sensitive report
+    url: https://github.com/Yoshiki0705/s3-burst-on-ontap-files/security/advisories/new
+    about: >-
+      Report privately instead of opening a public issue. Use this for an over-permissive template,
+      an unsafe documented procedure, or anything you would rather not post in the open.
+  - name: Question about the architecture
+    url: https://github.com/Yoshiki0705/s3-burst-on-ontap-files/blob/main/docs/ja/architecture.md
+    about: >-
+      The architecture guide covers what this design solves and does not solve, and the selection
+      flowchart says when not to adopt it. Worth reading before filing.
+  - name: What is verified and what is not
+    url: https://github.com/Yoshiki0705/s3-burst-on-ontap-files/blob/main/docs/ja/verification-status.md
+    about: >-
+      The central claim of this architecture is unverified. Check the stage of a statement before
+      reporting it as wrong.

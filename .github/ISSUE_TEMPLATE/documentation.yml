@@ -1,0 +1,61 @@
+name: Documentation correction
+description: A statement is wrong, out of date, or asserts more than the evidence supports.
+title: "docs: "
+labels: [documentation]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Corrections are welcome, including translation corrections — the English pages are produced
+        with machine assistance and are not natively reviewed before publication, so a correction is
+        an ordinary contribution rather than a special case.
+
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      description: File path and, if you can, the heading or line.
+      placeholder: docs/ja/support-matrix.md, "配布層 — FlexCache でファンアウトする"
+    validations:
+      required: true
+
+  - type: textarea
+    id: statement
+    attributes:
+      label: What it currently says
+    validations:
+      required: true
+
+  - type: textarea
+    id: correction
+    attributes:
+      label: What it should say, and why
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: What kind of correction is this
+      description: >-
+        This repository separates four stages — verified, documented, unverified, unconfirmed. Saying
+        which one applies is usually the whole correction.
+      options:
+        - A fact is wrong
+        - The stage is overstated (written as established, but it is not)
+        - The stage is understated (it is now documented or verified)
+        - A source is missing, wrong, or has moved
+        - A number is stated without the environment it was measured in
+        - Wording or translation
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: >-
+        A URL, or the environment you observed it in. Not required for a wording change. For a
+        measured number, please include date, Region, ONTAP version, configuration, object size and
+        concurrency — a number without them cannot be reproduced.

@@ -15,6 +15,11 @@
 >
 > 収集側は S3 API のまま、利用側は NFS / SMB のまま。両者の間にコピージョブを置きません。
 
+**English**: collect data over the Amazon FSx for NetApp ONTAP S3 Access Point, then serve it to
+NFS / SMB consuming sites through FlexCache — one source of truth, no copy job between them. The
+worked example is hybrid-cloud AV / ADAS Hardware-in-the-Loop testing.
+Full English hub: **[docs/en/README.md](docs/en/README.md)**.
+
 ---
 
 ## この構成
