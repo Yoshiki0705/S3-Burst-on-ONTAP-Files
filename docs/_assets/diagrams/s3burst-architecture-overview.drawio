@@ -1,0 +1,54 @@
+<mxfile host="drawio-jsapi" modified="2026-08-09T17:49:26.987Z" agent="DrawioJSAPI/1.0.0" version="1.0.0">
+  <diagram id="diagram-1" name="s3burst-architecture-overview">
+  <mxGraphModel dx="1426" dy="798" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850">
+    <root>
+      <mxCell id="0" />
+      <mxCell id="1" parent="0" />
+      <mxCell id="aws_cloud" value="AWS Cloud (Origin Region)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E" vertex="1" parent="1">
+        <mxGeometry x="50" y="50" width="600" height="400" as="geometry" />
+      </mxCell>
+      <mxCell id="edge_group" value="Cache Site (On-premises / Remote Region)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_corporate_data_center;strokeColor=#7D8998;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#5A6C86" vertex="1" parent="1">
+        <mxGeometry x="750" y="50" width="500" height="400" as="geometry" />
+      </mxCell>
+      <mxCell id="s3client" value="S3 Client
+(App / Pipeline)" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.client;fillColor=#232F3E;strokeColor=none;fontColor=#232F3E;fontSize=11;fontStyle=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center" vertex="1" parent="1">
+        <mxGeometry x="80" y="200" width="80" height="80" as="geometry" />
+      </mxCell>
+      <mxCell id="s3ap" value="Amazon S3
+Access Point" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3_access_points;fillColor=#3F8624;strokeColor=none;fontColor=#232F3E;fontSize=11;fontStyle=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center" vertex="1" parent="1">
+        <mxGeometry x="270" y="200" width="48" height="48" as="geometry" />
+      </mxCell>
+      <mxCell id="origin_vol" value="Amazon FSx for
+NetApp ONTAP
+(Origin)" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fsx_for_netapp_ontap;fillColor=#3F8624;strokeColor=none;fontColor=#232F3E;fontSize=11;fontStyle=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center" vertex="1" parent="1">
+        <mxGeometry x="430" y="180" width="80" height="80" as="geometry" />
+      </mxCell>
+      <mxCell id="cache_vol" value="Amazon FSx for
+NetApp ONTAP
+(FlexCache)" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fsx_for_netapp_ontap;fillColor=#3F8624;strokeColor=none;fontColor=#232F3E;fontSize=11;fontStyle=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center" vertex="1" parent="1">
+        <mxGeometry x="900" y="180" width="80" height="80" as="geometry" />
+      </mxCell>
+      <mxCell id="nfs_client" value="NFS / SMB Client
+(HiL, EDA, VFX)" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.client;fillColor=#232F3E;strokeColor=none;fontColor=#232F3E;fontSize=11;fontStyle=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center" vertex="1" parent="1">
+        <mxGeometry x="1080" y="200" width="80" height="80" as="geometry" />
+      </mxCell>
+      <mxCell id="e1" value="PutObject" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E" edge="1" parent="1" source="s3client" target="s3ap">
+        <mxGeometry relative="1" as="geometry" />
+      </mxCell>
+      <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1" edge="1" parent="1" source="s3ap" target="origin_vol">
+        <mxGeometry relative="1" as="geometry" />
+      </mxCell>
+      <mxCell id="e3" value="FlexCache
+(pull on read)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;dashed=1;fontSize=11;fontColor=#232F3E" edge="1" parent="1" source="origin_vol" target="cache_vol">
+        <mxGeometry relative="1" as="geometry" />
+      </mxCell>
+      <mxCell id="e4" value="NFS / SMB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E" edge="1" parent="1" source="cache_vol" target="nfs_client">
+        <mxGeometry relative="1" as="geometry" />
+      </mxCell>
+      <mxCell id="note" value="※1 S3 PutObject → FlexCache NFS/SMB read: p50 8 ms（実測、actimeo=0）\n※2 FlexCache の加算分: +5 ms（Origin 直接読み取りとの差）" style="rounded=1;whiteSpace=wrap;html=0;dashed=1;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=middle;spacingLeft=10" vertex="1" parent="1">
+        <mxGeometry x="200" y="380" width="550" height="80" as="geometry" />
+      </mxCell>
+    </root>
+  </mxGraphModel>
+  </diagram>
+</mxfile>
