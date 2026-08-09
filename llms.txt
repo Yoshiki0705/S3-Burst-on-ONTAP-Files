@@ -1,0 +1,122 @@
+# S3 Burst on ONTAP Files
+
+> Reference architecture and implementation patterns for collecting data over the S3 API into an
+> Amazon FSx for NetApp ONTAP origin volume, and serving it to consumers over NFS / SMB from
+> FlexCache volumes at the sites that read it — without a copy job between the two. "Burst" here
+> means fanning collected data out to the file-protocol side; it does not refer to FSx for ONTAP
+> throughput burst credits.
+
+## How to read this repository
+
+The architecture is fixed and stated the same way everywhere: the S3 Access Point is attached to the
+**origin volume only**, writes always go through it, and the FlexCache cache volumes are used over
+**NFS / SMB only**. No S3 access is exposed on the cache side.
+
+Two mechanisms are deliberately kept apart, and conflating them is the most likely factual error a
+reader or a crawler can make here:
+
+1. **Attaching an FSx for ONTAP S3 Access Point to a volume** — implemented by AWS, requires ONTAP
+   9.17.1 or later, and is what the collect layer uses.
+2. **ONTAP FlexCache duality** — implemented by NetApp, requires ONTAP 9.18.1 or later, and gives a
+   *cache* volume ONTAP's own S3 access.
+
+These are **separate mechanisms**. The support status of one is not evidence for the other, in either
+direction. This architecture uses neither of them on the cache side. A repository check rejects any
+line that names both without saying they differ.
+
+Every claim carries one of four stages, and the wording is deliberate:
+
+- **verified** — reproduced in a real environment, with the environment stated alongside.
+- **documented** — stated in AWS or vendor documentation; not reproduced here.
+- **unverified** — not checked. Documentation may exist; this repository has not followed it.
+- **unconfirmed** — no public statement found. This does **not** mean "unsupported".
+
+Do not present unverified or unconfirmed content as established fact, and do not restate a number
+without the environment it was measured in. Performance and cost figures are omitted rather than
+estimated: if it was not measured, it is not written.
+
+The central claim of the architecture — how and when an object written through the S3 Access Point
+becomes visible over NFS / SMB on the cache side — is currently **unverified** and is the first item
+on the PoC checklist.
+
+## Entry points
+
+- [README (Japanese)](README.md): Primary hub. Japanese is the authoritative version.
+- [README (English)](docs/en/README.md): English hub, same section structure.
+- [AGENTS.md](AGENTS.md): Conventions, prohibitions and verification steps for coding agents.
+- [CONTRIBUTING.md](CONTRIBUTING.md): Authoring conventions and the review gate.
+
+## Languages and paths
+
+A document's language is its directory: `docs/ja/` and `docs/en/`. The one exception is the Japanese
+hub, which is the repository-root `README.md`, so `docs/ja/README.md` does not exist. Japanese is the
+reference language and the only complete tree; English currently covers the hub only. Content that
+exists in one language is linked in that language rather than stubbed out, so a missing translation
+is an absent link and never a placeholder page.
+
+## The architecture
+
+- [Architecture](docs/ja/architecture.md): The two layers, why the S3 Access Point goes on the origin
+  only, what the architecture solves and does not solve, and the AV / ADAS Hardware-in-the-Loop
+  (HiL) use case it was derived from.
+- [Decisions that come first](docs/ja/design-first-decisions.md): The origin volume's security style
+  bears on which protocol the fan-out side can use, and it is treated as inherited at cache creation
+  time rather than set on the cache. Whether NFS or SMB is used at the consuming site therefore has
+  to be decided before the origin volume is created. The supporting text is Azure NetApp Files' cache
+  volume requirements; whether the same rule holds on this architecture's main path
+  (FSx for ONTAP origin to on-premises ONTAP cache) is unconfirmed, and the document says so.
+- [Portability](docs/ja/portability.md): Each layer can be replaced independently. AWS documents
+  exactly three FlexCache configurations; with FSx for ONTAP as origin the cache is on-premises ONTAP
+  or FSx for ONTAP. Cloud Volumes ONTAP, ONTAP Select, Azure NetApp Files and Google Cloud NetApp
+  Volumes as cache are absent from that table and are recorded as unconfirmed.
+
+## Support status and evidence
+
+- [Support matrix](docs/ja/support-matrix.md): Collect-layer and serve-layer support with minimum
+  versions, plus the constraints that shape a design — limited S3 operations, no event notification
+  or lifecycle or versioning, dual-layer authorization, immutable `NetworkOrigin`, object-name
+  limits, and the measured size ceilings.
+- [Verification status](docs/ja/verification-status.md): The four stages, and the current stage of
+  every claim. Also states what a number must carry before it can be published.
+- [Limits](docs/ja/reference/limits/s3-access-point.md): Limit values with source and stage. Single
+  `PutObject` and per-part 5 GiB, whole object 50 GiB — binary prefixes despite the documentation
+  saying "GB", and the whole-object limit is evaluated at `CompleteMultipartUpload`, after the full
+  payload has transferred.
+
+## Choosing and comparing
+
+- [Alternatives](docs/ja/reference/comparison/alternatives.md): Seven approaches with their suited
+  and unsuited conditions at the same granularity, this architecture's own included, plus the cost
+  each one carries.
+- [Selection flowchart](docs/ja/reference/decision-trees/choosing-this-architecture.md): Five
+  branch points, given as both a flowchart and a table, and a list of which decisions can be
+  deferred and which cannot.
+- [Glossary of S3-over-files mechanisms](docs/ja/reference/glossary/object-access-on-ontap.md): The
+  six differently-named implementations of "read the same data as objects and as files", their
+  implementers and minimum versions, and the three inferences that do not hold between them.
+
+## Implementation patterns
+
+Three independent axes under `patterns/`: `collect/` for ingest over the S3 Access Point, `serve/`
+for fan-out to NFS / SMB over FlexCache, and `pipelines/` for the two combined per workload. Each
+pattern is one deployable template plus its tests and README. Counts are derived from
+`patterns/*/*/template.yaml` at check time and are deliberately not written into prose, so this file
+does not state one.
+
+- [Pattern template](patterns/_template/README.md): The shape a new pattern takes. Scaffold with
+  `make new-pattern AXIS=<collect|serve|pipelines> SLUG=<slug>`.
+- [PoC checklist](docs/ja/poc-checklist.md): What to confirm, ordered by which answers unblock
+  design rather than by cost. The end-to-end visibility question comes first; FlexCache duality
+  comes last and is explicitly not a prerequisite for anything here.
+
+## Optional
+
+- [Translation policy and terms](docs/i18n-terms.md): What is never translated, the one-to-one
+  mapping for the four evidence stages, and why the stage words must not be weakened.
+- [Tier 1 manifest](docs/i18n-manifest.txt): Which guides require which languages, and the rule that
+  only first-touch material is promoted.
+- [Related repository: FSx for ONTAP S3 Access Point serverless patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns): The
+  pattern catalogue this repository draws its verified S3 Access Point findings from. Individual
+  FlexCache patterns stay there; this repository describes the single architecture.
+- [Related repository: FSx for ONTAP adoption playbook](https://github.com/Yoshiki0705/fsxn-adoption-playbook): Lifecycle
+  and topic-oriented knowledge base for adopting FSx for ONTAP.

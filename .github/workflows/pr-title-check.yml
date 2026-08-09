@@ -1,0 +1,35 @@
+name: pr-title-check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: conventional commit title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        env:
+          # Passed through the environment rather than interpolated into the script, so a title
+          # containing shell metacharacters cannot break out of the string.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|docs|chore|refactor|test|ci|perf|style|bench)(\([a-z0-9-]+\))?: .+'
+          if ! printf '%s' "$PR_TITLE" | grep -qE "$pattern"; then
+            echo "::error::PR title must follow conventional commits."
+            echo "  Got:      $PR_TITLE"
+            echo "  Expected: <type>(<optional-scope>): <description>"
+            echo "  Types:    feat fix docs chore refactor test ci perf style bench"
+            exit 1
+          fi
+          length=${#PR_TITLE}
+          if [ "$length" -gt 70 ]; then
+            echo "::error::PR title is $length characters; keep it under 70."
+            exit 1
+          fi
+          echo "PR title OK ($length characters)."

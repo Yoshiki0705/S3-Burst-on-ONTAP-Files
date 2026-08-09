@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+# Pattern skeleton. `make new-pattern AXIS=<axis> SLUG=<slug>` copies this directory and replaces
+# the __PATTERN_*__ tokens. Tokens appear only in descriptions, defaults and tags — never in a
+# logical ID, because logical IDs are alphanumeric only and a token there would not lint.
+#
+# One template is one deployable pattern. `make counts` counts template.yaml files to derive the
+# pattern totals, so a pattern without a template is invisible and a directory with two is
+# ambiguous. Keep it at one.
+Description: >-
+  __PATTERN_TITLE__ (__PATTERN_AXIS__) — S3 Burst on ONTAP Files pattern.
+  Collect over the Amazon FSx for NetApp ONTAP S3 Access Point, serve over NFS / SMB via FlexCache.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Pattern
+        Parameters:
+          - PatternName
+          - Environment
+      - Label:
+          default: FSx for ONTAP
+        Parameters:
+          - FileSystemId
+          - StorageVirtualMachineId
+          - VolumeName
+      - Label:
+          default: S3 Access Point
+        Parameters:
+          - S3AccessPointAlias
+    ParameterLabels:
+      S3AccessPointAlias:
+        default: S3 Access Point alias or bucket name
+
+Parameters:
+  # Deliberately no Default: the value belongs in params.example.json, which the scaffolder fills
+  # with the slug. A default here would have to be either a valid slug that lies about which pattern
+  # this is, or a placeholder token that fails its own AllowedPattern — cfn-lint rejects the second,
+  # and the first is the kind of copied-in wrong value nobody notices.
+  PatternName:
+    Type: String
+    Description: Identifier used in resource names and tags.
+    AllowedPattern: "^[a-z][a-z0-9-]{1,38}[a-z0-9]$"
+    ConstraintDescription: lowercase letters, digits and hyphens; 3-40 characters.
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, stg, prod]
+    Description: Deployment environment, used in tags.
+
+  FileSystemId:
+    Type: String
+    Default: ""
+    Description: >-
+      FSx for ONTAP file system holding the origin volume. Leave empty while the pattern is not yet
+      wired to a file system.
+
+  StorageVirtualMachineId:
+    Type: String
+    Default: ""
+    Description: SVM that owns the origin volume.
+
+  VolumeName:
+    Type: String
+    Default: ""
+    Description: >-
+      Origin volume name. ONTAP allows only alphanumerics and underscores, so this is not validated
+      with the same pattern as PatternName.
+
+  S3AccessPointAlias:
+    Type: String
+    Default: ""
+    Description: >-
+      Alias of the S3 Access Point attached to the origin volume, or a plain bucket name when
+      running against Amazon S3 for a local dry run. The access point itself is created out of band
+      with `aws fsx create-and-attach-s3-access-point`, because CloudFormation has no native
+      resource for it.
+
+  LogRetentionInDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 180, 365]
+    Description: CloudWatch Logs retention for this pattern's function.
+
+Resources:
+  # The log group is declared explicitly rather than left to implicit creation, so that retention is
+  # set from the start. An implicitly created group retains forever, which is a cost that nobody
+  # notices until it appears on a bill.
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    # checkov:skip=CKV_AWS_158: encrypted with the service-managed key; a CMK is a per-deployment
+    # decision and adding one here would put a KMS key in every scaffolded pattern.
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-${PatternName}"
+      RetentionInDays: !Ref LogRetentionInDays
+
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-${PatternName}"
+      Description: !Sub "__PATTERN_TITLE__ — ${PatternName}"
+      CodeUri: functions/
+      Handler: handler.handler
+      Runtime: python3.13
+      Architectures:
+        - arm64
+      MemorySize: 256
+      Timeout: 30
+      LoggingConfig:
+        LogGroup: !Ref FunctionLogGroup
+      Environment:
+        Variables:
+          PATTERN_NAME: !Ref PatternName
+          PATTERN_AXIS: __PATTERN_AXIS__
+          ENVIRONMENT: !Ref Environment
+          FILE_SYSTEM_ID: !Ref FileSystemId
+          STORAGE_VIRTUAL_MACHINE_ID: !Ref StorageVirtualMachineId
+          VOLUME_NAME: !Ref VolumeName
+          S3_ACCESS_POINT_ALIAS: !Ref S3AccessPointAlias
+      Tags:
+        Pattern: !Ref PatternName
+        PatternAxis: __PATTERN_AXIS__
+        Environment: !Ref Environment
+      # Replace with the least privilege this pattern actually needs. An access point ARN is
+      # required for S3 calls against FSx for ONTAP: a bucket-style ARN does not work, and the
+      # object-level statement needs the `/object/*` suffix. Authorization is dual-layer — the AWS
+      # side and the ONTAP file system identity must both allow the call.
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Sid: DenyPlaceholderReplaceWithLeastPrivilege
+              Effect: Deny
+              Action: "s3:*"
+              Resource: "*"
+
+Outputs:
+  FunctionArn:
+    Description: ARN of this pattern's function.
+    Value: !GetAtt Function.Arn
+
+  LogGroupName:
+    Description: CloudWatch Logs group for this pattern's function.
+    Value: !Ref FunctionLogGroup
+
+  NextSteps:
+    Description: What to do after deploying.
+    Value: >-
+      Replace the placeholder IAM policy with the least privilege this pattern needs, then follow
+      docs/ja/poc-checklist.md. Teardown order matters on the serve side: release the cache, then
+      the SVM peer, then the cluster peer.

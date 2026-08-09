@@ -1,0 +1,29 @@
+# Tier 1 documents under docs/<lang>/ and the languages required for each.
+#
+# Format:  <subpath>[: lang,lang,...]
+#   - Omitting the language list requires every Tier 1 language (currently ja, en).
+#   - Listing languages explicitly is how a guide lands in Japanese first and gets promoted later.
+#
+# The root README.md is the Japanese hub and is always compared against docs/en/README.md, so it is
+# not listed here.
+#
+# Promotion checklist when adding an entry:
+#   1. Copy the docs/ja file to docs/en at the same depth and translate headings + body, keeping the
+#      section structure identical. Same depth means every relative link stays byte-identical; if
+#      you find yourself adjusting `../` counts, the file is in the wrong place.
+#   2. Do NOT translate: file paths, commands, badge URLs, anchor IDs, product and technical terms.
+#      See i18n-terms.md.
+#   3. Add the subpath here.
+#   4. Run: make i18n-check && make switcher-write && make switcher-check
+#
+# What belongs in Tier 1: first-touch material only — how to find your way around, and how to read
+# the confidence signals. The dividing line is consequence. A mistranslation in navigation sends
+# someone to the wrong page, which they notice. A mistranslation in a design judgement does not
+# announce itself and can be acted on. Deep technical material therefore stays Japanese-only even
+# when a translation would be easy to produce.
+#
+# Promotion is also gated on stability. Translating a document that is still changing multiplies
+# every later edit. Promote when the content has settled, not when it is first written.
+#
+# Currently empty: the hub is the only Tier 1 document. Everything under docs/ja/ is still moving,
+# and the architecture's central claim is unverified, so nothing has settled enough to promote.

@@ -1,0 +1,33 @@
+title = "S3 Burst on ONTAP Files - gitleaks config"
+
+[extend]
+useDefault = true
+
+# Documentation deliberately shows the shape of identifiers so readers recognise them. These are
+# the sanctioned placeholders; anything outside them should still be flagged.
+[[allowlists]]
+description = "Sanctioned documentation placeholders"
+regexTarget = "match"
+regexes = [
+  '''123456789012''',                 # placeholder AWS account ID
+  '''fs-0123456789abcdef0''',         # placeholder file system ID
+  '''svm-0123456789abcdef0''',
+  '''fsvol-0123456789abcdef0''',
+  '''vpc-0123456789abcdef0''',
+  '''subnet-0123456789abcdef0''',
+  '''sg-0123456789abcdef0''',
+  '''10\.0\.[x0-9]+\.[x0-9]+''',      # masked internal IP
+  '''-XXXXXX''',                      # masked Secrets Manager ARN suffix
+  '''<[a-z-]+>''',                    # angle-bracket placeholders
+  '''\$\{[A-Z_]+\}''',                # shell-style placeholders
+  '''example\.(com|org)''',
+]
+
+[[allowlists]]
+description = "Paths whose pattern literals are the rules, not secrets"
+paths = [
+  '''\.gitleaks\.toml''',
+  '''(^|/)tools/''',                  # validator regexes look like secret patterns
+  '''(^|/)tests/''',                  # so do the fixtures that prove they fire
+  '''(^|/)scripts/''',
+]

@@ -1,0 +1,53 @@
+{
+  // Adapted from the sibling repository fsxn-adoption-playbook. Rules are tuned for a
+  // Japanese-primary documentation repository with heavy table use.
+  "config": {
+    "default": true,
+
+    // Line length: Japanese prose and wide comparison tables make a hard wrap counterproductive.
+    "MD013": false,
+
+    // Duplicate headings: intentional. Bilingual pages repeat a heading in both languages, and
+    // every pattern README reuses the same section names.
+    "MD024": { "siblings_only": true },
+
+    // Inline HTML: <details>/<summary> is core to the progressive-disclosure structure, and
+    // <strong> is required inside <summary> because Markdown emphasis is not parsed there.
+    "MD033": { "allowed_elements": ["details", "summary", "strong", "br", "img", "a", "kbd"] },
+
+    // First line must be an H1: GitHub issue and PR templates are rendered as form bodies, not as
+    // documents, and conventionally open at "##".
+    "MD041": false,
+
+    // Emphasis used as heading: the "> **Security note**:" callout pattern is deliberate.
+    "MD036": false,
+
+    // Bare URLs are flagged; link syntax is always used so the audit can see the target.
+    "MD034": true,
+
+    // Ordered list numbering: allow 1./2./3. style.
+    "MD029": { "style": "ordered" },
+
+    // Table delimiter style: the compact "|---|---|" form is used across the sibling
+    // repositories. Enforcing padded delimiters would reformat every table for no reader benefit.
+    "MD060": false,
+
+    // Blank line inside blockquote: a Japanese callout followed by its English counterpart is a
+    // deliberate pattern.
+    "MD028": false,
+
+    // Trailing punctuation in headings: Japanese headings sometimes end with a full-width char.
+    "MD026": { "punctuation": ".,;:!。，；：！" }
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules/**",
+    ".private/**", // gitleaks:allow - path pattern, not committed content
+    ".kiro/**", // gitleaks:allow - path pattern, not committed content
+    // Generated caches. A linter whose file count depends on whether tests have run reports a
+    // different verdict for the same change.
+    ".pytest_cache/**",
+    ".ruff_cache/**",
+    "**/__pycache__/**"
+  ]
+}

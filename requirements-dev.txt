@@ -1,0 +1,19 @@
+# Development toolchain, exact-pinned.
+#
+# Why pinned: a lint gate whose verdict depends on the day it runs cannot tell you whether your
+# change is clean. In a sibling repository CI resolved ruff at install time; when a minor release
+# widened the default rule set, CI started reporting findings on code that had not changed while a
+# developer on the previous version saw "All checks passed".
+#
+# Bump deliberately: change the version here, run `make lint`, fix what the new version finds, and
+# commit both together. `make python` warns when the installed ruff differs from this file, because
+# a local pass with a different version does not predict CI.
+#
+# The validators in tools/ are stdlib-only by design and need nothing from this file.
+ruff==0.15.20
+pytest==9.1.1
+cfn-lint==1.52.1
+
+# Not installable via pip — install separately, see CONTRIBUTING.md:
+#   markdownlint-cli2   npm install -g markdownlint-cli2@0.22.1
+#   gitleaks            brew install gitleaks

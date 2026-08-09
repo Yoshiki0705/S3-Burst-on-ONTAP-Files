@@ -1,0 +1,9 @@
+[
+  { "ParameterKey": "PatternName", "ParameterValue": "__PATTERN_SLUG__" },
+  { "ParameterKey": "Environment", "ParameterValue": "dev" },
+  { "ParameterKey": "FileSystemId", "ParameterValue": "fs-0123456789abcdef0" },
+  { "ParameterKey": "StorageVirtualMachineId", "ParameterValue": "svm-0123456789abcdef0" },
+  { "ParameterKey": "VolumeName", "ParameterValue": "origin_vol" },
+  { "ParameterKey": "S3AccessPointAlias", "ParameterValue": "<access-point-alias>" },
+  { "ParameterKey": "LogRetentionInDays", "ParameterValue": "30" }
+]

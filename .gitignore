@@ -1,0 +1,29 @@
+# Kiro のワークスペース設定。BLEA など AWS のプロジェクトの慣行に合わせ、公開しない。
+# 知識の本体は追跡対象（docs/ 配下）に置き、.kiro/ には「いつ読むか」だけを持たせる。
+.kiro/
+
+# 非公開の作業メモ・レビュー来歴・MCP のメモリ
+.private/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# SAM / CDK
+.aws-sam/
+cdk.out/
+samconfig.toml
+
+# Node
+node_modules/
+
+# ローカル生成物
+bandit-report.json
+tmp-previews/
+.DS_Store

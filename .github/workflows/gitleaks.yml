@@ -1,0 +1,36 @@
+name: gitleaks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a secret committed before the rule that would catch it still gets found.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+  # The action lists a pull request's commits to decide what to scan. Without this it gets
+  # "403 Resource not accessible by integration" from /pulls/{n}/commits and the job fails before
+  # scanning, which reads like a secret finding but is a permission gap.
+  pull-requests: read
+
+jobs:
+  scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          # Required for pull_request events. Without it the action exits before scanning anything
+          # ("GITHUB_TOKEN is now required to scan pull requests"), so every pull request reported a
+          # failure and none was ever actually secret-scanned.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false

@@ -1,0 +1,102 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      # Installed from the pinned manifest, not `pip install ruff`. An unpinned install resolves to
+      # the latest release, so a version that widens its default rule set turns this gate red with
+      # no commit behind it — and disagrees with whatever developers have locally.
+      - name: Install pinned toolchain
+        run: pip install -r requirements-dev.txt
+
+      # check and format are separate steps because formatting drift otherwise passes locally and
+      # only surfaces here, which is exactly the failure this ordering prevents.
+      - name: Lint Python
+        run: ruff check tools scripts tests
+
+      - name: Check Python formatting
+        run: ruff format --check tools scripts tests
+
+      # Each validator is its own step so a failure names the concern that broke, rather than
+      # reporting that "make all failed" and leaving the reader to run it locally to find out.
+      - name: Check i18n parity
+        run: python3 tools/check_i18n_parity.py
+
+      - name: Check language switchers and cross-language links
+        run: python3 tools/sync_lang_switcher.py
+
+      - name: Audit public output
+        run: python3 tools/audit_public_output.py
+
+      - name: Check for untranslated Japanese in English documents
+        run: python3 tools/check_en_doc_language.py
+
+      - name: Check internal links
+        run: python3 tools/check_links.py
+
+      - name: Check derived counts
+        run: python3 tools/check_derived_counts.py
+
+      # `.kiro/` is gitignored, so the loader half of this check is skipped here by design. The
+      # AGENTS.md budget and the reachability of its index are still enforced.
+      - name: Check agent context budget
+        run: python3 tools/check_agent_context_budget.py
+
+      - name: Lint CloudFormation templates
+        run: |
+          set -euo pipefail
+          templates=$(find patterns -name template.yaml -print)
+          if [ -z "$templates" ]; then
+            echo "no template.yaml under patterns/ yet"
+            exit 0
+          fi
+          # shellcheck disable=SC2086
+          cfn-lint --non-zero-exit-code error $templates
+
+      # One pytest process per directory. Patterns each ship their own `functions/` package, so
+      # collecting two in a single run resolves the second import of `functions.<name>` to whatever
+      # sys.modules cached from the first.
+      - name: Run tests
+        run: python3 scripts/run_tests.py
+
+  markdown-lint:
+    name: markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !.pytest_cache
+            !.ruff_cache

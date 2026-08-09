@@ -1,0 +1,89 @@
+# 最初に決めること — Origin ボリュームを作る前に
+
+この構成で後戻りが最も高くつく判断は、**ファンアウト先で NFS を使うのか SMB を使うのか**である。
+Origin ボリュームのセキュリティスタイルがこれに関わり、Cache 側では設定できない項目として
+扱われるためで、後から変えると配布層を作り直すことになる。
+
+先に結論だけ述べる。
+
+> **利用拠点で NFS を使うのか SMB を使うのかを、Origin ボリュームの作成前に決めておく。**
+> セキュリティスタイルは Cache 作成時に Origin から継承される項目とされており、Cache 側の
+> 設定項目ではない。Origin 側で後から変更した場合、Cache は削除して作り直すことになる。
+
+## 出典と、どこまで確認できているか
+
+この節の根拠は **Azure NetApp Files のキャッシュボリューム要件**である
+（[cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes) /
+[requirements](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-requirements)）。
+FlexCache 一般の仕様として AWS のドキュメントで裏を取れているわけではない。
+
+つまり次の 2 つを分けて読む必要がある。
+
+| 事項 | 状態 |
+|---|---|
+| セキュリティスタイルとプロトコルの対応（下表） | Azure NetApp Files のキャッシュボリューム要件に記載。**この構成の主経路（FSx for ONTAP Origin → オンプレミス ONTAP Cache）で同じ規則が成り立つかは未確認** |
+| 「セキュリティスタイルは Origin から継承される」という性質 | 同じ要件文に記載。上記と同じ理由で、主経路での挙動は未確認 |
+| プロトコルを後から変えると配布層の作り直しになる | 上 2 つが成り立つ場合の帰結。前提が未確認なので、断定はしない |
+
+未確認であることを理由にこの判断を後回しにしない、という立場をとっている。
+成り立っていた場合の手戻りが大きく、成り立っていなかった場合に失うものが何もないためである。
+実機で確かめる手順は [PoC チェックリスト](poc-checklist.md)に入れてある。
+
+## セキュリティスタイルとプロトコルの対応
+
+Azure NetApp Files のキャッシュボリューム要件が示している対応は次のとおり。
+
+| Origin のセキュリティスタイル | Cache のプロトコル | 結果 |
+|---|---|---|
+| UNIX | NFS | UNIX |
+| NTFS | SMB | NTFS |
+| MIXED | NFS または SMB | 非対応 |
+
+MIXED が非対応とされている点も設計に影響する。FSx for ONTAP 側で S3 Access Point に
+Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）と、UNIX 識別情報を使う構成の
+どちらを採るかが、そのままファンアウト先のプロトコル選択と結びつく。
+
+> **セキュリティに関する補足**: Active Directory 参加 SVM では、S3 Access Point 経由の
+> **すべてのデータ操作**に AD ドメインコントローラーへの到達性が必要になる。`HeadBucket` は
+> AD が到達不能でも成功するため、疎通確認には使えない。到達性の確認は必ずデータ操作で行う。
+> この挙動は姉妹リポジトリで検証済みとして扱っている（[検証状況](verification-status.md)）。
+
+## 同じ要件文が挙げているその他の前提
+
+いずれも Azure NetApp Files のキャッシュボリューム要件の記載であり、この構成の主経路で
+同じ条件が課されるかは未確認である。検討の入口として挙げておく。
+
+- Cache の作成は REST API のみ（キャッシュ用のエンドポイント経由）
+- Origin 側クラスタが ONTAP 9.15.1 以降
+- Cache と Origin のプロトコル種別を一致させる
+- 同一 Origin を共有する Cache 群で `globalFileLocking` を揃える。変更は Origin 側クラスタの
+  CLI（`volume flexcache origin config modify`）で行う
+
+## 決める順序
+
+1. **利用拠点のプロトコルを決める** — NFS か SMB か。装置やアプリが決めているなら、それが答え
+2. **Origin のセキュリティスタイルを決める** — 1 に対応するものを選ぶ。MIXED は避ける
+3. **S3 Access Point の識別情報を決める** — 2 と整合させる。NTFS 側を選ぶなら SVM の
+   Active Directory 参加が前提になり、AD 到達性が定常的な依存になる
+4. **Origin ボリュームを作る**
+5. **Cache を作る** — この時点でセキュリティスタイルは選べない
+
+1 から 3 のどれかを保留したまま 4 に進むと、5 で選択肢が消える。
+
+## 不可逆・作り直しになる操作
+
+| 操作 | 影響 |
+|---|---|
+| Origin のセキュリティスタイル変更 | Cache は削除して作り直すことになる（上記の前提が成り立つ場合） |
+| S3 Access Point の `NetworkOrigin` | 作成後は変更できない。`Internet` origin は S3 Gateway VPC エンドポイントからは到達しない |
+| FlexCache の削除順序 | Cache を残したまま Origin 側を削除しない。ピアリングの削除は Cache と SVM ピアの解除が先 |
+| SnapLock / 改ざん防止 Snapshot の有効化 | 取り消せない。**保持期間を明示した指示がない限り有効化しない**。詳細は [AGENTS.md](../../AGENTS.md) の不可逆操作の節 |
+
+## 関連ドキュメント
+
+| ドキュメント | 内容 |
+|---|---|
+| [構成の形](architecture.md) | 収集層と配布層の全体像 |
+| [サポート状況](support-matrix.md) | 最小バージョンと対応構成 |
+| [検証状況](verification-status.md) | 何が検証済みで何が未検証か |
+| [PoC チェックリスト](poc-checklist.md) | この節の未確認事項を実機で確かめる手順 |
