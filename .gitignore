@@ -20,6 +20,26 @@ htmlcov/
 cdk.out/
 samconfig.toml
 
+# Terraform
+# .terraform/ holds the downloaded provider binary (26 MB for one provider).
+# State is excluded because Terraform writes variable values into it in clear text, including any
+# marked sensitive — the cache cluster password would be committed in readable form.
+# .terraform.lock.hcl is deliberately NOT excluded: it pins provider hashes and is the Terraform
+# equivalent of the exact pins in requirements-dev.txt.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
 # Node
 node_modules/
 

@@ -25,5 +25,12 @@
 # Promotion is also gated on stability. Translating a document that is still changing multiplies
 # every later edit. Promote when the content has settled, not when it is first written.
 #
-# Currently empty: the hub is the only Tier 1 document. Everything under docs/ja/ is still moving,
-# and the architecture's central claim is unverified, so nothing has settled enough to promote.
+# The deployment guides are Tier 1 because they are first-touch material in the strongest sense: a
+# reader follows them while creating billable resources, and the teardown order in them is what stops
+# an undeletable resource being left behind. Getting those steps in front of a reader in their own
+# language is worth more than the risk of a wording slip.
+#
+# Everything else under docs/ja/ stays Japanese-only for now. It is still moving, and the
+# architecture's central claim is unverified, so nothing else has settled enough to promote.
+deployment/aws-cloudformation.md
+deployment/onprem-terraform.md

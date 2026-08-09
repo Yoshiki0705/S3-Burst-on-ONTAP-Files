@@ -35,6 +35,8 @@ SKIP_DIRS = (
     ".ruff_cache",
     "__pycache__",
     ".hypothesis",
+    # .terraform/ holds the downloaded provider, which ships its own README and links.
+    ".terraform",
 )
 
 # [text](target) - skips image embeds (leading !) and reference-style definitions.

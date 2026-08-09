@@ -23,7 +23,9 @@ import check_links as links
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHES = (".pytest_cache", ".ruff_cache", "__pycache__")
+# Every directory a tool generates. `.terraform` joined the list when the link checker walked
+# into a downloaded provider's own README and reported its relative links as broken.
+CACHES = (".pytest_cache", ".ruff_cache", "__pycache__", ".terraform")
 
 
 @pytest.mark.parametrize("cache", CACHES)
@@ -69,7 +71,7 @@ def test_the_makefile_and_ci_agree_on_the_markdown_ignores() -> None:
     """Two invocations of the same linter with different scopes is the drift this prevents."""
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    for cache in (".pytest_cache", ".ruff_cache"):
+    for cache in (".pytest_cache", ".ruff_cache", ".terraform"):
         assert cache in makefile, f"Makefile markdown target does not exclude {cache}"
         assert cache in workflow, f"ci.yml markdown job does not exclude {cache}"
 

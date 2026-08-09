@@ -1,0 +1,16 @@
+[
+  { "ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0" },
+  { "ParameterKey": "SubnetId", "ParameterValue": "subnet-0123456789abcdef0" },
+  { "ParameterKey": "FileSystemName", "ParameterValue": "s3burst-origin" },
+  { "ParameterKey": "StorageCapacityGiB", "ParameterValue": "1024" },
+  { "ParameterKey": "ThroughputCapacityMBps", "ParameterValue": "128" },
+  { "ParameterKey": "SvmName", "ParameterValue": "origin_svm" },
+  { "ParameterKey": "OriginVolumeName", "ParameterValue": "origin_vol" },
+  { "ParameterKey": "OriginVolumeSizeMB", "ParameterValue": "10240" },
+  { "ParameterKey": "OriginVolumeSecurityStyle", "ParameterValue": "UNIX" },
+  { "ParameterKey": "DeployVerificationHost", "ParameterValue": "true" },
+  { "ParameterKey": "HostInstanceType", "ParameterValue": "t3.small" },
+  { "ParameterKey": "HostVolumeSizeGiB", "ParameterValue": "20" },
+  { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
+  { "ParameterKey": "Environment", "ParameterValue": "verify" }
+]

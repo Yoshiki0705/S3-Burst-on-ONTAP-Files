@@ -7,13 +7,14 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
         audit secrets pinning links links-external budget en-lang counts test all new-pattern \
+        terraform \
         commit-gate clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-lint: markdown python cfn ## Markdown lint + Python lint + CloudFormation lint
+lint: markdown python cfn terraform ## Markdown, Python, CloudFormation and Terraform
 
 RUFF_PINNED := $(shell sed -n 's/^ruff==//p' requirements-dev.txt)
 
@@ -38,20 +39,37 @@ format-python: ## Apply ruff formatting to tools/, scripts/ and tests/
 
 markdown: ## Run markdownlint if available (skipped when not installed)
 	@if command -v markdownlint-cli2 >/dev/null 2>&1; then \
-		markdownlint-cli2 "**/*.md" "#node_modules" "#.private" "#.kiro" "#.pytest_cache" "#.ruff_cache"; \
+		markdownlint-cli2 "**/*.md" "#node_modules" "#.private" "#.kiro" "#.pytest_cache" "#.ruff_cache" "#**/.terraform"; \
 	else \
 		echo "markdownlint-cli2 not installed - skipping (npm install -g markdownlint-cli2)"; \
 	fi
 
-cfn: ## Lint every pattern template (skipped when cfn-lint is not installed)
+cfn: ## Lint every CloudFormation template (skipped when cfn-lint is not installed)
 	@if ! command -v cfn-lint >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
-		found=$$(find patterns -name template.yaml -print 2>/dev/null); \
+		found=$$(find patterns environments -name template.yaml -print 2>/dev/null); \
 		if [ -z "$$found" ]; then \
-			echo "cfn: no template.yaml under patterns/ yet"; \
+			echo "cfn: no template.yaml found yet"; \
 		else \
 			cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
+		fi; \
+	fi
+
+terraform: ## Validate and format-check every Terraform root (skipped when terraform is absent)
+	@if ! command -v terraform >/dev/null 2>&1; then \
+		echo "terraform not installed - skipping (brew install terraform)"; \
+	else \
+		roots=$$(find environments -name '*.tf' -exec dirname {} \; 2>/dev/null | sort -u); \
+		if [ -z "$$roots" ]; then echo "terraform: no .tf files yet"; else \
+			for d in $$roots; do \
+				terraform -chdir="$$d" fmt -check -recursive >/dev/null || { echo "terraform: $$d is not formatted; run 'terraform -chdir=$$d fmt'"; exit 1; }; \
+				if [ -d "$$d/.terraform" ]; then \
+					terraform -chdir="$$d" validate || exit 1; \
+				else \
+					echo "terraform: $$d not initialised, checked formatting only (run 'terraform -chdir=$$d init -backend=false' to validate)"; \
+				fi; \
+			done; \
 		fi; \
 	fi
 

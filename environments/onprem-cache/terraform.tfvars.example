@@ -1,0 +1,51 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+# Do not put the password here if you can avoid it. Terraform writes variable values into the state
+# file in clear text, including values marked sensitive, so the password ends up readable in two
+# places instead of one. Prefer:
+#
+#   export TF_VAR_cache_cluster_password="$(aws secretsmanager get-secret-value \
+#     --secret-id <secret> --query SecretString --output text | jq -r .password)"
+#
+# and leave it out of this file entirely.
+
+# --- cache cluster (where the consumers are) -------------------------------------------------------
+
+# Management hostname or IP of the ONTAP cluster that will hold the cache.
+# When the cache is a second FSx for ONTAP this endpoint is VPC-only, so Terraform has to run from
+# inside that VPC or through a tunnel. From outside, the failure looks like a network timeout rather
+# than a configuration error.
+cache_cluster_hostname = "<cache-cluster-management-endpoint>"
+cache_cluster_username = "admin"
+
+# Set to false only for a lab cluster with a self-signed certificate, and only deliberately.
+validate_certs = true
+
+cache_svm_name       = "<cache-svm>"
+cache_volume_name    = "cache_vol"
+cache_volume_size_gb = 50
+cache_junction_path  = "/cache_vol"
+
+# Leave empty on FSx for ONTAP, where the aggregate is service-managed.
+aggregates = []
+
+use_tiered_aggregate = true
+global_file_locking  = false
+
+# The consuming site's network. Required, with no default: an export rule is an access control
+# decision. 0.0.0.0/0 is rejected by a variable validation rather than being merely discouraged.
+# Comma-separate to allow several.
+allowed_clients = "<10.20.0.0/16>"
+
+# --- origin (the AWS side, built by environments/aws-origin) ---------------------------------------
+
+# The cluster peer name as the cache cluster knows it, not a hostname.
+# Cluster and SVM peering must already exist. This configuration does not create them, because
+# peering needs routing between the two clusters' intercluster LIFs and that topology is owned
+# elsewhere.
+origin_cluster_name = "<origin-cluster-peer-name>"
+origin_svm_name     = "<origin-svm>"
+
+# The volume the S3 Access Point is attached to. In this architecture the access point is on the
+# origin only.
+origin_volume_name = "origin_vol"
