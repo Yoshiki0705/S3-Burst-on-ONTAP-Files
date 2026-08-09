@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -152,6 +153,19 @@ def check_message(message: str) -> list[str]:
 
 
 def current_branch() -> str | None:
+    """The branch a commit would land on, or None when that cannot be determined.
+
+    `COMMIT_GATE_BRANCH` overrides the lookup. Two situations need it. In CI the checkout is often a
+    detached head or a synthesised merge ref, so the name git reports is not the branch anyone is
+    committing to. And a test that exercises the *message* rules must not also depend on whichever
+    branch the working copy happens to be on — this check was written without the override, and it
+    passed locally only because the repository had no commits yet, so `rev-parse` failed and the
+    branch rules were skipped. The same test failed the moment a commit existed. A test that is
+    green because of the state of its environment is not evidence of anything.
+    """
+    override = os.environ.get("COMMIT_GATE_BRANCH")
+    if override is not None:
+        return override.strip() or None
     try:
         proc = subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
