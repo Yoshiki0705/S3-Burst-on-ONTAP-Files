@@ -87,7 +87,7 @@ audit: ## Pre-publication audit (naming / vendor-ref / neutrality / PII / confla
 
 secrets: ## Secret scan (skipped when gitleaks is not installed)
 	@if command -v gitleaks >/dev/null 2>&1; then \
-		gitleaks detect --no-git --source . --redact --exit-code 1; \
+		gitleaks detect --no-git --source . --config .gitleaks.toml --redact --exit-code 1; \
 	else \
 		echo "gitleaks not installed - skipping (brew install gitleaks)"; \
 	fi
