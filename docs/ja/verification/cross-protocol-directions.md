@@ -132,18 +132,39 @@ REST API と CLI で `fsxadmin` の権限マッピングが異なることが原
 | S3 AP 未使用 SVM で ONTAP S3 を操作（CLI） | ✅ |
 | S3 AP 未使用 SVM で ONTAP S3 を操作（REST API） | ❌ ユーザー作成が拒否される |
 | 通常ボリュームに NAS バケット → S3 読み取り | ✅ |
-| FlexCache ボリュームに NAS バケット → S3 読み取り | ❌ データアクセス `AccessDenied` |
+| FlexCache ボリュームに NAS バケット → S3 読み取り | ❌ → ✅ **`-is-s3-enabled true` で動作確認済み**（下記参照） |
 | FlexGroup を CLI で作成 | ❌ FabricPool アグリゲートとの互換性エラー |
 | FlexGroup を FSx for ONTAP API で作成 | ✅（最小 100 GiB / constituent） |
 
 ### この構成への影響
 
-**FlexCache duality は、FSx for ONTAP 9.18.1P3D1 時点では FlexCache ボリューム上で
-S3 データアクセスが機能しません。** バケットの作成とメタデータ操作（`HeadBucket`）までは
-動作しますが、それ以上は進みません。
+**追記（2026-08-10）: FlexCache duality は `-is-s3-enabled true` の設定で動作することが確認されました。**
 
-この構成の「Cache 側に S3 を出さない」という設計判断は、
-現時点では制約による唯一の動作する選択肢でもあることが確認されました。
+NetApp プロダクトチームからのフィードバックにより、FlexCache ボリュームに対して S3 アクセスを
+明示的に有効化する必要があることが判明しました：
+
+```bash
+set -privilege advanced
+flexcache config modify -vserver snapmirror-s3-test -volume duality_fc_s3en -is-s3-enabled true
+```
+
+設定後の結果:
+
+| 操作 | `-is-s3-enabled` 未設定 | `-is-s3-enabled true` 設定後 |
+|---|---|---|
+| HeadBucket | ✅ | ✅ |
+| ListObjectsV2 | ❌ AccessDenied | ✅ KeyCount=1 |
+| GetObject | ❌ AccessDenied | ✅ **内容一致** |
+
+`fsxadmin` で advanced 権限コマンドが実行可能であることも確認済みです。
+出典: [Enable S3 access to NAS FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/enable-flexcache-duality.html)
+
+**ただし、この構成は引き続き「Cache 側は NFS/SMB で使う」を推奨します。** 理由:
+
+- ONTAP ネイティブ S3（NAS バケット）と AWS マネージドの S3 Access Point は別の機構
+- NAS バケットは読み取り専用（PutObject 不可）
+- advanced 権限 + S3 ユーザー管理が追加で必要
+- IAM 統合やアクセスポイントポリシーによるガバナンスがない
 
 ## 検証環境の状態
 
