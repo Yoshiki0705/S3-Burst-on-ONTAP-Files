@@ -1217,8 +1217,10 @@ class ReadHeavy:
     throughput_mbps: int = 128
     deployment: str = "saz1"
     ssd_headroom: float = 0.20
-    # Blocks a cache re-fetches over the month because the origin changed or they were evicted,
-    # as a fraction of the working set. An assumption, and the sweep below shows its weight.
+    # Blocks a cache re-fetches over the month because the origin changed or they were evicted, as
+    # a fraction of the working set. Reviewed as plausible for read-heavy reference workloads, but
+    # it remains an assumption rather than a measurement: nothing here was measured against a live
+    # cache, and the hit rate that determines it drifts with the workload.
     refetch_fraction: float = 0.20
 
     @property
@@ -1256,6 +1258,9 @@ class ReadHeavy:
         }
 
 
+# Working set at a tenth of the dataset and a 20 percent refetch rate. Both were reviewed as
+# plausible for this class of workload; both are still assumptions, and the document says which
+# way each one moves the result.
 READ_HEAVY = ReadHeavy(
     title="同じデータを繰り返し読む — 利用側はオンプレミス",
     dataset_gib=20 * GIB_PER_TIB,
