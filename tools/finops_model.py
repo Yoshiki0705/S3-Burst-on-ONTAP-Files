@@ -40,7 +40,7 @@ import argparse
 import math
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +61,16 @@ SOURCE_FLEXCACHE_SIZING = (
 )
 
 GIB_PER_TIB = 1024
+
+# S3 Files metering minimums, from the metering reference.
+# https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html
+S3FILES_METADATA_KIB = 4.0  # metadata read/write minimum
+S3FILES_MIN_IO_KIB = 32.0  # file read/write minimum per operation
+S3FILES_MIN_FILE_KIB = 10.0  # minimum billable file size on high-performance storage
+S3FILES_DEFAULT_THRESHOLD_KIB = (
+    128.0  # files at or below this are held on high-perf storage
+)
+S3FILES_DEFAULT_EXPIRY_DAYS = 30.0  # unread data expires from high-perf storage
 SECONDS_PER_MONTH = 30 * 24 * 3600
 
 
@@ -255,6 +265,20 @@ FSX = {
     "backup": Rate(0.050, "GB-Mo", "バックアップストレージ", "2026-07-01", SOURCE_FSX),
 }
 
+# S3 Files, effective 2026-08-01. Three dimensions only; the Price List API returned no
+# per-file-system or per-mount-target hourly charge for this Region.
+S3FILES = {
+    "storage": Rate(
+        0.36,
+        "GB-Mo",
+        "S3 Files 高性能ストレージ (アクティブ分のみ)",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "read": Rate(0.04, "GB", "S3 Files データ読み取り", "2026-08-01", SOURCE_S3),
+    "write": Rate(0.07, "GB", "S3 Files データ書き込み", "2026-08-01", SOURCE_S3),
+}
+
 DATASYNC = {
     "basic_gb": Rate(
         0.0125, "GB", "DataSync 転送 (Basic モード)", "2025-09-01", SOURCE_DATASYNC
@@ -389,6 +413,12 @@ class Scenario:
     # A cache is rebuildable from the origin, which is why Single-AZ is defensible for it even
     # when the origin is Multi-AZ.
     cache_deployment: str = "saz1"
+    # S3 Files needs the mount helper on Linux compute in AWS, so viability is a property of where
+    # the consumer runs, not of the data. Stated per scenario rather than assumed.
+    s3files_viable: bool = True
+    s3files_reason: str = ""
+    s3files_threshold_kib: float = S3FILES_DEFAULT_THRESHOLD_KIB
+    s3files_expiration_days: float = S3FILES_DEFAULT_EXPIRY_DAYS
 
     @property
     def ingest_gib(self) -> float:
@@ -485,6 +515,62 @@ def fsx_s3ap(sc: Scenario) -> dict[str, float]:
     return lines
 
 
+def s3_files_option(sc: Scenario) -> dict[str, float] | None:
+    """An S3 bucket read as a file system through S3 Files, with no FSx for ONTAP at all.
+
+    The authoritative copy stays in the bucket, so S3 Standard is still paid in full. On top of
+    that, S3 Files charges for the active fraction resident on its high-performance storage and for
+    reads and writes against that storage.
+
+    Object size decides almost everything. Files above the size threshold (default 128 KiB) are
+    streamed straight from the bucket and incur no S3 Files storage charge at all, which makes large
+    object workloads very cheap here. Files at or below it are imported onto high-performance
+    storage at 0.36 USD per GB-month, which makes small object workloads expensive unless the
+    expiration window is shortened. Both branches are modelled rather than assuming one.
+    """
+    if not sc.s3files_viable:
+        return None
+
+    object_kib = sc.object_mib * 1024
+    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+
+    lines: dict[str, float] = {
+        "ストレージ (S3 Standard、正典はバケットに残る)": tiered_s3_storage(
+            sc.stored_gib
+        ),
+        "PUT リクエスト (S3 バケット宛)": sc.objects_per_month * S3["tier1"].usd,
+    }
+
+    if object_kib <= sc.s3files_threshold_kib:
+        retention_days = sc.retention_months * 30.0
+        active = min(1.0, sc.s3files_expiration_days / retention_days)
+        # A file smaller than the minimum billable size is charged as that size.
+        floor_factor = max(1.0, S3FILES_MIN_FILE_KIB / object_kib)
+        hps_gib = sc.stored_gib * active * floor_factor
+        io_kib = max(object_kib, S3FILES_MIN_IO_KIB)
+        import_gib = sc.objects_per_month * io_kib / (1024 * 1024)
+        read_gib = sc.reads_per_month * io_kib / (1024 * 1024)
+
+        lines[f"S3 Files 高性能ストレージ (アクティブ {active:.0%})"] = (
+            hps_gib * S3FILES["storage"].usd
+        )
+        lines["S3 Files 書き込み (高性能ストレージへの取り込み)"] = (
+            import_gib + sc.objects_per_month * metadata_gib
+        ) * S3FILES["write"].usd
+        lines["S3 Files 読み取り"] = (
+            read_gib + sc.reads_per_month * metadata_gib
+        ) * S3FILES["read"].usd
+    else:
+        lines["GET リクエスト (バケットから直接ストリーム)"] = (
+            sc.reads_per_month * S3["tier2"].usd
+        )
+        lines["S3 Files メタデータ読み取り"] = (
+            sc.reads_per_month * metadata_gib * S3FILES["read"].usd
+        )
+
+    return lines
+
+
 # ------------------------------------------------------------------ distribution site
 
 
@@ -553,6 +639,8 @@ SCENARIOS: list[Scenario] = [
         deployment="saz1",
         pool_fraction=0.0,
         file_protocol_required=False,
+        s3files_viable=True,
+        s3files_reason="解析処理を AWS 側の Linux コンピュートで動かす前提。マウントヘルパーを入れられる",
         notes=[
             "3 億オブジェクト / 月 (1 日あたり 1,000 万) を 64 KiB で受ける",
             "利用側が S3 API を話せる場合を想定し、S3 単独も参考として並べる。"
@@ -572,6 +660,8 @@ SCENARIOS: list[Scenario] = [
         deployment="saz1",
         pool_fraction=0.30,
         file_protocol_required=True,
+        s3files_viable=False,
+        s3files_reason="テストベンチは構成を変えられない物理機器で、AWS 外にある。マウントヘルパーを入れられない",
         notes=[
             "テストベンチは NFS / SMB マウントしか話さない。S3 単独は要件を満たさない",
             "3 割は再読み出し頻度が低くキャパシティプールへ落ちるものとして置く",
@@ -590,6 +680,8 @@ SCENARIOS: list[Scenario] = [
         deployment="saz2",
         pool_fraction=0.40,
         file_protocol_required=True,
+        s3files_viable=True,
+        s3files_reason="ツールチェーンを AWS の EC2 Linux で動かす前提。オンプレミスのファームに残す場合は選べない",
         notes=[
             "ツールチェーンが POSIX セマンティクスを要求する。S3 単独は要件を満たさない",
             "第二世代を選ぶ理由は単価ではなく上限 (SSD 512 TiB、200,000 IOPS)",
@@ -608,6 +700,8 @@ SCENARIOS: list[Scenario] = [
         deployment="saz1",
         pool_fraction=0.80,
         file_protocol_required=True,
+        s3files_viable=True,
+        s3files_reason="レンダリングノードが AWS の EC2 Linux である前提。Windows ベースの工程や SMB が要る場合は選べない",
         notes=[
             "レンダリングノードは NFS マウント。S3 単独は要件を満たさない",
             "リクエスト単価の差はほぼ効かない。効くのはスループットとストレージ",
@@ -626,6 +720,8 @@ SCENARIOS: list[Scenario] = [
         deployment="saz1",
         pool_fraction=0.70,
         file_protocol_required=True,
+        s3files_viable=True,
+        s3files_reason="HPC クラスタを AWS の EC2 Linux で動かす前提",
         notes=[
             "HPC クラスタは NFS マウント。S3 単独は要件を満たさない",
             "長期保持が効くため、キャパシティプールへの階層化が最大のレバーになる",
@@ -896,6 +992,7 @@ def render_cache_site() -> list[str]:
     rows = []
     for sc in burst:
         cache = sum(cache_component(sc).values())
+        cache_20 = sum(cache_component(sc, 0.20).values())
         copy_total = sum(full_copy_component(sc).values())
         dep = DEPLOYMENTS[sc.cache_deployment]
         cache_ssd_gib = max(
@@ -914,6 +1011,7 @@ def render_cache_site() -> list[str]:
                 gib(sc.stored_gib),
                 gib(cache_ssd_gib) + ("(下限に張り付き)" if floored else ""),
                 usd(cache),
+                usd(cache_20),
                 usd(copy_total),
                 f"{copy_total / cache:.1f} 倍" if cache else "—",
             ]
@@ -947,8 +1045,9 @@ def render_cache_site() -> list[str]:
             [
                 "ワークロード",
                 "Origin 論理",
-                "Cache SSD (効率適用後)",
-                "Cache の月額",
+                "Cache SSD (効率適用後、10%)",
+                "Cache 10% の月額",
+                "Cache 20% の月額",
                 "全量コピーの月額",
                 "コピーが何倍か",
             ],
@@ -964,7 +1063,7 @@ def render_cache_site() -> list[str]:
     # How the cost moves with the ratio, on the workload where the ratio has the most room.
     pick = max(burst, key=lambda s: s.stored_gib)
     ratio_rows = []
-    for ratio in (0.05, 0.10, 0.15, 0.25, 0.50, 1.00):
+    for ratio in (0.10, 0.15, 0.20, 0.25, 0.50, 1.00):
         dep = DEPLOYMENTS[pick.cache_deployment]
         ssd = max(
             dep["min_ssd_gib"],
@@ -976,7 +1075,9 @@ def render_cache_site() -> list[str]:
             ),
         )
         total = sum(cache_component(pick, ratio).values())
-        note = "サイジング指針の下限" if ratio == 0.10 else ""
+        note = "サイジング指針の下限、かつ作成時の既定値" if ratio == 0.10 else ""
+        if ratio == 0.20:
+            note = "作業セットが読みきれないときの比較用"
         if ratio == 1.00:
             note = "実質的にコピー。階層化できないぶんコピーより高い"
         ratio_rows.append([f"{ratio:.0%}", gib(ssd), usd(total), note])
@@ -992,6 +1093,115 @@ def render_cache_site() -> list[str]:
         "Cache を「コピーの代わり」として全量でサイジングすると、この領域に入る。",
         "",
     ]
+    return out
+
+
+def render_whole_system() -> list[str]:
+    """Origin plus cache against the alternatives, so the totals are comparable.
+
+    The per-scenario tables above price the origin only. Compared against S3 Files, which needs no
+    file system of its own, an origin-only figure would understate this architecture. This table
+    adds the distribution side to both FSx for ONTAP options.
+    """
+    rows = []
+    for sc in SCENARIOS:
+        cache = sum(cache_component(sc).values())
+        sync_total = sum(s3_plus_sync(sc).values()) + cache
+        ap_total = sum(fsx_s3ap(sc).values()) + cache
+        files = s3_files_option(sc)
+        files_cell = usd(sum(files.values())) if files else "要件を満たさない"
+        rows.append(
+            [
+                sc.title.split(" — ")[0],
+                f"{sc.object_mib * 1024:,.0f} KiB",
+                usd(sync_total),
+                usd(ap_total),
+                files_cell,
+            ]
+        )
+
+    out = [
+        "### 構成全体での比較 — 収集側と配布側を合算",
+        "",
+        "上の試算は収集側だけを見ている。配布側を持たない選択肢と比べるには合算しないと不公平になるので、"
+        "FSx for ONTAP を使う 2 案には Cache 比率 10% の配布側を足した。",
+        "",
+        "この表は「利用側にファイルとして配る」ことを前提にした比較である。"
+        "利用側が S3 API で足りるなら配布層そのものが不要で、"
+        "各ワークロードの試算にある S3 単独の金額が下限になる。",
+        "",
+        "3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。"
+        "FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。"
+        "**標準の NFSv4 マウントではない**点に注意が要る。"
+        "EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) を入れ、"
+        "`s3files` というファイルシステムタイプでマウントする"
+        " ([マウント手順](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-mounting.html))。"
+        "対応するコンピュートは EC2、Lambda、EKS、ECS で、SMB は提供されない"
+        " ([S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html))。",
+        "",
+        *table(
+            [
+                "ワークロード",
+                "平均オブジェクト",
+                "S3 + DataSync + FSx for ONTAP + Cache",
+                "FSx for ONTAP S3 AP + Cache",
+                "S3 + S3 Files",
+            ],
+            rows,
+        ),
+        "",
+        "オブジェクトサイズで結果が反転する。"
+        f"S3 Files は既定のしきい値 ({S3FILES_DEFAULT_THRESHOLD_KIB:,.0f} KiB) を超えるファイルを"
+        "高性能ストレージに載せず、バケットから直接ストリームする。"
+        "ストレージ課金が発生しないので、大きいオブジェクトを読むワークロードでは安い。"
+        "しきい値以下のファイルは高性能ストレージに取り込まれ、"
+        f"{unit_usd(S3FILES['storage'].usd)} / GB-Mo が効くので、小さいオブジェクトでは高くつく。",
+        "",
+        "S3 Files が安く出るワークロードで、それでもこの構成を選ぶ理由は費用ではない。"
+        "利用側が構成を変えられない装置である、SMB が要る、AWS 外にいる、"
+        "ONTAP のデータ管理機能を収集直後のデータに効かせたい、といった要件の側にある。"
+        "費用だけで選ぶなら、その要件がない限り S3 Files のほうが合う場面がある。",
+        "",
+    ]
+
+    # The two tunables that move the S3 Files figure most, on the workload where they bind.
+    small = [
+        sc for sc in SCENARIOS if sc.object_mib * 1024 <= S3FILES_DEFAULT_THRESHOLD_KIB
+    ]
+    if small:
+        sc = small[0]
+        sweep = []
+        for days in (1, 3, 7, 30, 90):
+            variant = replace(sc, s3files_expiration_days=float(days))
+            total = sum(s3_files_option(variant).values())
+            retention_days = sc.retention_months * 30.0
+            active = min(1.0, days / retention_days)
+            sweep.append(
+                [
+                    f"{days} 日",
+                    f"{active:.0%}",
+                    usd(total),
+                    "既定値" if days == 30 else "",
+                ]
+            )
+        out += [
+            f"小さいオブジェクトの場合、高性能ストレージの有効期限が最大のレバーになる。"
+            f"「{sc.title.split(' — ')[0]}」で期限を振ると次のようになる"
+            "(既定は 30 日、設定可能な範囲は 1 日から 365 日)。",
+            "",
+            *table(
+                ["有効期限", "アクティブ割合", "S3 + S3 Files の月額", "備考"], sweep
+            ),
+            "",
+            "期限を詰めれば下がるが、期限外のファイルを読むとバケットからの取り込みが再度発生する。"
+            "読み取りの時間的な偏りが小さいワークロードでは、期限を詰めても取り込みの往復で戻ってくる。",
+            "",
+            "しきい値のほうも同じ構造を持つ。"
+            "しきい値を上げれば小さくないファイルも低レイテンシで読めるが、"
+            "その分が高性能ストレージの課金対象になる。"
+            "この列の安さは、しきい値を超えるファイルが S3 のレイテンシで読まれることと引き換えである。",
+            "",
+        ]
     return out
 
 
@@ -1051,6 +1261,7 @@ def render() -> str:
     for sc in SCENARIOS:
         out += render_scenario(sc)
     out += render_cache_site()
+    out += render_whole_system()
     out += render_marginal_cost()
     out += [END]
     return "\n".join(out).rstrip() + "\n"
