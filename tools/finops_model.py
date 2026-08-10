@@ -552,22 +552,34 @@ def s3_files_option(sc: Scenario) -> dict[str, float] | None:
         hps_gib = sc.stored_gib * active * floor_factor
         io_kib = max(object_kib, S3FILES_MIN_IO_KIB)
         import_gib = sc.objects_per_month * io_kib / (1024 * 1024)
-        read_gib = sc.reads_per_month * io_kib / (1024 * 1024)
+        # The first read of a file not yet on high-performance storage is streamed from the bucket
+        # and carries an S3 GET plus a metadata read, with no file read charge. It is that read
+        # which triggers the asynchronous import. Only the reads after it are served from
+        # high-performance storage and metered as file reads.
+        streamed_reads = float(sc.objects_per_month)
+        hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
+        read_gib = hps_reads * io_kib / (1024 * 1024)
 
         lines[f"S3 Files 高性能ストレージ (アクティブ {active:.0%})"] = (
             hps_gib * S3FILES["storage"].usd
         )
+        lines["GET リクエスト (初回読み出しはバケットからストリーム)"] = (
+            streamed_reads * S3["tier2"].usd
+        )
         lines["S3 Files 書き込み (高性能ストレージへの取り込み)"] = (
             import_gib + sc.objects_per_month * metadata_gib
         ) * S3FILES["write"].usd
-        lines["S3 Files 読み取り"] = (
+        lines["S3 Files 読み取り (取り込み後の読み出しとメタデータ)"] = (
             read_gib + sc.reads_per_month * metadata_gib
         ) * S3FILES["read"].usd
     else:
         lines["GET リクエスト (バケットから直接ストリーム)"] = (
             sc.reads_per_month * S3["tier2"].usd
         )
-        lines["S3 Files メタデータ読み取り"] = (
+        lines["S3 Files 書き込み (メタデータの取り込み)"] = (
+            sc.objects_per_month * metadata_gib * S3FILES["write"].usd
+        )
+        lines["S3 Files 読み取り (メタデータ)"] = (
             sc.reads_per_month * metadata_gib * S3FILES["read"].usd
         )
 
@@ -1100,17 +1112,20 @@ def render_cache_site() -> list[str]:
 
 
 def render_whole_system() -> list[str]:
-    """Origin plus cache against the alternatives, so the totals are comparable.
+    """The three delivery options at a single site, with no cache in any of them.
 
-    The per-scenario tables above price the origin only. Compared against S3 Files, which needs no
-    file system of its own, an origin-only figure would understate this architecture. This table
-    adds the distribution side to both FSx for ONTAP options.
+    An earlier version of this table added a FlexCache to the DataSync option as well, which was
+    wrong. Copying from a bucket into an FSx for ONTAP file system produces a file system that
+    already serves NFS and SMB; nothing is left for a cache to do. A cache earns its cost only when
+    the consumers sit somewhere other than the file system, and in that case the DataSync
+    alternative is a full copy at that site rather than a cache. The per-site comparison for that
+    case is the cache table above; this table is the single-site case, where every option is one
+    file system or none.
     """
     rows = []
     for sc in SCENARIOS:
-        cache = sum(cache_component(sc).values())
-        sync_total = sum(s3_plus_sync(sc).values()) + cache
-        ap_total = sum(fsx_s3ap(sc).values()) + cache
+        sync_total = sum(s3_plus_sync(sc).values())
+        ap_total = sum(fsx_s3ap(sc).values())
         files = s3_files_option(sc)
         files_cell = usd(sum(files.values())) if files else "要件を満たさない"
         rows.append(
@@ -1124,10 +1139,13 @@ def render_whole_system() -> list[str]:
         )
 
     out = [
-        "### 構成全体での比較 — 収集側と配布側を合算",
+        "### 3 つの選択肢を並べる — 収集と利用が同じ場所の場合",
         "",
-        "上の試算は収集側だけを見ている。配布側を持たない選択肢と比べるには合算しないと不公平になるので、"
-        "FSx for ONTAP を使う 2 案には Cache 比率 10% の配布側を足した。",
+        "ここでは配布側を足さない。**バケットから DataSync で FSx for ONTAP にコピーすれば、"
+        "その FSx for ONTAP 自体が NFS / SMB で読み書きできるので、Cache を置く理由がない。**"
+        "Cache が費用に見合うのは、利用側がファイルシステムと別の場所にいる場合だけである。"
+        "その場合の比較は Cache と全量コピーの対比（上の表）になる。"
+        "この表は 3 案がいずれもファイルシステム 1 つ、または 0 つで済む単一サイトの比較である。",
         "",
         "この表は「利用側にファイルとして配る」ことを前提にした比較である。"
         "利用側が S3 API で足りるなら配布層そのものが不要で、"
@@ -1149,8 +1167,8 @@ def render_whole_system() -> list[str]:
             [
                 "ワークロード",
                 "平均オブジェクト",
-                "S3 + DataSync + FSx for ONTAP + Cache",
-                "FSx for ONTAP S3 AP + Cache",
+                "S3 + DataSync + FSx for ONTAP",
+                "FSx for ONTAP S3 AP (この構成)",
                 "S3 + S3 Files",
             ],
             rows,
@@ -1162,6 +1180,22 @@ def render_whole_system() -> list[str]:
         "ストレージ課金が発生しないので、大きいオブジェクトを読むワークロードでは安い。"
         "しきい値以下のファイルは高性能ストレージに取り込まれ、"
         f"{unit_usd(S3FILES['storage'].usd)} / GB-Mo が効くので、小さいオブジェクトでは高くつく。",
+        "",
+        "大きいオブジェクトの行で S3 Files の金額がほぼ S3 Standard の保存料金に見えるのは、"
+        "計上漏れではなく設計どおりである。1 MiB 以上の読み出しは高性能ストレージを経由せず"
+        "バケットから直接ストリームされ、ファイルシステム側のデータ課金が発生しない。"
+        "残るのは S3 の GET リクエストと 4 KiB のメタデータ読み取りだけで、"
+        "オブジェクトが大きければ回数が少ないため金額に出ない。"
+        "S3 の GET と PUT はどの行でも計上している。",
+        "",
+        "**配布サイトを増やしたときの増え方は 3 案で違う。**"
+        "この構成は Origin 1 つに対してサイトごとに Cache を足すので、"
+        "1 サイトあたり Origin 論理の 1 割程度で増える。"
+        "DataSync 方式はサイトごとに全量コピーを置くので、1 サイトあたり全量で増える。"
+        "S3 Files はファイルシステムあたり 1 VPC なのでサイトごとにファイルシステムを作るが、"
+        "同じバケットに複数のファイルシステムを付けられ、"
+        "課金されるのは各ファイルシステムが実際に使った分だけである。"
+        "サイト数が増えるほど全量コピー方式が不利になる。",
         "",
         "S3 Files が安く出るワークロードで、それでもこの構成を選ぶ理由は費用ではない。"
         "利用側が構成を変えられない装置である、SMB が要る、AWS 外にいる、"
