@@ -1396,6 +1396,143 @@ def render_read_requests(rh: ReadHeavy) -> list[str]:
     return out
 
 
+def read_side_totals(rh: ReadHeavy) -> dict[str, float]:
+    """Transfer and request charges for reading, split so either can be seen to dominate."""
+    costs = read_request_costs(rh)
+    direct_requests = sum(costs["S3 バケットを直接読む"].values())
+    direct_egress = tiered_egress(rh.read_gib)
+    cache_requests = sum(
+        costs["FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)"].values()
+    )
+    cache_egress = tiered_egress(rh.working_set_gib * (1 + rh.refetch_fraction))
+    # Both sides carry their storage, or the side that has a file system would be charged for
+    # holding the data while the side reading the bucket would not.
+    direct_storage = tiered_s3_storage(rh.dataset_gib)
+    cache_fixed = sum(rh.origin_lines().values())
+    return {
+        "direct_egress": direct_egress,
+        "direct_requests": direct_requests,
+        "direct_storage": direct_storage,
+        "direct_total": direct_egress + direct_requests + direct_storage,
+        "cache_egress": cache_egress,
+        "cache_requests": cache_requests,
+        "cache_fixed": cache_fixed,
+        "cache_total": cache_egress + cache_requests + cache_fixed,
+    }
+
+
+def render_read_cost_matrix(rh: ReadHeavy) -> list[str]:
+    """Both read-side charges in one grid, so a design can be located on it.
+
+    The two charges were shown in separate sweeps, which left the reader unable to tell which one
+    their own workload runs into. They respond to different remedies -- transfer to carrying fewer
+    bytes, requests to making fewer calls -- so the design decision depends on knowing which
+    dominates, and for some workloads it is both.
+    """
+    sizes = (8 / 1024, 64 / 1024, 1.0, 4.0)
+    read_counts = (1, 10, 50)
+
+    rows = []
+    for mib in sizes:
+        for reads in read_counts:
+            v = read_side_totals(
+                replace(rh, object_mib=mib, reads_per_file=float(reads))
+            )
+            share = v["direct_requests"] / v["direct_total"] * 100
+            if v["direct_total"] < v["cache_total"]:
+                verdict = "直接読むほうが安い"
+            elif share >= 30:
+                verdict = "**両方**"
+            elif share >= 5:
+                verdict = "転送 (リクエストも無視できない)"
+            else:
+                verdict = "転送"
+            rows.append(
+                [
+                    f"{mib * 1024:,.0f} KiB",
+                    f"{reads}",
+                    usd(v["direct_egress"]),
+                    usd(v["direct_requests"]),
+                    f"{share:.0f}%",
+                    usd(v["direct_total"]),
+                    usd(v["cache_total"]),
+                    f"{v['direct_total'] / v['cache_total']:.1f} 倍",
+                    verdict,
+                ]
+            )
+
+    return [
+        "### 転送とリクエストを同時に見る",
+        "",
+        "読み取り側の課金は転送とリクエストの 2 つで、効く手が違う。"
+        "転送はバイト数を減らすことで下がり、リクエストは呼び出し回数を減らすことで下がる。"
+        "**どちらが支配項かで打つ手が変わる**ので、自分のワークロードがどこにいるかを先に確かめる。",
+        "",
+        "作業セットとデータセットの量は固定し、平均オブジェクトサイズと読み取り回数だけを振る。"
+        "合計にはどちらの側も保管料金を含める"
+        "(直接読む側は S3 Standard、この構成は SSD とキャパシティプールとスループット)。"
+        "変動するのは転送とリクエストの 2 列である。",
+        "",
+        *table(
+            [
+                "平均オブジェクト",
+                "読み取り回数 / 月",
+                "転送",
+                "リクエスト",
+                "リクエストの占率",
+                "直接読む計",
+                "この構成",
+                "倍率",
+                "支配項",
+            ],
+            rows,
+        ),
+        "",
+        "読み方は 2 つある。**縦に見ると回数の効果**が出る。"
+        "回数が増えて増えるのは転送だけで、リクエストの占率はほぼ変わらない。"
+        "**横に見るとサイズの効果**が出る。サイズを小さくすると転送は変わらず"
+        "リクエストだけが増えるので、占率が上がる。",
+        "",
+        "#### 支配項ごとの打ち手",
+        "",
+        *table(
+            ["支配項", "症状", "効く手", "効かない手"],
+            [
+                [
+                    "転送",
+                    "同じデータを何度も読む。オブジェクトは数 MiB 以上",
+                    "作業セットだけを運ぶ (FlexCache)、利用側の移設、Direct Connect で単価を下げる",
+                    "オブジェクトをまとめる。回数は減っても運ぶバイト数は変わらない",
+                ],
+                [
+                    "リクエスト",
+                    "オブジェクトが一桁 KiB で、読み出し回数が非常に多い",
+                    "オブジェクトをまとめて大きくする、S3 API を経由しない読み出し経路にする",
+                    "転送単価の交渉。金額の大半がリクエスト側にある",
+                ],
+                [
+                    "両方",
+                    "小さいオブジェクトを繰り返し読む",
+                    "まとめる (リクエスト) とキャッシュする (転送) の併用。片方だけでは残る",
+                    "片方だけの対処",
+                ],
+                [
+                    "どちらも小さい",
+                    "読み取り回数が少ない。ファイルプロトコルの要件もない",
+                    "S3 を直接読む。ファイルシステムの固定費を負わない",
+                    "キャッシュの導入。固定費のほうが大きい",
+                ],
+            ],
+        ),
+        "",
+        "この構成の列がサイズと回数でほとんど動かないのは、"
+        "読み出しが S3 API を経由せず、運ぶのが作業セットに限られるためである。"
+        "**そのぶん固定費が先に立つ**ので、読み取りが少ない領域では不利になる。"
+        "表の「直接読むほうが安い」行がその領域である。",
+        "",
+    ]
+
+
 def render_migrated_to_aws(rh: ReadHeavy) -> list[str]:
     """The same reads with the consumers inside AWS, where egress disappears.
 
@@ -1565,6 +1702,7 @@ def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
     # egress. At these object sizes they do not, and saying so is more useful than implying they do.
     out += render_read_requests(replace(rh, reads_per_file=10.0))
 
+    out += render_read_cost_matrix(rh)
     out += render_migrated_to_aws(replace(rh, reads_per_file=10.0))
 
     # The number of reads is the whole argument, so show it as a curve.
