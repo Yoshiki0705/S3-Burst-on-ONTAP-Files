@@ -51,6 +51,9 @@
 |---|---|---|---|
 | Origin あたりの Cache 数 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨 | ドキュメント記載 / 挙動は未検証 | ファンアウト数の設計に影響する可能性がある |
 | 対応構成 | 3 通り | ドキュメント記載 | [移植性](../../portability.md)に一覧 |
+| 書き込みモード | write-around (既定) と write-back (ONTAP 9.15.1 以降) | ドキュメント記載 | [FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)。write-around は Origin 確定後に応答、write-back は Cache 確定後に非同期で Origin へ |
+| Cache の階層化 | 不可 | ドキュメント記載 | [対応機能一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)。FabricPool の Origin を Cache できるが、Cache ボリューム自体は階層化されない |
+| Cache のサイジング | Origin の最低 10% を推奨、作成時の既定値も 10% | ドキュメント記載 | [サイジング指針](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html) |
 | セキュリティスタイル | Cache 作成時に Origin から継承される項目として扱われる | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路では未確認（[最初に決めること](../../design-first-decisions.md)） |
 
 ## 書かない数値

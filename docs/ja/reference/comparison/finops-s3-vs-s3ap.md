@@ -25,6 +25,11 @@ S3 バケットにするか FSx for ONTAP S3 AP にするかで、費用の出�
 | 配布側が必要とするのは全データではなく作業セット | FlexCache の Cache ボリューム | 疎なキャッシュなので、Origin の 1 割程度の SSD で足りる |
 | 利用側が AWS 上の Linux コンピュートで、マウントヘルパーを入れられる | S3 Files | FSx for ONTAP の固定費がかからない。大きいオブジェクトではとくに安い |
 | 利用側が構成を変えられない装置、SMB、または AWS 外 | FSx for ONTAP S3 AP + FlexCache | S3 Files は EC2 / Lambda / EKS / ECS の Linux 向けで、SMB を提供しない |
+
+費用の前に絞り込みが効く軸が 2 つある。利用側が話せるプロトコルと、書き込みの経路である。
+
+- [対応プロトコルとバージョンの対比](#対応プロトコルとバージョンの対比) — NFSv3 で固定された装置や SMB を使う工程があるかどうかで、選択肢が先に絞られる
+- [配布側での書き込み](#配布側での書き込み--flexcache-の-2-つのモード) — Cache は書き込み可能で、既定の write-around と非同期の write-back で鮮度と遅延の出方が違う
 | 配布側で全データを常時ローカルに置く必要がある | 全量コピー (SnapMirror など) | Cache は階層化できないため、全量を載せるとコピーより高くつく |
 
 ## 課金次元の対応
@@ -590,6 +595,24 @@ FinOps の判断は請求書の金額だけでは閉じない。
 金額だけで選ぶと判断を誤るので、費用に現れない仕様上の制約をここに集める。
 以下はすべて AWS のドキュメント記載であり、この構成での実測ではない。
 
+### 対応プロトコルとバージョンの対比
+
+ファイルで配る設計では、利用側が話せる NFS のバージョンが選択肢を決める。
+3 つの選択肢で対応範囲が違う。
+
+| 選択肢 | 対応プロトコル | 出典 |
+|---|---|---|
+| FSx for ONTAP (Origin / Cache) | NFS v3、v4.0、v4.1、v4.2 と SMB。NVMe と iSCSI も使える | [FSx for ONTAP の仕組み](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/how-it-works-fsx-ontap.html) |
+| S3 Files | NFSv4.1 と NFSv4.2。**NFSv3 と SMB は対象外** | [非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+| Amazon EFS (S3 Files の基盤) | NFSv4.0 と NFSv4.1 | [EFS とは](https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html) |
+
+S3 Files は EFS を基盤にしているが、対応バージョンは一致しない。
+EFS が持つ v4.0 は対象外で、代わりに v4.2 が入っている。
+基盤が同じだからといってバージョンを推測せず、それぞれのドキュメントで確認する。
+
+NFSv3 で固定された装置がある場合、この差がそのまま選択肢の絞り込みになる。
+SMB を使う工程がある場合も同様で、FSx for ONTAP 以外は候補から外れる。
+
 ### プロトコルと利用側の前提
 
 | 項目 | 内容 | 出典 |
@@ -676,11 +699,56 @@ S3 Files を配布経路にする場合、ファイルで読ませたいデー�
 | 項目 | 内容 |
 |---|---|
 | 収集層の対応オペレーション | S3 の全機能は使えない。イベント通知・ライフサイクル・バージョニングは対象外 ([上限値](../limits/s3-access-point.md)) |
-| 配布層の書き込み | 拠点側から大量に書く用途は想定していない |
+| 配布層の書き込み | Cache は書き込み可能。既定の write-around は Origin 確定後に応答するため遅延が大きい。write-back は非同期で速いが上の条件が付く |
 | 配布層の階層化 | Cache ボリュームは階層化できない |
 | 配布層でのオブジェクトアクセス | Cache 側で S3 API は提供しない |
 | 収集層の前提バージョン | ONTAP 9.17.1 以降 |
 | 固定費 | スループットキャパシティと SSD の下限を毎月負う |
+
+## 配布側での書き込み — FlexCache の 2 つのモード
+
+Cache ボリュームは読み取り専用ではない。書き込みができる。
+モードが 2 つあり、既定と選択肢で鮮度と遅延の出方が変わる。
+
+| モード | 挙動 | 出典 |
+|---|---|---|
+| write-around (既定) | 書き込みは Cache から Origin へ転送される。Origin がストレージに確定して応答を返すまでクライアントに応答しない。ネットワークを往復するため write-back より遅延が大きい | [FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) |
+| write-back (ONTAP 9.15.1 以降) | 書き込みを Cache 側で確定してクライアントに即座に応答し、Origin へは**非同期**に書く。ローカルに近い速度で書ける | 同上 |
+
+AWS のドキュメントは、書き込みが多く低遅延が要るワークロードには write-back、
+読み取り中心で遅延に敏感でない場合や Origin ボリュームが 10 を超える場合には write-around を挙げている。
+作成時に `-is-writeback-enabled true` を指定するか、
+`volume flexcache config modify -is-writeback-enabled` で後から変更する
+(advanced 権限が必要) ([FlexCache の作成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/create-flexcache.html))。
+
+鮮度の観点では、既定の write-around が持つ性質が重要である。
+Origin が確定してから応答するため、**Cache 側の書き込みが Origin に無い時間帯が生じない**。
+非同期のバッチを待つ構造ではないので、正典側から見た遅れが発生しない。
+遅延と引き換えに鮮度を取る設計である。
+
+### write-back を使う場合の条件
+
+有効にすると条件が増える。費用ではなく設計の制約なのでここに集める。
+
+| 項目 | 内容 | 出典 |
+|---|---|---|
+| ONTAP バージョン | 9.15.1 以降で利用可能。ただし 9.17.1P1 で重要な改善が入っており、Origin と Cache の両方でそれ以降を強く推奨。9.15.1 は本番向けに推奨されない | [write-back のガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html) |
+| 構成 | Cache ボリューム全体を単一コンスティチュエントで構成することが推奨。マルチコンスティチュエントは意図しない退避を招く | 同上 |
+| 検証済みの範囲 | 100 GB 未満のファイルと、Cache と Origin 間の WAN 往復 200 ms 以内でテストされている | 同上 |
+| リネーム | ファイルのリネームは Cache から退避される。ダーティデータを Origin へ流し切るまで他の操作ができない | 同上 |
+| 変更できる属性 | Cache 側で設定できるのはタイムスタンプ、モードビット、NT ACL、所有者、グループ、サイズ。それ以外は Origin へ転送され、退避を招く場合がある | 同上 |
+| Origin のスナップショット | Origin でスナップショットを取ると、関連する全 write-back Cache から未処理のダーティデータを回収する。書き込みが多いと複数回の再試行が必要になる | 同上 |
+| SMB | write-back 有効の Cache では、書き込みの SMB Opportunistic Lock (oplock) が非対応 | 同上 |
+| Origin の空き容量 | Origin ボリュームの空きが 20% 以下になると自動的に write-around へ切り替わる。閾値は Origin の報告値とアグリゲートの物理空き容量の両方で評価されるため、オーバープロビジョニングしていると想定より早く切り替わる | 同上 |
+| ネットワーク | 帯域が細い、あるいはロスのあるクラスタ間ネットワークは write-back 性能に強く影響する | 同上 |
+| Origin 側のリソース | Origin の各ノードに 128 GB RAM と 20 CPU 以上が強く推奨される。FSx for ONTAP のスケールアップ構成では SSD 1,024 GiB 以上が基準として挙げられている | [TCO 事例](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/) |
+| ライセンス | write-back を含め FlexCache に追加ライセンスは不要 | 同上 |
+| ピアリング | Origin と Cache のクラスタ間ピアリングと、FlexCache オプション付きの SVM ピアリングが必要 | 同上 |
+
+この構成が収集を S3 AP で Origin に集約し、配布側を読み取り中心として説明しているのは、
+Cache に書き込み機能がないからではない。上の条件を負わずに済むからである。
+配布側で書き込みが多い要件があるなら write-back は選択肢に入る。
+その場合はバージョン要件と Origin 側のリソースを見積りに含める。
 
 ## 周辺ワークロードへの影響
 
