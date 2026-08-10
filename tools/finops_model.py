@@ -59,6 +59,13 @@ SOURCE_FLEXCACHE_FEATURES = "https://docs.netapp.com/us-en/ontap/flexcache/suppo
 SOURCE_FLEXCACHE_SIZING = (
     "https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html"
 )
+SOURCE_FSX_EFFICIENCY = (
+    "https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-storage-capacity.html"
+)
+SOURCE_FSX_TIER_EFFICIENCY = (
+    "https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/manage-vol-SE.html"
+)
+SOURCE_NETAPP_TIER_EFFICIENCY = "https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/Does_ONTAP_apply_efficiencies_to_blocks_that_are_tiered-out_to_Fabricpool%3F"
 SOURCE_S3FILES_QUOTAS = (
     "https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html"
 )
@@ -74,6 +81,17 @@ S3FILES_DEFAULT_THRESHOLD_KIB = (
     128.0  # files at or below this are held on high-perf storage
 )
 S3FILES_DEFAULT_EXPIRY_DAYS = 30.0  # unread data expires from high-perf storage
+
+# Fraction of the SSD-tier saving that survives on blocks living in the capacity pool.
+#
+# Background storage efficiency does not run on data once it has been tiered; only savings already
+# applied while the block was on SSD are preserved. A block tiered before efficiency ran keeps no
+# saving at all. So the pool-tier rate cannot simply be the published SSD rate, and how close it
+# gets depends on the tiering policy and cooling period, which no vendor figure covers. Half is an
+# assumption, stated as one, and the document carries a sensitivity table across the whole range
+# because the choice moves the totals more than most.
+#   https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/manage-vol-SE.html
+POOL_EFFICIENCY_RETENTION = 0.5
 SECONDS_PER_MONTH = 30 * 24 * 3600
 
 
@@ -400,7 +418,7 @@ class Scenario:
     object_mib: float
     retention_months: float
     reads_per_object: float
-    efficiency: float
+    efficiency_ssd: float
     efficiency_note: str
     deployment: str
     pool_fraction: float
@@ -434,6 +452,11 @@ class Scenario:
     @property
     def reads_per_month(self) -> float:
         return self.objects_per_month * self.reads_per_object
+
+    @property
+    def efficiency_pool(self) -> float:
+        """Saving assumed on blocks in the capacity pool. See POOL_EFFICIENCY_RETENTION."""
+        return self.efficiency_ssd * POOL_EFFICIENCY_RETENTION
 
     @property
     def cache_required_mbps(self) -> float:
@@ -471,9 +494,9 @@ def fsx_component(sc: Scenario) -> dict[str, float]:
     logical_pool = sc.stored_gib * sc.pool_fraction
     ssd = max(
         dep["min_ssd_gib"],
-        math.ceil(logical_ssd * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+        math.ceil(logical_ssd * (1 - sc.efficiency_ssd) * (1 + sc.ssd_headroom)),
     )
-    pool = logical_pool * (1 - sc.efficiency)
+    pool = logical_pool * (1 - sc.efficiency_pool)
     tput = choose_throughput(sc.required_mbps, dep["tput_options"], sc.tput_headroom)
 
     lines = {
@@ -602,7 +625,7 @@ def cache_component(sc: Scenario, ratio: float | None = None) -> dict[str, float
     logical = sc.stored_gib * ratio
     ssd = max(
         dep["min_ssd_gib"],
-        math.ceil(logical * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+        math.ceil(logical * (1 - sc.efficiency_ssd) * (1 + sc.ssd_headroom)),
     )
     tput = choose_throughput(
         sc.cache_required_mbps, dep["tput_options"], sc.tput_headroom
@@ -625,9 +648,9 @@ def full_copy_component(sc: Scenario) -> dict[str, float]:
     logical_pool = sc.stored_gib * sc.pool_fraction
     ssd = max(
         dep["min_ssd_gib"],
-        math.ceil(logical_ssd * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+        math.ceil(logical_ssd * (1 - sc.efficiency_ssd) * (1 + sc.ssd_headroom)),
     )
-    pool = logical_pool * (1 - sc.efficiency)
+    pool = logical_pool * (1 - sc.efficiency_pool)
     tput = choose_throughput(
         sc.cache_required_mbps, dep["tput_options"], sc.tput_headroom
     )
@@ -649,8 +672,8 @@ SCENARIOS: list[Scenario] = [
         object_mib=0.0625,  # 64 KiB
         retention_months=1.0,
         reads_per_object=2.0,
-        efficiency=0.65,
-        efficiency_note="テキスト / JSON 主体。AWS が汎用ファイル共有の典型として公表する 65% を当てる",
+        efficiency_ssd=0.50,
+        efficiency_note="テキスト / JSON 主体だが同一内容の重複は少ない。AWS 公表値の汎用ファイル共有・圧縮のみ 50% を当てる",
         deployment="saz1",
         pool_fraction=0.0,
         file_protocol_required=False,
@@ -670,8 +693,8 @@ SCENARIOS: list[Scenario] = [
         object_mib=1.0,
         retention_months=2.0,
         reads_per_object=1.5,
-        efficiency=0.50,
-        efficiency_note="一部が既圧縮の混在データ。汎用ファイル共有の 65% より保守的に置く",
+        efficiency_ssd=0.40,
+        efficiency_note="センサー由来のバイナリが主体。AWS 公表値で最も近い地震探査データの 40% を当てる",
         deployment="saz1",
         pool_fraction=0.30,
         file_protocol_required=True,
@@ -690,8 +713,8 @@ SCENARIOS: list[Scenario] = [
         object_mib=0.25,  # 256 KiB
         retention_months=3.0,
         reads_per_object=4.0,
-        efficiency=0.65,
-        efficiency_note="ソースとネットリストが主体で重複が多い。汎用ファイル共有の 65% を当てる",
+        efficiency_ssd=0.75,
+        efficiency_note="AWS 公表値のエンジニアリングデータ 75% (圧縮 + 重複排除) を当てる",
         deployment="saz2",
         pool_fraction=0.40,
         file_protocol_required=True,
@@ -710,8 +733,8 @@ SCENARIOS: list[Scenario] = [
         object_mib=500.0,
         retention_months=3.0,
         reads_per_object=3.0,
-        efficiency=0.0,
-        efficiency_note="既に圧縮された素材。重複排除と圧縮の効果は見込まない",
+        efficiency_ssd=0.0,
+        efficiency_note="既に圧縮された素材。圧縮も重複排除も効果を見込まない",
         deployment="saz1",
         pool_fraction=0.80,
         file_protocol_required=True,
@@ -730,8 +753,8 @@ SCENARIOS: list[Scenario] = [
         object_mib=8.0,
         retention_months=6.0,
         reads_per_object=2.0,
-        efficiency=0.30,
-        efficiency_note="FASTQ / BAM は部分的に圧縮済み。保守的に 30% を置く",
+        efficiency_ssd=0.40,
+        efficiency_note="FASTQ / BAM は部分的に圧縮済み。AWS 公表値で最も近い地震探査データの 40% を当てる",
         deployment="saz1",
         pool_fraction=0.70,
         file_protocol_required=True,
@@ -918,6 +941,7 @@ def render_scenario(sc: Scenario) -> list[str]:
         ("S3 単独 (利用側も S3 API)", s3_only(sc)),
         ("S3 バケット + DataSync + FSx for ONTAP", s3_plus_sync(sc)),
         ("FSx for ONTAP S3 AP (この構成)", fsx_s3ap(sc)),
+        ("S3 バケット + S3 Files", s3_files_option(sc)),
     ]
 
     out = [
@@ -934,7 +958,15 @@ def render_scenario(sc: Scenario) -> list[str]:
                 ["保持期間", f"{sc.retention_months:g} か月"],
                 ["定常保存量 (論理)", gib(sc.stored_gib)],
                 ["1 オブジェクトあたり読み出し回数", f"{sc.reads_per_object:g}"],
-                ["ストレージ効率の仮定", f"{sc.efficiency:.0%} — {sc.efficiency_note}"],
+                [
+                    "ストレージ効率の仮定 (SSD 層)",
+                    f"{sc.efficiency_ssd:.0%} — {sc.efficiency_note}",
+                ],
+                [
+                    "ストレージ効率の仮定 (キャパシティプール層)",
+                    f"{sc.efficiency_pool:.0%} — 階層化後は背景の効率化が動かないため、"
+                    f"SSD 層の {POOL_EFFICIENCY_RETENTION:.0%} と仮定",
+                ],
                 ["デプロイ", f"{dep['label']} (`{dep['api']}`)"],
                 ["平均所要スループット", f"{sc.required_mbps:,.1f} MB/s"],
                 ["キャパシティプールへ落とす割合", f"{sc.pool_fraction:.0%}"],
@@ -965,7 +997,12 @@ def render_scenario(sc: Scenario) -> list[str]:
     totals: dict[str, float] = {}
     for label, lines in options:
         if lines is None:
-            out += [f"**{label}**: 要件を満たさないため試算しない。", ""]
+            reason = (
+                sc.s3files_reason
+                if label.endswith("S3 Files") and sc.s3files_reason
+                else "利用側がファイルプロトコルを要求するため"
+            )
+            out += [f"**{label}**: 要件を満たさないため試算しない（{reason}）。", ""]
             continue
         total = sum(lines.values())
         totals[label] = total
@@ -1015,7 +1052,7 @@ def render_cache_site() -> list[str]:
             math.ceil(
                 sc.stored_gib
                 * sc.cache_ratio
-                * (1 - sc.efficiency)
+                * (1 - sc.efficiency_ssd)
                 * (1 + sc.ssd_headroom)
             ),
         )
@@ -1085,7 +1122,7 @@ def render_cache_site() -> list[str]:
             math.ceil(
                 pick.stored_gib
                 * ratio
-                * (1 - pick.efficiency)
+                * (1 - pick.efficiency_ssd)
                 * (1 + pick.ssd_headroom)
             ),
         )
@@ -1201,6 +1238,121 @@ def render_whole_system() -> list[str]:
         "利用側が構成を変えられない装置である、SMB が要る、AWS 外にいる、"
         "ONTAP のデータ管理機能を収集直後のデータに効かせたい、といった要件の側にある。"
         "費用だけで選ぶなら、その要件がない限り S3 Files のほうが合う場面がある。",
+        "",
+    ]
+
+    # Why the large-object columns land where they do. The arithmetic is short and it is the whole
+    # explanation, so it belongs in the document rather than in a reader's head.
+    # Largest dataset among the workloads whose objects sit above the S3 Files threshold. Chosen by
+    # logical size rather than object size so the efficiency sweep below lands on a workload where
+    # a non-zero efficiency is plausible; sweeping it on pre-compressed media would be theatre.
+    big = max(
+        (s for s in SCENARIOS if s.object_mib * 1024 > S3FILES_DEFAULT_THRESHOLD_KIB),
+        key=lambda s: s.stored_gib,
+    )
+    dep = DEPLOYMENTS[big.deployment]
+    big_ssd = max(
+        dep["min_ssd_gib"],
+        math.ceil(
+            big.stored_gib
+            * (1 - big.pool_fraction)
+            * (1 - big.efficiency_ssd)
+            * (1 + big.ssd_headroom)
+        ),
+    )
+    big_ssd_cost = big_ssd * dep["ssd"].usd
+    big_s3_storage = tiered_s3_storage(big.stored_gib)
+    out += [
+        "#### 大きいオブジェクトで S3 Files が安くなる理由",
+        "",
+        f"「{big.title.split(' — ')[0]}」の内訳を並べると理由が 1 行で出る。"
+        "S3 Files は**しきい値を超えるファイルのデータを高性能ストレージに載せない**ので、"
+        "保管の課金は S3 Standard の単価だけになる。"
+        "FSx for ONTAP は作業セット相当を SSD に置く。",
+        "",
+        *table(
+            ["比較項目", "値"],
+            [
+                ["論理データ量", gib(big.stored_gib)],
+                [
+                    "S3 Files の保管 (論理全量を S3 Standard に)",
+                    usd(big_s3_storage),
+                ],
+                [
+                    f"この構成の SSD 分のみ ({gib(big_ssd)} × {unit_usd(dep['ssd'].usd)})",
+                    usd(big_ssd_cost),
+                ],
+                [
+                    "SSD 分が S3 Standard 全量の何倍か",
+                    f"{big_ssd_cost / big_s3_storage:.2f} 倍",
+                ],
+            ],
+        ),
+        "",
+        f"論理データの {1 - big.pool_fraction:.0%} を SSD に置くだけで、"
+        "論理全量を S3 Standard に置いた金額を上回る。"
+        "さらにスループットキャパシティの固定費が乗る。S3 Files にはその項目がない。",
+        "",
+        "引き換えになっているものも同じ表から読める。"
+        "S3 Files でしきい値を超えるファイルは、読み出しのたびにバケットから取得される。"
+        "低レイテンシが要るならしきい値を上げることになり、"
+        f"上げた分は {unit_usd(S3FILES['storage'].usd)} / GB-Mo の課金対象になる。"
+        "この安さは、読み出しが S3 のレイテンシで行われることと引き換えである。",
+        "",
+    ]
+
+    # Storage efficiency is the assumption with the most leverage, and it is an assumption.
+    eff_rows = []
+    for eff in (0.0, 0.20, 0.40, 0.60, 0.75):
+        variant = replace(big, efficiency_ssd=eff)
+        ap = sum(fsx_s3ap(variant).values())
+        files = s3_files_option(variant)
+        note = ""
+        if eff == 0.40:
+            note = "AWS 公表値の地震探査データ"
+        elif eff == 0.65:
+            note = "AWS 公表値の汎用ファイル共有"
+        elif eff == 0.75:
+            note = "AWS 公表値のエンジニアリングデータ"
+        eff_rows.append(
+            [
+                f"{eff:.0%}",
+                f"{eff * POOL_EFFICIENCY_RETENTION:.0%}",
+                usd(ap),
+                usd(sum(files.values())) if files else "—",
+                note,
+            ]
+        )
+    out += [
+        "#### ストレージ効率の仮定を振ってみる",
+        "",
+        "効率の仮定は、この文書で最も金額を動かす仮定である。"
+        f"「{big.title.split(' — ')[0]}」で SSD 層の効率を振ると次のようになる"
+        "（キャパシティプール層は常にその半分と仮定）。",
+        "",
+        *table(
+            [
+                "SSD 層の効率",
+                "プール層の効率",
+                "この構成の月額",
+                "S3 + S3 Files の月額",
+                "備考",
+            ],
+            eff_rows,
+        ),
+        "",
+        "**S3 Files の列は動かない。** ONTAP の重複排除と圧縮は S3 の保管料金に効かないので、"
+        "効率をどう仮定しても S3 Files 側の金額は変わらない。"
+        "つまり効率の仮定は、この構成に有利な方向にしか働かない。"
+        "楽観的な効率を置くと、この構成が実際より良く見える。",
+        "",
+        "階層化を有効にしている環境で高い効率を期待するのは慎重に扱う。"
+        "**階層化されたデータには背景の効率化処理が動かない**。"
+        "SSD にいる間に適用された分だけが保持され、"
+        "効率化が走る前に階層化されたブロックは削減なしでプールに残る"
+        f" ([FSx for ONTAP のドキュメント]({SOURCE_FSX_TIER_EFFICIENCY})、"
+        f"[NetApp KB]({SOURCE_NETAPP_TIER_EFFICIENCY}))。"
+        "cooling period が短い構成や `All` ポリシーでは、プール層の効率は 0% に寄る。",
         "",
     ]
 
