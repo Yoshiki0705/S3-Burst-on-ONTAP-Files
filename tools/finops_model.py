@@ -59,6 +59,9 @@ SOURCE_FLEXCACHE_FEATURES = "https://docs.netapp.com/us-en/ontap/flexcache/suppo
 SOURCE_FLEXCACHE_SIZING = (
     "https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html"
 )
+SOURCE_S3FILES_QUOTAS = (
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html"
+)
 
 GIB_PER_TIB = 1024
 
@@ -1132,12 +1135,15 @@ def render_whole_system() -> list[str]:
         "",
         "3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。"
         "FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。"
-        "**標準の NFSv4 マウントではない**点に注意が要る。"
-        "EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) を入れ、"
+        "対応プロトコルは NFSv4.1 と NFSv4.2 で、**NFSv3 と SMB は対象外**である"
+        f" ([非対応事項とクォータ]({SOURCE_S3FILES_QUOTAS}))。"
+        "EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) が必要で、"
         "`s3files` というファイルシステムタイプでマウントする"
         " ([マウント手順](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-mounting.html))。"
-        "対応するコンピュートは EC2、Lambda、EKS、ECS で、SMB は提供されない"
-        " ([S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html))。",
+        "対応するコンピュートは EC2、Lambda、EKS、ECS である"
+        " ([S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html))。"
+        "費用だけでは決められない仕様上の制約が複数あるので、"
+        "この表の金額は後述の[S3 Files を選ぶ場合の仕様](#s3-files-を選ぶ場合の仕様)と併せて読む。",
         "",
         *table(
             [

@@ -511,7 +511,7 @@ Cache 比率を動かしたときの月額を、Origin 論理が最大の「ゲ�
 
 この表は「利用側にファイルとして配る」ことを前提にした比較である。利用側が S3 API で足りるなら配布層そのものが不要で、各ワークロードの試算にある S3 単独の金額が下限になる。
 
-3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。**標準の NFSv4 マウントではない**点に注意が要る。EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) を入れ、`s3files` というファイルシステムタイプでマウントする ([マウント手順](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-mounting.html))。対応するコンピュートは EC2、Lambda、EKS、ECS で、SMB は提供されない ([S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html))。
+3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。対応プロトコルは NFSv4.1 と NFSv4.2 で、**NFSv3 と SMB は対象外**である ([非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html))。EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) が必要で、`s3files` というファイルシステムタイプでマウントする ([マウント手順](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-mounting.html))。対応するコンピュートは EC2、Lambda、EKS、ECS である ([S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html))。費用だけでは決められない仕様上の制約が複数あるので、この表の金額は後述の[S3 Files を選ぶ場合の仕様](#s3-files-を選ぶ場合の仕様)と併せて読む。
 
 | ワークロード | 平均オブジェクト | S3 + DataSync + FSx for ONTAP + Cache | FSx for ONTAP S3 AP + Cache | S3 + S3 Files |
 |---|---|---|---|---|
@@ -583,6 +583,104 @@ FinOps の判断は請求書の金額だけでは閉じない。
 前半 4 行はいずれも請求書に出ない。
 費用だけで比較すると、大きいオブジェクトを低頻度で扱うワークロードでは差が小さく見える。
 その場合に選ぶ根拠は後半の表と前半の表の突き合わせにある。
+
+## S3 Files を選ぶ場合の仕様
+
+前節の試算で S3 Files が安く出るワークロードがある。
+金額だけで選ぶと判断を誤るので、費用に現れない仕様上の制約をここに集める。
+以下はすべて AWS のドキュメント記載であり、この構成での実測ではない。
+
+### プロトコルと利用側の前提
+
+| 項目 | 内容 | 出典 |
+|---|---|---|
+| 対応プロトコル | NFSv4.1 と NFSv4.2。**NFSv3 と SMB は対象外** | [非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+| ロック | すべて advisory。mandatory locking と deny share は非対応 | 同上 |
+| NFS ACL | 非対応。POSIX 権限ビットは対応する | 同上 |
+| Kerberos | 非対応。AD 統合を前提とした認証は持ち込めない | 同上 |
+| `nconnect` | 非対応。マウントオプションでの多重接続チューニングができない | 同上 |
+| マウント方法 | EC2 ではマウントヘルパー (`amazon-efs-utils`) が必要。`s3files` タイプでマウントする | [マウント手順](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-mounting.html) |
+| 対応コンピュート | EC2、Lambda、EKS、ECS | [S3 Files の概要](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html) |
+| VPC | ファイルシステムあたり 1 VPC、AZ あたりマウントターゲット 1 つ | [非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+
+SMB と NFSv3 が対象外である点は、この構成が対象とする状況に直接効く。
+既存の Windows 工程や、NFSv3 で固定された装置は利用側になれない。
+
+### 同期の遅延
+
+| 方向 | 挙動 | 出典 |
+|---|---|---|
+| バケット → ファイルシステム | S3 イベント通知を監視し、**通常は数秒**で反映される。ただし反映されるのは高性能ストレージに現在データがあるファイルに限る。期限切れで追い出されたファイルは、次にアクセスするまで更新されない | [同期の仕組み](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-synchronization.html) |
+| ファイルシステム → バケット | 書き込みが止まってから **約 60 秒**待って、まとめてエクスポートする | [性能仕様](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-performance.html) |
+
+エクスポート側の 60 秒は待ち時間ではなく**書き込みの無活動時間**である。
+ドキュメントの例では、30 秒ごとに 5 分間追記し続けるアプリケーションのエクスポートは 6 分目に始まる。
+追記が続いている間はバケットに出ない。ログのように書き込みが途切れないファイルでは、
+S3 API 側から見た鮮度がこの分だけ遅れる。
+
+収集を S3 API で行い、利用側が読み取りだけを行うのであれば、効くのはインポート側の数秒である。
+利用側が書き戻す設計にすると、エクスポート側の 60 秒が下流の鮮度になる。
+
+| 同期のレート上限 | 値 | 出典 |
+|---|---|---|
+| インポート | 1 ファイルシステムあたり 2,400 オブジェクト/秒、700 MB/秒 | [性能仕様](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-performance.html) |
+| エクスポート | 1 ファイルシステムあたり 800 ファイル/秒、2,700 MB/秒 | 同上 |
+
+変更が同期レートを超えると、キューに積まれて順に処理される。
+`PendingExports` の増加がその状態を示す ([ベストプラクティス](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-best-practices.html))。
+
+### 一貫性と競合
+
+| 項目 | 内容 | 出典 |
+|---|---|---|
+| 競合時の正典 | バケットが正典。ファイルシステム側とバケット側が同じファイルを同時に変更すると、ファイルシステム側は lost and found ディレクトリに移される | [ベストプラクティス](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-best-practices.html) |
+| 推奨 | 書き込み経路をファイルシステムかバケットの片方に固定する | 同上 |
+| バージョニング | リンクするバケットで **S3 バージョニングが必須**。ファイルシステム側の変更は新しいバージョンとして書かれる | [同期の仕組み](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-synchronization.html) |
+
+バージョニングが必須である点はコストに関わる。
+非現行バージョンの保管料金が積み上がるため、ライフサイクルでの失効設計が必要になる。
+`chmod` や `chown` も新しいバージョンを作る。本文の試算にはこの分を含めていない。
+
+### 名前空間と構造の制約
+
+この構成の[S3 AP 設計ガイド](../limits/s3ap-design-guide.md)で扱っている論点と重なる。
+
+| 項目 | 値 | 出典 |
+|---|---|---|
+| パス構成要素 | ディレクトリ名・ファイル名は 255 バイトまで | [非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+| オブジェクトキー | 全体で 1,024 バイトを超えるとエクスポートできない | 同上 |
+| POSIX にできないキー名 | `foo//bar`、`foo/./bar`、`foo/../bar`、ヌルバイトを含むキーはアクセスできない | 同上 |
+| ハードリンク | 非対応 | 同上 |
+| ディレクトリ深さ | 1,000 段まで | 同上 |
+| リネームと移動 | S3 にリネームがないため、プレフィックス配下の全オブジェクトをコピーして削除する。10 万ファイルのディレクトリのリネームはバケットに反映されるまで数分かかる | [同期の仕組み](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-synchronization.html) |
+| 大きなプレフィックス | リネームに最大 4 時間かかる規模 (約 1,200 万オブジェクト) のプレフィックスを指定するとエラーになる。`--AcceptBucketWarning` で回避する | 同上 |
+
+同じフォルダーに大量のオブジェクトを平置きすると、リネームと初回一覧が重くなる。
+これは受け口を S3 AP にする場合と同じ論点で、どちらを選んでもディレクトリ設計は必要になる。
+
+### ストレージクラスとの関係
+
+| 項目 | 内容 | 出典 |
+|---|---|---|
+| アーカイブ系 | S3 Glacier Flexible Retrieval、S3 Glacier Deep Archive、Intelligent-Tiering のアーカイブ層とディープアーカイブ層のオブジェクトは、**ファイルシステムから読めない**。先に S3 API で復元する必要がある | [非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+| S3 ACL | ファイルシステム側で変更すると保持されない | 同上 |
+
+アーカイブ系が読めない点は、費用設計の自由度に効く。
+保存単価を下げるためにアーカイブ層へ落とすと、ファイルとしては読めなくなる。
+S3 Files を配布経路にする場合、ファイルで読ませたいデータは Standard 系に置き続けることになる。
+
+### この構成側の対応する制約
+
+比較を片側だけ厳しく書かないために、同じ粒度でこちらの制約も挙げる。
+
+| 項目 | 内容 |
+|---|---|
+| 収集層の対応オペレーション | S3 の全機能は使えない。イベント通知・ライフサイクル・バージョニングは対象外 ([上限値](../limits/s3-access-point.md)) |
+| 配布層の書き込み | 拠点側から大量に書く用途は想定していない |
+| 配布層の階層化 | Cache ボリュームは階層化できない |
+| 配布層でのオブジェクトアクセス | Cache 側で S3 API は提供しない |
+| 収集層の前提バージョン | ONTAP 9.17.1 以降 |
+| 固定費 | スループットキャパシティと SSD の下限を毎月負う |
 
 ## 周辺ワークロードへの影響
 
@@ -688,6 +786,7 @@ FinOps の対象は請求書だけではない。
 | ストレージ効率 | 仮定。AWS が公表する 65% は汎用ファイル共有の典型値であり、既に圧縮された素材には当たらない |
 | Cache 比率 | Origin 論理データに対する割合として仮定。既定は 10% で、NetApp のサイジング指針の下限と作成時の既定値に合わせている。比較用に 20% も併記する |
 | S3 Files のしきい値と有効期限 | 既定値 (128 KiB、30 日) を仮定。どちらも設定可能で、費用とレイテンシの両方を動かす |
+| S3 Files のバージョニング | 必須だが、非現行バージョンの保管料金は試算に含めていない |
 | S3 Files の利用可否 | 利用側が AWS 上の Linux コンピュートでマウントヘルパーを入れられるかどうかで、ワークロードごとに判断している |
 | Cache の可用性構成 | Single-AZ を仮定。Cache は Origin から再構築できるという前提に基づく |
 | 試算に含めない項目 | SnapLock、追加 SSD IOPS、スナップショット予約、リージョン間データ転送、VPN と Direct Connect、キャッシュミス時の Origin への転送 |
