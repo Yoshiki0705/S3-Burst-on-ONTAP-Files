@@ -6,7 +6,7 @@ PY ?= python3
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_phony.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
-        audit secrets pinning links links-external budget en-lang counts test all new-pattern \
+        audit secrets pinning links links-external budget en-lang xlang counts test all new-pattern \
         terraform finops finops-write \
         commit-gate clean
 
@@ -82,6 +82,9 @@ switcher-check: ## Verify language switchers, and that no page links to the wron
 switcher-write: ## Regenerate language switcher blocks from what exists on disk
 	@$(PY) tools/sync_lang_switcher.py --write
 
+xlang: ## Links from English into Japanese must be marked (Japanese)
+	@$(PY) tools/check_cross_language_links.py
+
 audit: ## Pre-publication audit (naming / vendor-ref / neutrality / PII / conflation)
 	@$(PY) tools/audit_public_output.py
 
@@ -119,7 +122,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check audit secrets pinning links budget en-lang counts finops test ## Commit gate
+all: lint i18n-check switcher-check xlang audit secrets pinning links budget en-lang counts finops test ## Commit gate
 	@echo "All checks passed."
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x
