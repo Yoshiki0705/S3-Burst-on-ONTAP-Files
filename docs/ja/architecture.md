@@ -143,5 +143,6 @@ AV / ADAS 開発では、実車で記録した走行ログとセンサーデー�
 | [検証状況](verification-status.md) | 検証済みと未検証の区別 |
 | [移植性](portability.md) | 収集層・配布層をプラットフォームごとに置き換える場合 |
 | [代替案との比較](reference/comparison/alternatives.md) | 他の方式が向く条件・向かない条件 |
+| [FinOps の費用構造](reference/comparison/finops-s3-vs-s3ap.md) | 課金次元の違い、構成別の試算、周辺ワークロードへの影響 |
 | [選び方](reference/decision-trees/choosing-this-architecture.md) | この構成を採るかどうかの判断 |
 | [PoC チェックリスト](poc-checklist.md) | 何をどの順に確かめるか |

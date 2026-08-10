@@ -51,13 +51,20 @@
 |---|---|---|---|
 | Origin あたりの Cache 数 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨 | ドキュメント記載 / 挙動は未検証 | ファンアウト数の設計に影響する可能性がある |
 | 対応構成 | 3 通り | ドキュメント記載 | [移植性](../../portability.md)に一覧 |
+| 書き込みモード | write-around (既定) と write-back (ONTAP 9.15.1 以降) | ドキュメント記載 | [FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)。write-around は Origin 確定後に応答、write-back は Cache 確定後に非同期で Origin へ |
+| Cache の階層化 | 不可 | ドキュメント記載 | [対応機能一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)。FabricPool の Origin を Cache できるが、Cache ボリューム自体は階層化されない |
+| Cache のサイジング | Origin の最低 10% を推奨、作成時の既定値も 10% | ドキュメント記載 | [サイジング指針](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html) |
 | セキュリティスタイル | Cache 作成時に Origin から継承される項目として扱われる | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路では未確認（[最初に決めること](../../design-first-decisions.md)） |
 
 ## 書かない数値
 
-性能値とコスト値は、実測して環境を併記できるまで書かない。
+性能値は、実測して環境を併記できるまで書かない。
 環境の併記がない数値は再現できないので、比較にも見積りにも使えない。
 必要な項目は[検証状況](../../verification-status.md)にある。
+
+コストについては、単価と試算を分けて扱う。単価は AWS Price List API から取得した値を
+リージョンと適用開始日つきで[FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md)に置いている。
+そこから出る月額は使用量の仮定に依存するため、試算として扱い実測と混ぜない。
 
 ## 関連ドキュメント
 

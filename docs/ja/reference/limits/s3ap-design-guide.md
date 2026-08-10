@@ -239,11 +239,139 @@ FlexCache 経由の NFS/SMB read からも一貫したデータが見える（�
 FlexGroup を Origin にした FlexCache では NAS バケットが作成可能（`-is-s3-enabled true` の設定で
 [S3 データアクセスも動作する](../../verification/cross-protocol-directions.md)）。
 
+## 層をまたぐ境界値と落とし穴
+
+上限値そのものは[別ページ](s3-access-point.md)にある。
+ここでは**層が違う上限どうしが噛み合って問題になる組み合わせ**を集める。
+どれも単独のページを読んだだけでは気づきにくい。
+
+### サイズの境界は層ごとに違う
+
+| 境界 | 値 | 効く層 | 段階 |
+|---|---|---|---|
+| S3 AP 単一 `PutObject` | 5 GiB | 収集 | 検証済み |
+| S3 AP `UploadPart` 1 パート | 5 GiB | 収集 | 検証済み |
+| S3 AP オブジェクト全体 | 50 GiB | 収集 | 検証済み |
+| S3 AP `GetObject` | サイズ上限なし（Range GET 対応） | 収集 | 検証済み |
+| FlexCache write-back の検証済みファイルサイズ | 100 GB 未満 | 配布 | ドキュメント記載（[ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)） |
+| FlexCache write-back の検証済み WAN 往復 | 200 ms 以内 | 配布 | 同上 |
+
+**S3 AP から収集する限り、この 2 つは衝突しない。** オブジェクト全体が 50 GiB で止まるため、
+write-back の検証範囲である 100 GB の内側に必ず収まる。
+
+衝突するのは経路が変わったときである。**Cache 側の NFS / SMB から直接ファイルを書く場合、
+サイズを止めるものが S3 AP 側にない。** write-back を有効にしていると、
+100 GB を超えたファイルは検証済みの範囲外に出る。
+配布側で大きなファイルを生成する設計（レンダリング出力、シミュレーション結果、
+アーカイブの組み立てなど）では、この境界を設計時に確認する。
+
+### 50 GiB の判定はペイロード転送後に行われる
+
+オブジェクト全体の 50 GiB は `CompleteMultipartUpload` の時点で判定される。
+つまり**全パートを転送し終えてから失敗する**。転送に使った時間とリクエスト課金は戻らない。
+クライアント側で送信前にサイズを検証する。
+
+### スナップショットの取得間隔と write-back
+
+Origin でスナップショットを取ると、その Origin ボリュームに紐づく
+**すべての write-back Cache から未処理のダーティデータを回収する**。
+書き込みが多い時間帯では、この回収に複数回の再試行が必要になる
+([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+
+保護のためにスナップショットを短い間隔で取る運用と、write-back は相性が悪い。
+両方が要るなら、スナップショットの間隔と書き込みのピークをずらす、
+あるいは配布側の書き込みを Origin に寄せる。
+
+### シンプロビジョニングと write-back の無言の切り替え
+
+write-back Cache は、**Origin ボリュームの空き容量が 20% 以下になると自動的に
+write-around へ切り替わる**。閾値は Origin の報告する空き容量と、
+アグリゲートの物理空き容量の**両方**で評価される。
+Origin をオーバープロビジョニングしていると、想定より早く切り替わる ([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+
+切り替わってもエラーは出ない。書き込み遅延が増えることで気づく。
+容量を詰めた設計をしているなら、write-back に依存した性能前提を置かない。
+
+### Cache は階層化できないので、作業セットの増加がそのまま SSD になる
+
+Cache ボリュームは階層化されない ([対応機能一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html))。
+Origin 側で `AUTO` ティアリングを効かせて SSD を小さく保っていても、
+**配布側にはその逃げ場がない**。作業セットが増えた分は SSD の増設になる。
+
+サイジングの指針は Origin の最低 10%、作成時の既定値も 10% ([サイジング指針](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html))。
+小さい Origin では、比率よりも SSD 1 TiB の下限が先に効く。
+費用の出方は[FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md)にまとめている。
+
+### Cache は FlexGroup でなければならない、write-back は単一コンスティチュエントを推奨
+
+AWS のドキュメントは **FlexCache ボリュームは FlexGroup であること**を求めている
+([FlexCache の作成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/create-flexcache.html))。
+一方 write-back のガイドラインは、意図しない退避を避けるために
+**Cache ボリューム全体を単一コンスティチュエントで構成すること**を推奨している
+([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+両方を満たすと「コンスティチュエントが 1 つの FlexGroup」になる。
+
+加えて、この構成の検証では **FlexGroup を ONTAP CLI で作成しようとすると
+FabricPool アグリゲートとの互換性エラーになり、FSx for ONTAP の API で作成する必要があった**
+（[検証記録](../../verification/cross-protocol-directions.md)）。
+作成経路によって成否が変わるので、CLI で失敗しても仕様上不可能とは判断しない。
+
+### Origin ボリュームが 10 を超えるなら write-around
+
+AWS のドキュメントは、読み取り中心で遅延に敏感でない場合、
+**あるいは Origin ファイルシステムの FlexCache Origin ボリュームが 10 を超える場合**に
+write-around を挙げている ([FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html))。
+拠点数を増やすファンアウト設計では、この本数が write-back の可否に効く。
+
+### リネームは両方の層で高くつく
+
+S3 のキーは NFS 側のパスそのものなので、パーティションの付け替えはディレクトリのリネームになる。
+write-back を有効にしている場合、**リネームしたファイルは Cache から退避され、
+ダーティデータを Origin へ流し切るまで他の操作ができない** ([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+
+キー設計をやり直す前提で運用しない。最初から動かさない構造にする。
+（代替案として S3 Files を採る場合も、リネームはプレフィックス配下の全オブジェクトの
+コピーと削除になる。詳細は[FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md)にある）
+
+### 名前の衝突はキー設計の段階でしか防げない
+
+`part1/part2` と `part1/part2/part3` は NAS 上で同時に存在できない。
+前者がファイル、後者が同名ディレクトリを要求するためである ([NAS データ要件](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html))。
+
+マニフェストを `.../day=10/_manifest_14.json` に置き、
+同じ階層に `.../day=10/_manifest_14/` を作る設計にすると衝突する。
+リーフとその下の階層に同じ名前を使わない。
+
+### write-back で Cache 側から変更できる属性は限られる
+
+write-back 有効の Cache で設定できるのは、タイムスタンプ、モードビット、NT ACL、
+所有者、グループ、サイズだけである。それ以外の属性変更は Origin へ転送され、
+**ファイルが Cache から退避される場合がある** ([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+拡張属性を使うアプリケーションを配布側で動かす場合は、事前に確認する。
+
+### SMB の書き込み oplock は write-back で使えない
+
+write-back 有効の Cache では、書き込みの SMB Opportunistic Lock が非対応である
+([ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html))。
+SMB クライアントの性能前提が oplock に依存している場合、write-back と併用できない。
+
+### バージョン要件は Origin と Cache の両方に掛かる
+
+| 項目 | 要件 |
+|---|---|
+| S3 AP（収集層） | ONTAP 9.17.1 以降 |
+| FlexCache write-back | ONTAP 9.15.1 以降で利用可能。9.17.1P1 で重要な改善が入り、Origin と Cache の両方でそれ以降を強く推奨。9.15.1 は本番向けに推奨されない（[ガイドライン](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)） |
+| FlexCache duality（NAS バケット） | ONTAP 9.18.1 以降。加えて `-is-s3-enabled true`（advanced 権限） |
+
+収集層の要件だけを見て版数を決めると、配布側で write-back を使う段階で足りなくなる。
+**両側の要件を先に足し合わせてから版数を決める。**
+
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |
 |---|---|
 | [上限値](s3-access-point.md) | サイズ・名前・構成上の前提 |
+| [FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md) | 課金次元、構成別の試算、代替案の仕様上の制約 |
 | [サポート状況](../../support-matrix.md) | 収集層と配布層の対応マトリクス |
 | [構成の形](../../architecture.md) | この構成が解くことと解かないこと |
 | [最初に決めること](../../design-first-decisions.md) | セキュリティスタイルとボリューム設計の決定順序 |

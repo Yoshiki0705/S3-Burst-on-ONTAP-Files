@@ -53,6 +53,7 @@ Origin のセキュリティスタイルがファンアウト先のプロトコ�
 | 構成の全体像をつかむ | [構成の形](docs/ja/architecture.md) | 5 分 |
 | 採るべき構成か判断する | [選び方](docs/ja/reference/decision-trees/choosing-this-architecture.md) | 5 分 |
 | 他の方式と比べる | [代替案との比較](docs/ja/reference/comparison/alternatives.md) | 10 分 |
+| 費用を見積もる | [FinOps の費用構造](docs/ja/reference/comparison/finops-s3-vs-s3ap.md) | 15 分 |
 | 作る前に決めることを確認する | [最初に決めること](docs/ja/design-first-decisions.md) | 5 分 |
 | 何がどこまで確かめられているか知る | [検証状況](docs/ja/verification-status.md) | 5 分 |
 | 対応バージョンと制約を調べる | [サポート状況](docs/ja/support-matrix.md) | 10 分 |
