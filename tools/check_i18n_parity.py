@@ -128,6 +128,24 @@ def compare(label: str, reference: Path, others: list[tuple[str, Path]]) -> list
     return errors
 
 
+def tier2_count() -> int:
+    """How many documents under docs/ja/ are deliberately not translated.
+
+    Reported on success so that the summary line cannot be read as coverage. "3 document groups in
+    parity" is true whether the repository has three Japanese documents or thirty, and the number
+    that matters when judging whether the split is still the right one is the other one.
+    """
+    ja_root = ROOT / "docs" / "ja"
+    if not ja_root.is_dir():
+        return 0
+    promoted = {name for name, _ in read_manifest()}
+    return sum(
+        1
+        for path in ja_root.rglob("*.md")
+        if str(path.relative_to(ja_root).as_posix()) not in promoted
+    )
+
+
 def main() -> int:
     errors: list[str] = []
     checked = 0
@@ -165,7 +183,11 @@ def main() -> int:
             print(f"  {error}", file=sys.stderr)
         return 1
 
-    print(f"i18n: {checked} document group(s) in parity")
+    tier2 = tier2_count()
+    print(
+        f"i18n: {checked} document group(s) in parity, "
+        f"{tier2} document(s) Japanese-only by policy (Tier 2)"
+    )
     return 0
 
 
