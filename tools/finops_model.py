@@ -1267,6 +1267,134 @@ READ_HEAVY = ReadHeavy(
 )
 
 
+# FabricPool bundles cold blocks into 4 MB objects, so a fetch from the capacity pool is metered in
+# units of that size rather than per file.
+# https://docs.netapp.com/us-en/ontap-whatsnew/ontap98fo_storage_efficiencies.html
+FABRICPOOL_OBJECT_MIB = 4.0
+
+
+def read_request_costs(rh: ReadHeavy) -> dict[str, dict[str, float]]:
+    """Request charges only, per option. Storage and transfer are deliberately left out."""
+    reads = rh.read_requests
+    objects_in_working_set = rh.working_set_gib * 1024 / rh.object_mib
+    objects_in_dataset = rh.dataset_gib * 1024 / rh.object_mib
+    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+
+    # Cache fills pull the working set plus refetches; the share sitting in the capacity pool is
+    # read in FabricPool-sized units.
+    fill_gib = rh.working_set_gib * (1 + rh.refetch_fraction)
+    pool_ops = fill_gib * rh.pool_fraction * 1024 / FABRICPOOL_OBJECT_MIB
+
+    return {
+        "S3 バケットを直接読む": {
+            f"S3 GET ({reads:,.0f} 回)": reads * S3["tier2"].usd,
+        },
+        "FSx for ONTAP S3 AP 経由で読む": {
+            f"S3 AP 経由 GET ({reads:,.0f} 回)": reads * S3["ap_tier2"].usd,
+            f"キャパシティプール読み取り ({pool_ops:,.0f} 操作)": pool_ops
+            * FSX["pool_read"].usd,
+        },
+        "FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)": {
+            "S3 リクエスト": 0.0,
+            f"キャパシティプール読み取り ({pool_ops:,.0f} 操作、キャッシュ充填分のみ)": pool_ops
+            * FSX["pool_read"].usd,
+        },
+        "S3 + S3 Files": {
+            f"S3 GET ({reads:,.0f} 回、しきい値超のためバケットから直接)": reads
+            * S3["tier2"].usd,
+            "S3 Files メタデータ読み取り": reads * metadata_gib * S3FILES["read"].usd,
+            "S3 Files メタデータ取り込み": objects_in_working_set
+            * metadata_gib
+            * S3FILES["write"].usd,
+        },
+        "S3 + DataSync で全量コピー": {
+            f"S3 GET ({objects_in_dataset:,.0f} 回、全量を 1 回)": objects_in_dataset
+            * S3["tier2"].usd,
+            "S3 LIST": math.ceil(objects_in_dataset / 1000) * S3["tier1"].usd,
+            "利用側の読み出し (ローカル)": 0.0,
+        },
+    }
+
+
+def render_read_requests(rh: ReadHeavy) -> list[str]:
+    """Request charges at a fixed read count, and how object size moves them."""
+    costs = read_request_costs(rh)
+    rows = []
+    for label, lines in costs.items():
+        detail = "、".join(f"{k} {usd(v)}" for k, v in lines.items() if v > 0) or "なし"
+        rows.append([label, detail, f"**{usd(sum(lines.values()))}**"])
+
+    direct_egress = tiered_egress(rh.read_gib)
+    direct_requests = sum(costs["S3 バケットを直接読む"].values())
+
+    out = [
+        f"#### 読み取り {rh.reads_per_file:g} 回時点のリクエスト課金",
+        "",
+        f"前提は上と同じで、読み取り回数だけ {rh.reads_per_file:g} 回に固定する。"
+        f"作業セット {gib(rh.working_set_gib)} を {rh.object_mib:g} MiB のオブジェクトで持つと"
+        f"ユニークなオブジェクト数は {rh.working_set_gib * 1024 / rh.object_mib:,.0f} 個、"
+        f"読み出し回数は {rh.read_requests:,.0f} 回になる。",
+        "",
+        *table(["方式", "内訳", "リクエスト課金の合計"], rows),
+        "",
+        f"**この規模ではリクエスト課金は支配項ではない。** 同じ条件での転送料金は {usd(direct_egress)} で、"
+        f"直接読む構成のリクエスト課金 {usd(direct_requests)} の "
+        f"{direct_egress / direct_requests:,.0f} 倍にあたる。"
+        "この構成が読み取り側で効くのは、リクエスト単価ではなく転送量を減らすからである。",
+        "",
+        "FlexCache 経由の読み出しに S3 リクエストは発生しない。"
+        "利用側は NFS / SMB で読むためである。"
+        "残るのはキャッシュ充填時に Origin 側のキャパシティプールから読む分だけで、"
+        f"FabricPool が {FABRICPOOL_OBJECT_MIB:g} MB 単位で扱うためこの操作数で計上している。",
+        "",
+    ]
+
+    # Where request charges do start to matter: small objects.
+    size_rows = []
+    for mib in (8 / 1024, 64 / 1024, 0.25, 1.0, 4.0, 64.0):
+        variant = replace(rh, object_mib=mib)
+        c = read_request_costs(variant)
+        direct = sum(c["S3 バケットを直接読む"].values())
+        ap = sum(c["FSx for ONTAP S3 AP 経由で読む"].values())
+        flex = sum(
+            c["FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)"].values()
+        )
+        size_rows.append(
+            [
+                f"{mib * 1024:,.0f} KiB",
+                f"{variant.read_requests:,.0f}",
+                usd(direct),
+                usd(ap),
+                usd(flex),
+                f"{direct / tiered_egress(variant.read_gib) * 100:.1f}%",
+            ]
+        )
+    out += [
+        "#### リクエスト課金が効いてくるのはオブジェクトが小さいとき",
+        "",
+        "読み出す総量は同じで、オブジェクトサイズだけを変える。回数が変わるので課金額も変わる。",
+        "",
+        *table(
+            [
+                "平均オブジェクトサイズ",
+                "月間の読み出し回数",
+                "S3 を直接読む",
+                "S3 AP 経由",
+                "この構成 (FlexCache)",
+                "直接読む場合の転送料金に対する比",
+            ],
+            size_rows,
+        ),
+        "",
+        "最右列が読みどころである。オブジェクトが数 MiB 以上なら、リクエスト課金は転送料金の 1% に届かない。"
+        "一桁 KiB まで小さくすると数十 % に達し、このときは転送とリクエストの両方が問題になる。"
+        "**「S3 の API コールが高額になる」という見立てが成立するのは、この小オブジェクト側の領域である。**"
+        "オブジェクトが大きいワークロードでは、削減対象は転送量に絞ってよい。",
+        "",
+    ]
+    return out
+
+
 def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
     """The read side, where egress rather than storage decides the bill."""
     egress_direct = tiered_egress(rh.read_gib)
@@ -1354,6 +1482,11 @@ def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
         "こちらは AWS の請求には出ない。",
         "",
     ]
+
+    # Request charges alone, at a read count where the transfer argument is already decided. The
+    # original hypothesis behind this architecture was that S3 request charges hurt as much as
+    # egress. At these object sizes they do not, and saying so is more useful than implying they do.
+    out += render_read_requests(replace(rh, reads_per_file=10.0))
 
     # The number of reads is the whole argument, so show it as a curve.
     rows = []
