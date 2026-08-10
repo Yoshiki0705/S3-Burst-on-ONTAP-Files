@@ -51,6 +51,7 @@ flowchart TD
 | ドキュメント | 内容 |
 |---|---|
 | [代替案との比較](../comparison/alternatives.md) | 各方式の向く条件・向かない条件と代償 |
+| [FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md) | 費用面での判断材料。固定費の下限とリクエスト単価の差 |
 | [最初に決めること](../../design-first-decisions.md) | 保留できない判断 |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
 | [サポート状況](../../support-matrix.md) | 前提となる対応状況と最小バージョン |

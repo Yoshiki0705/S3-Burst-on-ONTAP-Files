@@ -1,0 +1,950 @@
+#!/usr/bin/env python3
+"""Generate the cost tables in `docs/ja/reference/comparison/finops-s3-vs-s3ap.md`.
+
+Why this is a script and not arithmetic typed into the document.
+
+The comparison needs roughly six scenarios with eight line items each, and every line item is a
+product of a list price and an assumed usage figure. Typed into Markdown, that arithmetic is
+unverifiable: a reader cannot tell a transcription slip from a modelling choice, and when a list
+price changes there is no way to find which of the fifty-odd totals moved. Here the prices live in
+one dated table with a source, the scenarios are declarations, and the totals are derived. When a
+price changes, one line changes and `--check` reports every total that no longer matches the
+document.
+
+What this script is not. It is not a measurement. Every total is a model built on stated
+assumptions about object size, retention, read multiplier, storage efficiency and provisioned
+throughput. The list prices are real and sourced; the usage figures are illustrative. The document
+labels them as 試算 for that reason, and the distinction is the point rather than a caveat.
+
+Storage efficiency deserves particular care. AWS publishes "typical savings" of 65% for
+general-purpose file sharing workloads, and that figure is used only where the workload plausibly
+resembles that description. Pre-compressed media gets 0%, because deduplicating an already
+compressed render output does not save anything and assuming otherwise would flatter the
+architecture this repository proposes. Each scenario carries its own assumed rate so the choice is
+visible rather than buried in a constant.
+
+Prices are ap-northeast-1 list prices, on demand, excluding tax and any private pricing. They were
+read from the AWS Price List API on the date in `PRICE_SNAPSHOT`. Re-read them with:
+
+    python3 tools/finops_model.py --show-prices
+
+Run:
+    python3 tools/finops_model.py --write    # regenerate the block in the document
+    python3 tools/finops_model.py --check    # fail if the document is stale
+    python3 tools/finops_model.py            # print the block to stdout
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DOC = ROOT / "docs" / "ja" / "reference" / "comparison" / "finops-s3-vs-s3ap.md"
+BEGIN = "<!-- finops-model:begin -->"
+END = "<!-- finops-model:end -->"
+
+REGION = "ap-northeast-1"
+REGION_LABEL = "アジアパシフィック (東京)"
+PRICE_SNAPSHOT = "2026-08-09"
+
+SOURCE_S3 = "https://aws.amazon.com/s3/pricing/"
+SOURCE_FSX = "https://aws.amazon.com/fsx/netapp-ontap/pricing/"
+SOURCE_DATASYNC = "https://aws.amazon.com/datasync/pricing/"
+
+GIB_PER_TIB = 1024
+SECONDS_PER_MONTH = 30 * 24 * 3600
+
+
+# --------------------------------------------------------------------------- prices
+
+
+@dataclass(frozen=True)
+class Rate:
+    """One billable unit price, carried with the effective date AWS returned for it."""
+
+    usd: float
+    unit: str
+    label: str
+    effective: str
+    source: str
+
+
+# S3, effective 2026-08-01 (AmazonS3 offer publication 2026-08-07).
+S3_STANDARD_TIERS: tuple[tuple[float, float], ...] = (
+    (51_200.0, 0.025),  # first 50 TiB
+    (512_000.0, 0.024),  # next 450 TB
+    (math.inf, 0.023),  # beyond 500 TB
+)
+
+S3 = {
+    "standard": Rate(
+        0.025,
+        "GB-Mo",
+        "S3 Standard ストレージ (最初の 50 TiB)",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "standard_ia": Rate(
+        0.0138, "GB-Mo", "S3 Standard-IA ストレージ", "2026-08-01", SOURCE_S3
+    ),
+    "onezone_ia": Rate(
+        0.011, "GB-Mo", "S3 One Zone-IA ストレージ", "2026-08-01", SOURCE_S3
+    ),
+    "gir": Rate(
+        0.005,
+        "GB-Mo",
+        "S3 Glacier Instant Retrieval ストレージ",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "int_fa": Rate(
+        0.025, "GB-Mo", "S3 Intelligent-Tiering 頻繁アクセス層", "2026-08-01", SOURCE_S3
+    ),
+    "int_ia": Rate(
+        0.0138,
+        "GB-Mo",
+        "S3 Intelligent-Tiering 低頻度アクセス層",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "int_aia": Rate(
+        0.005,
+        "GB-Mo",
+        "S3 Intelligent-Tiering アーカイブインスタントアクセス層",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "tier1": Rate(
+        0.0047 / 1000,
+        "リクエスト",
+        "S3 標準 PUT / COPY / POST / LIST",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "tier2": Rate(
+        0.00037 / 1000,
+        "リクエスト",
+        "S3 標準 GET およびその他",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "ia_tier1": Rate(
+        0.01 / 1000,
+        "リクエスト",
+        "S3 Standard-IA PUT / COPY / POST / LIST",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "ia_tier2": Rate(
+        0.001 / 1000,
+        "リクエスト",
+        "S3 Standard-IA GET およびその他",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "ia_retrieval": Rate(
+        0.01, "GB", "S3 Standard-IA 取り出し", "2026-08-01", SOURCE_S3
+    ),
+    "gir_retrieval": Rate(
+        0.03, "GB", "S3 Glacier Instant Retrieval 取り出し", "2026-08-01", SOURCE_S3
+    ),
+    # Requests reaching an FSx for ONTAP volume through an S3 Access Point.
+    "ap_tier1": Rate(
+        0.00108 / 1000,
+        "リクエスト",
+        "S3 AP 経由 PUT / COPY / POST / LIST (FSx for ONTAP 宛)",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+    "ap_tier2": Rate(
+        0.000029 / 1000,
+        "リクエスト",
+        "S3 AP 経由 GET およびその他 (FSx for ONTAP 宛)",
+        "2026-08-01",
+        SOURCE_S3,
+    ),
+}
+
+# FSx for ONTAP, effective 2026-07-01 (AmazonFSx offer publication 2026-08-05).
+FSX = {
+    "ssd_saz": Rate(
+        0.150,
+        "GB-Mo",
+        "SSD ストレージ Single-AZ (第一 / 第二世代)",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "ssd_maz": Rate(
+        0.300,
+        "GB-Mo",
+        "SSD ストレージ Multi-AZ (第一 / 第二世代)",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "tput_saz1": Rate(
+        0.906,
+        "MBps-Mo",
+        "スループットキャパシティ Single-AZ 第一世代",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "tput_saz2": Rate(
+        2.013,
+        "MBps-Mo",
+        "スループットキャパシティ Single-AZ 第二世代",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "tput_maz1": Rate(
+        1.511,
+        "MBps-Mo",
+        "スループットキャパシティ Multi-AZ 第一世代",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "tput_maz2": Rate(
+        3.148,
+        "MBps-Mo",
+        "スループットキャパシティ Multi-AZ 第二世代",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "iops_saz": Rate(
+        0.0204, "IOPS-Mo", "追加 SSD IOPS Single-AZ", "2026-07-01", SOURCE_FSX
+    ),
+    "iops_maz": Rate(
+        0.0408, "IOPS-Mo", "追加 SSD IOPS Multi-AZ", "2026-07-01", SOURCE_FSX
+    ),
+    "pool_saz": Rate(
+        0.0238,
+        "GB-Mo",
+        "キャパシティプールストレージ Single-AZ",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "pool_maz": Rate(
+        0.0476,
+        "GB-Mo",
+        "キャパシティプールストレージ Multi-AZ",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "pool_read": Rate(
+        0.00037 / 1000,
+        "リクエスト",
+        "キャパシティプール読み取りリクエスト",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "pool_write": Rate(
+        0.0047 / 1000,
+        "リクエスト",
+        "キャパシティプール書き込みリクエスト",
+        "2026-07-01",
+        SOURCE_FSX,
+    ),
+    "backup": Rate(0.050, "GB-Mo", "バックアップストレージ", "2026-07-01", SOURCE_FSX),
+}
+
+DATASYNC = {
+    "basic_gb": Rate(
+        0.0125, "GB", "DataSync 転送 (Basic モード)", "2025-09-01", SOURCE_DATASYNC
+    ),
+    "enhanced_gb": Rate(
+        0.015, "GB", "DataSync 転送 (Enhanced モード)", "2025-09-01", SOURCE_DATASYNC
+    ),
+    "enhanced_exec": Rate(
+        0.55,
+        "タスク実行",
+        "DataSync タスク実行 (Enhanced モード)",
+        "2025-09-01",
+        SOURCE_DATASYNC,
+    ),
+}
+
+# Deployment options, from the FSx for ONTAP user guide's generation comparison table.
+# https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html
+DEPLOYMENTS = {
+    "saz1": {
+        "label": "Single-AZ 第一世代",
+        "api": "SINGLE_AZ_1",
+        "ssd": FSX["ssd_saz"],
+        "tput": FSX["tput_saz1"],
+        "pool": FSX["pool_saz"],
+        "tput_options": (128, 256, 512, 1024, 2048, 4096),
+        "min_ssd_gib": 1024,
+    },
+    "maz1": {
+        "label": "Multi-AZ 第一世代",
+        "api": "MULTI_AZ_1",
+        "ssd": FSX["ssd_maz"],
+        "tput": FSX["tput_maz1"],
+        "pool": FSX["pool_maz"],
+        "tput_options": (128, 256, 512, 1024, 2048, 4096),
+        "min_ssd_gib": 1024,
+    },
+    "saz2": {
+        "label": "Single-AZ 第二世代",
+        "api": "SINGLE_AZ_2",
+        "ssd": FSX["ssd_saz"],
+        "tput": FSX["tput_saz2"],
+        "pool": FSX["pool_saz"],
+        "tput_options": (384, 768, 1536, 3072, 6144),
+        "min_ssd_gib": 1024,
+    },
+    "maz2": {
+        "label": "Multi-AZ 第二世代",
+        "api": "MULTI_AZ_2",
+        "ssd": FSX["ssd_maz"],
+        "tput": FSX["tput_maz2"],
+        "pool": FSX["pool_maz"],
+        "tput_options": (384, 768, 1536, 3072, 6144),
+        "min_ssd_gib": 1024,
+    },
+}
+
+
+# --------------------------------------------------------------------------- helpers
+
+
+def usd(value: float) -> str:
+    return f"${value:,.2f}"
+
+
+def unit_usd(value: float) -> str:
+    """Format a unit price without collapsing the small ones to $0.00."""
+    if value == 0:
+        return "$0"
+    if value >= 0.01:
+        return f"${value:,.4f}".rstrip("0").rstrip(".")
+    return f"${value:.9f}".rstrip("0")
+
+
+def per_1000(rate: Rate) -> str:
+    return f"${rate.usd * 1000:,.6f}".rstrip("0").rstrip(".") + " / 1,000"
+
+
+def gib(value: float) -> str:
+    return f"{value:,.0f} GiB"
+
+
+def tiered_s3_storage(gib_stored: float) -> float:
+    """S3 Standard storage cost across its volume tiers."""
+    remaining, total, floor = gib_stored, 0.0, 0.0
+    for ceiling, price in S3_STANDARD_TIERS:
+        band = min(remaining, ceiling - floor)
+        if band <= 0:
+            break
+        total += band * price
+        remaining -= band
+        floor = ceiling
+    return total
+
+
+def choose_throughput(
+    required_mbps: float, options: tuple[int, ...], headroom: float
+) -> int:
+    """Smallest offered tier that covers the sustained requirement plus burst headroom."""
+    target = required_mbps * (1 + headroom)
+    for option in options:
+        if option >= target:
+            return option
+    return options[-1]
+
+
+# --------------------------------------------------------------------------- scenarios
+
+
+@dataclass
+class Scenario:
+    key: str
+    title: str
+    industry: str
+    objects_per_month: int
+    object_mib: float
+    retention_months: float
+    reads_per_object: float
+    efficiency: float
+    efficiency_note: str
+    deployment: str
+    pool_fraction: float
+    file_protocol_required: bool
+    notes: list[str] = field(default_factory=list)
+    tput_headroom: float = 4.0
+    ssd_headroom: float = 0.20
+    # Months the S3 landing copy survives before a lifecycle rule expires it. 0.25 ≈ 7 days.
+    landing_retention_months: float = 0.25
+
+    @property
+    def ingest_gib(self) -> float:
+        return self.objects_per_month * self.object_mib / 1024
+
+    @property
+    def stored_gib(self) -> float:
+        return self.ingest_gib * self.retention_months
+
+    @property
+    def reads_per_month(self) -> float:
+        return self.objects_per_month * self.reads_per_object
+
+    @property
+    def required_mbps(self) -> float:
+        """Sustained throughput implied by ingest plus reads, in MB/s averaged over the month."""
+        moved_mib = self.ingest_gib * 1024 * (1 + self.reads_per_object)
+        return moved_mib / SECONDS_PER_MONTH
+
+
+def s3_only(sc: Scenario) -> dict[str, float] | None:
+    """Everything in an S3 bucket, consumers speaking the S3 API."""
+    if sc.file_protocol_required:
+        return None
+    return {
+        "ストレージ (S3 Standard)": tiered_s3_storage(sc.stored_gib),
+        "PUT リクエスト": sc.objects_per_month * S3["tier1"].usd,
+        "GET リクエスト": sc.reads_per_month * S3["tier2"].usd,
+    }
+
+
+def fsx_component(sc: Scenario) -> dict[str, float]:
+    """The file system the consumers read from.
+
+    Identical in both file-protocol options. The tiering ratio, the storage efficiency and the
+    provisioned throughput are properties of the workload and of how the volume is configured, not
+    of how bytes arrived. Modelling the sync option without tiering would inflate it by the whole
+    capacity pool discount and make this repository's architecture look better than it is.
+    """
+    dep = DEPLOYMENTS[sc.deployment]
+    logical_ssd = sc.stored_gib * (1 - sc.pool_fraction)
+    logical_pool = sc.stored_gib * sc.pool_fraction
+    ssd = max(
+        dep["min_ssd_gib"],
+        math.ceil(logical_ssd * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+    )
+    pool = logical_pool * (1 - sc.efficiency)
+    tput = choose_throughput(sc.required_mbps, dep["tput_options"], sc.tput_headroom)
+
+    lines = {
+        f"SSD ストレージ ({gib(ssd)})": ssd * dep["ssd"].usd,
+        f"スループットキャパシティ ({tput} MBps)": tput * dep["tput"].usd,
+    }
+    if sc.pool_fraction > 0:
+        lines[f"キャパシティプールストレージ ({gib(pool)})"] = pool * dep["pool"].usd
+        lines["キャパシティプール読み取りリクエスト"] = (
+            sc.reads_per_month * sc.pool_fraction * FSX["pool_read"].usd
+        )
+    return lines
+
+
+def s3_plus_sync(sc: Scenario) -> dict[str, float]:
+    """The same file system, fed by an S3 landing bucket and a DataSync task.
+
+    The landing bucket is assumed to hold each object only until the task has copied it and a
+    lifecycle rule expires it, so its storage line is a fraction of a month rather than the full
+    retention period. Organisations that keep the S3 copy as the archive of record pay the full
+    retention instead, which widens the gap; the shorter assumption is used because it is the one
+    less favourable to the architecture this repository proposes.
+    """
+    lines = dict(fsx_component(sc))
+    landing_gib = sc.ingest_gib * sc.landing_retention_months
+    list_calls = math.ceil(sc.objects_per_month / 1000)
+    lines[f"ストレージ (S3 Standard、着信面 {gib(landing_gib)})"] = tiered_s3_storage(
+        landing_gib
+    )
+    lines["PUT リクエスト (S3 バケット宛)"] = sc.objects_per_month * S3["tier1"].usd
+    lines["GET / LIST リクエスト (同期の読み出し)"] = (
+        sc.objects_per_month * S3["tier2"].usd + list_calls * S3["tier1"].usd
+    )
+    lines["DataSync 転送"] = sc.ingest_gib * DATASYNC["basic_gb"].usd
+    return lines
+
+
+def fsx_s3ap(sc: Scenario) -> dict[str, float]:
+    """The same file system, written through an S3 Access Point. No second copy, no task."""
+    lines = dict(fsx_component(sc))
+    lines["PUT リクエスト (S3 AP 経由)"] = sc.objects_per_month * S3["ap_tier1"].usd
+    return lines
+
+
+SCENARIOS: list[Scenario] = [
+    Scenario(
+        key="telemetry",
+        title="車載 / IoT テレメトリ — 小オブジェクト高頻度",
+        industry="自動車、製造、IoT",
+        objects_per_month=300_000_000,
+        object_mib=0.0625,  # 64 KiB
+        retention_months=1.0,
+        reads_per_object=2.0,
+        efficiency=0.65,
+        efficiency_note="テキスト / JSON 主体。AWS が汎用ファイル共有の典型として公表する 65% を当てる",
+        deployment="saz1",
+        pool_fraction=0.0,
+        file_protocol_required=False,
+        notes=[
+            "3 億オブジェクト / 月 (1 日あたり 1,000 万) を 64 KiB で受ける",
+            "利用側が S3 API を話せる場合を想定し、S3 単独も参考として並べる。"
+            "NFS / SMB が要るなら S3 単独は選択肢から外れる",
+        ],
+    ),
+    Scenario(
+        key="hil",
+        title="HiL テストベンチ — 走行ログを装置へ配る",
+        industry="自動車 (AV / ADAS)",
+        objects_per_month=20_000_000,
+        object_mib=1.0,
+        retention_months=2.0,
+        reads_per_object=1.5,
+        efficiency=0.50,
+        efficiency_note="一部が既圧縮の混在データ。汎用ファイル共有の 65% より保守的に置く",
+        deployment="saz1",
+        pool_fraction=0.30,
+        file_protocol_required=True,
+        notes=[
+            "テストベンチは NFS / SMB マウントしか話さない。S3 単独は要件を満たさない",
+            "3 割は再読み出し頻度が低くキャパシティプールへ落ちるものとして置く",
+        ],
+    ),
+    Scenario(
+        key="eda",
+        title="EDA / CAE — バースト読み出し、メタデータ操作が多い",
+        industry="半導体、製造",
+        objects_per_month=60_000_000,
+        object_mib=0.25,  # 256 KiB
+        retention_months=3.0,
+        reads_per_object=4.0,
+        efficiency=0.65,
+        efficiency_note="ソースとネットリストが主体で重複が多い。汎用ファイル共有の 65% を当てる",
+        deployment="saz2",
+        pool_fraction=0.40,
+        file_protocol_required=True,
+        notes=[
+            "ツールチェーンが POSIX セマンティクスを要求する。S3 単独は要件を満たさない",
+            "第二世代を選ぶ理由は単価ではなく上限 (SSD 512 TiB、200,000 IOPS)",
+        ],
+    ),
+    Scenario(
+        key="media",
+        title="メディア / レンダリング — 大オブジェクト、リクエストは少ない",
+        industry="メディア、エンターテインメント",
+        objects_per_month=50_000,
+        object_mib=500.0,
+        retention_months=3.0,
+        reads_per_object=3.0,
+        efficiency=0.0,
+        efficiency_note="既に圧縮された素材。重複排除と圧縮の効果は見込まない",
+        deployment="saz1",
+        pool_fraction=0.80,
+        file_protocol_required=True,
+        notes=[
+            "レンダリングノードは NFS マウント。S3 単独は要件を満たさない",
+            "リクエスト単価の差はほぼ効かない。効くのはスループットとストレージ",
+        ],
+    ),
+    Scenario(
+        key="genomics",
+        title="ゲノム解析 — シーケンサー出力を HPC へ",
+        industry="ライフサイエンス、研究",
+        objects_per_month=2_000_000,
+        object_mib=8.0,
+        retention_months=6.0,
+        reads_per_object=2.0,
+        efficiency=0.30,
+        efficiency_note="FASTQ / BAM は部分的に圧縮済み。保守的に 30% を置く",
+        deployment="saz1",
+        pool_fraction=0.70,
+        file_protocol_required=True,
+        notes=[
+            "HPC クラスタは NFS マウント。S3 単独は要件を満たさない",
+            "長期保持が効くため、キャパシティプールへの階層化が最大のレバーになる",
+        ],
+    ),
+]
+
+
+# --------------------------------------------------------------------------- rendering
+
+
+def table(headers: list[str], rows: list[list[str]]) -> list[str]:
+    out = [
+        "| " + " | ".join(headers) + " |",
+        "|" + "|".join(["---"] * len(headers)) + "|",
+    ]
+    out += ["| " + " | ".join(row) + " |" for row in rows]
+    return out
+
+
+def render_prices() -> list[str]:
+    out = [
+        "### 単価表",
+        "",
+        f"{REGION_LABEL} (`{REGION}`)、オンデマンド、税別。"
+        f"AWS Price List API から {PRICE_SNAPSHOT} に取得したもので、`effective` は API が返した適用開始日である。",
+        "",
+    ]
+    rows = []
+    for group, rates in (("S3", S3), ("FSx for ONTAP", FSX), ("DataSync", DATASYNC)):
+        for rate in rates.values():
+            shown = (
+                per_1000(rate)
+                if rate.unit == "リクエスト"
+                else f"{unit_usd(rate.usd)} / {rate.unit}"
+            )
+            rows.append([group, rate.label, shown, rate.effective])
+    out += table(["サービス", "課金項目", "単価", "effective"], rows)
+    out += [
+        "",
+        "S3 Standard のストレージ単価は使用量で段階が変わる"
+        f" (最初の 50 TiB {unit_usd(0.025)}、次の 450 TB {unit_usd(0.024)}、500 TB 超 {unit_usd(0.023)} / GB-Mo)。"
+        "以下の試算はこの段階を反映している。",
+        "",
+    ]
+    return out
+
+
+def render_request_asymmetry() -> list[str]:
+    put_ratio = S3["tier1"].usd / S3["ap_tier1"].usd
+    get_ratio = S3["tier2"].usd / S3["ap_tier2"].usd
+    ia_put_ratio = S3["ia_tier1"].usd / S3["ap_tier1"].usd
+    rows = [
+        [
+            "PUT / COPY / POST / LIST",
+            per_1000(S3["tier1"]),
+            per_1000(S3["ap_tier1"]),
+            f"{put_ratio:.2f} 倍",
+        ],
+        [
+            "GET およびその他",
+            per_1000(S3["tier2"]),
+            per_1000(S3["ap_tier2"]),
+            f"{get_ratio:.2f} 倍",
+        ],
+    ]
+    return [
+        "### リクエスト単価の非対称",
+        "",
+        "同じ API 操作でも、宛先が S3 バケットか FSx for ONTAP ボリュームかで単価が違う。",
+        "",
+        *table(
+            [
+                "操作",
+                "S3 バケット宛",
+                "S3 AP 経由 (FSx for ONTAP 宛)",
+                "S3 バケット宛が何倍か",
+            ],
+            rows,
+        ),
+        "",
+        f"低頻度アクセス層を選ぶと逆に開く。S3 Standard-IA の PUT は {per_1000(S3['ia_tier1'])} で、"
+        f"S3 AP 経由の {ia_put_ratio:.1f} 倍にあたる。"
+        "保存単価を下げる目的で階層を落とすと、書き込みが多いワークロードではリクエスト側で戻ってくる。",
+        "",
+    ]
+
+
+def render_floor() -> list[str]:
+    rows = []
+    for dep in DEPLOYMENTS.values():
+        min_tput = dep["tput_options"][0]
+        ssd_cost = dep["min_ssd_gib"] * dep["ssd"].usd
+        tput_cost = min_tput * dep["tput"].usd
+        rows.append(
+            [
+                dep["label"],
+                f"`{dep['api']}`",
+                gib(dep["min_ssd_gib"]),
+                f"{min_tput} MBps",
+                usd(ssd_cost),
+                usd(tput_cost),
+                f"**{usd(ssd_cost + tput_cost)}**",
+            ]
+        )
+    return [
+        "### 固定費の下限",
+        "",
+        "S3 バケットに下限はない。1 バイトも置かなければ請求は発生しない。"
+        "FSx for ONTAP は SSD 1 TiB とスループットキャパシティ 1 段が最小構成で、"
+        "使用量に関わらずこの分が毎月かかる。",
+        "",
+        *table(
+            [
+                "デプロイ",
+                "API 値",
+                "最小 SSD",
+                "最小スループット",
+                "SSD 分",
+                "スループット分",
+                "月額下限",
+            ],
+            rows,
+        ),
+        "",
+        "第二世代の最小スループットは 384 MBps で、第一世代の 128 MBps より 3 段上にあたる。"
+        "第二世代を選ぶ理由は MBps あたりの単価ではなく、"
+        "SSD 512 TiB、200,000 IOPS、Single-AZ で最大 12 HA ペアという上限の側にある"
+        "([世代の比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html))。"
+        "上限に用がないワークロードで第二世代を選ぶと、使わない余力に払うことになる。",
+        "",
+    ]
+
+
+def render_object_size_sensitivity() -> list[str]:
+    sizes_kib = (8, 32, 64, 128, 256, 1024, 8192)
+    rows = []
+    for kib in sizes_kib:
+        objects_per_gib = 1024 * 1024 / kib
+        s3_put = objects_per_gib * S3["tier1"].usd
+        ap_put = objects_per_gib * S3["ap_tier1"].usd
+        rows.append(
+            [
+                f"{kib:,} KiB",
+                f"{objects_per_gib:,.0f}",
+                unit_usd(s3_put),
+                unit_usd(ap_put),
+                f"{s3_put / S3['standard'].usd:.1f} 倍",
+            ]
+        )
+    crossover_mib = S3["tier1"].usd * 1024 / S3["standard"].usd
+    return [
+        "### オブジェクトサイズが効く理由",
+        "",
+        "リクエスト課金は容量ではなく回数にかかる。"
+        "同じ 1 GiB を書くとき、オブジェクトが小さいほど回数が増え、リクエスト課金が保存料金を追い越す。",
+        "",
+        *table(
+            [
+                "平均オブジェクトサイズ",
+                "1 GiB あたりの PUT 回数",
+                "S3 バケット宛の PUT / GiB",
+                "S3 AP 経由の PUT / GiB",
+                "S3 の PUT が S3 Standard 1 か月保存料の何倍か",
+            ],
+            rows,
+        ),
+        "",
+        f"平均オブジェクトサイズが約 {crossover_mib * 1024:,.0f} KiB を下回ると、"
+        "S3 バケットへの PUT 料金が S3 Standard の 1 か月分の保存料金を超える。"
+        "小さいオブジェクトを高頻度で書く収集系では、保存単価ではなくリクエスト単価が支配項になる。",
+        "",
+    ]
+
+
+def render_scenario(sc: Scenario) -> list[str]:
+    dep = DEPLOYMENTS[sc.deployment]
+    options: list[tuple[str, dict[str, float] | None]] = [
+        ("S3 単独 (利用側も S3 API)", s3_only(sc)),
+        ("S3 バケット + DataSync + FSx for ONTAP", s3_plus_sync(sc)),
+        ("FSx for ONTAP S3 AP (この構成)", fsx_s3ap(sc)),
+    ]
+
+    out = [
+        f"#### {sc.title}",
+        "",
+        f"想定業種: {sc.industry}",
+        "",
+        *table(
+            ["前提", "値"],
+            [
+                ["月間オブジェクト数", f"{sc.objects_per_month:,}"],
+                ["平均オブジェクトサイズ", f"{sc.object_mib * 1024:,.0f} KiB"],
+                ["月間書き込み量", gib(sc.ingest_gib)],
+                ["保持期間", f"{sc.retention_months:g} か月"],
+                ["定常保存量 (論理)", gib(sc.stored_gib)],
+                ["1 オブジェクトあたり読み出し回数", f"{sc.reads_per_object:g}"],
+                ["ストレージ効率の仮定", f"{sc.efficiency:.0%} — {sc.efficiency_note}"],
+                ["デプロイ", f"{dep['label']} (`{dep['api']}`)"],
+                ["平均所要スループット", f"{sc.required_mbps:,.1f} MB/s"],
+                ["キャパシティプールへ落とす割合", f"{sc.pool_fraction:.0%}"],
+                [
+                    "スループットの余裕",
+                    f"平均所要の {sc.tput_headroom + 1:g} 倍を満たす最小の段を選ぶ",
+                ],
+                [
+                    "SSD のプロビジョニング余裕",
+                    f"効率適用後の {sc.ssd_headroom:.0%} 増し",
+                ],
+                [
+                    "着信面 (S3) の保持期間",
+                    f"{sc.landing_retention_months:g} か月 — 同期後にライフサイクルで失効させる想定",
+                ],
+                [
+                    "利用側がファイルプロトコルを要求するか",
+                    "はい" if sc.file_protocol_required else "いいえ",
+                ],
+            ],
+        ),
+        "",
+    ]
+    for note in sc.notes:
+        out.append(f"- {note}")
+    out.append("")
+
+    totals: dict[str, float] = {}
+    for label, lines in options:
+        if lines is None:
+            out += [f"**{label}**: 要件を満たさないため試算しない。", ""]
+            continue
+        total = sum(lines.values())
+        totals[label] = total
+        rows = [[item, usd(cost)] for item, cost in lines.items()]
+        rows.append(["**合計 (月額)**", f"**{usd(total)}**"])
+        rows.append(["論理 1 GiB あたり", unit_usd(total / sc.stored_gib)])
+        out += [f"**{label}**", "", *table(["内訳", "月額"], rows), ""]
+
+    ap_label = "FSx for ONTAP S3 AP (この構成)"
+    sync_label = "S3 バケット + DataSync + FSx for ONTAP"
+    if ap_label in totals and sync_label in totals:
+        delta = totals[sync_label] - totals[ap_label]
+        pct = delta / totals[sync_label] * 100
+        direction = "下回る" if delta > 0 else "上回る"
+
+        # Name the dominant term rather than reciting the same three causes every time. Which one
+        # dominates changes with object size, and that change is the finding.
+        shared = fsx_component(sc)
+        contributions = {k: v for k, v in s3_plus_sync(sc).items() if k not in shared}
+        contributions["PUT リクエスト (S3 AP 経由) の節約"] = -(
+            sc.objects_per_month * S3["ap_tier1"].usd
+        )
+        top = max(contributions.items(), key=lambda kv: abs(kv[1]))
+        top_share = abs(top[1]) / abs(delta) * 100 if delta else 0.0
+
+        out += [
+            f"同期ジョブを挟む構成と比べ、この構成は月額 {usd(abs(delta))} "
+            f"({abs(pct):.0f}%) {direction}。"
+            f"差の最大項は「{top[0]}」で、差の {top_share:.0f}% を占める。",
+            "",
+        ]
+    return out
+
+
+def render_marginal_cost() -> list[str]:
+    """The case this repository actually addresses: the file system already exists."""
+    sc = next(s for s in SCENARIOS if s.key == "telemetry")
+    shared = fsx_component(sc)
+    ap_incremental = sum(v for k, v in fsx_s3ap(sc).items() if k not in shared)
+    alt_incremental = sum(v for k, v in s3_plus_sync(sc).items() if k not in shared)
+    return [
+        "### 既に FSx for ONTAP がある場合の増分",
+        "",
+        "この構成が対象とする状況では、利用側が NFS / SMB を要求するため FSx for ONTAP は既にある。"
+        "そこに S3 の受け口を足すときの比較は、"
+        "グリーンフィールドの「S3 か FSx for ONTAP か」ではなく「増分としてどちらが安いか」になる。",
+        "",
+        f"前提は上の「{SCENARIOS[0].title}」と同じ (3 億オブジェクト / 月、64 KiB)。"
+        "SSD とスループットは既存ワークロードのために既に払っているものとして、増分だけを並べる。",
+        "",
+        *table(
+            ["増分", "内訳", "月額"],
+            [
+                ["S3 AP を足す", "S3 AP 経由 PUT のみ", usd(ap_incremental)],
+                [
+                    "S3 バケットと同期ジョブを足す",
+                    "S3 保存 + S3 PUT + 同期の読み出し GET + DataSync 転送",
+                    usd(alt_incremental),
+                ],
+                ["差", "", f"**{usd(alt_incremental - ap_incremental)}**"],
+            ],
+        ),
+        "",
+        "S3 AP はアクセスポイント自体に時間課金がないため、増分はリクエスト課金に集約される。"
+        "同期ジョブ側の増分には、同じバイト列を 2 系統で持つ保存料金が含まれる。"
+        "この差は容量が増えても縮まらない。",
+        "",
+    ]
+
+
+def render() -> str:
+    out = [
+        BEGIN,
+        "",
+        "<!-- 生成物。編集しない。tools/finops_model.py で再生成する -->",
+        "",
+        *render_prices(),
+        *render_request_asymmetry(),
+        *render_floor(),
+        *render_object_size_sensitivity(),
+        "### ユースケース別の試算",
+        "",
+        "いずれも**試算**であり実測ではない。単価は上の単価表、使用量は各表の前提に置いた仮定である。",
+        "自分のワークロードで置き換えるべき値は、月間オブジェクト数、平均オブジェクトサイズ、"
+        "保持期間、読み出し回数、ストレージ効率の 5 つ。",
+        "",
+    ]
+    for sc in SCENARIOS:
+        out += render_scenario(sc)
+    out += render_marginal_cost()
+    out += [END]
+    return "\n".join(out).rstrip() + "\n"
+
+
+# --------------------------------------------------------------------------- entry
+
+
+def show_prices() -> None:
+    print(f"# {REGION} list prices, snapshot {PRICE_SNAPSHOT}")
+    for group, rates in (("S3", S3), ("FSX", FSX), ("DATASYNC", DATASYNC)):
+        for key, rate in rates.items():
+            print(
+                f"{group:9} {key:16} {rate.usd:<14.10g} {rate.unit:12} effective {rate.effective}"
+            )
+
+
+def splice(text: str, block: str) -> str:
+    pattern = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.DOTALL)
+    if not pattern.search(text):
+        raise SystemExit(f"{DOC}: markers {BEGIN} / {END} not found")
+    return pattern.sub(block.rstrip("\n"), text)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--write", action="store_true", help="regenerate the block in the document"
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="fail if the document is stale"
+    )
+    parser.add_argument(
+        "--show-prices", action="store_true", help="print the price table"
+    )
+    args = parser.parse_args()
+
+    if args.show_prices:
+        show_prices()
+        return 0
+
+    block = render()
+
+    if not (args.write or args.check):
+        print(block, end="")
+        return 0
+
+    if not DOC.exists():
+        raise SystemExit(f"{DOC}: not found")
+    original = DOC.read_text(encoding="utf-8")
+    updated = splice(original, block)
+
+    if args.write:
+        if updated != original:
+            DOC.write_text(updated, encoding="utf-8")
+            print(f"finops-model: rewrote {DOC.relative_to(ROOT)}")
+        else:
+            print("finops-model: already current")
+        return 0
+
+    if updated != original:
+        print(
+            "finops-model: generated cost tables are stale.\n"
+            "  Run: python3 tools/finops_model.py --write",
+            file=sys.stderr,
+        )
+        return 1
+    print("finops-model: current")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

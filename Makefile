@@ -7,7 +7,7 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
         audit secrets pinning links links-external budget en-lang counts test all new-pattern \
-        terraform \
+        terraform finops finops-write \
         commit-gate clean
 
 help: ## Show available targets
@@ -110,10 +110,16 @@ en-lang: ## Catch untranslated Japanese in docs/en/
 counts: ## Verify every count stated in prose against the filesystem
 	@$(PY) tools/check_derived_counts.py
 
+finops: ## Verify the generated cost tables match the model
+	@$(PY) tools/finops_model.py --check
+
+finops-write: ## Regenerate the cost tables from the model
+	@$(PY) tools/finops_model.py --write
+
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check audit secrets pinning links budget en-lang counts test ## Commit gate
+all: lint i18n-check switcher-check audit secrets pinning links budget en-lang counts finops test ## Commit gate
 	@echo "All checks passed."
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x

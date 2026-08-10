@@ -90,5 +90,6 @@ NAS 上のデータを DataSync / rsync / robocopy / 自作 ETL で S3 に複製
 | ドキュメント | 内容 |
 |---|---|
 | [選び方](../decision-trees/choosing-this-architecture.md) | この表を判断に落とすフローチャート |
+| [FinOps の費用構造](finops-s3-vs-s3ap.md) | この表の「コスト」を課金次元に分解し、構成別に試算したもの |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
 | [検証状況](../../verification-status.md) | 未検証の範囲 |

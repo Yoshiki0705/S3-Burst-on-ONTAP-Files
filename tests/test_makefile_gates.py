@@ -32,6 +32,7 @@ NOT_IN_ALL = {
     "lint",  # an aggregate, and its own members are asserted below
     "format-python",  # rewrites files
     "switcher-write",  # rewrites files
+    "finops-write",  # rewrites files; `finops` is the gate that runs in the aggregate
     "links-external",  # needs a network
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate

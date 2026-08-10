@@ -52,6 +52,7 @@ nothing to lose if it does not. Detail and sources are in
 | Understand the shape of the architecture | [Architecture](../ja/architecture.md) | 5 min |
 | Decide whether to adopt it | [Selection flowchart](../ja/reference/decision-trees/choosing-this-architecture.md) | 5 min |
 | Compare it with other approaches | [Alternatives](../ja/reference/comparison/alternatives.md) | 10 min |
+| Estimate what it costs | [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (JA) | 15 min |
 | Check what must be decided up front | [Decisions that come first](../ja/design-first-decisions.md) | 5 min |
 | See how far each claim is confirmed | [Verification status](../ja/verification-status.md) | 5 min |
 | Look up versions and constraints | [Support matrix](../ja/support-matrix.md) | 10 min |
