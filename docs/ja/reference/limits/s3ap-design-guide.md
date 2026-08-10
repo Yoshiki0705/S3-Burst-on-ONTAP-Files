@@ -113,6 +113,94 @@ s3://<ap-alias>/objects/a3/b2/object-uuid-001.bin
 | ルート `/` での全件 LIST | ボリューム全体を走査。数十万件で数十秒〜タイムアウト | Prefix を必ず指定 |
 | スラッシュなしのフラットキー大量投入 | 全ファイルがルートディレクトリに集中 | 階層パーティションを使う |
 | 再帰的 LIST（Delimiter なし） | 全サブディレクトリを再帰走査 | 階層ごとに LIST |
+| 投入ボリュームを FlexCache する | 書き込み先をキャッシュする意味がなく、スループットを食い合う | 投入用と消費用でボリュームを分ける |
+| NFS 側で `find /mnt/vol/` | パーティション構造を無視して全走査 | マニフェストまたはパス生成で探索 |
+
+### パーティション粒度の決め方
+
+**「1 時間あたりの投入ファイル数 ÷ パーティション数 < 1 万件」** を満たす粒度まで切る。
+
+| 投入レート | 推奨粒度 | 例 |
+|---|---|---|
+| 数百件/日 | `year/month/day/` | バッチ投入、レポート |
+| 数千件/時 | `year/month/day/hour/` | IoT テレメトリ |
+| 数万件/時 | `year/month/day/hour/` + デバイス別 | 大規模 IoT |
+| 数十万件/時 | ハッシュバケット 2 桁（256 分割） | UUID ベースのオブジェクト |
+
+## ボリューム設計 — 投入用と消費用を分ける
+
+**S3 キー設計は NFS 側のディレクトリ構造そのものです。** 同じボリュームに大量投入と NFS 読み取りが
+同居すると、スループット競合とディレクトリ肥大化が同時に起こる。
+
+### 推奨構成
+
+```text
+Origin FS (FSx for ONTAP)
+├── vol_ingest_telemetry    ← S3 AP アタッチ（IoT 投入用）
+│   └── /year=YYYY/month=MM/day=DD/hour=HH/{device}_{uuid}.json
+├── vol_ingest_artifacts    ← S3 AP アタッチ（CI/CD 成果物）
+│   └── /{repo}/{branch}/{build_id}/{artifact}
+├── vol_shared_data         ← S3 AP アタッチ（設計データ・共有素材）
+│   └── /{project}/{version}/{filename}
+└── vol_processed           ← NFS only（処理済み、配布用）
+    └── /{output_type}/{date}/{result}
+
+Cache Site (FlexCache)
+├── fc_shared_data          ← vol_shared_data のキャッシュ
+└── fc_processed            ← vol_processed のキャッシュ
+    （vol_ingest_* は FlexCache しない）
+```
+
+### 設計原則
+
+| 原則 | 理由 |
+|---|---|
+| 投入用ボリュームは FlexCache しない | 書き込み先をキャッシュする意味がない。スループットの無駄 |
+| FlexCache は消費用ボリュームのみ | 必要なデータだけが pull される |
+| 投入と消費でボリュームを分ける | スループット競合を避け、それぞれ独立にサイズ/ティアリング設定可能 |
+| S3 AP は投入用ボリュームにアタッチ | 消費用は NFS/SMB のみで十分 |
+
+### 投入ボリュームのティアリング
+
+高頻度投入 → すぐに消費 → cold 化するデータには `AUTO` ティアリングが有効。
+31 日（デフォルト cooling period）経過したデータは capacity tier に移り、SSD コストを抑える。
+FlexCache 側は hot data だけを保持するため、ティアリングの影響を受けない。
+
+## NFS 側のファイル探索戦略
+
+S3 AP で投入されたデータを NFS/SMB で消費する際、ディレクトリを走査するのではなく
+**「何が投入されたかを知る仕組み」** を用意する。
+
+### マニフェストパターン（推奨）
+
+投入完了時にマニフェストファイルを書き、NFS 側はそれだけ読む：
+
+```text
+# 投入側（Lambda / パイプライン）の最後に
+s3://ap-alias/data/year=2026/month=08/day=10/_manifest_14.json
+内容: {"files": ["hour=14/sensor_001.json", ...], "count": 42, "timestamp": "..."}
+
+# NFS 側のスクリプト
+cat /mnt/cache/data/year=2026/month=08/day=10/_manifest_14.json | jq -r '.files[]'
+# → ディレクトリを走査せず、投入されたファイルだけを処理
+```
+
+### パス生成パターン
+
+パーティション構造が既知なら、スクリプト側でパスを生成して直接アクセス：
+
+```bash
+# 昨日のデータを処理するスクリプト — find を使わない
+YESTERDAY=$(date -d "yesterday" +%Y/month=%m/day=%d)
+for f in /mnt/cache/data/year=$YESTERDAY/*.json; do
+  process "$f"
+done
+```
+
+### inotifywait / FPolicy イベント
+
+リアルタイム処理が必要な場合は、NFS 側で `inotifywait` またはサーバー側で FPolicy イベントを
+使い、「ファイルが現れたら処理」のイベント駆動にする。ポーリング（定期的な `ls`）はスケールしない。
 
 ## マルチプロトコル一貫性
 
@@ -148,8 +236,8 @@ FlexCache 経由の NFS/SMB read からも一貫したデータが見える（�
 | 推奨用途 | 単一ワークロード / PoC | 大規模データ / マルチテナント |
 | この構成での推奨 | 検証・小規模から開始 | 本番の大規模データ |
 
-FlexGroup を Origin にした FlexCache では NAS バケットが作成可能（ただし[現時点では
-FlexCache 上のデータアクセスが動作しない](../../verification/cross-protocol-directions.md)）。
+FlexGroup を Origin にした FlexCache では NAS バケットが作成可能（`-is-s3-enabled true` の設定で
+[S3 データアクセスも動作する](../../verification/cross-protocol-directions.md)）。
 
 ## 関連ドキュメント
 
@@ -158,4 +246,6 @@ FlexCache 上のデータアクセスが動作しない](../../verification/cros
 | [上限値](s3-access-point.md) | サイズ・名前・構成上の前提 |
 | [サポート状況](../../support-matrix.md) | 収集層と配布層の対応マトリクス |
 | [構成の形](../../architecture.md) | この構成が解くことと解かないこと |
+| [最初に決めること](../../design-first-decisions.md) | セキュリティスタイルとボリューム設計の決定順序 |
+| [PoC チェックリスト](../../poc-checklist.md) | 何をどの順に確かめるか |
 | [姉妹リポジトリ: 互換性ノート](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | Lambda / Step Functions 連携の詳細 |
