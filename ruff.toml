@@ -7,3 +7,10 @@ target-version = "py312"
 # ISC004: implicit string concatenation in a list — used for readable multi-line error messages.
 # PIE810: merge startswith calls — readability preference, not a defect.
 ignore = ["PLW1510", "ISC004", "PIE810"]
+
+# E402: the audit import must follow the sys.path insert that makes tools/ importable, so it cannot
+# sit with the other imports. Suppressed here rather than with a `# noqa`, because ruff releases
+# after the pinned one stop reporting E402 for this shape and then flag the noqa itself as unused —
+# the two versions cannot both be satisfied by an inline comment.
+[lint.per-file-ignores]
+"scripts/commit_gate.py" = ["E402"]

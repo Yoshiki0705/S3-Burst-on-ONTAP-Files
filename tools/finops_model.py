@@ -55,6 +55,10 @@ PRICE_SNAPSHOT = "2026-08-09"
 SOURCE_S3 = "https://aws.amazon.com/s3/pricing/"
 SOURCE_FSX = "https://aws.amazon.com/fsx/netapp-ontap/pricing/"
 SOURCE_DATASYNC = "https://aws.amazon.com/datasync/pricing/"
+SOURCE_FLEXCACHE_FEATURES = "https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html"
+SOURCE_FLEXCACHE_SIZING = (
+    "https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html"
+)
 
 GIB_PER_TIB = 1024
 SECONDS_PER_MONTH = 30 * 24 * 3600
@@ -379,6 +383,12 @@ class Scenario:
     ssd_headroom: float = 0.20
     # Months the S3 landing copy survives before a lifecycle rule expires it. 0.25 ≈ 7 days.
     landing_retention_months: float = 0.25
+    # Cache size as a fraction of origin logical data. NetApp's documented best practice is at
+    # least 10 percent, and 10 percent is also the create default, so 0.10 is the baseline here.
+    cache_ratio: float = 0.10
+    # A cache is rebuildable from the origin, which is why Single-AZ is defensible for it even
+    # when the origin is Multi-AZ.
+    cache_deployment: str = "saz1"
 
     @property
     def ingest_gib(self) -> float:
@@ -391,6 +401,11 @@ class Scenario:
     @property
     def reads_per_month(self) -> float:
         return self.objects_per_month * self.reads_per_object
+
+    @property
+    def cache_required_mbps(self) -> float:
+        """Sustained read throughput the distribution site serves, in MB/s over the month."""
+        return self.ingest_gib * 1024 * self.reads_per_object / SECONDS_PER_MONTH
 
     @property
     def required_mbps(self) -> float:
@@ -467,6 +482,60 @@ def fsx_s3ap(sc: Scenario) -> dict[str, float]:
     """The same file system, written through an S3 Access Point. No second copy, no task."""
     lines = dict(fsx_component(sc))
     lines["PUT リクエスト (S3 AP 経由)"] = sc.objects_per_month * S3["ap_tier1"].usd
+    return lines
+
+
+# ------------------------------------------------------------------ distribution site
+
+
+def cache_component(sc: Scenario, ratio: float | None = None) -> dict[str, float]:
+    """A FlexCache volume at the distribution site.
+
+    Entirely on SSD. A cache volume cannot be tiered, so there is no capacity pool line here even
+    when the origin has one. That constraint is what forces the cache to stay small, and staying
+    small is what makes an all-SSD footprint affordable: the cache holds the working set, not the
+    dataset. Sizing it like a copy and then discovering the SSD bill is the failure this models.
+    """
+    dep = DEPLOYMENTS[sc.cache_deployment]
+    ratio = sc.cache_ratio if ratio is None else ratio
+    logical = sc.stored_gib * ratio
+    ssd = max(
+        dep["min_ssd_gib"],
+        math.ceil(logical * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+    )
+    tput = choose_throughput(
+        sc.cache_required_mbps, dep["tput_options"], sc.tput_headroom
+    )
+    return {
+        f"SSD ストレージ ({gib(ssd)}、階層化不可)": ssd * dep["ssd"].usd,
+        f"スループットキャパシティ ({tput} MBps)": tput * dep["tput"].usd,
+    }
+
+
+def full_copy_component(sc: Scenario) -> dict[str, float]:
+    """A full second copy at the same site instead of a cache.
+
+    This is a normal volume, so it can tier. Modelling it as all-SSD would overstate the gap;
+    the honest comparison gives the copy its capacity pool discount and still asks what the
+    remaining difference is.
+    """
+    dep = DEPLOYMENTS[sc.cache_deployment]
+    logical_ssd = sc.stored_gib * (1 - sc.pool_fraction)
+    logical_pool = sc.stored_gib * sc.pool_fraction
+    ssd = max(
+        dep["min_ssd_gib"],
+        math.ceil(logical_ssd * (1 - sc.efficiency) * (1 + sc.ssd_headroom)),
+    )
+    pool = logical_pool * (1 - sc.efficiency)
+    tput = choose_throughput(
+        sc.cache_required_mbps, dep["tput_options"], sc.tput_headroom
+    )
+    lines = {
+        f"SSD ストレージ ({gib(ssd)})": ssd * dep["ssd"].usd,
+        f"スループットキャパシティ ({tput} MBps)": tput * dep["tput"].usd,
+    }
+    if sc.pool_fraction > 0:
+        lines[f"キャパシティプールストレージ ({gib(pool)})"] = pool * dep["pool"].usd
     return lines
 
 
@@ -820,6 +889,112 @@ def render_scenario(sc: Scenario) -> list[str]:
     return out
 
 
+def render_cache_site() -> list[str]:
+    """The distribution side, which the origin-only tables leave out entirely."""
+    burst = [sc for sc in SCENARIOS if sc.file_protocol_required]
+
+    rows = []
+    for sc in burst:
+        cache = sum(cache_component(sc).values())
+        copy_total = sum(full_copy_component(sc).values())
+        dep = DEPLOYMENTS[sc.cache_deployment]
+        cache_ssd_gib = max(
+            dep["min_ssd_gib"],
+            math.ceil(
+                sc.stored_gib
+                * sc.cache_ratio
+                * (1 - sc.efficiency)
+                * (1 + sc.ssd_headroom)
+            ),
+        )
+        floored = cache_ssd_gib == dep["min_ssd_gib"]
+        rows.append(
+            [
+                sc.title.split(" — ")[0],
+                gib(sc.stored_gib),
+                gib(cache_ssd_gib) + ("(下限に張り付き)" if floored else ""),
+                usd(cache),
+                usd(copy_total),
+                f"{copy_total / cache:.1f} 倍" if cache else "—",
+            ]
+        )
+
+    out = [
+        "### 配布側 — フル SSD の Cache ボリューム",
+        "",
+        "ここまでの試算は収集側 (Origin) だけを見ている。"
+        "この構成は配布側に FlexCache の Cache ボリュームを置くので、その分が別に載る。",
+        "",
+        "Cache ボリュームには階層化ができない。"
+        "ONTAP の仕様として、FabricPool の Origin を Cache することはできるが"
+        "**Cache ボリューム自体は階層化されない** "
+        f"([対応機能一覧]({SOURCE_FLEXCACHE_FEATURES}))。"
+        "したがって Cache は全量が SSD に載る。",
+        "",
+        "それが成立するのは Cache が疎だからである。FlexCache は Origin の全データを複製せず、"
+        "実際に読まれたブロックだけを保持する。"
+        f"NetApp のサイジング指針は Origin の**最低 10%**を推奨し、作成時の既定値も 10% である"
+        f" ([サイジング指針]({SOURCE_FLEXCACHE_SIZING}))。"
+        "読み取り中心のワークロードでは 5〜15% に収める運用が一般的で、"
+        "この帯であれば全量 SSD でも費用が成り立つ。",
+        "",
+        f"以下は Cache 比率を {burst[0].cache_ratio:.0%} に置いた場合の配布側の月額と、"
+        "同じ場所に全量コピーを置いた場合の比較である。"
+        "全量コピーは通常のボリュームなので階層化できるものとして計算している。"
+        "全量 SSD として計算すれば差はさらに開くが、それは比較として不当なので採らない。",
+        "",
+        *table(
+            [
+                "ワークロード",
+                "Origin 論理",
+                "Cache SSD (効率適用後)",
+                "Cache の月額",
+                "全量コピーの月額",
+                "コピーが何倍か",
+            ],
+            rows,
+        ),
+        "",
+        "差が小さく出るのは、Origin の階層化割合が大きいワークロードである。"
+        "コピー側もキャパシティプールに落とせるため、SSD 単価の差が効きにくくなる。"
+        "逆にホットなデータが多いワークロードでは、コピー側も SSD に置くことになり差が開く。",
+        "",
+    ]
+
+    # How the cost moves with the ratio, on the workload where the ratio has the most room.
+    pick = max(burst, key=lambda s: s.stored_gib)
+    ratio_rows = []
+    for ratio in (0.05, 0.10, 0.15, 0.25, 0.50, 1.00):
+        dep = DEPLOYMENTS[pick.cache_deployment]
+        ssd = max(
+            dep["min_ssd_gib"],
+            math.ceil(
+                pick.stored_gib
+                * ratio
+                * (1 - pick.efficiency)
+                * (1 + pick.ssd_headroom)
+            ),
+        )
+        total = sum(cache_component(pick, ratio).values())
+        note = "サイジング指針の下限" if ratio == 0.10 else ""
+        if ratio == 1.00:
+            note = "実質的にコピー。階層化できないぶんコピーより高い"
+        ratio_rows.append([f"{ratio:.0%}", gib(ssd), usd(total), note])
+
+    out += [
+        f"Cache 比率を動かしたときの月額を、Origin 論理が最大の"
+        f"「{pick.title.split(' — ')[0]}」({gib(pick.stored_gib)}) で示す。",
+        "",
+        *table(["Cache 比率", "Cache SSD", "Cache の月額", "備考"], ratio_rows),
+        "",
+        "比率 100% は成立しない選択である。階層化できない Cache に全量を置くと、"
+        "階層化できる通常のボリュームに全量コピーを置くより高くつく。"
+        "Cache を「コピーの代わり」として全量でサイジングすると、この領域に入る。",
+        "",
+    ]
+    return out
+
+
 def render_marginal_cost() -> list[str]:
     """The case this repository actually addresses: the file system already exists."""
     sc = next(s for s in SCENARIOS if s.key == "telemetry")
@@ -875,6 +1050,7 @@ def render() -> str:
     ]
     for sc in SCENARIOS:
         out += render_scenario(sc)
+    out += render_cache_site()
     out += render_marginal_cost()
     out += [END]
     return "\n".join(out).rstrip() + "\n"
