@@ -55,6 +55,8 @@ PRICE_SNAPSHOT = "2026-08-09"
 SOURCE_S3 = "https://aws.amazon.com/s3/pricing/"
 SOURCE_FSX = "https://aws.amazon.com/fsx/netapp-ontap/pricing/"
 SOURCE_DATASYNC = "https://aws.amazon.com/datasync/pricing/"
+SOURCE_EGRESS = "https://aws.amazon.com/ec2/pricing/on-demand/#Data_Transfer"
+SOURCE_DX = "https://aws.amazon.com/directconnect/pricing/"
 SOURCE_FLEXCACHE_FEATURES = "https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html"
 SOURCE_FLEXCACHE_SIZING = (
     "https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html"
@@ -300,6 +302,32 @@ S3FILES = {
     "write": Rate(0.07, "GB", "S3 Files データ書き込み", "2026-08-01", SOURCE_S3),
 }
 
+# Data transfer out of ap-northeast-1. Internet egress is tiered per month across the account;
+# Direct Connect is flat per GB and carries separate port charges that depend on the facility.
+EGRESS_INTERNET_TIERS: tuple[tuple[float, float], ...] = (
+    (10_240.0, 0.114),  # first 10 TB
+    (51_200.0, 0.089),  # next 40 TB
+    (153_600.0, 0.086),  # next 100 TB
+    (math.inf, 0.084),  # beyond 150 TB
+)
+
+EGRESS = {
+    "internet": Rate(
+        EGRESS_INTERNET_TIERS[0][1],
+        "GB",
+        "インターネット向けデータ転送 (最初の 10 TB)",
+        "2026-06-01",
+        SOURCE_EGRESS,
+    ),
+    "dx": Rate(
+        0.041,
+        "GB",
+        "Direct Connect 経由のデータ転送 (東京、ポート料金は別)",
+        "2026-07-01",
+        SOURCE_DX,
+    ),
+}
+
 DATASYNC = {
     "basic_gb": Rate(
         0.0125, "GB", "DataSync 転送 (Basic モード)", "2025-09-01", SOURCE_DATASYNC
@@ -386,6 +414,19 @@ def tiered_s3_storage(gib_stored: float) -> float:
     """S3 Standard storage cost across its volume tiers."""
     remaining, total, floor = gib_stored, 0.0, 0.0
     for ceiling, price in S3_STANDARD_TIERS:
+        band = min(remaining, ceiling - floor)
+        if band <= 0:
+            break
+        total += band * price
+        remaining -= band
+        floor = ceiling
+    return total
+
+
+def tiered_egress(gib_out: float) -> float:
+    """Internet egress cost across its monthly volume tiers."""
+    remaining, total, floor = gib_out, 0.0, 0.0
+    for ceiling, price in EGRESS_INTERNET_TIERS:
         band = min(remaining, ceiling - floor)
         if band <= 0:
             break
@@ -789,7 +830,13 @@ def render_prices() -> list[str]:
         "",
     ]
     rows = []
-    for group, rates in (("S3", S3), ("FSx for ONTAP", FSX), ("DataSync", DATASYNC)):
+    for group, rates in (
+        ("S3", S3),
+        ("FSx for ONTAP", FSX),
+        ("S3 Files", S3FILES),
+        ("データ転送", EGRESS),
+        ("DataSync", DATASYNC),
+    ):
         for rate in rates.values():
             shown = (
                 per_1000(rate)
@@ -1148,6 +1195,570 @@ def render_cache_site() -> list[str]:
     return out
 
 
+@dataclass
+class ReadHeavy:
+    """A dataset in AWS, read repeatedly by consumers outside AWS.
+
+    This is the shape the architecture was built for and the one the earlier revisions of this
+    document never priced. Every scenario above assumed the reader sat in the same Region, where
+    transfer is free, so the comparison turned on storage and request rates. Once the readers are
+    on premises, egress enters and it is charged per byte moved — so it multiplies by the number of
+    times the same bytes are read, which is exactly what a cache removes.
+    """
+
+    title: str
+    dataset_gib: float
+    working_set_gib: float
+    reads_per_file: float
+    object_mib: float
+    note: str
+    pool_fraction: float = 0.70
+    efficiency_ssd: float = 0.40
+    throughput_mbps: int = 128
+    deployment: str = "saz1"
+    ssd_headroom: float = 0.20
+    # Blocks a cache re-fetches over the month because the origin changed or they were evicted,
+    # as a fraction of the working set. An assumption, and the sweep below shows its weight.
+    refetch_fraction: float = 0.20
+
+    @property
+    def read_gib(self) -> float:
+        return self.working_set_gib * self.reads_per_file
+
+    @property
+    def read_requests(self) -> float:
+        per_file = self.object_mib / 1024
+        return (
+            self.working_set_gib / per_file * self.reads_per_file if per_file else 0.0
+        )
+
+    def origin_lines(self) -> dict[str, float]:
+        dep = DEPLOYMENTS[self.deployment]
+        ssd = max(
+            dep["min_ssd_gib"],
+            math.ceil(
+                self.dataset_gib
+                * (1 - self.pool_fraction)
+                * (1 - self.efficiency_ssd)
+                * (1 + self.ssd_headroom)
+            ),
+        )
+        pool = (
+            self.dataset_gib
+            * self.pool_fraction
+            * (1 - self.efficiency_ssd * POOL_EFFICIENCY_RETENTION)
+        )
+        return {
+            f"SSD ストレージ ({gib(ssd)})": ssd * dep["ssd"].usd,
+            f"スループットキャパシティ ({self.throughput_mbps} MBps)": self.throughput_mbps
+            * dep["tput"].usd,
+            f"キャパシティプールストレージ ({gib(pool)})": pool * dep["pool"].usd,
+        }
+
+
+READ_HEAVY = ReadHeavy(
+    title="同じデータを繰り返し読む — 利用側はオンプレミス",
+    dataset_gib=20 * GIB_PER_TIB,
+    working_set_gib=2 * GIB_PER_TIB,
+    reads_per_file=30.0,
+    object_mib=4.0,
+    note="参照データセットを毎月 30 回読み直す。回帰試験、再生、突き合わせのように"
+    "同じ入力を何度も読むワークロードを想定する",
+)
+
+
+# FabricPool bundles cold blocks into 4 MB objects, so a fetch from the capacity pool is metered in
+# units of that size rather than per file.
+# https://docs.netapp.com/us-en/ontap-whatsnew/ontap98fo_storage_efficiencies.html
+FABRICPOOL_OBJECT_MIB = 4.0
+
+
+def read_request_costs(rh: ReadHeavy) -> dict[str, dict[str, float]]:
+    """Request charges only, per option. Storage and transfer are deliberately left out."""
+    reads = rh.read_requests
+    objects_in_dataset = rh.dataset_gib * 1024 / rh.object_mib
+
+    # Cache fills pull the working set plus refetches; the share sitting in the capacity pool is
+    # read in FabricPool-sized units.
+    fill_gib = rh.working_set_gib * (1 + rh.refetch_fraction)
+    pool_ops = fill_gib * rh.pool_fraction * 1024 / FABRICPOOL_OBJECT_MIB
+
+    return {
+        "S3 バケットを直接読む": {
+            f"S3 GET ({reads:,.0f} 回)": reads * S3["tier2"].usd,
+        },
+        "FSx for ONTAP S3 AP 経由で読む": {
+            f"S3 AP 経由 GET ({reads:,.0f} 回)": reads * S3["ap_tier2"].usd,
+            f"キャパシティプール読み取り ({pool_ops:,.0f} 操作)": pool_ops
+            * FSX["pool_read"].usd,
+        },
+        "FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)": {
+            "S3 リクエスト": 0.0,
+            f"キャパシティプール読み取り ({pool_ops:,.0f} 操作、キャッシュ充填分のみ)": pool_ops
+            * FSX["pool_read"].usd,
+        },
+        "S3 + DataSync で全量コピー": {
+            f"S3 GET ({objects_in_dataset:,.0f} 回、全量を 1 回)": objects_in_dataset
+            * S3["tier2"].usd,
+            "S3 LIST": math.ceil(objects_in_dataset / 1000) * S3["tier1"].usd,
+            "利用側の読み出し (ローカル)": 0.0,
+        },
+    }
+
+
+def render_read_requests(rh: ReadHeavy) -> list[str]:
+    """Request charges at a fixed read count, and how object size moves them."""
+    costs = read_request_costs(rh)
+    rows = []
+    for label, lines in costs.items():
+        detail = "、".join(f"{k} {usd(v)}" for k, v in lines.items() if v > 0) or "なし"
+        rows.append([label, detail, f"**{usd(sum(lines.values()))}**"])
+
+    direct_egress = tiered_egress(rh.read_gib)
+    direct_requests = sum(costs["S3 バケットを直接読む"].values())
+
+    out = [
+        f"#### 読み取り {rh.reads_per_file:g} 回時点のリクエスト課金",
+        "",
+        f"前提は上と同じで、読み取り回数だけ {rh.reads_per_file:g} 回に固定する。"
+        f"作業セット {gib(rh.working_set_gib)} を {rh.object_mib:g} MiB のオブジェクトで持つと"
+        f"ユニークなオブジェクト数は {rh.working_set_gib * 1024 / rh.object_mib:,.0f} 個、"
+        f"読み出し回数は {rh.read_requests:,.0f} 回になる。",
+        "",
+        *table(["方式", "内訳", "リクエスト課金の合計"], rows),
+        "",
+        f"**この規模ではリクエスト課金は支配項ではない。** 同じ条件での転送料金は {usd(direct_egress)} で、"
+        f"直接読む構成のリクエスト課金 {usd(direct_requests)} の "
+        f"{direct_egress / direct_requests:,.0f} 倍にあたる。"
+        "この構成が読み取り側で効くのは、リクエスト単価ではなく転送量を減らすからである。",
+        "",
+        "FlexCache 経由の読み出しに S3 リクエストは発生しない。"
+        "利用側は NFS / SMB で読むためである。"
+        "残るのはキャッシュ充填時に Origin 側のキャパシティプールから読む分だけで、"
+        f"FabricPool が {FABRICPOOL_OBJECT_MIB:g} MB 単位で扱うためこの操作数で計上している。",
+        "",
+    ]
+
+    out += [
+        "S3 Files はこの表に入れていない。**この構成が対象とする利用側では使えない。**"
+        "対応プロトコルが NFSv4.1 と NFSv4.2 だけで、"
+        f"NFSv3 と SMB が対象外である ([非対応事項とクォータ]({SOURCE_S3FILES_QUOTAS}))。"
+        "NFSv3 で固定された装置や Windows の工程はこれで外れる。"
+        "ドキュメントが挙げる対応コンピュートも EC2、Lambda、EKS、ECS で、"
+        "オンプレミスからのマウントについては記載がない。"
+        "利用側を AWS へ移せる場合の参考値は後述する。",
+        "",
+    ]
+
+    # Where request charges do start to matter: small objects.
+    size_rows = []
+    for mib in (8 / 1024, 64 / 1024, 0.25, 1.0, 4.0, 64.0):
+        variant = replace(rh, object_mib=mib)
+        c = read_request_costs(variant)
+        direct = sum(c["S3 バケットを直接読む"].values())
+        ap = sum(c["FSx for ONTAP S3 AP 経由で読む"].values())
+        flex = sum(
+            c["FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)"].values()
+        )
+        size_rows.append(
+            [
+                f"{mib * 1024:,.0f} KiB",
+                f"{variant.read_requests:,.0f}",
+                usd(direct),
+                usd(ap),
+                usd(flex),
+                f"{direct / tiered_egress(variant.read_gib) * 100:.1f}%",
+            ]
+        )
+    out += [
+        "#### リクエスト課金が効いてくるのはオブジェクトが小さいとき",
+        "",
+        "読み出す総量は同じで、オブジェクトサイズだけを変える。回数が変わるので課金額も変わる。",
+        "",
+        *table(
+            [
+                "平均オブジェクトサイズ",
+                "月間の読み出し回数",
+                "S3 を直接読む",
+                "S3 AP 経由",
+                "この構成 (FlexCache)",
+                "直接読む場合の転送料金に対する比",
+            ],
+            size_rows,
+        ),
+        "",
+        "最右列が読みどころである。オブジェクトが数 MiB 以上なら、リクエスト課金は転送料金の 1% に届かない。"
+        "一桁 KiB まで小さくすると数十 % に達し、このときは転送とリクエストの両方が問題になる。"
+        "**「S3 の API コールが高額になる」という見立てが成立するのは、この小オブジェクト側の領域である。**"
+        "オブジェクトが大きいワークロードでは、削減対象は転送量に絞ってよい。",
+        "",
+    ]
+    return out
+
+
+def read_side_totals(rh: ReadHeavy) -> dict[str, float]:
+    """Transfer and request charges for reading, split so either can be seen to dominate."""
+    costs = read_request_costs(rh)
+    direct_requests = sum(costs["S3 バケットを直接読む"].values())
+    direct_egress = tiered_egress(rh.read_gib)
+    cache_requests = sum(
+        costs["FSx for ONTAP + FlexCache を NFS / SMB で読む (この構成)"].values()
+    )
+    cache_egress = tiered_egress(rh.working_set_gib * (1 + rh.refetch_fraction))
+    # Both sides carry their storage, or the side that has a file system would be charged for
+    # holding the data while the side reading the bucket would not.
+    direct_storage = tiered_s3_storage(rh.dataset_gib)
+    cache_fixed = sum(rh.origin_lines().values())
+    return {
+        "direct_egress": direct_egress,
+        "direct_requests": direct_requests,
+        "direct_storage": direct_storage,
+        "direct_total": direct_egress + direct_requests + direct_storage,
+        "cache_egress": cache_egress,
+        "cache_requests": cache_requests,
+        "cache_fixed": cache_fixed,
+        "cache_total": cache_egress + cache_requests + cache_fixed,
+    }
+
+
+def render_read_cost_matrix(rh: ReadHeavy) -> list[str]:
+    """Both read-side charges in one grid, so a design can be located on it.
+
+    The two charges were shown in separate sweeps, which left the reader unable to tell which one
+    their own workload runs into. They respond to different remedies -- transfer to carrying fewer
+    bytes, requests to making fewer calls -- so the design decision depends on knowing which
+    dominates, and for some workloads it is both.
+    """
+    sizes = (8 / 1024, 64 / 1024, 1.0, 4.0)
+    read_counts = (1, 10, 50)
+
+    rows = []
+    for mib in sizes:
+        for reads in read_counts:
+            v = read_side_totals(
+                replace(rh, object_mib=mib, reads_per_file=float(reads))
+            )
+            share = v["direct_requests"] / v["direct_total"] * 100
+            if v["direct_total"] < v["cache_total"]:
+                verdict = "直接読むほうが安い"
+            elif share >= 30:
+                verdict = "**両方**"
+            elif share >= 5:
+                verdict = "転送 (リクエストも無視できない)"
+            else:
+                verdict = "転送"
+            rows.append(
+                [
+                    f"{mib * 1024:,.0f} KiB",
+                    f"{reads}",
+                    usd(v["direct_egress"]),
+                    usd(v["direct_requests"]),
+                    f"{share:.0f}%",
+                    usd(v["direct_total"]),
+                    usd(v["cache_total"]),
+                    f"{v['direct_total'] / v['cache_total']:.1f} 倍",
+                    verdict,
+                ]
+            )
+
+    return [
+        "### 転送とリクエストを同時に見る",
+        "",
+        "読み取り側の課金は転送とリクエストの 2 つで、効く手が違う。"
+        "転送はバイト数を減らすことで下がり、リクエストは呼び出し回数を減らすことで下がる。"
+        "**どちらが支配項かで打つ手が変わる**ので、自分のワークロードがどこにいるかを先に確かめる。",
+        "",
+        "作業セットとデータセットの量は固定し、平均オブジェクトサイズと読み取り回数だけを振る。"
+        "合計にはどちらの側も保管料金を含める"
+        "(直接読む側は S3 Standard、この構成は SSD とキャパシティプールとスループット)。"
+        "変動するのは転送とリクエストの 2 列である。",
+        "",
+        *table(
+            [
+                "平均オブジェクト",
+                "読み取り回数 / 月",
+                "転送",
+                "リクエスト",
+                "リクエストの占率",
+                "直接読む計",
+                "この構成",
+                "倍率",
+                "支配項",
+            ],
+            rows,
+        ),
+        "",
+        "読み方は 2 つある。**縦に見ると回数の効果**が出る。"
+        "回数が増えて増えるのは転送だけで、リクエストの占率はほぼ変わらない。"
+        "**横に見るとサイズの効果**が出る。サイズを小さくすると転送は変わらず"
+        "リクエストだけが増えるので、占率が上がる。",
+        "",
+        "#### 支配項ごとの打ち手",
+        "",
+        *table(
+            ["支配項", "症状", "効く手", "効かない手"],
+            [
+                [
+                    "転送",
+                    "同じデータを何度も読む。オブジェクトは数 MiB 以上",
+                    "作業セットだけを運ぶ (FlexCache)、利用側の移設、Direct Connect で単価を下げる",
+                    "オブジェクトをまとめる。回数は減っても運ぶバイト数は変わらない",
+                ],
+                [
+                    "リクエスト",
+                    "オブジェクトが一桁 KiB で、読み出し回数が非常に多い",
+                    "オブジェクトをまとめて大きくする、S3 API を経由しない読み出し経路にする",
+                    "転送単価の交渉。金額の大半がリクエスト側にある",
+                ],
+                [
+                    "両方",
+                    "小さいオブジェクトを繰り返し読む",
+                    "まとめる (リクエスト) とキャッシュする (転送) の併用。片方だけでは残る",
+                    "片方だけの対処",
+                ],
+                [
+                    "どちらも小さい",
+                    "読み取り回数が少ない。ファイルプロトコルの要件もない",
+                    "S3 を直接読む。ファイルシステムの固定費を負わない",
+                    "キャッシュの導入。固定費のほうが大きい",
+                ],
+            ],
+        ),
+        "",
+        "この構成の列がサイズと回数でほとんど動かないのは、"
+        "読み出しが S3 API を経由せず、運ぶのが作業セットに限られるためである。"
+        "**そのぶん固定費が先に立つ**ので、読み取りが少ない領域では不利になる。"
+        "表の「直接読むほうが安い」行がその領域である。",
+        "",
+    ]
+
+
+def render_migrated_to_aws(rh: ReadHeavy) -> list[str]:
+    """The same reads with the consumers inside AWS, where egress disappears.
+
+    Included because it is the honest upper bound on what any storage-layer choice can save. If the
+    workload can move, moving it removes the entire transfer charge, which is larger than every
+    difference between the options. This architecture exists for the cases where it cannot move,
+    and saying that plainly is better than leaving the comparison looking like the only lever.
+    """
+    reads = rh.read_requests
+    objects = rh.working_set_gib * 1024 / rh.object_mib
+    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+    storage = tiered_s3_storage(rh.dataset_gib)
+    on_hps = rh.object_mib * 1024 <= S3FILES_DEFAULT_THRESHOLD_KIB
+
+    direct = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": storage,
+        f"S3 GET ({reads:,.0f} 回)": reads * S3["tier2"].usd,
+        "データ転送": 0.0,
+    }
+    files = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": storage,
+        f"S3 GET ({reads:,.0f} 回、しきい値超のためバケットから直接)": reads
+        * S3["tier2"].usd,
+        "S3 Files メタデータ読み取り": reads * metadata_gib * S3FILES["read"].usd,
+        "S3 Files メタデータ取り込み": objects * metadata_gib * S3FILES["write"].usd,
+        "S3 Files 高性能ストレージ": 0.0,
+        "データ転送": 0.0,
+    }
+    fsx = dict(rh.origin_lines())
+    fsx["データ転送"] = 0.0
+
+    out = [
+        "#### 参考 — 利用側を AWS へ移した場合",
+        "",
+        "この構成の前提は「利用側が AWS の外にいて、動かせない」ことである。"
+        "動かせるなら話は変わるので、参考としてその場合を並べる。",
+        "",
+        "**同一リージョン内のデータ転送には課金がない。**"
+        f"上の表で {usd(tiered_egress(rh.read_gib))} を占めていた転送料金がそのまま消える。"
+        "ストレージ層をどう選ぶかで動く金額より、この 1 項目のほうが大きい。",
+        "",
+    ]
+    for label, lines in (
+        ("EC2 から S3 を直接読む", direct),
+        ("EC2 から S3 Files でファイルとして読む", files),
+        ("FSx for ONTAP を同一リージョンで読む", fsx),
+    ):
+        total = sum(lines.values())
+        rows = [[k, usd(v)] for k, v in lines.items()]
+        rows.append(["**合計 (月額)**", f"**{usd(total)}**"])
+        out += [f"**{label}**", "", *table(["内訳", "月額"], rows), ""]
+
+    d, f, x = sum(direct.values()), sum(files.values()), sum(fsx.values())
+    out += [
+        f"S3 Files は直接読む場合との差が {usd(f - d)} しかない。"
+        f"平均オブジェクトサイズ {rh.object_mib:g} MiB は"
+        f"しきい値 {S3FILES_DEFAULT_THRESHOLD_KIB:,.0f} KiB を超えるため"
+        f"{'データが高性能ストレージに載らず' if not on_hps else ''}"
+        "保管の課金が増えないためである。"
+        "POSIX のファイルセマンティクスを S3 のデータに与える手段としては安い。",
+        "",
+        f"FSx for ONTAP を同一リージョンで使う場合は {usd(x)} で、"
+        f"直接読む場合の {x / d:.1f} 倍になる。"
+        "転送料金という差が消えた状態では、ファイルシステムの固定費が残るためである。"
+        "この状況で FSx for ONTAP を選ぶ理由は費用ではなく、"
+        "SMB、NFSv3、ONTAP のデータ管理機能、あるいはオンプレミスとの併用といった要件になる。",
+        "",
+        "**読み取り側の費用を下げる手段として、利用側の移設が最も効く。**"
+        "移設できるなら、まずそれを検討する。"
+        "この構成が対象とするのは、装置が現地にある、計測対象との距離が要る、"
+        "既存設備の投資が残っている、といった理由で移設できない場合である。",
+        "",
+    ]
+    return out
+
+
+def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
+    """The read side, where egress rather than storage decides the bill."""
+    egress_direct = tiered_egress(rh.read_gib)
+    egress_full = tiered_egress(rh.dataset_gib)
+    egress_cache = tiered_egress(rh.working_set_gib * (1 + rh.refetch_fraction))
+
+    direct = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": tiered_s3_storage(
+            rh.dataset_gib
+        ),
+        f"GET リクエスト ({rh.read_requests:,.0f} 回)": rh.read_requests
+        * S3["tier2"].usd,
+        f"**データ転送 (読んだ量 {gib(rh.read_gib)} がそのまま出る)**": egress_direct,
+    }
+    full_copy = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": tiered_s3_storage(
+            rh.dataset_gib
+        ),
+        f"データ転送 (全量 {gib(rh.dataset_gib)} を 1 回)": egress_full,
+        "DataSync 転送": rh.dataset_gib * DATASYNC["basic_gb"].usd,
+    }
+    cache = dict(rh.origin_lines())
+    cache[
+        f"データ転送 (作業セット {gib(rh.working_set_gib)} + 再取得 {rh.refetch_fraction:.0%})"
+    ] = egress_cache
+
+    out = [
+        "### 読み取りが繰り返されるとき — 効くのは Egress",
+        "",
+        "ここまでの試算は利用側が同一リージョンにいることを前提にしていた。"
+        "同一リージョン内のデータ転送には課金がないため、比較は保存単価とリクエスト単価の話になる。",
+        "",
+        "**利用側がオンプレミスにいると話が変わる。**"
+        "データ転送はリージョンから出たバイト数に課金されるので、"
+        "同じファイルを読み直した回数だけ倍になる。"
+        "キャッシュが取り除くのはまさにこの倍数である。",
+        "",
+        *table(
+            ["前提", "値"],
+            [
+                ["データセット全体 (論理)", gib(rh.dataset_gib)],
+                [
+                    "月間の作業セット (実際に触るユニークなバイト数)",
+                    gib(rh.working_set_gib),
+                ],
+                ["同じファイルを読む回数 / 月", f"{rh.reads_per_file:g}"],
+                ["月間の読み出し総量", gib(rh.read_gib)],
+                ["平均オブジェクトサイズ", f"{rh.object_mib:g} MiB"],
+                ["キャッシュの再取得率の仮定", f"{rh.refetch_fraction:.0%}"],
+                ["転送経路", "インターネット (段階単価)"],
+            ],
+        ),
+        "",
+        f"- {rh.note}",
+        "",
+    ]
+
+    for label, lines in (
+        ("オンプレミスから S3 を直接読む", direct),
+        ("S3 から全量をオンプレミスへコピーして読む (DataSync)", full_copy),
+        ("FSx for ONTAP + FlexCache で読む (この構成)", cache),
+    ):
+        total = sum(lines.values())
+        rows = [[k, usd(v)] for k, v in lines.items()]
+        rows.append(["**合計 (月額)**", f"**{usd(total)}**"])
+        out += [f"**{label}**", "", *table(["内訳", "月額"], rows), ""]
+
+    d_total, f_total, c_total = (
+        sum(direct.values()),
+        sum(full_copy.values()),
+        sum(cache.values()),
+    )
+    out += [
+        f"直接読む構成では、転送料金だけで {usd(egress_direct)} "
+        f"({egress_direct / d_total * 100:.0f}%) を占める。"
+        "保存料金とリクエスト料金は誤差に近い。"
+        f"この構成は同じ読み取りを {usd(c_total)} で提供し、"
+        f"直接読む場合の {d_total / c_total:.1f} 分の 1 になる。",
+        "",
+        "全量コピーとの差は転送量の差である。"
+        f"コピーはデータセット全量 {gib(rh.dataset_gib)} を運ぶ。"
+        f"キャッシュは作業セット {gib(rh.working_set_gib)} と再取得分だけを運ぶ。"
+        f"月額では {usd(f_total)} と {usd(c_total)} の差になる。"
+        "加えて、オンプレミス側に確保する容量が全量か作業セット分かで違う。"
+        "こちらは AWS の請求には出ない。",
+        "",
+    ]
+
+    # Request charges alone, at a read count where the transfer argument is already decided. The
+    # original hypothesis behind this architecture was that S3 request charges hurt as much as
+    # egress. At these object sizes they do not, and saying so is more useful than implying they do.
+    out += render_read_requests(replace(rh, reads_per_file=10.0))
+
+    out += render_read_cost_matrix(rh)
+    out += render_migrated_to_aws(replace(rh, reads_per_file=10.0))
+
+    # The number of reads is the whole argument, so show it as a curve.
+    rows = []
+    for r in (1, 5, 10, 30, 50, 100):
+        variant = replace(rh, reads_per_file=float(r))
+        d = (
+            tiered_s3_storage(variant.dataset_gib)
+            + variant.read_requests * S3["tier2"].usd
+            + tiered_egress(variant.read_gib)
+        )
+        c = sum(variant.origin_lines().values()) + tiered_egress(
+            variant.working_set_gib * (1 + variant.refetch_fraction)
+        )
+        rows.append(
+            [
+                f"{r} 回",
+                gib(variant.read_gib),
+                usd(d),
+                usd(c),
+                f"{d / c:.1f} 倍" if c else "—",
+            ]
+        )
+    out += [
+        "#### 読み取り回数を振る",
+        "",
+        "同じ作業セットを何回読むかだけを変えて、他の前提は固定する。",
+        "",
+        *table(
+            [
+                "読み取り回数 / 月",
+                "月間の読み出し総量",
+                "直接読む構成",
+                "この構成",
+                "直接読む構成が何倍か",
+            ],
+            rows,
+        ),
+        "",
+        "読み取りが 1 回なら直接読むほうが安い。"
+        "運ぶ量が同じで、ファイルシステムの固定費を負わないためである。"
+        "回数が増えると直接読む構成の転送料金だけが比例して増え、"
+        "キャッシュ側は増えない。**損益分岐は読み取り回数で決まる。**",
+        "",
+        f"Direct Connect を使う場合、転送単価は {unit_usd(EGRESS['dx'].usd)} / GB の定額になり"
+        f" (インターネットの最初の 10 TB は {unit_usd(EGRESS['internet'].usd)} / GB)、"
+        "倍率は下がるが構造は変わらない。ポート料金は別に発生し、接続する施設によって変わる。",
+        "",
+        "この節の前提で最も効くのは作業セットの割合である。"
+        "作業セットがデータセット全体に近づくほどキャッシュの利点は薄れ、"
+        "全量コピーとの差が縮む。逆に参照が局所的なほど差が開く。",
+        "",
+    ]
+    return out
+
+
 def render_whole_system() -> list[str]:
     """The three delivery options at a single site, with no cache in any of them.
 
@@ -1452,6 +2063,7 @@ def render() -> str:
     ]
     for sc in SCENARIOS:
         out += render_scenario(sc)
+    out += render_read_heavy()
     out += render_cache_site()
     out += render_whole_system()
     out += render_marginal_cost()
