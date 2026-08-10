@@ -1276,9 +1276,7 @@ FABRICPOOL_OBJECT_MIB = 4.0
 def read_request_costs(rh: ReadHeavy) -> dict[str, dict[str, float]]:
     """Request charges only, per option. Storage and transfer are deliberately left out."""
     reads = rh.read_requests
-    objects_in_working_set = rh.working_set_gib * 1024 / rh.object_mib
     objects_in_dataset = rh.dataset_gib * 1024 / rh.object_mib
-    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
 
     # Cache fills pull the working set plus refetches; the share sitting in the capacity pool is
     # read in FabricPool-sized units.
@@ -1298,14 +1296,6 @@ def read_request_costs(rh: ReadHeavy) -> dict[str, dict[str, float]]:
             "S3 リクエスト": 0.0,
             f"キャパシティプール読み取り ({pool_ops:,.0f} 操作、キャッシュ充填分のみ)": pool_ops
             * FSX["pool_read"].usd,
-        },
-        "S3 + S3 Files": {
-            f"S3 GET ({reads:,.0f} 回、しきい値超のためバケットから直接)": reads
-            * S3["tier2"].usd,
-            "S3 Files メタデータ読み取り": reads * metadata_gib * S3FILES["read"].usd,
-            "S3 Files メタデータ取り込み": objects_in_working_set
-            * metadata_gib
-            * S3FILES["write"].usd,
         },
         "S3 + DataSync で全量コピー": {
             f"S3 GET ({objects_in_dataset:,.0f} 回、全量を 1 回)": objects_in_dataset
@@ -1346,6 +1336,17 @@ def render_read_requests(rh: ReadHeavy) -> list[str]:
         "利用側は NFS / SMB で読むためである。"
         "残るのはキャッシュ充填時に Origin 側のキャパシティプールから読む分だけで、"
         f"FabricPool が {FABRICPOOL_OBJECT_MIB:g} MB 単位で扱うためこの操作数で計上している。",
+        "",
+    ]
+
+    out += [
+        "S3 Files はこの表に入れていない。**この構成が対象とする利用側では使えない。**"
+        "対応プロトコルが NFSv4.1 と NFSv4.2 だけで、"
+        f"NFSv3 と SMB が対象外である ([非対応事項とクォータ]({SOURCE_S3FILES_QUOTAS}))。"
+        "NFSv3 で固定された装置や Windows の工程はこれで外れる。"
+        "ドキュメントが挙げる対応コンピュートも EC2、Lambda、EKS、ECS で、"
+        "オンプレミスからのマウントについては記載がない。"
+        "利用側を AWS へ移せる場合の参考値は後述する。",
         "",
     ]
 
@@ -1390,6 +1391,82 @@ def render_read_requests(rh: ReadHeavy) -> list[str]:
         "一桁 KiB まで小さくすると数十 % に達し、このときは転送とリクエストの両方が問題になる。"
         "**「S3 の API コールが高額になる」という見立てが成立するのは、この小オブジェクト側の領域である。**"
         "オブジェクトが大きいワークロードでは、削減対象は転送量に絞ってよい。",
+        "",
+    ]
+    return out
+
+
+def render_migrated_to_aws(rh: ReadHeavy) -> list[str]:
+    """The same reads with the consumers inside AWS, where egress disappears.
+
+    Included because it is the honest upper bound on what any storage-layer choice can save. If the
+    workload can move, moving it removes the entire transfer charge, which is larger than every
+    difference between the options. This architecture exists for the cases where it cannot move,
+    and saying that plainly is better than leaving the comparison looking like the only lever.
+    """
+    reads = rh.read_requests
+    objects = rh.working_set_gib * 1024 / rh.object_mib
+    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+    storage = tiered_s3_storage(rh.dataset_gib)
+    on_hps = rh.object_mib * 1024 <= S3FILES_DEFAULT_THRESHOLD_KIB
+
+    direct = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": storage,
+        f"S3 GET ({reads:,.0f} 回)": reads * S3["tier2"].usd,
+        "データ転送": 0.0,
+    }
+    files = {
+        f"ストレージ (S3 Standard、{gib(rh.dataset_gib)})": storage,
+        f"S3 GET ({reads:,.0f} 回、しきい値超のためバケットから直接)": reads
+        * S3["tier2"].usd,
+        "S3 Files メタデータ読み取り": reads * metadata_gib * S3FILES["read"].usd,
+        "S3 Files メタデータ取り込み": objects * metadata_gib * S3FILES["write"].usd,
+        "S3 Files 高性能ストレージ": 0.0,
+        "データ転送": 0.0,
+    }
+    fsx = dict(rh.origin_lines())
+    fsx["データ転送"] = 0.0
+
+    out = [
+        "#### 参考 — 利用側を AWS へ移した場合",
+        "",
+        "この構成の前提は「利用側が AWS の外にいて、動かせない」ことである。"
+        "動かせるなら話は変わるので、参考としてその場合を並べる。",
+        "",
+        "**同一リージョン内のデータ転送には課金がない。**"
+        f"上の表で {usd(tiered_egress(rh.read_gib))} を占めていた転送料金がそのまま消える。"
+        "ストレージ層をどう選ぶかで動く金額より、この 1 項目のほうが大きい。",
+        "",
+    ]
+    for label, lines in (
+        ("EC2 から S3 を直接読む", direct),
+        ("EC2 から S3 Files でファイルとして読む", files),
+        ("FSx for ONTAP を同一リージョンで読む", fsx),
+    ):
+        total = sum(lines.values())
+        rows = [[k, usd(v)] for k, v in lines.items()]
+        rows.append(["**合計 (月額)**", f"**{usd(total)}**"])
+        out += [f"**{label}**", "", *table(["内訳", "月額"], rows), ""]
+
+    d, f, x = sum(direct.values()), sum(files.values()), sum(fsx.values())
+    out += [
+        f"S3 Files は直接読む場合との差が {usd(f - d)} しかない。"
+        f"平均オブジェクトサイズ {rh.object_mib:g} MiB は"
+        f"しきい値 {S3FILES_DEFAULT_THRESHOLD_KIB:,.0f} KiB を超えるため"
+        f"{'データが高性能ストレージに載らず' if not on_hps else ''}"
+        "保管の課金が増えないためである。"
+        "POSIX のファイルセマンティクスを S3 のデータに与える手段としては安い。",
+        "",
+        f"FSx for ONTAP を同一リージョンで使う場合は {usd(x)} で、"
+        f"直接読む場合の {x / d:.1f} 倍になる。"
+        "転送料金という差が消えた状態では、ファイルシステムの固定費が残るためである。"
+        "この状況で FSx for ONTAP を選ぶ理由は費用ではなく、"
+        "SMB、NFSv3、ONTAP のデータ管理機能、あるいはオンプレミスとの併用といった要件になる。",
+        "",
+        "**読み取り側の費用を下げる手段として、利用側の移設が最も効く。**"
+        "移設できるなら、まずそれを検討する。"
+        "この構成が対象とするのは、装置が現地にある、計測対象との距離が要る、"
+        "既存設備の投資が残っている、といった理由で移設できない場合である。",
         "",
     ]
     return out
@@ -1487,6 +1564,8 @@ def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
     # original hypothesis behind this architecture was that S3 request charges hurt as much as
     # egress. At these object sizes they do not, and saying so is more useful than implying they do.
     out += render_read_requests(replace(rh, reads_per_file=10.0))
+
+    out += render_migrated_to_aws(replace(rh, reads_per_file=10.0))
 
     # The number of reads is the whole argument, so show it as a curve.
     rows = []
