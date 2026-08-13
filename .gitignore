@@ -47,3 +47,8 @@ node_modules/
 bandit-report.json
 tmp-previews/
 .DS_Store
+
+# 図の生成に使うベンダーのアイコン素材。単体ファイルとしては置かず、完成した .drawio に
+# base64 で埋め込んだものだけをコミットする。AWS の Architecture Icons をリポジトリ外の
+# パッケージから読むのと同じ扱い。入手先と配置は tools/build_diagrams.py に書いてある。
+docs/_assets/icons/

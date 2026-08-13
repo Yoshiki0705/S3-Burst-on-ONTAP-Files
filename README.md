@@ -24,7 +24,7 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 
 ## この構成
 
-![Amazon S3 Access Point から Amazon FSx for NetApp ONTAP の Origin ボリュームへ書き込み、FlexCache でキャッシュ拠点の Amazon FSx for NetApp ONTAP へ配り、NFS / SMB クライアントが読む](docs/_assets/images/s3burst-architecture-overview.svg)
+![Amazon S3 Access Point から Amazon FSx for NetApp ONTAP の Origin ボリュームへ書き込み、FlexCache でキャッシュ拠点の Cache ボリューム（Amazon FSx for NetApp ONTAP またはオンプレミスの ONTAP 9 のいずれか）へ配り、NFS / SMB クライアントが読む](docs/_assets/images/s3burst-architecture-overview.svg)
 
 図 1: 収集層と配布層。図と下の表は同じことを述べています。画像が表示されない環境でも
 判断の根拠が残るように、内容は必ず表か本文の側にも置いています。
