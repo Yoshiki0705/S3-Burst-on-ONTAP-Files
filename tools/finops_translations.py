@@ -22,9 +22,7 @@ from __future__ import annotations
 TRANSLATIONS: dict[str, str] = {
     # --- units and labels carried by the price table ------------------------------------------
     "アジアパシフィック (東京)": "Asia Pacific (Tokyo)",
-    "リクエスト": "requests",
     "タスク実行": "task execution",
-    "データ転送": "Data transfer",
     "S3 Standard ストレージ (最初の 50 TiB)": "S3 Standard storage (first 50 TiB)",
     "S3 Standard-IA ストレージ": "S3 Standard-IA storage",
     "S3 One Zone-IA ストレージ": "S3 One Zone-IA storage",
@@ -168,8 +166,10 @@ TRANSLATIONS: dict[str, str] = {
     "月額": "Monthly",
     "月間オブジェクト数": "Objects per month",
     "月間書き込み量": "Written per month",
-    "保持期間": "Retention period",
-    "{months} か月": "{months} month(s)",
+    # The unit sits in the row label, not the cell: a bare "{months}" avoids both "1 months"
+    # and the "month(s)" hedge, for any value the scenarios use.
+    "保持期間": "Retention period (months)",
+    "{months} か月": "{months}",
     "定常保存量 (論理)": "Steady-state stored volume (logical)",
     "1 オブジェクトあたり読み出し回数": "Reads per object",
     "ストレージ効率の仮定 (SSD 層)": "Assumed storage efficiency (SSD tier)",
@@ -182,8 +182,8 @@ TRANSLATIONS: dict[str, str] = {
     "平均所要の {multiple} 倍を満たす最小の段を選ぶ": "the smallest step that covers {multiple}x the average requirement",
     "SSD のプロビジョニング余裕": "SSD provisioning headroom",
     "効率適用後の {share} 増し": "{share} above the post-efficiency figure",
-    "着信面 (S3) の保持期間": "Retention in the S3 landing area",
-    "{months} か月 — 同期後にライフサイクルで失効させる想定": "{months} month(s) — assumed to be expired by a lifecycle rule once the sync has run",
+    "着信面 (S3) の保持期間": "Retention in the S3 landing area (months)",
+    "{months} か月 — 同期後にライフサイクルで失効させる想定": "{months} — assumed to be expired by a lifecycle rule once the sync has run",
     "利用側がファイルプロトコルを要求するか": "Do the consumers require a file protocol?",
     "はい": "Yes",
     "いいえ": "No",
@@ -346,10 +346,11 @@ TRANSLATIONS.update(
         '**"S3 API calls get expensive" holds in this small-object region, and only there.** '
         "For a workload with large objects, bytes moved is the only thing worth attacking.",
         # --- the transfer / request matrix -------------------------------------------------------
-        "直接読むほうが安い": "reading directly is cheaper",
-        "**両方**": "**both**",
-        "転送 (リクエストも無視できない)": "transfer (requests not negligible)",
-        "転送": "transfer",
+        "直接読むほうが安い": "Reading directly is cheaper",
+        "**両方**": "**Both**",
+        "転送 (リクエストも無視できない)": "Transfer (requests not negligible)",
+        "転送": "Transfer",
+        "リクエスト": "Requests",
         "### 転送とリクエストを同時に見る": "### Looking at transfer and requests together",
         "読み取り側の課金は転送とリクエストの 2 つで、効く手が違う。"
         "転送はバイト数を減らすことで下がり、リクエストは呼び出し回数を減らすことで下がる。"
@@ -385,11 +386,11 @@ TRANSLATIONS.update(
         "オブジェクトが一桁 KiB で、読み出し回数が非常に多い": "Objects of single-digit KiB, read a very large number of times",
         "オブジェクトをまとめて大きくする、S3 API を経由しない読み出し経路にする": "Batch into larger objects, or read by a path that does not go through the S3 API",
         "転送単価の交渉。金額の大半がリクエスト側にある": "Negotiating the transfer rate. Most of the money is on the request side",
-        "両方": "both",
+        "両方": "Both",
         "小さいオブジェクトを繰り返し読む": "Small objects, read repeatedly",
         "まとめる (リクエスト) とキャッシュする (転送) の併用。片方だけでは残る": "Batching (for requests) and caching (for transfer) together. Either alone leaves the other",
         "片方だけの対処": "Addressing only one of the two",
-        "どちらも小さい": "neither",
+        "どちらも小さい": "Neither",
         "読み取り回数が少ない。ファイルプロトコルの要件もない": "Few reads, and no file-protocol requirement",
         "S3 を直接読む。ファイルシステムの固定費を負わない": "Read S3 directly and carry no file system floor",
         "キャッシュの導入。固定費のほうが大きい": "Introducing a cache. The floor costs more than it saves",
@@ -398,7 +399,7 @@ TRANSLATIONS.update(
         "**そのぶん固定費が先に立つ**ので、読み取りが少ない領域では不利になる。"
         "表の「直接読むほうが安い」行がその領域である。": "This architecture's column barely moves with size or count because the reads do not go through the S3 API and what is carried is limited to the working set. "
         "**The floor is therefore what stands out**, which puts it behind in the low-read region — "
-        'the rows marked "reading directly is cheaper".',
+        'the rows marked "Reading directly is cheaper".',
         # --- consumers moved into AWS ------------------------------------------------------------
         "S3 GET ({count} 回、しきい値超のためバケットから直接)": "S3 GET ({count}; above the threshold, so straight from the bucket)",
         "S3 Files メタデータ読み取り": "S3 Files metadata read",
@@ -641,13 +642,13 @@ TRANSLATIONS.update(
         "([FSx for ONTAP documentation]({fsx_url}), [NetApp KB]({netapp_url})). "
         "With a short cooling period, or an `All` policy, the pool-tier figure tends towards 0%.",
         # --- the S3 Files expiry sweep -----------------------------------------------------------
-        "{days} 日": "{days} days",
+        "{days} 日": "{days}",
         "既定値": "default",
         "小さいオブジェクトの場合、高性能ストレージの有効期限が最大のレバーになる。"
         "「{workload}」で期限を振ると次のようになる"
         "(既定は 30 日、設定可能な範囲は 1 日から 365 日)。": "For small objects the expiry on high-performance storage is the largest lever. "
         "Sweeping it on {workload} gives the following (the default is 30 days; the configurable range is 1 to 365).",
-        "有効期限": "Expiry",
+        "有効期限": "Expiry (days)",
         "アクティブ割合": "Active share",
         "期限を詰めれば下がるが、期限外のファイルを読むとバケットからの取り込みが再度発生する。"
         "読み取りの時間的な偏りが小さいワークロードでは、期限を詰めても取り込みの往復で戻ってくる。": "Shortening it lowers the figure, but reading a file that has expired triggers another import from the bucket. "

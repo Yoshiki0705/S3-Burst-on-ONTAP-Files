@@ -70,10 +70,9 @@ it. A figure without its environment cannot be reproduced, so it is useless for 
 estimation alike. The required items are in [verification status](../../verification-status.md).
 
 For cost, unit prices and estimates are kept apart. Unit prices are taken from the AWS Price List API
-and placed in
-[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) with the
-Region and the effective date. The monthly figures derived from them depend on assumed usage, so they
-are treated as estimates and never mixed with measurements.
+and placed in [FinOps cost structure](../comparison/finops-s3-vs-s3ap.md) with the Region and the
+effective date. The monthly figures derived from them depend on assumed usage, so they are treated as
+estimates and never mixed with measurements.
 
 ## Related documents
 

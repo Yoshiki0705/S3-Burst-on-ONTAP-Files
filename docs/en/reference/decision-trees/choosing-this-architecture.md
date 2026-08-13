@@ -59,7 +59,7 @@ Everything in the right column means a rebuild if it is changed afterwards.
 | Document | Contents |
 |---|---|
 | [Alternatives](../comparison/alternatives.md) | Each approach's suited and unsuited conditions, and its costs |
-| [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | The cost side of the decision. The fixed-cost floor and the request unit price difference |
+| [FinOps cost structure](../comparison/finops-s3-vs-s3ap.md) | The cost side of the decision. The fixed-cost floor and the request unit price difference |
 | [Decisions that come first](../../design-first-decisions.md) | The judgements that cannot be deferred |
 | [Architecture](../../architecture.md) | What this architecture solves and does not solve |
 | [Support matrix](../../support-matrix.md) | The support status and minimum versions it presupposes |

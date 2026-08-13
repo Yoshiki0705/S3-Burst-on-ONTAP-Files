@@ -150,10 +150,10 @@ created here, and it is not removed here.
 | Document | Contents |
 |---|---|
 | [Deploying the collect side](aws-cloudformation.md) | The origin half |
-| [Decisions that come first](../design-first-decisions.md) | Security style and protocol (Japanese) |
-| [Portability](../portability.md) | Supported configurations and unconfirmed combinations (Japanese) |
-| [Verification record](../verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
-| [PoC checklist](../poc-checklist.md) | The order to confirm things in (Japanese) |
+| [Decisions that come first](../design-first-decisions.md) | Security style and protocol |
+| [Portability](../portability.md) | Supported configurations and unconfirmed combinations |
+| [Verification record](../verification/s3ap-nfs-visibility.md) | Measured figures and conditions |
+| [PoC checklist](../poc-checklist.md) | The order to confirm things in |
 
 ---
 

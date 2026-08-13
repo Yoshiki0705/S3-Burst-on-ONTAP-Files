@@ -39,6 +39,14 @@ A link is marked in one of three ways:
 Closing a finding by marking the link is always correct. Closing it by writing the English target is
 better when the document has settled — see the promotion checklist in `docs/i18n-manifest.txt`.
 
+Taking that better route creates the third failure: the target is retargeted to the English sibling
+and the label is not, so a correctly spelled marker now sits on a line where nothing goes to
+Japanese. It misdescribes the link instead of describing it, and nothing else notices — the target
+resolves, the file is English, the spelling is the accepted one. A marker is therefore reported as
+stale when every link on its line resolves inside `docs/en/`. Files outside `docs/` are excluded:
+the root `README.md` and `CONTRIBUTING.md` are Japanese without being tiered, so a marker pointing
+at one of them is right.
+
 Run:  python3 tools/check_cross_language_links.py
 """
 
@@ -75,17 +83,34 @@ def english_docs() -> list[Path]:
     return sorted(en_root.rglob("*.md"))
 
 
-def targets_japanese(source: Path, target: str) -> bool:
-    """Whether `target`, written in `source`, resolves to a file under docs/ja/."""
+def resolves_under(source: Path, target: str, lang: str) -> bool:
+    """Whether `target`, written in `source`, resolves to a file under docs/<lang>/."""
     if target.startswith(SKIP_SCHEMES) or target.startswith("#"):
         return False
     path = (source.parent / target.split("#", 1)[0]).resolve()
-    return lang_root("ja").resolve() in path.parents
+    return lang_root(lang).resolve() in path.parents
+
+
+def targets_japanese(source: Path, target: str) -> bool:
+    return resolves_under(source, target, "ja")
+
+
+def targets_english(source: Path, target: str) -> bool:
+    """Used to decide that a marker is stale, so it has to be certain rather than probable.
+
+    `docs/en/` is the only place a target is known to be English. Files outside `docs/` — the root
+    `README.md`, `CONTRIBUTING.md`, `docs/i18n-terms.md` — are Japanese but are not tiered, so a
+    marker on a link to one of them is correct and is left alone. Judging those by their contents
+    was the alternative and would have failed the generated language switcher, whose home link
+    points at the Japanese hub and which no one can edit to add a marker.
+    """
+    return resolves_under(source, target, "en")
 
 
 def main() -> int:
     unmarked: list[str] = []
     near_miss: list[str] = []
+    stale: list[str] = []
     marked = 0
     scanned = 0
 
@@ -114,6 +139,17 @@ def main() -> int:
                 needs_marker.append((text, target))
 
             if not needs_marker:
+                # A marker on a line with no link into Japanese is left over from a promotion: the
+                # link was retargeted to the English sibling and the label was not. It now tells the
+                # reader the opposite of the truth, and nothing else here would notice — the target
+                # resolves, the file is English, and the marker is spelled correctly.
+                links = [m.group(2) for m in LINK.finditer(line)]
+                if (
+                    MARKER.search(line)
+                    and links
+                    and all(targets_english(path, target) for target in links)
+                ):
+                    stale.append(f"{relative}:{number}: {line.strip()}")
                 continue
 
             covered = len(MARKER.findall(line))
@@ -127,23 +163,33 @@ def main() -> int:
             for text, target in uncovered:
                 bucket.append(f"{relative}:{number}: [{text}]({target})")
 
-    if unmarked or near_miss:
-        total = len(unmarked) + len(near_miss)
+    if unmarked or near_miss or stale:
+        total = len(unmarked) + len(near_miss) + len(stale)
         print(
-            f"English documents link into Japanese without saying so ({total} link(s)):",
+            f"English documents describe where their links go incorrectly ({total} line(s)):",
             file=sys.stderr,
         )
         for finding in unmarked:
             print(f"  missing marker  {finding}", file=sys.stderr)
         for finding in near_miss:
             print(f"  wrong spelling  {finding}", file=sys.stderr)
-        print(
-            "\n  Append `(Japanese)` after the link, exactly that spelling. A reader who follows an\n"
-            "  English label onto a Japanese page was not warned by the missing translation; they\n"
-            "  were misled by the unlabelled link. If the document has settled, translating it is\n"
-            "  the better fix — see the promotion checklist in docs/i18n-manifest.txt.",
-            file=sys.stderr,
-        )
+        for finding in stale:
+            print(f"  stale marker    {finding}", file=sys.stderr)
+        if unmarked or near_miss:
+            print(
+                "\n  Append `(Japanese)` after the link, exactly that spelling. A reader who follows an\n"
+                "  English label onto a Japanese page was not warned by the missing translation; they\n"
+                "  were misled by the unlabelled link. If the document has settled, translating it is\n"
+                "  the better fix — see the promotion checklist in docs/i18n-manifest.txt.",
+                file=sys.stderr,
+            )
+        if stale:
+            print(
+                "\n  Remove the `(Japanese)` on the stale lines. Nothing on them goes to Japanese any\n"
+                "  more, so the marker now misdescribes the link rather than describing it. This is\n"
+                "  what a promotion leaves behind when the target is retargeted and the label is not.",
+                file=sys.stderr,
+            )
         return 1
 
     print(

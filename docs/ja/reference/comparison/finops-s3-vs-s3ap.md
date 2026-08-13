@@ -1,5 +1,9 @@
 # FinOps — S3 標準バケットと FSx for ONTAP S3 Access Point の費用構造
 
+<!-- lang-switcher:start -->
+🌐 [日本語](finops-s3-vs-s3ap.md) | [English](../../../en/reference/comparison/finops-s3-vs-s3ap.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
+
 費用が問題になる典型は 2 つある。
 
 1 つは**読み取り側**である。S3 に置いたデータを、AWS の外にいる利用側が S3 API で読む。同じファイルを何度も読むと、リージョンから出たバイト数に対してデータ転送料金がかかり、読んだ回数だけ倍になる。GET リクエストも回数に比例する。
@@ -34,12 +38,12 @@
 | 配布側が必要とするのは全データではなく作業セット | FlexCache の Cache ボリューム | 疎なキャッシュなので、Origin の 1 割程度の SSD で足りる |
 | 利用側が AWS 上の Linux コンピュートで、マウントヘルパーを入れられる | S3 Files | FSx for ONTAP の固定費がかからない。大きいオブジェクトではとくに安い |
 | 利用側が構成を変えられない装置、SMB、または AWS 外 | FSx for ONTAP S3 AP + FlexCache | S3 Files は EC2 / Lambda / EKS / ECS の Linux 向けで、SMB を提供しない |
+| 配布側で全データを常時ローカルに置く必要がある | 全量コピー (SnapMirror など) | Cache は階層化できないため、全量を載せるとコピーより高くつく |
 
 費用の前に絞り込みが効く軸が 2 つある。利用側が話せるプロトコルと、書き込みの経路である。
 
 - [対応プロトコルとバージョンの対比](#対応プロトコルとバージョンの対比) — NFSv3 で固定された装置や SMB を使う工程があるかどうかで、選択肢が先に絞られる
 - [配布側での書き込み](#配布側での書き込み--flexcache-の-2-つのモード) — Cache は書き込み可能で、既定の write-around と非同期の write-back で鮮度と遅延の出方が違う
-| 配布側で全データを常時ローカルに置く必要がある | 全量コピー (SnapMirror など) | Cache は階層化できないため、全量を載せるとコピーより高くつく |
 
 ## 課金次元の対応
 
@@ -1228,3 +1232,8 @@ Price List API と突き合わせる。
 | [S3 AP 設計ガイド](../limits/s3ap-design-guide.md) | 並行度設計、ディレクトリ設計 |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
 | [検証状況](../../verification-status.md) | 段階の定義と現在の状態 |
+
+---
+<!-- lang-switcher:start -->
+🌐 [日本語](finops-s3-vs-s3ap.md) | [English](../../../en/reference/comparison/finops-s3-vs-s3ap.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->

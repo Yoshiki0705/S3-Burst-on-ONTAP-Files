@@ -74,7 +74,7 @@ makes the idea close to FlexCache.
 | ONTAP features | ONTAP data management features such as Snapshot, FlexClone and SnapMirror are out of scope |
 
 Costs are compared in
-[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+[FinOps cost structure](finops-s3-vs-s3ap.md).
 For reading large objects from Linux on AWS, it can come out cheaper than this architecture.
 
 ### Collect over S3, serve with FlexCache (this architecture)
@@ -123,7 +123,7 @@ architecture is for.
 | Document | Contents |
 |---|---|
 | [Choosing](../decision-trees/choosing-this-architecture.md) | The flowchart that turns this table into a decision |
-| [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | This table's "cost" broken into billing dimensions and estimated per configuration |
+| [FinOps cost structure](finops-s3-vs-s3ap.md) | This table's "cost" broken into billing dimensions and estimated per configuration |
 | [Architecture](../../architecture.md) | What this architecture solves and does not solve |
 | [Verification status](../../verification-status.md) | The unverified scope |
 

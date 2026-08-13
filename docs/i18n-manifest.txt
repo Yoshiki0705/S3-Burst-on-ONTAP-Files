@@ -16,11 +16,11 @@
 #   3. Add the subpath here.
 #   4. Run: make i18n-check && make switcher-write && make switcher-check
 #
-# What belongs in Tier 1: first-touch material only — how to find your way around, and how to read
-# the confidence signals. The dividing line is consequence. A mistranslation in navigation sends
-# someone to the wrong page, which they notice. A mistranslation in a design judgement does not
-# announce itself and can be acted on. Deep technical material therefore stays Japanese-only even
-# when a translation would be easy to produce.
+# What Tier 1 originally meant: first-touch material only — how to find your way around, and how to
+# read the confidence signals. The dividing line was consequence. A mistranslation in navigation
+# sends someone to the wrong page, which they notice. A mistranslation in a design judgement does not
+# announce itself and can be acted on. That is why deep technical material was held back, and why
+# each English document now opens by saying which version is authoritative.
 #
 # Promotion is also gated on stability. Translating a document that is still changing multiplies
 # every later edit. Promote when the content has settled, not when it is first written.
@@ -50,3 +50,4 @@ verification/flexcache-s3ap-visibility.md
 verification/s3ap-nfs-visibility.md
 verification/cross-protocol-directions.md
 reference/limits/s3ap-design-guide.md
+reference/comparison/finops-s3-vs-s3ap.md
