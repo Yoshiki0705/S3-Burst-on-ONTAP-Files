@@ -84,6 +84,26 @@ def test_japanese_passes_through_untranslated() -> None:
     assert fm.t("合計 {amount}", amount="$1.00") == "合計 $1.00"
 
 
+def test_a_source_string_with_no_japanese_needs_no_entry() -> None:
+    """Otherwise a hundred entries mapping `GB-Mo` and `S3 Standard-IA GET` to themselves would sit
+    in the table for a reviewer to read past."""
+    fm._LANG = "en"
+    try:
+        assert fm.t("S3 Standard-IA GET / 1,000") == "S3 Standard-IA GET / 1,000"
+        assert fm.t("GB-Mo") == "GB-Mo"
+        assert fm.t("{mbps} MBps", mbps=384) == "384 MBps"
+    finally:
+        fm._LANG = "ja"
+
+
+def test_every_generated_string_now_has_english() -> None:
+    """The document is promoted only once this holds, and it has to keep holding afterwards: a new
+    gap makes the script skip English rather than fail, which would freeze the English tables."""
+    missing, residue = fm.translation_gaps()
+    assert missing == []
+    assert residue == []
+
+
 # --- documents ----------------------------------------------------------------------------------
 
 
