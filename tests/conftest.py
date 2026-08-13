@@ -26,3 +26,10 @@ for directory in ("tools", "scripts"):
 # one on the first commit of this repository. Building it keeps the assertions honest without putting
 # the shape into a tracked file.
 REAL_LOOKING_ACCOUNT = "".join(str((7 * index + 3) % 10) for index in range(12))
+
+# Same reasoning for a file system ID, and the same outcome: written as a literal, the assertion that
+# the audit rejects a real-looking ID was itself rejected by the secret scanner. Both spellings are
+# built, because the audit has to catch the AWS API form and the form ONTAP and the console show.
+_FSX_SUFFIX = "".join("0123456789abcdef"[(5 * index + 1) % 16] for index in range(17))
+REAL_LOOKING_FSX_ID = f"fs-{_FSX_SUFFIX}"
+REAL_LOOKING_FSX_ID_CONSOLE = f"FsxId{_FSX_SUFFIX}"

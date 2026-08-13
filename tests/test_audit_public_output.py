@@ -19,7 +19,11 @@ should find out from a red test rather than from a reader.
 from __future__ import annotations
 
 import audit_public_output as audit
-from conftest import REAL_LOOKING_ACCOUNT
+from conftest import (
+    REAL_LOOKING_ACCOUNT,
+    REAL_LOOKING_FSX_ID,
+    REAL_LOOKING_FSX_ID_CONSOLE,
+)
 
 CVO_CITATION = (
     "| Cloud Volumes ONTAP | ONTAP S3 | "
@@ -155,6 +159,8 @@ def test_identifiers_that_must_never_ship_are_flagged() -> None:
         "Contact someone@somecompany.example",
         "The management LIF is 10.0.4.17",
         f"Account {REAL_LOOKING_ACCOUNT} owns the bucket.",
+        f"| Origin cluster | {REAL_LOOKING_FSX_ID_CONSOLE} (`lab-cluster`), SINGLE_AZ_1 |",
+        f"The file system is {REAL_LOOKING_FSX_ID}.",
     ):
         assert "pii" in categories(line), line
 
@@ -164,6 +170,7 @@ def test_sanctioned_placeholders_pass() -> None:
         "Account 123456789012 owns the bucket.",
         "The management LIF is 10.0.x.x",
         "Contact reviewer@example.com",
+        "The file system is fs-0123456789abcdef0.",
     ):
         assert "pii" not in categories(line), line
 

@@ -123,14 +123,14 @@ nothing to lose if it does not. Detail and sources are in
 | Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](reference/glossary/object-access-on-ontap.md) | 5 min |
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
-| Read the measured figures and their conditions | [Verification record](../ja/verification/s3ap-nfs-visibility.md) (Japanese) | 10 min |
+| Read the measured figures and their conditions | [Verification record](verification/s3ap-nfs-visibility.md) | 10 min |
 | Confirm it on real hardware | [PoC checklist](poc-checklist.md) | 10 min |
 
 > **The central claim of this architecture is verified.** An object written to the origin through
 > the S3 Access Point is readable on the FlexCache cache volume over NFS in **p50 14 ms**
 > (ONTAP 9.18.1P3D1, same-Region VPC peering, `actimeo=0`, n=30). FlexCache adds approximately
 > +5 ms over reading the same volume directly.
-> Full results: [FlexCache verification record](../ja/verification/flexcache-s3ap-visibility.md) (Japanese). The difference between "unverified" and "unconfirmed" is stated explicitly in
+> Full results: [FlexCache verification record](verification/flexcache-s3ap-visibility.md). The difference between "unverified" and "unconfirmed" is stated explicitly in
 > [Verification status](verification-status.md). Performance and cost figures that were not
 > measured are not published here.
 

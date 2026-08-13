@@ -1,4 +1,7 @@
 # 検証記録 — S3 Access Point と NFS の相互可視性（同一ボリューム）
+<!-- lang-switcher:start -->
+🌐 [日本語](s3ap-nfs-visibility.md) | [English](../../en/verification/s3ap-nfs-visibility.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->
 
 **この記録は FlexCache の検証ではありません。** 測ったのは 1 つのボリュームに対して
 S3 Access Point とNFS の両方からアクセスしたときの可視性です。
@@ -135,3 +138,9 @@ Linux の既定は `acdirmin=30` / `acdirmax=60` なので、クライアント�
 | [PoC チェックリスト](../poc-checklist.md) | 次に確かめること |
 | [収集側のデプロイ](../deployment/aws-cloudformation.md) | 再現用の環境 |
 | [上限値](../reference/limits/s3-access-point.md) | サイズ上限と出典 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](s3ap-nfs-visibility.md) | [English](../../en/verification/s3ap-nfs-visibility.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->

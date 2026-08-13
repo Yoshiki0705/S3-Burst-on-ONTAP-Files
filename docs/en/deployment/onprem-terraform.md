@@ -108,7 +108,7 @@ sudo mount -t nfs -o nfsvers=3,actimeo=0 <cache-svm-nfs-ip>:/cache_vol /mnt/cach
 **The mount options change what you see.** With Linux defaults (`acdirmin=30`, `acdirmax=60`) a file
 appearing in a directory the client has already listed can be invisible for up to a minute. This was
 measured on the collect side — see the
-[verification record](../../ja/verification/s3ap-nfs-visibility.md) (Japanese).
+[verification record](../verification/s3ap-nfs-visibility.md).
 
 > **Stated as unverified**: **when an object written through the S3 Access Point becomes visible on
 > this cache volume has not been verified.** The figures published so far are for the origin volume
@@ -152,7 +152,7 @@ created here, and it is not removed here.
 | [Deploying the collect side](aws-cloudformation.md) | The origin half |
 | [Decisions that come first](../design-first-decisions.md) | Security style and protocol (Japanese) |
 | [Portability](../portability.md) | Supported configurations and unconfirmed combinations (Japanese) |
-| [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
+| [Verification record](../verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
 | [PoC checklist](../poc-checklist.md) | The order to confirm things in (Japanese) |
 
 ---

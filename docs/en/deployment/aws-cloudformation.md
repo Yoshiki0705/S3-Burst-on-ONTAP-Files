@@ -141,7 +141,7 @@ aws s3api delete-object --bucket "$AP" --key check.txt
 ```
 
 The measured figures, and what they do and do not support, are in the
-[verification record](../../ja/verification/s3ap-nfs-visibility.md) (Japanese).
+[verification record](../verification/s3ap-nfs-visibility.md).
 
 ## 5. Tear down
 
@@ -187,7 +187,7 @@ The Secrets Manager secret is deleted with a recovery window by default. Either 
 |---|---|
 | [Deploying the serve side](onprem-terraform.md) | The FlexCache half |
 | [Decisions that come first](../design-first-decisions.md) | What to settle before the origin exists (Japanese) |
-| [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
+| [Verification record](../verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
 | [PoC checklist](../poc-checklist.md) | The order to confirm things in (Japanese) |
 | [Architecture](../architecture.md) | The whole picture (Japanese) |
 
