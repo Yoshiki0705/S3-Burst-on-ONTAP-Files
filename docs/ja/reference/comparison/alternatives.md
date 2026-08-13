@@ -1,4 +1,7 @@
 # 代替案との比較
+<!-- lang-switcher:start -->
+🌐 [日本語](alternatives.md) | [English](../../../en/reference/comparison/alternatives.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
 
 S3 とファイルストレージの両方が必要なとき、実務では概ね次のいずれかに落ちる。
 どれも合理的な選択であり、問題は選択そのものではなく**代償が見えにくいこと**にある。
@@ -114,3 +117,9 @@ S3 を正典に保ったまま、ファイルシステムのセマンティク�
 | [FinOps の費用構造](finops-s3-vs-s3ap.md) | この表の「コスト」を課金次元に分解し、構成別に試算したもの |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
 | [検証状況](../../verification-status.md) | 未検証の範囲 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](alternatives.md) | [English](../../../en/reference/comparison/alternatives.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->

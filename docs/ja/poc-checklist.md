@@ -1,4 +1,7 @@
 # PoC チェックリスト
+<!-- lang-switcher:start -->
+🌐 [日本語](poc-checklist.md) | [English](../en/poc-checklist.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
 
 <!-- 出典と分岐の記録
      姉妹リポジトリ fsxn-s3ap-serverless-patterns の docs/flexcache-poc-checklist.md を
@@ -105,3 +108,9 @@ PoC は不可逆操作を置く場所として最悪である。削除できな�
 | [最初に決めること](design-first-decisions.md) | フェーズ 2 で確かめる未確認事項 |
 | [サポート状況](support-matrix.md) | 各項目の前提となる対応状況 |
 | [移植性](portability.md) | フェーズ 4 の結果の反映先 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](poc-checklist.md) | [English](../en/poc-checklist.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

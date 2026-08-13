@@ -57,7 +57,7 @@ supported configuration table.
 it is never written as "it works because it is ONTAP-based". Neither has any basis.
 
 The procedure for confirming this is in phase 4 of the
-[PoC checklist](../ja/poc-checklist.md) (Japanese). This table gets updated once there is a result.
+[PoC checklist](poc-checklist.md). This table gets updated once there is a result.
 
 ### Reference — Azure NetApp Files cache volumes
 
@@ -89,7 +89,7 @@ treated as something to confirm.
 | [Support matrix](support-matrix.md) | The constraints in one place |
 | [Verification status](verification-status.md) | The definition of the stages |
 | [Glossary](reference/glossary/object-access-on-ontap.md) | The names of the collect-layer mechanisms |
-| [PoC checklist](../ja/poc-checklist.md) (Japanese) | The procedure for closing the unconfirmed items |
+| [PoC checklist](poc-checklist.md) | The procedure for closing the unconfirmed items |
 
 ---
 

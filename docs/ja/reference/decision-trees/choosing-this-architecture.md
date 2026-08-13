@@ -1,4 +1,7 @@
 # 選び方 — この構成を採るかどうか
+<!-- lang-switcher:start -->
+🌐 [日本語](choosing-this-architecture.md) | [English](../../../en/reference/decision-trees/choosing-this-architecture.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
 
 判断の分岐点は 5 つある。フローチャートと下の表は同じことを述べている。
 Mermaid はすべての閲覧環境で描画されるわけではないので、判断の根拠は表の側にも置く。
@@ -55,3 +58,9 @@ flowchart TD
 | [最初に決めること](../../design-first-decisions.md) | 保留できない判断 |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
 | [サポート状況](../../support-matrix.md) | 前提となる対応状況と最小バージョン |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](choosing-this-architecture.md) | [English](../../../en/reference/decision-trees/choosing-this-architecture.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->

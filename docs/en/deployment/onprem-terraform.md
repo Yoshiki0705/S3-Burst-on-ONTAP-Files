@@ -153,7 +153,7 @@ created here, and it is not removed here.
 | [Decisions that come first](../design-first-decisions.md) | Security style and protocol (Japanese) |
 | [Portability](../portability.md) | Supported configurations and unconfirmed combinations (Japanese) |
 | [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
-| [PoC checklist](../../ja/poc-checklist.md) | The order to confirm things in (Japanese) |
+| [PoC checklist](../poc-checklist.md) | The order to confirm things in (Japanese) |
 
 ---
 
