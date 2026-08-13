@@ -20,6 +20,12 @@
 
 ## The architecture
 
+![An Amazon S3 Access Point writes into an Amazon FSx for NetApp ONTAP origin volume, FlexCache distributes to an Amazon FSx for NetApp ONTAP volume at the cache site, and NFS / SMB clients read from it](../_assets/images/s3burst-architecture-overview-en.svg)
+
+Figure 1: the collect and distribute layers. The figure and the table below state the same thing.
+The reasoning is kept in the table or the prose as well, so that it survives anywhere the image
+does not render.
+
 | Layer | Mechanism | Protocol |
 |---|---|---|
 | Collect (write) | FSx for ONTAP S3 Access Point, **attached to the origin volume only** | S3 API |
@@ -31,6 +37,37 @@ Writes always pass through the S3 Access Point on the origin, and no S3 access i
 cache side. That keeps the write path single and leaves the cache read-oriented, which is where
 FlexCache fits best. The full picture is in
 [Architecture](../ja/architecture.md) (Japanese).
+
+## When the consuming site is the origin
+
+If the consuming site sits in the same place as the origin, **this architecture is not needed**.
+The S3 Access Point alone satisfies "collect over S3, read as files". S3 Files does the same while
+leaving the source of truth in the bucket, and what separates the two is protocol coverage rather
+than cost.
+
+![A: an Amazon S3 Access Point writes into Amazon FSx for NetApp ONTAP and clients read over NFS v3 / v4.x and SMB. B: an Amazon S3 Bucket feeds Amazon S3 Files and clients read over NFS v4.1 / v4.2](../_assets/images/s3burst-single-site-options-en.svg)
+
+Figure 2: the two shapes that complete within one site. Neither has a FlexCache fan-out layer. The
+figure and the table below state the same thing.
+
+| Approach | Suited when | Not suited when |
+|---|---|---|
+| A. FSx for ONTAP S3 Access Point alone | Consumers speak NFSv3 or SMB. Snapshot or FlexClone is wanted on data as soon as it lands | The fixed-cost floor (1 TiB of SSD and one throughput step) cannot be earned back. The S3 API is enough for the consumers |
+| B. S3 bucket + S3 Files | Consumers run on AWS Linux compute (Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS) and can install the mount helper. The source of truth should stay in the bucket | NFSv3, SMB, or consumers outside AWS. A file-system write has to reach S3 within 60 seconds. Archive storage classes have to be readable as files |
+
+B serves NFSv4.1 and NFSv4.2 only; NFSv3 and SMB are out of scope
+([unsupported features and quotas](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html)).
+Equipment fixed on NFSv3, or a Windows stage in the process, rules B out before cost enters the
+picture. Where consumers do run on AWS Linux and read large objects, B comes out cheaper: files
+above the default threshold are not held in the performance tier and stream straight from the
+bucket.
+
+**This is also where this architecture does not fit.** The distribute layer earns its cost when
+consumers sit elsewhere and cannot be moved; in the same place, the cache SSD and the peering
+operations are spend with nothing coming back. The full set of branches is in
+[Selection flowchart](../ja/reference/decision-trees/choosing-this-architecture.md) (Japanese) and
+the cost breakdown in
+[FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
 
 ## Decisions that come first
 

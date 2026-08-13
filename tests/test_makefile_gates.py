@@ -33,6 +33,11 @@ NOT_IN_ALL = {
     "format-python",  # rewrites files
     "switcher-write",  # rewrites files
     "finops-write",  # rewrites files; `finops` is the gate that runs in the aggregate
+    "diagrams",  # rewrites files, and needs the AWS icon package, which is not committed
+    # `diagrams-check` would belong in the aggregate on its own terms, but it reads the same
+    # uncommitted icon package to rebuild what it compares against, so in CI it could only ever
+    # fail for a missing download. It is a local check, run alongside `diagrams`.
+    "diagrams-check",
     "links-external",  # needs a network
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate

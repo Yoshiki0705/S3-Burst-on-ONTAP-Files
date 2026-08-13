@@ -24,6 +24,11 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 
 ## この構成
 
+![Amazon S3 Access Point から Amazon FSx for NetApp ONTAP の Origin ボリュームへ書き込み、FlexCache でキャッシュ拠点の Amazon FSx for NetApp ONTAP へ配り、NFS / SMB クライアントが読む](docs/_assets/images/s3burst-architecture-overview.svg)
+
+図 1: 収集層と配布層。図と下の表は同じことを述べています。画像が表示されない環境でも
+判断の根拠が残るように、内容は必ず表か本文の側にも置いています。
+
 | 層 | 何を使うか | プロトコル |
 |---|---|---|
 | 収集（書き込み） | FSx for ONTAP の S3 Access Point。**Origin ボリュームにだけ付ける** | S3 API |
@@ -34,6 +39,33 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 書き込みは常に Origin 側の S3 Access Point を通り、Cache 側には S3 を出しません。
 これで書き込み経路が 1 本になり、Cache は読み取り中心という FlexCache 本来の適性に収まります。
 全体像は[構成の形](docs/ja/architecture.md)にあります。
+
+## 利用拠点が Origin と同じとき
+
+利用拠点が Origin と同じ場所にあるなら、**この構成は不要です。** S3 Access Point だけで
+「S3 で集めてファイルで読む」が満たせます。正典を S3 バケットに置いたまま同じことを実現する
+手段が S3 Files で、分かれ目は費用ではなく対応プロトコルです。
+
+![A は Amazon S3 Access Point から Amazon FSx for NetApp ONTAP へ書き NFS v3 / v4.x と SMB で読む形、B は Amazon S3 Bucket から Amazon S3 Files を介して NFS v4.1 / v4.2 で読む形](docs/_assets/images/s3burst-single-site-options.svg)
+
+図 2: 1 拠点で完結する 2 つの形。どちらも FlexCache によるファンアウトを持ちません。
+図と下の表は同じことを述べています。
+
+| 方式 | 向く条件 | 向かない条件 |
+|---|---|---|
+| A. FSx for ONTAP S3 Access Point のみ | 利用側が NFSv3 や SMB を使う。Snapshot や FlexClone を収集直後のデータに効かせたい | 固定費の下限（SSD 1 TiB とスループット 1 段）を回収できない。利用側が S3 API で足りる |
+| B. S3 バケット + S3 Files | 利用側が AWS 上の Linux コンピュート（Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS）で、マウントヘルパーを入れられる。正典を S3 バケットに残したい | NFSv3、SMB、AWS 外の利用側。ファイルシステム側の書き込みを 60 秒以内に S3 へ出したい。アーカイブ系ストレージクラスからファイルで読みたい |
+
+B の対応プロトコルは NFSv4.1 と NFSv4.2 だけで、NFSv3 と SMB は対象外です
+（[非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html)）。
+NFSv3 で固定された装置や Windows の工程があるなら、費用を見る前にここで絞られます。
+逆に利用側が AWS 上の Linux で大きいオブジェクトを読むなら B のほうが安く出ます。
+既定のしきい値を超えるファイルは高性能ストレージに載らず、バケットから直接ストリームされるためです。
+
+**この構成が向かないのもここです。** 配布層が効くのは利用側が別の場所にあって動かせないときで、
+同じ場所にあるなら Cache の SSD とピアリングの運用は戻りのない費用になります。
+分岐の全体は[選び方](docs/ja/reference/decision-trees/choosing-this-architecture.md)、
+金額の内訳は[FinOps の費用構造](docs/ja/reference/comparison/finops-s3-vs-s3ap.md)にあります。
 
 ## 最初に決めること
 
