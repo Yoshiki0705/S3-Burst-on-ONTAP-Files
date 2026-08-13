@@ -62,6 +62,33 @@ picture. Where consumers do run on AWS Linux and read large objects, B comes out
 above the default threshold are not held in the performance tier and stream straight from the
 bucket.
 
+### What to expect from a write
+
+After protocol coverage, the next thing that decides the design is how long a write takes to appear
+on the other face. **A's figures were measured on this architecture; B's come from AWS
+documentation.** They are different kinds of claim, so they are kept apart.
+
+| Expectation | A. S3 Access Point alone (measured) | B. S3 bucket + S3 Files (documented) |
+|---|---|---|
+| Written over S3, readable as a file | p50 9 ms (same volume, 64 B, `actimeo=0`, n=30) | Seconds, typically — but only for files whose data is currently in the performance tier |
+| Written as a file, readable over S3 | p50 44 ms (persistent boto3 session) | Only after roughly **60 seconds of write inactivity** |
+| What a partial write looks like | Invisible until `CompleteMultipartUpload` | If both sides change one file the bucket is authoritative and the file-system copy moves to lost and found |
+| Synchronisation rate ceiling | Not documented | Import 2,400 objects/s and 700 MB/s; export 800 files/s and 2,700 MB/s, per file system |
+| Preconditions | The collect layer excludes S3 event notifications, lifecycle and versioning | S3 versioning is mandatory on the bucket, and `chmod` or `chown` creates a new version |
+
+**B's 60 seconds is not a delay but an idle period.** In the documented example, an application that
+appends every 30 seconds for five minutes does not start exporting until the sixth minute; nothing
+reaches the bucket while the appending continues. For a file that is never quiet — a log — freshness
+as seen through the S3 API lags by exactly that much
+([performance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-performance.html),
+[synchronization](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-synchronization.html)).
+
+Which figure applies depends on the direction of the writes. Collect over the S3 API with
+read-only consumers and the import seconds are what matter. **Have the consumers write back and the
+60 seconds becomes the freshness everything downstream sees.** A has its counterpart caveat: on a
+default mount the client's cache expiry dominates over the server-side propagation, and both
+measured figures above are with `actimeo=0`.
+
 **This is also where this architecture does not fit.** The distribute layer earns its cost when
 consumers sit elsewhere and cannot be moved; in the same place, the cache SSD and the peering
 operations are spend with nothing coming back. The full set of branches is in
