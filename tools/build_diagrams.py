@@ -57,6 +57,14 @@ DRAWIO_CLI = Path("/Applications/draw.io.app/Contents/MacOS/draw.io")
 
 # --- icons ---------------------------------------------------------------------------------------
 
+# Icons that are not AWS assets, resolved under docs/_assets/icons/. That directory is gitignored on
+# purpose: the same reasoning that keeps the AWS Architecture Icons package outside the repository
+# applies to any vendor mark, so what gets committed is the finished diagram with the icon embedded,
+# never the icon as a file of its own. Obtain the ONTAP 9 product badge from NetApp and place it at
+# the path below before running --write.
+LOCAL_ICON_DIR = ROOT / "docs" / "_assets" / "icons"
+LOCAL_ICONS = {"ontap_9": "ontap-9.png"}
+
 # Relative to the icon package root. The `_Light` suffix on the general-purpose resource icons is
 # easy to miss: `Res_Client_48.svg` does not exist, `Res_Client_48_Light.svg` does.
 ICONS = {
@@ -88,6 +96,10 @@ ICON_SIZE = {
     "s3_bucket": 48,
     "s3": 80,
     "fsx_ontap": 80,
+    # Placed at 80 to match the AWS service icons it sits beside. The source badge is 96 px square,
+    # so this is the one icon that is scaled; an AWS asset would not be, but holding a third-party
+    # badge at its own size next to an 80 px service icon reads as a difference in importance.
+    "ontap_9": 80,
 }
 
 # --- styles --------------------------------------------------------------------------------------
@@ -118,6 +130,21 @@ def icon_style(data_uri: str) -> str:
 EDGE_STYLE = (
     "edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;"
     "strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;"
+)
+
+# A plain dashed container, used where landing an edge on one icon would misstate the architecture.
+# The cache platform is one of two products, so the FlexCache edge has to arrive at the choice rather
+# than at whichever option happens to be drawn first. Dashed and unfilled so it reads as a grouping
+# rather than as another boundary like the AWS Cloud and site groups.
+FRAME_STYLE = (
+    "rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;"
+    "fillColor=none;fontColor=#232F3E;fontSize=11;verticalAlign=top;align=center;spacingTop=6;"
+)
+
+# Free-standing text with no box, for the "or" between two alternatives.
+TEXT_STYLE = (
+    "text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;"
+    "fontSize=11;fontStyle=1;fontColor=#232F3E;"
 )
 
 NOTE_STYLE = (
@@ -169,10 +196,25 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon FSx for NetApp ONTAP (Origin)",
         "en": "Amazon FSx for NetApp ONTAP (Origin)",
     },
-    "cache_volume": {
-        "ja": "Amazon FSx for NetApp ONTAP (FlexCache)",
-        "en": "Amazon FSx for NetApp ONTAP (FlexCache)",
+    # Kept to one rendered line. At 220 px the two-line version pushed down onto the icon below it,
+    # which the geometry checks cannot see — a label is laid out by the renderer, not by the spec.
+    # The mechanism is already named on the incoming edge, so the frame does not repeat it.
+    "cache_platform": {
+        "ja": "Cache ボリューム（いずれか）",
+        "en": "Cache volume (either one)",
     },
+    "cache_volume_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    # Non-AWS products are exempt from the Amazon / AWS prefix rule. "on-premises" is the qualifier
+    # AWS's own documentation uses for this configuration, and it is load-bearing: the other ONTAP
+    # platforms are unverified here, so the icon must not stand for "any ONTAP".
+    "cache_volume_ontap": {
+        "ja": "ONTAP 9（オンプレミス）",
+        "en": "ONTAP 9 (on-premises)",
+    },
+    "either_of": {"ja": "または", "en": "or"},
     "file_client": {
         "ja": "NFS / SMB Client (HiL, EDA, VFX)",
         "en": "NFS / SMB Client (HiL, EDA, VFX)",
@@ -203,6 +245,13 @@ LABELS: dict[str, dict[str, str]] = {
                     "p50 +5 ms（Origin を直接読む場合との差）",
                 ),
                 ("※3", "SMB と NFS は同等", "持続接続でどちらも p50 7 ms（n=30）"),
+                (
+                    "※4",
+                    "Cache 側は FSx for ONTAP かオンプレミスの ONTAP 9",
+                    "AWS が文書化している FlexCache 構成はこの 2 つ。Cloud Volumes ONTAP、"
+                    "ONTAP Select、Azure NetApp Files、Google Cloud NetApp Volumes は未検証で、"
+                    "「ONTAP ベースだから動く」とは書かない",
+                ),
             ),
         ),
         "en": note_body(
@@ -219,6 +268,13 @@ LABELS: dict[str, dict[str, str]] = {
                     "*3",
                     "SMB and NFS are equivalent",
                     "p50 7 ms each over persistent mounts (n=30)",
+                ),
+                (
+                    "*4",
+                    "The cache is FSx for ONTAP or on-premises ONTAP 9",
+                    "Those are the two FlexCache configurations AWS documents. Cloud Volumes ONTAP, "
+                    "ONTAP Select, Azure NetApp Files and Google Cloud NetApp Volumes are "
+                    "unverified, which is not the same as unsupported",
                 ),
             ),
         ),
@@ -426,6 +482,26 @@ class Edge:
 
 
 @dataclass(frozen=True)
+class Frame:
+    cid: str
+    label: str
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
+class TextBox:
+    cid: str
+    label: str
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
 class Note:
     cid: str
     label: str
@@ -442,7 +518,9 @@ class Diagram:
     width: int
     height: int
     groups: tuple[Group, ...] = ()
+    frames: tuple[Frame, ...] = ()
     nodes: tuple[Node, ...] = ()
+    texts: tuple[TextBox, ...] = ()
     edges: tuple[Edge, ...] = ()
     notes: tuple[Note, ...] = ()
 
@@ -459,12 +537,19 @@ def centred(icon: str, cx: int, cy: int) -> tuple[int, int]:
 
 
 def _overview() -> Diagram:
-    """The architecture as published: collect over S3, fan out with FlexCache."""
+    """The architecture as published: collect over S3, fan out with FlexCache.
+
+    The cache side is drawn as two products inside one frame rather than as a single icon. AWS
+    documents the cache as either FSx for ONTAP or on-premises ONTAP, and a lone FSx for ONTAP icon
+    reads as a requirement — which would send a reader with an existing on-premises cluster looking
+    for a second file system they do not need. The FlexCache edge lands on the frame so it arrives at
+    the choice rather than at whichever option is drawn first.
+    """
     return Diagram(
         name="s3burst-architecture-overview",
         diagram_id="s3burst-overview",
         width=1350,
-        height=580,
+        height=635,
         groups=(
             Group("aws_cloud", "aws_cloud", 50, 50, 560, 350),
             Group(
@@ -472,26 +557,39 @@ def _overview() -> Diagram:
                 "cache_site",
                 720,
                 50,
-                500,
+                560,
                 350,
                 gr_icon="group_corporate_data_center",
                 stroke="#147EBA",
             ),
         ),
+        frames=(Frame("cache_platform", "cache_platform", 760, 85, 220, 270),),
         nodes=(
             Node("s3client", "users", "s3_client", 100, 180),
             Node("s3ap", "s3_access_point", "s3_access_point", 270, 180),
             Node("origin_vol", "fsx_ontap", "origin_volume", 420, 164),
-            Node("cache_vol", "fsx_ontap", "cache_volume", 850, 164),
-            Node("nfs_client", "client", "file_client", 1060, 180),
+            Node(
+                "cache_fsx",
+                "fsx_ontap",
+                "cache_volume_fsx",
+                *centred("fsx_ontap", 870, 155),
+            ),
+            Node(
+                "cache_ontap",
+                "ontap_9",
+                "cache_volume_ontap",
+                *centred("ontap_9", 870, 285),
+            ),
+            Node("nfs_client", "client", "file_client", *centred("client", 1160, 205)),
         ),
+        texts=(TextBox("cache_or", "either_of", 820, 215, 100, 20),),
         edges=(
             Edge("e1", "s3client", "s3ap", "put_object"),
             Edge("e2", "s3ap", "origin_vol"),
-            Edge("e3", "origin_vol", "cache_vol", "flexcache_pull"),
-            Edge("e4", "cache_vol", "nfs_client", "nfs_smb"),
+            Edge("e3", "origin_vol", "cache_platform", "flexcache_pull"),
+            Edge("e4", "cache_platform", "nfs_client", "nfs_smb"),
         ),
-        notes=(Note("note", "overview_note", 50, 425, 1250, 125),),
+        notes=(Note("note", "overview_note", 50, 440, 1250, 170),),
     )
 
 
@@ -582,8 +680,10 @@ def icon_package(explicit: str | None) -> Path:
 def data_uris(package: Path) -> dict[str, str]:
     """Read each icon and build its draw.io data URI.
 
-    The comma rather than `;base64,` is not a typo: draw.io renders nothing when the encoding is
-    declared the way the MIME specification would suggest.
+    The comma-only form is required, and it is required for PNG as well as for SVG. Writing the URI
+    the way the MIME specification would suggest — `data:image/png;base64,` — exports a broken-image
+    placeholder rather than failing, so the export "succeeds" and only looking at the picture shows
+    it. Established by exporting the same icon twice, once in each form.
     """
     uris = {}
     for key, relative in ICONS.items():
@@ -592,6 +692,18 @@ def data_uris(package: Path) -> dict[str, str]:
             raise SystemExit(f"build_diagrams: {relative} missing from {package}")
         encoded = base64.b64encode(path.read_bytes()).decode("ascii")
         uris[key] = f"data:image/svg+xml,{encoded}"
+
+    for key, name in LOCAL_ICONS.items():
+        path = LOCAL_ICON_DIR / name
+        if not path.is_file():
+            raise SystemExit(
+                f"build_diagrams: {name} not found at {path.relative_to(ROOT)}.\n"
+                "  This is a third-party product badge and is deliberately not committed, so it has\n"
+                "  to be placed there once before the diagrams can be regenerated. It is embedded\n"
+                "  into the generated .drawio, which is what gets committed."
+            )
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        uris[key] = f"data:image/png,{encoded}"
     return uris
 
 
@@ -636,6 +748,27 @@ def render(diagram: Diagram, lang: str, uris: dict[str, str]) -> str:
             group.y,
             group.width,
             group.height,
+        )
+    # Frames before nodes so the icons draw on top of the container they sit in.
+    for frame in diagram.frames:
+        vertex(
+            frame.cid,
+            label(frame.label, lang),
+            FRAME_STYLE,
+            frame.x,
+            frame.y,
+            frame.width,
+            frame.height,
+        )
+    for text in diagram.texts:
+        vertex(
+            text.cid,
+            label(text.label, lang),
+            TEXT_STYLE,
+            text.x,
+            text.y,
+            text.width,
+            text.height,
         )
     for node in diagram.nodes:
         size = ICON_SIZE[node.icon]

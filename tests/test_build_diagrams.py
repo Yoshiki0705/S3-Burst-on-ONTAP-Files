@@ -9,6 +9,7 @@ that opens and exports without complaint.
 
 from __future__ import annotations
 
+import subprocess
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import quoteattr
 
@@ -18,14 +19,24 @@ import pytest
 # --- the spec and the label table agree ----------------------------------------------------------
 
 
+def boxes(diagram) -> list:
+    """Every vertex that carries a width and a height."""
+    return [*diagram.groups, *diagram.frames, *diagram.texts, *diagram.notes]
+
+
+def endpoints(diagram) -> set[str]:
+    """What an edge may attach to. Frames count on purpose: an edge that has to arrive at a choice
+    between two products must land on the container, not on whichever option is drawn first."""
+    return {c.cid for c in (*diagram.nodes, *diagram.frames)}
+
+
 def test_every_label_a_spec_refers_to_exists_in_every_language() -> None:
     """A missing entry would otherwise surface as an empty label in the exported picture."""
     for diagram in bd.DIAGRAMS:
         keys = (
-            [group.label for group in diagram.groups]
+            [box.label for box in boxes(diagram)]
             + [node.label for node in diagram.nodes]
             + [edge.label for edge in diagram.edges if edge.label]
-            + [note.label for note in diagram.notes]
         )
         for key in keys:
             for lang in bd.LANGS:
@@ -33,14 +44,24 @@ def test_every_label_a_spec_refers_to_exists_in_every_language() -> None:
 
 
 def test_every_icon_a_spec_refers_to_has_a_path_and_a_size() -> None:
+    known = set(bd.ICONS) | set(bd.LOCAL_ICONS)
     for diagram in bd.DIAGRAMS:
         for node in diagram.nodes:
-            assert node.icon in bd.ICONS, (
-                f"{diagram.name}: no path for icon {node.icon}"
-            )
+            assert node.icon in known, f"{diagram.name}: no path for icon {node.icon}"
             assert node.icon in bd.ICON_SIZE, (
                 f"{diagram.name}: no size for icon {node.icon}"
             )
+
+
+def test_a_vendor_badge_is_not_committed_as_a_file() -> None:
+    """It belongs embedded in the finished diagram, the same treatment the AWS package gets."""
+    for name in bd.LOCAL_ICONS.values():
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", f"docs/_assets/icons/{name}"],
+            cwd=bd.ROOT,
+            capture_output=True,
+        )
+        assert tracked.returncode != 0, f"docs/_assets/icons/{name} is tracked by git"
 
 
 def test_only_the_two_official_icon_sizes_are_used() -> None:
@@ -48,9 +69,9 @@ def test_only_the_two_official_icon_sizes_are_used() -> None:
     assert set(bd.ICON_SIZE.values()) == {48, 80}
 
 
-def test_edges_reference_declared_nodes() -> None:
+def test_edges_reference_declared_endpoints() -> None:
     for diagram in bd.DIAGRAMS:
-        declared = {node.cid for node in diagram.nodes}
+        declared = endpoints(diagram)
         for edge in diagram.edges:
             assert edge.source in declared, (
                 f"{diagram.name}: {edge.cid} source {edge.source}"
@@ -62,14 +83,11 @@ def test_edges_reference_declared_nodes() -> None:
 
 def test_cell_ids_are_unique_within_a_diagram() -> None:
     for diagram in bd.DIAGRAMS:
-        ids = [
-            c.cid
-            for c in (*diagram.groups, *diagram.nodes, *diagram.edges, *diagram.notes)
-        ]
+        ids = [c.cid for c in (*boxes(diagram), *diagram.nodes, *diagram.edges)]
         assert len(ids) == len(set(ids)), f"{diagram.name}: duplicate cell id"
 
 
-def test_nodes_and_notes_stay_inside_the_page() -> None:
+def test_every_vertex_stays_inside_the_page() -> None:
     """draw.io exports past the page edge without complaining; the crop is what gives it away."""
     for diagram in bd.DIAGRAMS:
         for node in diagram.nodes:
@@ -80,13 +98,34 @@ def test_nodes_and_notes_stay_inside_the_page() -> None:
             assert node.y + size <= diagram.height, (
                 f"{diagram.name}: {node.cid} past the bottom"
             )
-        for box in (*diagram.groups, *diagram.notes):
+        for box in boxes(diagram):
             assert box.x + box.width <= diagram.width, (
                 f"{diagram.name}: {box.cid} too wide"
             )
             assert box.y + box.height <= diagram.height, (
                 f"{diagram.name}: {box.cid} too tall"
             )
+
+
+def test_icons_inside_a_frame_stay_inside_it() -> None:
+    """A frame states "one of these"; an icon spilling out of it says something else."""
+    for diagram in bd.DIAGRAMS:
+        for frame in diagram.frames:
+            inside = [
+                node
+                for node in diagram.nodes
+                if frame.x <= node.x <= frame.x + frame.width
+                and frame.y <= node.y <= frame.y + frame.height
+            ]
+            assert inside, f"{diagram.name}: frame {frame.cid} contains no icon"
+            for node in inside:
+                size = bd.ICON_SIZE[node.icon]
+                assert node.x + size <= frame.x + frame.width, (
+                    f"{diagram.name}: {node.cid} overflows {frame.cid} horizontally"
+                )
+                assert node.y + size <= frame.y + frame.height, (
+                    f"{diagram.name}: {node.cid} overflows {frame.cid} vertically"
+                )
 
 
 # --- the language gate ---------------------------------------------------------------------------

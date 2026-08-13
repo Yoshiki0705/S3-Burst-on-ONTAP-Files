@@ -20,7 +20,7 @@
 
 ## The architecture
 
-![An Amazon S3 Access Point writes into an Amazon FSx for NetApp ONTAP origin volume, FlexCache distributes to an Amazon FSx for NetApp ONTAP volume at the cache site, and NFS / SMB clients read from it](../_assets/images/s3burst-architecture-overview-en.svg)
+![An Amazon S3 Access Point writes into an Amazon FSx for NetApp ONTAP origin volume, FlexCache distributes to a cache volume at the cache site — either Amazon FSx for NetApp ONTAP or on-premises ONTAP 9 — and NFS / SMB clients read from it](../_assets/images/s3burst-architecture-overview-en.svg)
 
 Figure 1: the collect and distribute layers. The figure and the table below state the same thing.
 The reasoning is kept in the table or the prose as well, so that it survives anywhere the image
