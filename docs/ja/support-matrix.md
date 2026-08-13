@@ -1,5 +1,9 @@
 # サポート状況 — 収集層と配布層
 
+<!-- lang-switcher:start -->
+🌐 [日本語](support-matrix.md) | [English](../en/support-matrix.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 <!-- 出典と分岐の記録
      この表は姉妹リポジトリ fsxn-s3ap-serverless-patterns の
      docs/support-matrix-fsx-ontap-flexcache-s3ap.md を出発点にしている。
@@ -91,3 +95,9 @@ FSx for ONTAP を Origin として使えるかは
 | [最初に決めること](design-first-decisions.md) | セキュリティスタイルとプロトコルの関係 |
 | [移植性](portability.md) | 層ごとの置き換えを検討する場合 |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 機構の呼び名と実装元 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](support-matrix.md) | [English](../en/support-matrix.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

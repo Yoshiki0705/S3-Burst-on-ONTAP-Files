@@ -1,5 +1,9 @@
 # 移植性 — 層ごとに置き換える
 
+<!-- lang-switcher:start -->
+🌐 [日本語](portability.md) | [English](../en/portability.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 この構成は 2 つの層に分かれており、それぞれ別に移植を検討できる。
 収集層を差し替えても配布層の設計は変わらず、逆も同じである。
 
@@ -81,3 +85,9 @@ FSx for ONTAP を Origin として使えるかは
 | [検証状況](verification-status.md) | 段階の定義 |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 収集層の機構の呼び名 |
 | [PoC チェックリスト](poc-checklist.md) | 未確認を埋める手順 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](portability.md) | [English](../en/portability.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

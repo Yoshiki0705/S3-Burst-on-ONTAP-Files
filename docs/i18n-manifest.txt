@@ -30,7 +30,15 @@
 # an undeletable resource being left behind. Getting those steps in front of a reader in their own
 # language is worth more than the risk of a wording slip.
 #
-# Everything else under docs/ja/ stays Japanese-only for now. It is still moving, and the
-# architecture's central claim is unverified, so nothing else has settled enough to promote.
+# The rest of docs/ja/ is being promoted. The two conditions the list above was waiting on have both
+# changed: the architecture's central claim is now verified, and the documents stopped moving once the
+# read-side cost model settled. What remains of the original caution is handled by the wording rules
+# in i18n-terms.md and by `make en-lang`, not by withholding the translation.
 deployment/aws-cloudformation.md
 deployment/onprem-terraform.md
+architecture.md
+design-first-decisions.md
+portability.md
+support-matrix.md
+verification-status.md
+reference/glossary/object-access-on-ontap.md

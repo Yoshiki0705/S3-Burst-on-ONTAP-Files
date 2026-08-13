@@ -1,5 +1,9 @@
 # 用語の整理 — 「ファイルを S3 で見せる」機能の呼び名
 
+<!-- lang-switcher:start -->
+🌐 [日本語](object-access-on-ontap.md) | [English](../../../en/reference/glossary/object-access-on-ontap.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
+
 「S3 でもファイルでも同じデータを読める」という機能は、プラットフォームごとに**別の名前と
 別の実装**を持つ。ここを混ぜると対応バージョンの議論が噛み合わなくなる。
 
@@ -51,3 +55,9 @@
 | [構成の形](../../architecture.md) | 収集層と配布層の全体像 |
 | [サポート状況](../../support-matrix.md) | 対応構成と最小バージョン |
 | [移植性](../../portability.md) | 収集層をこの表の他の機構に置き換える場合 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](object-access-on-ontap.md) | [English](../../../en/reference/glossary/object-access-on-ontap.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
