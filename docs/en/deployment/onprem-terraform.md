@@ -32,7 +32,7 @@ cannot be created without its origin.
   > FSx for ONTAP as the origin the cache is **on-premises ONTAP or FSx for ONTAP only**. Whether
   > Cloud Volumes ONTAP, ONTAP Select, Azure NetApp Files or Google Cloud NetApp Volumes can be the
   > cache is **unconfirmed** — no public statement was found either way. "It is ONTAP-based, so it
-  > works" does not follow. See [Portability](../../ja/portability.md) (Japanese).
+  > works" does not follow. See [Portability](../portability.md).
 
 - **Run Terraform from somewhere that can reach the cache cluster's management endpoint.** When the
   cache is a second FSx for ONTAP that endpoint is VPC-only, so running from a laptop produces a
@@ -113,7 +113,7 @@ measured on the collect side — see the
 > **Stated as unverified**: **when an object written through the S3 Access Point becomes visible on
 > this cache volume has not been verified.** The figures published so far are for the origin volume
 > itself across both protocols, which is a different question. Record whatever you observe here, with
-> its environment, in [Verification status](../../ja/verification-status.md) (Japanese). A negative
+> its environment, in [Verification status](../verification-status.md). A negative
 > result is as valuable as a positive one.
 
 ## 5. Tear down
@@ -150,8 +150,8 @@ created here, and it is not removed here.
 | Document | Contents |
 |---|---|
 | [Deploying the collect side](aws-cloudformation.md) | The origin half |
-| [Decisions that come first](../../ja/design-first-decisions.md) | Security style and protocol (Japanese) |
-| [Portability](../../ja/portability.md) | Supported configurations and unconfirmed combinations (Japanese) |
+| [Decisions that come first](../design-first-decisions.md) | Security style and protocol (Japanese) |
+| [Portability](../portability.md) | Supported configurations and unconfirmed combinations (Japanese) |
 | [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
 | [PoC checklist](../../ja/poc-checklist.md) | The order to confirm things in (Japanese) |
 

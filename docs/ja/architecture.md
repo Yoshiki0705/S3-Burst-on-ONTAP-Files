@@ -1,5 +1,9 @@
 # 構成の形 — 収集は S3 API、利用は NFS / SMB
 
+<!-- lang-switcher:start -->
+🌐 [日本語](architecture.md) | [English](../en/architecture.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 この構成は 2 つの層に分かれる。**収集層**が S3 API で書き込みを受け、**配布層**が FlexCache で
 利用拠点へ配る。読む側のプロトコルは NFS / SMB のままで、両者の間にコピージョブを置かない。
 
@@ -146,3 +150,9 @@ AV / ADAS 開発では、実車で記録した走行ログとセンサーデー�
 | [FinOps の費用構造](reference/comparison/finops-s3-vs-s3ap.md) | 課金次元の違い、構成別の試算、周辺ワークロードへの影響 |
 | [選び方](reference/decision-trees/choosing-this-architecture.md) | この構成を採るかどうかの判断 |
 | [PoC チェックリスト](poc-checklist.md) | 何をどの順に確かめるか |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](architecture.md) | [English](../en/architecture.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

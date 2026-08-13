@@ -36,7 +36,7 @@ does not render.
 Writes always pass through the S3 Access Point on the origin, and no S3 access is exposed on the
 cache side. That keeps the write path single and leaves the cache read-oriented, which is where
 FlexCache fits best. The full picture is in
-[Architecture](../ja/architecture.md) (Japanese).
+[Architecture](architecture.md).
 
 ## When the consuming site is the origin
 
@@ -107,20 +107,20 @@ The supporting text is Azure NetApp Files' cache volume requirements, and whethe
 holds on this architecture's main path (FSx for ONTAP origin to on-premises ONTAP cache) is
 unconfirmed. Deciding early is still worth it: the rework if the rule holds is large, and there is
 nothing to lose if it does not. Detail and sources are in
-[Decisions that come first](../ja/design-first-decisions.md) (Japanese).
+[Decisions that come first](design-first-decisions.md).
 
 ## Start here
 
 | What you want | Guide | Time |
 |---|---|---|
-| Understand the shape of the architecture | [Architecture](../ja/architecture.md) (Japanese) | 5 min |
+| Understand the shape of the architecture | [Architecture](architecture.md) | 5 min |
 | Decide whether to adopt it | [Selection flowchart](../ja/reference/decision-trees/choosing-this-architecture.md) (Japanese) | 5 min |
 | Compare it with other approaches | [Alternatives](../ja/reference/comparison/alternatives.md) (Japanese) | 10 min |
 | Estimate what it costs | [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | 15 min |
-| Check what must be decided up front | [Decisions that come first](../ja/design-first-decisions.md) (Japanese) | 5 min |
-| See how far each claim is confirmed | [Verification status](../ja/verification-status.md) (Japanese) | 5 min |
-| Look up versions and constraints | [Support matrix](../ja/support-matrix.md) (Japanese) | 10 min |
-| Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](../ja/reference/glossary/object-access-on-ontap.md) (Japanese) | 5 min |
+| Check what must be decided up front | [Decisions that come first](design-first-decisions.md) | 5 min |
+| See how far each claim is confirmed | [Verification status](verification-status.md) | 5 min |
+| Look up versions and constraints | [Support matrix](support-matrix.md) | 10 min |
+| Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](reference/glossary/object-access-on-ontap.md) | 5 min |
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
 | Read the measured figures and their conditions | [Verification record](../ja/verification/s3ap-nfs-visibility.md) (Japanese) | 10 min |
@@ -131,7 +131,7 @@ nothing to lose if it does not. Detail and sources are in
 > (ONTAP 9.18.1P3D1, same-Region VPC peering, `actimeo=0`, n=30). FlexCache adds approximately
 > +5 ms over reading the same volume directly.
 > Full results: [FlexCache verification record](../ja/verification/flexcache-s3ap-visibility.md) (Japanese). The difference between "unverified" and "unconfirmed" is stated explicitly in
-> [Verification status](../ja/verification-status.md) (Japanese). Performance and cost figures that were not
+> [Verification status](verification-status.md). Performance and cost figures that were not
 > measured are not published here.
 
 ## Implementation patterns
@@ -237,7 +237,7 @@ that exist. Translated terms and the do-not-translate list are in
 |---|---|
 | [`llms.txt`](../../llms.txt) | Map of the whole repository ([llmstxt.org](https://llmstxt.org/)) |
 | [`AGENTS.md`](../../AGENTS.md) | Conventions, prohibitions, verification steps |
-| [`docs/ja/verification-status.md`](../ja/verification-status.md) | The stage of each claim (verified / documented / unverified / unconfirmed) |
+| [`docs/ja/verification-status.md`](verification-status.md) | The stage of each claim (verified / documented / unverified / unconfirmed) |
 
 **If you quote this repository**: its central claim is unverified. Do not cite content as
 established fact without checking its stage. "Unconfirmed" does not mean "unsupported". Numbers are
@@ -247,7 +247,7 @@ configuration, object size, concurrency.
 **The distinction most easily lost**: ONTAP FlexCache duality and attaching an FSx for ONTAP S3
 Access Point to a volume are **separate mechanisms**. Never use the support status of one as
 evidence for the other. This architecture uses neither. The distinction is set out in the
-[glossary](../ja/reference/glossary/object-access-on-ontap.md) (Japanese).
+[glossary](reference/glossary/object-access-on-ontap.md).
 
 </details>
 

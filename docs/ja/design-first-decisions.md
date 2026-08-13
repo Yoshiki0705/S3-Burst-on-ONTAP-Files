@@ -1,5 +1,9 @@
 # 最初に決めること — Origin ボリュームを作る前に
 
+<!-- lang-switcher:start -->
+🌐 [日本語](design-first-decisions.md) | [English](../en/design-first-decisions.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 この構成で後戻りが最も高くつく判断は、**ファンアウト先で NFS を使うのか SMB を使うのか**である。
 Origin ボリュームのセキュリティスタイルがこれに関わり、Cache 側では設定できない項目として
 扱われるためで、後から変えると配布層を作り直すことになる。
@@ -103,3 +107,9 @@ Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）�
 | [サポート状況](support-matrix.md) | 最小バージョンと対応構成 |
 | [検証状況](verification-status.md) | 何が検証済みで何が未検証か |
 | [PoC チェックリスト](poc-checklist.md) | この節の未確認事項を実機で確かめる手順 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](design-first-decisions.md) | [English](../en/design-first-decisions.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

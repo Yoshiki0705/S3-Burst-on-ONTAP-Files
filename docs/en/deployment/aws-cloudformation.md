@@ -28,7 +28,7 @@ and [the environments index](../../../environments/README.md) for why.
 
 - **Decide the consuming site's protocol first.** Set `OriginVolumeSecurityStyle` to `UNIX` for NFS
   or `NTFS` for SMB. **Changing it later means rebuilding the serve layer.** The reasoning and its
-  source are in [Decisions that come first](../../ja/design-first-decisions.md) (Japanese). MIXED is
+  source are in [Decisions that come first](../design-first-decisions.md). MIXED is
   deliberately not offered.
 - One VPC and one subnet. The file system and the verification host go in the same subnet.
 - The subnet must reach Systems Manager, through a NAT gateway or SSM VPC endpoints. The verification
@@ -186,10 +186,10 @@ The Secrets Manager secret is deleted with a recovery window by default. Either 
 | Document | Contents |
 |---|---|
 | [Deploying the serve side](onprem-terraform.md) | The FlexCache half |
-| [Decisions that come first](../../ja/design-first-decisions.md) | What to settle before the origin exists (Japanese) |
+| [Decisions that come first](../design-first-decisions.md) | What to settle before the origin exists (Japanese) |
 | [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
 | [PoC checklist](../../ja/poc-checklist.md) | The order to confirm things in (Japanese) |
-| [Architecture](../../ja/architecture.md) | The whole picture (Japanese) |
+| [Architecture](../architecture.md) | The whole picture (Japanese) |
 
 ---
 

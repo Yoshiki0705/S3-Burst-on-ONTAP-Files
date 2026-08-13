@@ -1,5 +1,9 @@
 # 検証状況 — 検証済みと未検証を分ける
 
+<!-- lang-switcher:start -->
+🌐 [日本語](verification-status.md) | [English](../en/verification-status.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 このリポジトリは公開されている。未検証の項目が動作保証として読まれないように、
 段階を明示し、未検証の事項に断定形を使わない。
 
@@ -81,3 +85,9 @@
 | [PoC チェックリスト](poc-checklist.md) | 未検証項目を確かめる順序 |
 | [サポート状況](support-matrix.md) | 公開ドキュメントに何が書かれているか |
 | [最初に決めること](design-first-decisions.md) | 未確認だが後戻りが高い判断 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](verification-status.md) | [English](../en/verification-status.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
