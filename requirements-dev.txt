@@ -13,6 +13,11 @@
 ruff==0.15.20
 pytest==9.1.1
 cfn-lint==1.52.1
+# zizmor audits the workflow files themselves. Pinned for the same reason as the rest: its rule set
+# grows, and an unpinned install would turn the gate red with no commit behind it. The consequence of
+# pinning is that a new rule does not reach us until the pin moves, which is why the workflow also
+# runs on a schedule — see .github/workflows/zizmor.yml.
+zizmor==1.29.0
 
 # Not installable via pip — install separately, see CONTRIBUTING.md:
 #   markdownlint-cli2   npm install -g markdownlint-cli2@0.22.1

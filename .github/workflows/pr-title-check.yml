@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# `edited` fires on every keystroke-saved title change, so a rename produces a run per edit. Only
+# the last one is about the title as it now stands.
+concurrency:
+  group: pr-title-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   title:
     name: conventional commit title

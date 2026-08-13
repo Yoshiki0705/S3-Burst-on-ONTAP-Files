@@ -13,7 +13,18 @@ permissions:
   # The action lists a pull request's commits to decide what to scan. Without this it gets
   # "403 Resource not accessible by integration" from /pulls/{n}/commits and the job fails before
   # scanning, which reads like a secret finding but is a permission gap.
-  pull-requests: read
+  #
+  # zizmor wants that explanation as a trailing comment on the line. It does not fit on one, and
+  # shortening it to fit would cost the reader the symptom, which is the part that makes this
+  # grant recognisable when it is missing.
+  pull-requests: read # zizmor: ignore[undocumented-permissions]
+
+# A push to main while the weekly run is in flight would otherwise scan the same history twice at
+# once. Cancelling the older one is safe here because both scan the full history — `fetch-depth: 0`
+# below — so the surviving run covers everything the cancelled one would have.
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   scan:

@@ -63,20 +63,20 @@ hub, which is the root `README.md`, so `docs/ja/README.md` does not exist.
 ## Commands
 
 ```bash
-pip install -r requirements-dev.txt      # ruff, pytest, cfn-lint — exact-pinned
+pip install -r requirements-dev.txt      # ruff, pytest, cfn-lint, zizmor — exact-pinned
 npm install -g markdownlint-cli2         # not pip-installable
 brew install gitleaks                    # not pip-installable
 
 make help    # every target
-make all     # the commit gate: lint i18n switcher audit secrets links budget en-lang counts test
+make all     # the commit gate: lint i18n switcher audit secrets zizmor links budget en-lang counts test
 ```
 
 `make all` is the gate. Run it **after the last edit**, not before. Editing one more file after a
 green run — a CHANGELOG line is the usual candidate — is how a red pull request happens.
 
-`make python` warns when the installed `ruff` differs from `requirements-dev.txt`. That warning
-means a local pass does not predict CI, because rule sets widen between releases. Install the
-pinned version instead of working past it.
+`make python` warns when the installed `ruff` differs from `requirements-dev.txt`, and `make
+zizmor` does the same for zizmor. That warning means a local pass does not predict CI, because rule
+sets widen between releases. Install the pinned version instead of working past it.
 
 ## Naming (applies to every file, diagram, comment and commit)
 
@@ -268,9 +268,9 @@ Automated checks catch syntax. These catch design-level problems.
 
 ## External dependencies
 
-- Python 3.12 or later for `tools/` and `scripts/` (stdlib only). `ruff`, `pytest` and `cfn-lint`
-  are exact-pinned in `requirements-dev.txt`; CI installs from that file so the verdict does not
-  depend on the day it runs.
+- Python 3.12 or later for `tools/` and `scripts/` (stdlib only). `ruff`, `pytest`, `cfn-lint` and
+  `zizmor` are exact-pinned in `requirements-dev.txt`; CI installs from that file so the verdict does
+  not depend on the day it runs.
 - No application runtime. Patterns are CloudFormation / SAM templates deployed by the reader.
 - The S3 Access Point itself is created out of band: CloudFormation has no native resource for it,
   so `aws fsx create-and-attach-s3-access-point --cli-input-json file://…` is used. Positional
