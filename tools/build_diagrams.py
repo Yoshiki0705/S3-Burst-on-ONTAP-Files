@@ -257,9 +257,19 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "NFS v4.1 / v4.2",
         "en": "NFS v4.1 / v4.2",
     },
-    "auto_sync": {
-        "ja": "自動同期（取り込みは数秒）",
-        "en": "auto-sync (import in seconds)",
+    # Both directions are drawn because only one of them is fast. A single "auto-sync" arrow reads as
+    # if the whole thing settles in seconds, which is true of the import and not of the export.
+    "sync_import": {
+        "ja": "取り込み ※3",
+        "en": "import *3",
+    },
+    "sync_export": {
+        "ja": "書き戻し ※4",
+        "en": "write-back *4",
+    },
+    "nfs_smb_rw": {
+        "ja": "NFS / SMB（読み書き）※2",
+        "en": "NFS / SMB (read / write) *2",
     },
     "single_site_note": {
         "ja": note_body(
@@ -272,16 +282,30 @@ LABELS: dict[str, dict[str, str]] = {
                 ),
                 (
                     "※2",
-                    "選択を先に絞るのは費用ではなく対応プロトコル",
-                    "A は NFS v3 / v4.x と SMB。B は NFS v4.1 と v4.2 のみで、SMB と NFSv3 は対象外",
+                    "A は両方向ミリ秒（この構成での実測）",
+                    "S3 → NFS は p50 9 ms、NFS → S3 AP は p50 44 ms。同一ボリューム、64 B、"
+                    "actimeo=0、n=30。既定マウントではクライアント側キャッシュが支配的",
                 ),
                 (
                     "※3",
-                    "正典の置き場所の違い",
-                    "A は FSx for ONTAP のボリューム。B は S3 バケットのまま",
+                    "B の取り込みは通常数秒（AWS ドキュメント記載。以下 ※4 も同じ）",
+                    "対象は高性能ストレージに現在データがあるファイルのみ。"
+                    "期限切れで追い出されたファイルは次のアクセスまで更新されない",
                 ),
                 (
                     "※4",
+                    "B の書き戻しは「書き込みが約 60 秒止まってから」",
+                    "待ち時間ではなく無活動時間。30 秒ごとに 5 分追記する例ではエクスポート開始は "
+                    "6 分目で、追記が続く間はバケットに出ない",
+                ),
+                (
+                    "※5",
+                    "正典の置き場所の違い",
+                    "A は FSx for ONTAP のボリューム。B は S3 バケットのままで、"
+                    "両側が同じファイルを変更するとバケットが優先し、ファイル側は lost and found へ",
+                ),
+                (
+                    "※6",
                     "B の利用側は AWS 上のコンピュートに限られる",
                     "Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS。マウントヘルパーが必要",
                 ),
@@ -297,17 +321,32 @@ LABELS: dict[str, dict[str, str]] = {
                 ),
                 (
                     "*2",
-                    "Protocol coverage narrows the choice before cost does",
-                    "A serves NFS v3 / v4.x and SMB. B serves NFS v4.1 and v4.2 only; NFSv3 and "
-                    "SMB are out of scope",
+                    "A settles in milliseconds both ways (measured on this architecture)",
+                    "S3 to NFS p50 9 ms; NFS to S3 Access Point p50 44 ms. Same volume, 64 B, "
+                    "actimeo=0, n=30. On a default mount the client cache dominates",
                 ),
                 (
                     "*3",
-                    "The source of truth sits in different places",
-                    "A: the FSx for ONTAP volume. B: the S3 bucket, unchanged",
+                    "B imports in seconds, typically (AWS documentation, as is *4)",
+                    "Only for files whose data is currently in the performance tier. A file evicted "
+                    "on expiry is not updated until it is next accessed",
                 ),
                 (
                     "*4",
+                    "B writes back only after roughly 60 seconds of write inactivity",
+                    "Not a delay but an idle period. For an application appending every 30 seconds "
+                    "for five minutes, the export starts in the sixth minute; nothing reaches the "
+                    "bucket while the appending continues",
+                ),
+                (
+                    "*5",
+                    "The source of truth sits in different places",
+                    "A: the FSx for ONTAP volume. B: the S3 bucket, unchanged — and if both sides "
+                    "change one file the bucket wins, with the file-system copy moved to lost and "
+                    "found",
+                ),
+                (
+                    "*6",
                     "B requires consumers on AWS compute",
                     "Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS, with a mount helper",
                 ),
@@ -369,6 +408,21 @@ class Edge:
     source: str
     target: str
     label: str = ""
+    # Fixed connection points, as (x, y) fractions of the shape. Needed when two edges join the same
+    # pair in opposite directions: left to itself, draw.io routes both along the same centre line and
+    # the second one disappears under the first, taking its label with it.
+    exit_at: tuple[float, float] | None = None
+    entry_at: tuple[float, float] | None = None
+
+    def style(self) -> str:
+        style = EDGE_STYLE
+        if self.exit_at:
+            style += (
+                f"exitX={self.exit_at[0]};exitY={self.exit_at[1]};exitDx=0;exitDy=0;"
+            )
+        if self.entry_at:
+            style += f"entryX={self.entry_at[0]};entryY={self.entry_at[1]};entryDx=0;entryDy=0;"
+        return style
 
 
 @dataclass(frozen=True)
@@ -454,7 +508,7 @@ def _single_site() -> Diagram:
         name="s3burst-single-site-options",
         diagram_id="s3burst-single-site",
         width=1180,
-        height=780,
+        height=825,
         groups=(
             Group("panel_a", "panel_s3ap", 40, 60, 1100, 230),
             Group("panel_b", "panel_s3files", 40, 330, 1100, 230),
@@ -486,12 +540,13 @@ def _single_site() -> Diagram:
         edges=(
             Edge("a1", "a_client", "a_ap", "put_object"),
             Edge("a2", "a_ap", "a_vol"),
-            Edge("a3", "a_vol", "a_file", "nfs_smb"),
+            Edge("a3", "a_vol", "a_file", "nfs_smb_rw"),
             Edge("b1", "b_client", "b_bucket", "put_object"),
-            Edge("b2", "b_bucket", "b_files", "auto_sync"),
+            Edge("b2", "b_bucket", "b_files", "sync_import", (1, 0.25), (0, 0.25)),
+            Edge("b4", "b_files", "b_bucket", "sync_export", (0, 0.75), (1, 0.75)),
             Edge("b3", "b_files", "b_file", "nfs41_protocol"),
         ),
-        notes=(Note("note", "single_site_note", 40, 590, 1100, 155),),
+        notes=(Note("note", "single_site_note", 40, 590, 1100, 205),),
     )
 
 
@@ -597,7 +652,7 @@ def render(diagram: Diagram, lang: str, uris: dict[str, str]) -> str:
         value = label(edge.label, lang) if edge.label else ""
         lines.append(
             f"        <mxCell id={quoteattr(edge.cid)} value={quoteattr(value)} "
-            f'style={quoteattr(EDGE_STYLE)} edge="1" source={quoteattr(edge.source)} '
+            f'style={quoteattr(edge.style())} edge="1" source={quoteattr(edge.source)} '
             f'target={quoteattr(edge.target)} parent="1">'
         )
         lines.append('          <mxGeometry relative="1" as="geometry" />')
@@ -685,6 +740,10 @@ def export(diagram: Diagram, lang: str) -> None:
             f"  draw.io CLI not found at {DRAWIO_CLI}; skipping export", file=sys.stderr
         )
         return
+    # The SVG export is not byte-reproducible: draw.io stamps a fresh random element id into every
+    # run, so an unchanged diagram still comes out as a one-line diff. Check the diff before
+    # committing an SVG whose `.drawio` did not move — if the id is all that changed, drop it, or the
+    # real edit ends up buried among files that did not change.
     runs = (
         # SVG for the repository: crawlers and screen readers can reach the text.
         (IMAGE_DIR / f"{stem}.svg", ["--format", "svg", "--embed-svg-images"]),

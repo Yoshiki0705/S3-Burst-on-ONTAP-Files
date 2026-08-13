@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2026-08-10T00:00:00.000Z" agent="build_diagrams.py" version="24.0.0" type="device">
   <diagram id="s3burst-single-site" name="s3burst-single-site-options">
-    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="780" math="0" shadow="0">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="825" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -41,20 +41,23 @@
         <mxCell id="a2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_ap" target="a_vol" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="a3" value="NFS / SMB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_vol" target="a_file" parent="1">
+        <mxCell id="a3" value="NFS / SMB（読み書き）※2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_vol" target="a_file" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="b1" value="PutObject" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_client" target="b_bucket" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="b2" value="自動同期（取り込みは数秒）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_bucket" target="b_files" parent="1">
+        <mxCell id="b2" value="取り込み ※3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" source="b_bucket" target="b_files" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="書き戻し ※4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" source="b_files" target="b_bucket" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="b3" value="NFS v4.1 / v4.2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_files" target="b_file" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="note" value="&lt;b&gt;補足&lt;/b&gt;&lt;br&gt;※1 &lt;b&gt;どちらも 1 拠点で完結し、FlexCache によるファンアウトは不要&lt;/b&gt;&lt;br&gt;この構成が対象とするのは、利用側が別の場所にあって動かせない場合&lt;br&gt;※2 &lt;b&gt;選択を先に絞るのは費用ではなく対応プロトコル&lt;/b&gt;&lt;br&gt;A は NFS v3 / v4.x と SMB。B は NFS v4.1 と v4.2 のみで、SMB と NFSv3 は対象外&lt;br&gt;※3 &lt;b&gt;正典の置き場所の違い&lt;/b&gt;&lt;br&gt;A は FSx for ONTAP のボリューム。B は S3 バケットのまま&lt;br&gt;※4 &lt;b&gt;B の利用側は AWS 上のコンピュートに限られる&lt;/b&gt;&lt;br&gt;Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS。マウントヘルパーが必要" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="40" y="590" width="1100" height="155" as="geometry" />
+        <mxCell id="note" value="&lt;b&gt;補足&lt;/b&gt;&lt;br&gt;※1 &lt;b&gt;どちらも 1 拠点で完結し、FlexCache によるファンアウトは不要&lt;/b&gt;&lt;br&gt;この構成が対象とするのは、利用側が別の場所にあって動かせない場合&lt;br&gt;※2 &lt;b&gt;A は両方向ミリ秒（この構成での実測）&lt;/b&gt;&lt;br&gt;S3 → NFS は p50 9 ms、NFS → S3 AP は p50 44 ms。同一ボリューム、64 B、actimeo=0、n=30。既定マウントではクライアント側キャッシュが支配的&lt;br&gt;※3 &lt;b&gt;B の取り込みは通常数秒（AWS ドキュメント記載。以下 ※4 も同じ）&lt;/b&gt;&lt;br&gt;対象は高性能ストレージに現在データがあるファイルのみ。期限切れで追い出されたファイルは次のアクセスまで更新されない&lt;br&gt;※4 &lt;b&gt;B の書き戻しは「書き込みが約 60 秒止まってから」&lt;/b&gt;&lt;br&gt;待ち時間ではなく無活動時間。30 秒ごとに 5 分追記する例ではエクスポート開始は 6 分目で、追記が続く間はバケットに出ない&lt;br&gt;※5 &lt;b&gt;正典の置き場所の違い&lt;/b&gt;&lt;br&gt;A は FSx for ONTAP のボリューム。B は S3 バケットのままで、両側が同じファイルを変更するとバケットが優先し、ファイル側は lost and found へ&lt;br&gt;※6 &lt;b&gt;B の利用側は AWS 上のコンピュートに限られる&lt;/b&gt;&lt;br&gt;Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS。マウントヘルパーが必要" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="590" width="1100" height="205" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

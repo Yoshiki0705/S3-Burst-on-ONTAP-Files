@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2026-08-10T00:00:00.000Z" agent="build_diagrams.py" version="24.0.0" type="device">
   <diagram id="s3burst-single-site-en" name="s3burst-single-site-options-en">
-    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="780" math="0" shadow="0">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="825" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -41,20 +41,23 @@
         <mxCell id="a2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_ap" target="a_vol" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="a3" value="NFS / SMB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_vol" target="a_file" parent="1">
+        <mxCell id="a3" value="NFS / SMB (read / write) *2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="a_vol" target="a_file" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="b1" value="PutObject" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_client" target="b_bucket" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="b2" value="auto-sync (import in seconds)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_bucket" target="b_files" parent="1">
+        <mxCell id="b2" value="import *3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" source="b_bucket" target="b_files" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="write-back *4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" source="b_files" target="b_bucket" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="b3" value="NFS v4.1 / v4.2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="b_files" target="b_file" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="note" value="&lt;b&gt;Notes&lt;/b&gt;&lt;br&gt;*1 &lt;b&gt;Both complete within one site; no FlexCache fan-out&lt;/b&gt;&lt;br&gt;This architecture is for consumers that sit elsewhere and cannot be moved&lt;br&gt;*2 &lt;b&gt;Protocol coverage narrows the choice before cost does&lt;/b&gt;&lt;br&gt;A serves NFS v3 / v4.x and SMB. B serves NFS v4.1 and v4.2 only; NFSv3 and SMB are out of scope&lt;br&gt;*3 &lt;b&gt;The source of truth sits in different places&lt;/b&gt;&lt;br&gt;A: the FSx for ONTAP volume. B: the S3 bucket, unchanged&lt;br&gt;*4 &lt;b&gt;B requires consumers on AWS compute&lt;/b&gt;&lt;br&gt;Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS, with a mount helper" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="40" y="590" width="1100" height="155" as="geometry" />
+        <mxCell id="note" value="&lt;b&gt;Notes&lt;/b&gt;&lt;br&gt;*1 &lt;b&gt;Both complete within one site; no FlexCache fan-out&lt;/b&gt;&lt;br&gt;This architecture is for consumers that sit elsewhere and cannot be moved&lt;br&gt;*2 &lt;b&gt;A settles in milliseconds both ways (measured on this architecture)&lt;/b&gt;&lt;br&gt;S3 to NFS p50 9 ms; NFS to S3 Access Point p50 44 ms. Same volume, 64 B, actimeo=0, n=30. On a default mount the client cache dominates&lt;br&gt;*3 &lt;b&gt;B imports in seconds, typically (AWS documentation, as is *4)&lt;/b&gt;&lt;br&gt;Only for files whose data is currently in the performance tier. A file evicted on expiry is not updated until it is next accessed&lt;br&gt;*4 &lt;b&gt;B writes back only after roughly 60 seconds of write inactivity&lt;/b&gt;&lt;br&gt;Not a delay but an idle period. For an application appending every 30 seconds for five minutes, the export starts in the sixth minute; nothing reaches the bucket while the appending continues&lt;br&gt;*5 &lt;b&gt;The source of truth sits in different places&lt;/b&gt;&lt;br&gt;A: the FSx for ONTAP volume. B: the S3 bucket, unchanged — and if both sides change one file the bucket wins, with the file-system copy moved to lost and found&lt;br&gt;*6 &lt;b&gt;B requires consumers on AWS compute&lt;/b&gt;&lt;br&gt;Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS, with a mount helper" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="590" width="1100" height="205" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
