@@ -46,3 +46,5 @@ poc-checklist.md
 reference/comparison/alternatives.md
 reference/decision-trees/choosing-this-architecture.md
 reference/limits/s3-access-point.md
+verification/flexcache-s3ap-visibility.md
+verification/s3ap-nfs-visibility.md

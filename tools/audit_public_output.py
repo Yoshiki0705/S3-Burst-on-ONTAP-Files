@@ -171,6 +171,15 @@ PII_RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         "mask internal IPs as 10.0.x.x or <management-ip>",
     ),
+    # A real file system ID names a resource in a real account. AGENTS.md has listed it as
+    # never-commit from the start, but nothing enforced it, and two of them reached a published
+    # verification record. Both `FsxId0123...` (as ONTAP and the console render it) and `fs-0123...`
+    # (as the AWS API does) are caught; the documented placeholder is allowed through so that the
+    # replacement this message asks for does not itself fail.
+    (
+        re.compile(rf"\b(?:FsxId|fs-)(?!{'0123456789abcdef0'})[0-9a-f]{{17}}\b"),
+        "remove real file system IDs; use fs-0123456789abcdef0",
+    ),
 ]
 
 # 12-digit AWS account IDs other than the sanctioned placeholder.

@@ -12,8 +12,8 @@ FSx for ONTAP 上で有効化できるかを確認しました。
 | 計測日 | 2026-08-09（UTC） |
 | リージョン | ap-northeast-1 |
 | ONTAP バージョン | NetApp Release 9.18.1P3D1（両クラスタ） |
-| Origin クラスタ | FsxId002ec851eba809979（`fsxmaru`）、SINGLE_AZ_1、128 MBps |
-| Cache クラスタ | FsxId09ffe72a3b2b7dbbd（`FSxN_OnPre_Sim`）、SINGLE_AZ_1、128 MBps |
+| Origin クラスタ | ファイルシステム 1（`fs-0123456789abcdef0`、Origin 役）、SINGLE_AZ_1、128 MBps |
+| Cache クラスタ | ファイルシステム 2（`fs-0123456789abcdef0`、オンプレミス相当の Cache 役）、SINGLE_AZ_1、128 MBps |
 | 接続 | VPC ピアリング（同一リージョン、同一アカウント） |
 | Origin ボリューム | `s3burst_origin_vol2`、SVM `fsxsvm02`、UNIX |
 | Cache ボリューム | `s3burst_cache_vol2`、FlexCache |

@@ -1,4 +1,7 @@
 # 検証記録 — S3 Access Point 経由の書き込みが FlexCache の Cache ボリュームでいつ見えるか
+<!-- lang-switcher:start -->
+🌐 [日本語](flexcache-s3ap-visibility.md) | [English](../../en/verification/flexcache-s3ap-visibility.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->
 
 **この構成の中核的な主張を検証した記録です。** S3 Access Point で Origin ボリュームに書いた
 オブジェクトが、FlexCache を経由して別クラスタの Cache ボリューム上の NFS マウントで
@@ -10,8 +13,8 @@
 |---|---|
 | 計測日 | 2026-08-09（UTC） |
 | リージョン | ap-northeast-1 |
-| Origin クラスタ | FsxId002ec851eba809979（`fsxmaru`）、SINGLE_AZ_1、128 MBps、1 HA ペア |
-| Cache クラスタ | FsxId09ffe72a3b2b7dbbd（`FSxN_OnPre_Sim`）、SINGLE_AZ_1、128 MBps、1 HA ペア |
+| Origin クラスタ | ファイルシステム 1（`fs-0123456789abcdef0`、Origin 役）、SINGLE_AZ_1、128 MBps、1 HA ペア |
+| Cache クラスタ | ファイルシステム 2（`fs-0123456789abcdef0`、オンプレミス相当の Cache 役）、SINGLE_AZ_1、128 MBps、1 HA ペア |
 | **ONTAP バージョン** | **NetApp Release 9.18.1P3D1**（両クラスタ同一） |
 | 接続 | VPC ピアリング（同一リージョン、同一アカウント） |
 | Origin ボリューム | `s3burst_origin_vol2`、SVM `fsxsvm02`、セキュリティスタイル UNIX |
@@ -115,3 +118,9 @@
 | [サポート状況](../support-matrix.md) | 対応構成と制約 |
 | [PoC チェックリスト](../poc-checklist.md) | 検証の順序 |
 | [構成の形](../architecture.md) | 全体像 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](flexcache-s3ap-visibility.md) | [English](../../en/verification/flexcache-s3ap-visibility.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->
