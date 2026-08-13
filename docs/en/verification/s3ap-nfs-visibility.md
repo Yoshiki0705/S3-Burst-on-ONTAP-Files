@@ -64,7 +64,7 @@ Mounted with `actimeo=0`, to measure server-side propagation rather than the cli
 > command each time, so each includes CLI process startup and a TLS handshake. A re-measurement using
 > a boto3 persistent session gave **p50 44 ms**. Most of the 873 ms was CLI startup cost, not storage
 > propagation delay. The correct value and the all-directions comparison are in the
-> [all-directions record](../../ja/verification/cross-protocol-directions.md) (Japanese).
+> [all-directions record](../verification/cross-protocol-directions.md).
 
 | Object size | n | min | p50 | p90 | p99 | max |
 |---|---|---|---|---|---|---|
@@ -96,7 +96,7 @@ that gap.
 **The slow direction is dominated by S3 API overhead.** A re-measurement using a boto3 persistent
 session brought it down to p50 44 ms. The values in the table above are kept only as a reference that
 includes CLI startup cost; for the correct comparison see the
-[all-directions comparison](../../ja/verification/cross-protocol-directions.md) (Japanese).
+[all-directions comparison](../verification/cross-protocol-directions.md).
 
 **A partial object does not appear on the file side.** A multipart upload was not visible over NFS
 until `CompleteMultipartUpload`. The result is that there is no need to worry about reading a
