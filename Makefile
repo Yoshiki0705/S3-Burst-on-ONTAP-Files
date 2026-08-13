@@ -7,6 +7,7 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
         audit secrets pinning links links-external budget en-lang xlang counts test all new-pattern \
+        diagrams diagrams-check \
         terraform finops finops-write \
         commit-gate clean
 
@@ -84,6 +85,12 @@ switcher-write: ## Regenerate language switcher blocks from what exists on disk
 
 xlang: ## Links from English into Japanese must be marked (Japanese)
 	@$(PY) tools/check_cross_language_links.py
+
+diagrams: ## Regenerate the diagrams and export SVG + PNG (needs the AWS icon package)
+	@$(PY) tools/build_diagrams.py --write --export
+
+diagrams-check: ## Confirm the committed diagrams match their spec (needs the AWS icon package)
+	@$(PY) tools/build_diagrams.py --check
 
 audit: ## Pre-publication audit (naming / vendor-ref / neutrality / PII / conflation)
 	@$(PY) tools/audit_public_output.py
