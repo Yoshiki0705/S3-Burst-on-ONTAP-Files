@@ -154,7 +154,7 @@ of "collect in the cloud, consume over the site's file protocol" is common to al
 |---|---|
 | [Decisions that come first](design-first-decisions.md) | Items that have to be settled before the Origin is created |
 | [Glossary](reference/glossary/object-access-on-ontap.md) | The names given to the "present files over S3" feature, and the differences in what implements it |
-| [S3 AP design guide](../ja/reference/limits/s3ap-design-guide.md) (Japanese) | Supported operations, concurrency design, directory design, volume design, and the discovery strategy on the NFS side |
+| [S3 AP design guide](reference/limits/s3ap-design-guide.md) | Supported operations, concurrency design, directory design, volume design, and the discovery strategy on the NFS side |
 | [Support matrix](support-matrix.md) | Support status and minimum versions for the collect and serve layers |
 | [Verification status](verification-status.md) | The line between verified and unverified |
 | [Portability](portability.md) | Replacing the collect layer or the serve layer per platform |

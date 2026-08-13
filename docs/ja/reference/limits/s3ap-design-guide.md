@@ -1,4 +1,7 @@
 # S3 Access Point — 設計ガイド（収集層の詳細）
+<!-- lang-switcher:start -->
+🌐 [日本語](s3ap-design-guide.md) | [English](../../../en/reference/limits/s3ap-design-guide.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
 
 <!-- 出典: 姉妹リポジトリ fsxn-s3ap-serverless-patterns の設計考慮事項・互換性ノート・
      性能考慮事項を、この構成の観点でまとめ直したもの。
@@ -462,3 +465,9 @@ SMB クライアントの性能前提が oplock に依存している場合、wr
 | [最初に決めること](../../design-first-decisions.md) | セキュリティスタイルとボリューム設計の決定順序 |
 | [PoC チェックリスト](../../poc-checklist.md) | 何をどの順に確かめるか |
 | [姉妹リポジトリ: 互換性ノート](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | Lambda / Step Functions 連携の詳細 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](s3ap-design-guide.md) | [English](../../../en/reference/limits/s3ap-design-guide.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
