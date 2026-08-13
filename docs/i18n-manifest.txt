@@ -42,3 +42,7 @@ portability.md
 support-matrix.md
 verification-status.md
 reference/glossary/object-access-on-ontap.md
+poc-checklist.md
+reference/comparison/alternatives.md
+reference/decision-trees/choosing-this-architecture.md
+reference/limits/s3-access-point.md

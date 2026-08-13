@@ -188,7 +188,7 @@ The Secrets Manager secret is deleted with a recovery window by default. Either 
 | [Deploying the serve side](onprem-terraform.md) | The FlexCache half |
 | [Decisions that come first](../design-first-decisions.md) | What to settle before the origin exists (Japanese) |
 | [Verification record](../../ja/verification/s3ap-nfs-visibility.md) | Measured figures and conditions (Japanese) |
-| [PoC checklist](../../ja/poc-checklist.md) | The order to confirm things in (Japanese) |
+| [PoC checklist](../poc-checklist.md) | The order to confirm things in (Japanese) |
 | [Architecture](../architecture.md) | The whole picture (Japanese) |
 
 ---

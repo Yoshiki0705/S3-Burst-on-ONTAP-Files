@@ -90,7 +90,7 @@ kind of information unobtainable after the fact.
 
 | Document | Contents |
 |---|---|
-| [PoC checklist](../ja/poc-checklist.md) (Japanese) | The order in which to confirm unverified items |
+| [PoC checklist](poc-checklist.md) | The order in which to confirm unverified items |
 | [Support matrix](support-matrix.md) | What the public documentation states |
 | [Decisions that come first](design-first-decisions.md) | Judgements that are unconfirmed but expensive to reverse |
 

@@ -158,10 +158,10 @@ of "collect in the cloud, consume over the site's file protocol" is common to al
 | [Support matrix](support-matrix.md) | Support status and minimum versions for the collect and serve layers |
 | [Verification status](verification-status.md) | The line between verified and unverified |
 | [Portability](portability.md) | Replacing the collect layer or the serve layer per platform |
-| [Comparison with alternatives](../ja/reference/comparison/alternatives.md) (Japanese) | The conditions other approaches suit and do not suit |
+| [Comparison with alternatives](reference/comparison/alternatives.md) | The conditions other approaches suit and do not suit |
 | [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | Differences in the billing dimensions, estimates per configuration, and the effect on surrounding workloads |
-| [How to choose](../ja/reference/decision-trees/choosing-this-architecture.md) (Japanese) | Deciding whether to adopt this architecture |
-| [PoC checklist](../ja/poc-checklist.md) (Japanese) | What to confirm, and in what order |
+| [How to choose](reference/decision-trees/choosing-this-architecture.md) | Deciding whether to adopt this architecture |
+| [PoC checklist](poc-checklist.md) | What to confirm, and in what order |
 
 ---
 

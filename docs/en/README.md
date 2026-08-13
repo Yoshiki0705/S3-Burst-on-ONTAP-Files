@@ -92,7 +92,7 @@ measured figures above are with `actimeo=0`.
 **This is also where this architecture does not fit.** The distribute layer earns its cost when
 consumers sit elsewhere and cannot be moved; in the same place, the cache SSD and the peering
 operations are spend with nothing coming back. The full set of branches is in
-[Selection flowchart](../ja/reference/decision-trees/choosing-this-architecture.md) (Japanese) and
+[Selection flowchart](reference/decision-trees/choosing-this-architecture.md) and
 the cost breakdown in
 [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
 
@@ -114,8 +114,8 @@ nothing to lose if it does not. Detail and sources are in
 | What you want | Guide | Time |
 |---|---|---|
 | Understand the shape of the architecture | [Architecture](architecture.md) | 5 min |
-| Decide whether to adopt it | [Selection flowchart](../ja/reference/decision-trees/choosing-this-architecture.md) (Japanese) | 5 min |
-| Compare it with other approaches | [Alternatives](../ja/reference/comparison/alternatives.md) (Japanese) | 10 min |
+| Decide whether to adopt it | [Selection flowchart](reference/decision-trees/choosing-this-architecture.md) | 5 min |
+| Compare it with other approaches | [Alternatives](reference/comparison/alternatives.md) | 10 min |
 | Estimate what it costs | [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | 15 min |
 | Check what must be decided up front | [Decisions that come first](design-first-decisions.md) | 5 min |
 | See how far each claim is confirmed | [Verification status](verification-status.md) | 5 min |
@@ -124,7 +124,7 @@ nothing to lose if it does not. Detail and sources are in
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
 | Read the measured figures and their conditions | [Verification record](../ja/verification/s3ap-nfs-visibility.md) (Japanese) | 10 min |
-| Confirm it on real hardware | [PoC checklist](../ja/poc-checklist.md) (Japanese) | 10 min |
+| Confirm it on real hardware | [PoC checklist](poc-checklist.md) | 10 min |
 
 > **The central claim of this architecture is verified.** An object written to the origin through
 > the S3 Access Point is readable on the FlexCache cache volume over NFS in **p50 14 ms**

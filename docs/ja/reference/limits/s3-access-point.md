@@ -1,4 +1,7 @@
 # 上限値 — 収集層（FSx for ONTAP S3 Access Point）
+<!-- lang-switcher:start -->
+🌐 [日本語](s3-access-point.md) | [English](../../../en/reference/limits/s3-access-point.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
 
 数値は出典と段階を併記する。段階の定義は[検証状況](../../verification-status.md)にある。
 
@@ -74,3 +77,9 @@
 | [サポート状況](../../support-matrix.md) | 制約の全体像 |
 | [検証状況](../../verification-status.md) | 段階の定義と現在の状態 |
 | [構成の形](../../architecture.md) | この構成が解かないこと |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](s3-access-point.md) | [English](../../../en/reference/limits/s3-access-point.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->

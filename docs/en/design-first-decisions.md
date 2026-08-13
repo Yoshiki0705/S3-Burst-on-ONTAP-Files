@@ -35,7 +35,7 @@ Two things therefore have to be read apart.
 
 The position taken here is not to defer the decision on the grounds that it is unconfirmed. The rework
 if the rule holds is large, and there is nothing to lose if it does not. The procedure for confirming
-it on hardware is in the [PoC checklist](../ja/poc-checklist.md) (Japanese).
+it on hardware is in the [PoC checklist](poc-checklist.md).
 
 ## The mapping between security style and protocol
 
@@ -116,7 +116,7 @@ Proceeding to step 4 with any of steps 1 to 3 still open removes the choice at s
 | [Architecture](architecture.md) | The collect and serve layers as a whole |
 | [Support matrix](support-matrix.md) | Minimum versions and supported configurations |
 | [Verification status](verification-status.md) | What is verified and what is not |
-| [PoC checklist](../ja/poc-checklist.md) (Japanese) | The procedure for confirming this section's unconfirmed items on hardware |
+| [PoC checklist](poc-checklist.md) | The procedure for confirming this section's unconfirmed items on hardware |
 
 ---
 
