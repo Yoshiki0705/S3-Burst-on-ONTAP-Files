@@ -44,9 +44,61 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOC = ROOT / "docs" / "ja" / "reference" / "comparison" / "finops-s3-vs-s3ap.md"
 BEGIN = "<!-- finops-model:begin -->"
 END = "<!-- finops-model:end -->"
+
+LANGS = ("ja", "en")
+SUBPATH = Path("reference") / "comparison" / "finops-s3-vs-s3ap.md"
+
+
+def doc_for(lang: str) -> Path:
+    return ROOT / "docs" / lang / SUBPATH
+
+
+# --------------------------------------------------------------------------- language
+#
+# The generated block carries headings, so the English document cannot simply reuse the Japanese one:
+# `make i18n-check` compares heading structure between a pair, which means the block has to be
+# generated in each language. Hand-maintaining an English copy of it was the alternative and was
+# rejected — 723 of the document's lines are generated, so the two copies would diverge the first
+# time a unit price moved, which is the failure this script exists to prevent.
+#
+# The current language is module state rather than a parameter threaded through every function. There
+# are twenty-odd render functions and rendering is sequential and single-threaded, so the parameter
+# would be noise at every call site while buying nothing. `render()` sets it and is the only entry.
+
+_LANG = "ja"
+
+# Keyed by the Japanese source text. Inventing key names for six hundred strings would add a second
+# thing to keep in step; the Japanese string is already unique and already at the call site. The cost
+# is that rewording the Japanese orphans its translation — which `translation_gaps()` reports, so it
+# fails loudly rather than silently emitting Japanese into the English document.
+TRANSLATIONS: dict[str, str] = {}
+
+
+def t(ja: str, **fmt: object) -> str:
+    """Return `ja` in the current language, with `fmt` applied after translation.
+
+    Interpolation happens after the lookup so that the placeholders, not the interpolated values,
+    are what gets translated. Formatting a value into the string first would make every distinct
+    number a distinct key.
+    """
+    if _LANG == "ja":
+        text = ja
+    else:
+        text = TRANSLATIONS.get(ja)
+        if text is None:
+            raise MissingTranslation(ja)
+    return text.format(**fmt) if fmt else text
+
+
+class MissingTranslation(Exception):
+    """Raised when a generated string has no entry for the current language."""
+
+    def __init__(self, source: str) -> None:
+        super().__init__(source)
+        self.source = source
+
 
 REGION = "ap-northeast-1"
 REGION_LABEL = "アジアパシフィック (東京)"
@@ -2049,7 +2101,11 @@ def render_marginal_cost() -> list[str]:
     ]
 
 
-def render() -> str:
+def render(lang: str = "ja") -> str:
+    global _LANG
+    if lang not in LANGS:
+        raise SystemExit(f"finops-model: unknown language {lang!r}")
+    _LANG = lang
     out = [
         BEGIN,
         "",
@@ -2088,10 +2144,45 @@ def show_prices() -> None:
             )
 
 
-def splice(text: str, block: str) -> str:
+CJK = re.compile(r"[\u3000-\u30ff\u4e00-\u9fff]")
+
+
+def translation_gaps() -> tuple[list[str], list[str]]:
+    """What still stands between the model and an English document.
+
+    Two kinds, and the second is the one that matters. Missing keys are strings that reached `t()`
+    with no English entry. Residue is Japanese in the rendered English output — which catches the
+    larger class: a string that never reached `t()` at all. Counting only the missing keys would have
+    reported zero before a single call site was converted, and reported the model ready.
+
+    Missing keys are collected by rendering repeatedly, because the first miss aborts the render and
+    everything after it goes unseen.
+    """
+    global _LANG
+    missing: list[str] = []
+    while True:
+        try:
+            block = render("en")
+            break
+        except MissingTranslation as gap:
+            if gap.source in missing:  # a stand-in that did not get us further
+                block = ""
+                break
+            missing.append(gap.source)
+            TRANSLATIONS[gap.source] = (
+                gap.source
+            )  # stand in, only to reach the next gap
+    for source in missing:
+        TRANSLATIONS.pop(source, None)
+    _LANG = "ja"
+    residue = [line for line in block.split("\n") if CJK.search(line)]
+    return missing, residue
+
+
+def splice(text: str, block: str, doc: Path) -> str:
     pattern = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.DOTALL)
     if not pattern.search(text):
-        raise SystemExit(f"{DOC}: markers {BEGIN} / {END} not found")
+        raise SystemExit(f"{doc}: markers {BEGIN} / {END} not found")
     return pattern.sub(block.rstrip("\n"), text)
 
 
@@ -2106,35 +2197,69 @@ def main() -> int:
     parser.add_argument(
         "--show-prices", action="store_true", help="print the price table"
     )
+    parser.add_argument(
+        "--translation-gaps",
+        action="store_true",
+        help="list the generated strings that have no English entry yet",
+    )
     args = parser.parse_args()
 
     if args.show_prices:
         show_prices()
         return 0
 
-    block = render()
+    if args.translation_gaps:
+        missing, residue = translation_gaps()
+        for source in missing:
+            print(f"no entry: {source}")
+        for line in residue:
+            print(f"residue : {line}")
+        print(
+            f"\n{len(missing)} string(s) without an English entry, "
+            f"{len(residue)} line(s) of Japanese left in the English render",
+            file=sys.stderr,
+        )
+        return 0
 
     if not (args.write or args.check):
-        print(block, end="")
+        print(render(), end="")
         return 0
 
-    if not DOC.exists():
-        raise SystemExit(f"{DOC}: not found")
-    original = DOC.read_text(encoding="utf-8")
-    updated = splice(original, block)
-
-    if args.write:
-        if updated != original:
-            DOC.write_text(updated, encoding="utf-8")
-            print(f"finops-model: rewrote {DOC.relative_to(ROOT)}")
-        else:
-            print("finops-model: already current")
-        return 0
-
-    if updated != original:
+    # English is skipped, not half-written, while any string is still untranslated. A document that
+    # renders with Japanese left in it would pass this script and fail `make en-lang` later, with the
+    # cause several steps back.
+    missing, residue = translation_gaps()
+    languages = LANGS if not (missing or residue) else ("ja",)
+    if missing or residue:
         print(
-            "finops-model: generated cost tables are stale.\n"
-            "  Run: python3 tools/finops_model.py --write",
+            f"finops-model: {len(missing)} string(s) without an English entry and "
+            f"{len(residue)} line(s) of Japanese in the English render; generating Japanese only. "
+            "Run --translation-gaps to list them.",
+            file=sys.stderr,
+        )
+
+    stale: list[str] = []
+    for lang in languages:
+        doc = doc_for(lang)
+        if not doc.exists():
+            if lang == "ja":
+                raise SystemExit(f"{doc}: not found")
+            continue  # the English document is created by the promotion, not by this script
+        original = doc.read_text(encoding="utf-8")
+        updated = splice(original, render(lang), doc)
+        if updated == original:
+            continue
+        if args.write:
+            doc.write_text(updated, encoding="utf-8")
+            print(f"finops-model: rewrote {doc.relative_to(ROOT)}")
+        else:
+            stale.append(str(doc.relative_to(ROOT)))
+
+    if args.check and stale:
+        print(
+            "finops-model: generated cost tables are stale in "
+            + ", ".join(stale)
+            + "\n  Run: python3 tools/finops_model.py --write",
             file=sys.stderr,
         )
         return 1
