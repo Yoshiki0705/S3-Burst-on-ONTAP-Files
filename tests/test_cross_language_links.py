@@ -116,6 +116,44 @@ def test_links_that_stay_in_english_are_not_examined(repo, capsys) -> None:
     assert "0 link(s) into Japanese are marked" in output
 
 
+# --- the marker that outlived its link ----------------------------------------------------------
+
+
+def test_a_marker_on_a_link_that_stays_in_english_fails(repo, capsys) -> None:
+    """What a promotion leaves behind: the target was retargeted to the English sibling and the
+    label was not. Every other check passes — the target resolves, the file is English, the marker is
+    spelled correctly — and the line now tells the reader the opposite of the truth."""
+    write(repo, "docs/en/README.md", "See [Deploy](deployment/guide.md) (Japanese).\n")
+    write(repo, "docs/en/deployment/guide.md", "# Guide\n")
+    code, output = run(capsys)
+    assert code == 1
+    assert "stale marker" in output
+    assert "docs/en/README.md:1" in output
+
+
+def test_a_marker_on_a_link_outside_the_language_trees_is_left_alone(
+    repo, capsys
+) -> None:
+    """`CONTRIBUTING.md` and `docs/i18n-terms.md` are Japanese but are not tiered, so the marker on a
+    link to one of them is correct. Judging them by their contents would have failed the generated
+    switcher, whose home link points at the Japanese hub."""
+    write(repo, "CONTRIBUTING.md", "# 執筆規約\n")
+    write(
+        repo,
+        "docs/en/README.md",
+        "Conventions are in [CONTRIBUTING.md](../../CONTRIBUTING.md) (Japanese).\n",
+    )
+    code, _ = run(capsys)
+    assert code == 0
+
+
+def test_a_marker_with_no_link_at_all_is_left_alone(repo, capsys) -> None:
+    """Prose can mention the word without it being a label on anything."""
+    write(repo, "docs/en/README.md", "The upstream discussion was (Japanese).\n")
+    code, _ = run(capsys)
+    assert code == 0
+
+
 def test_external_and_anchor_targets_are_ignored(repo, capsys) -> None:
     write(
         repo,

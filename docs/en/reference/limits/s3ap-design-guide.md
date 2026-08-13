@@ -256,7 +256,7 @@ On a FlexCache whose origin is a FlexGroup, a NAS bucket can be created (and wit
 When the consuming side sits outside AWS, read-side charges come from **data transfer** and
 **requests**, and different measures work on each. A design that looks at only one gets the other back.
 The monetary estimates are in
-[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese); only the procedure is here.
+[FinOps cost structure](../comparison/finops-s3-vs-s3ap.md); only the procedure is here.
 
 ### Step 1 — establish four quantities
 
@@ -285,7 +285,7 @@ request share        = request charge ÷ (transfer charge + request charge)
 ```
 
 The share changes what to do. The rough guide is in the "looking at transfer and requests together"
-table in [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+table in [FinOps cost structure](../comparison/finops-s3-vs-s3ap.md).
 
 | Share | Dominant term | What to do |
 |---|---|---|
@@ -399,7 +399,7 @@ The sizing guidance is at least 10% of the origin, and 10% is also the default a
 ([sizing guidance](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html)).
 On a small origin, the 1 TiB SSD floor bites before the ratio does.
 How the cost falls out is collected in
-[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+[FinOps cost structure](../comparison/finops-s3-vs-s3ap.md).
 
 ### The Cache has to be a FlexGroup; write-back recommends a single constituent
 
@@ -435,7 +435,7 @@ Do not operate on the assumption that the key design can be redone. Build a stru
 to move in the first place.
 (If S3 Files is taken as the alternative, a rename there is also a copy and delete of every object under
 the prefix. The detail is in
-[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese))
+[FinOps cost structure](../comparison/finops-s3-vs-s3ap.md))
 
 ### A name collision can only be prevented at the key design stage
 
@@ -476,7 +476,7 @@ write-back is used on the serve side.
 | Document | Contents |
 |---|---|
 | [Limits](s3-access-point.md) | Size, name and configuration prerequisites |
-| [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | Billing dimensions, estimates per configuration, and the alternatives' specification constraints |
+| [FinOps cost structure](../comparison/finops-s3-vs-s3ap.md) | Billing dimensions, estimates per configuration, and the alternatives' specification constraints |
 | [Support matrix](../../support-matrix.md) | The support matrix for the collect and serve layers |
 | [Architecture](../../architecture.md) | What this architecture solves and does not solve |
 | [Decisions that come first](../../design-first-decisions.md) | The order for deciding security style and volume design |

@@ -94,7 +94,7 @@ consumers sit elsewhere and cannot be moved; in the same place, the cache SSD an
 operations are spend with nothing coming back. The full set of branches is in
 [Selection flowchart](reference/decision-trees/choosing-this-architecture.md) and
 the cost breakdown in
-[FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+[FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md).
 
 ## Decisions that come first
 
@@ -116,7 +116,7 @@ nothing to lose if it does not. Detail and sources are in
 | Understand the shape of the architecture | [Architecture](architecture.md) | 5 min |
 | Decide whether to adopt it | [Selection flowchart](reference/decision-trees/choosing-this-architecture.md) | 5 min |
 | Compare it with other approaches | [Alternatives](reference/comparison/alternatives.md) | 10 min |
-| Estimate what it costs | [FinOps cost structure](../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | 15 min |
+| Estimate what it costs | [FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md) | 15 min |
 | Check what must be decided up front | [Decisions that come first](design-first-decisions.md) | 5 min |
 | See how far each claim is confirmed | [Verification status](verification-status.md) | 5 min |
 | Look up versions and constraints | [Support matrix](support-matrix.md) | 10 min |
@@ -211,18 +211,22 @@ Authoring conventions are in [CONTRIBUTING.md](../../CONTRIBUTING.md) (Japanese)
 <details>
 <summary><strong>🌐 Localization policy</strong></summary>
 
-Japanese is authoritative. English covers the hub only, and a document's language is its directory
-(`docs/ja/` / `docs/en/`). Filenames never carry an `.en` suffix.
+Japanese is authoritative. A document's language is its directory (`docs/ja/` / `docs/en/`).
+Filenames never carry an `.en` suffix.
 
 | Tier | Scope | Languages |
 |---|---|---|
 | Tier 1 | Root `README.md` and `docs/en/README.md`, plus the documents listed in [`docs/i18n-manifest.txt`](../i18n-manifest.txt) | Japanese + English |
-| Tier 2 | Technical documents under `docs/ja/` | Japanese |
+| Tier 2 | Documents not promoted yet | Japanese |
 
-Only first-touch material is promoted to Tier 1. The dividing line is consequence: a mistranslation
-in navigation sends someone to the wrong page, which they notice, while a mistranslation in a design
-judgement does not announce itself and can be acted on. Technical documents are therefore left
-untranslated on purpose, even where translating them would be easy.
+Every document under `docs/ja/` has been promoted, so Tier 2 is currently empty. It remains as a
+mechanism: a new document is written in Japanese first and gets its English version once the content
+has stopped moving. Starting a translation too early multiplies every later edit.
+
+That English is less reliable than Japanese on accuracy is stated at the top of each document. The
+translations are machine-assisted and have not had a native review before publication. Making it
+possible for a reader to report a discrepancy comes first, and a translation error is then handled as
+an ordinary fix.
 
 The language switcher is never hand-written. `make switcher-write` generates it from the languages
 that exist. Translated terms and the do-not-translate list are in

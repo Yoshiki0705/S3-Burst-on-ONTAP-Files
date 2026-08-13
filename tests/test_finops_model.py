@@ -8,6 +8,9 @@ output, and that a partially translated model cannot produce a half-Japanese Eng
 
 from __future__ import annotations
 
+import ast
+import pathlib
+
 import finops_model as fm
 import pytest
 
@@ -94,6 +97,32 @@ def test_a_source_string_with_no_japanese_needs_no_entry() -> None:
         assert fm.t("{mbps} MBps", mbps=384) == "384 MBps"
     finally:
         fm._LANG = "ja"
+
+
+def test_no_key_is_defined_twice_in_the_translation_source() -> None:
+    """The table is a dict literal plus an `update()` call, so ruff's duplicate-key rule only sees
+    within each. A key defined in both is silently resolved to whichever ran last, and a later edit
+    to the other one has no effect — which is not visible in a diff or in the rendered output."""
+    source = (pathlib.Path(fm.__file__).parent / "finops_translations.py").read_text(
+        encoding="utf-8"
+    )
+    keys = [
+        node.value
+        for dictionary in ast.walk(ast.parse(source))
+        if isinstance(dictionary, ast.Dict)
+        for node in dictionary.keys
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    assert duplicates == [], duplicates
+
+
+def test_every_scenario_title_keeps_the_separator_the_short_name_needs() -> None:
+    """The tables index workloads by `title.split(" — ")[0]`. Translate a title without the em dash
+    and the whole title lands in a narrow column instead — no error, just a wrecked table."""
+    for scenario in fm.SCENARIOS:
+        assert " — " in scenario.title, scenario.key
+        assert " — " in fm.TRANSLATIONS[scenario.title], scenario.key
 
 
 def test_every_generated_string_now_has_english() -> None:
