@@ -79,7 +79,7 @@ are treated as estimates and never mixed with measurements.
 
 | Document | Contents |
 |---|---|
-| [S3 AP design guide](../../../ja/reference/limits/s3ap-design-guide.md) (Japanese) | Supported operations in detail, concurrency design, directory design, multiprotocol consistency |
+| [S3 AP design guide](../../reference/limits/s3ap-design-guide.md) | Supported operations in detail, concurrency design, directory design, multiprotocol consistency |
 | [Support matrix](../../support-matrix.md) | The constraints as a whole |
 | [Verification status](../../verification-status.md) | The definition of the stages and the current state |
 | [Architecture](../../architecture.md) | What this architecture does not solve |

@@ -1,4 +1,7 @@
 # 検証記録 — 全方向の可視性比較と NAS バケットの制約
+<!-- lang-switcher:start -->
+🌐 [日本語](cross-protocol-directions.md) | [English](../../en/verification/cross-protocol-directions.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->
 
 ## 概要
 
@@ -221,3 +224,9 @@ flexcache config modify -vserver snapmirror-s3-test -volume duality_fc_s3en -is-
 | [同一ボリュームの検証記録](s3ap-nfs-visibility.md) | 初回の同一ボリューム測定（NFS → S3 方向は本記録で訂正） |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
 | [用語の整理](../reference/glossary/object-access-on-ontap.md) | 機構の区別 |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](cross-protocol-directions.md) | [English](../../en/verification/cross-protocol-directions.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->

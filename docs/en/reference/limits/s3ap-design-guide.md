@@ -1,0 +1,490 @@
+# S3 Access Point — design guide (the collect layer in detail)
+
+<!-- lang-switcher:start -->
+🌐 [日本語](../../../ja/reference/limits/s3ap-design-guide.md) | [English](s3ap-design-guide.md) | [🏠 Repository home](../../README.md)
+<!-- lang-switcher:end -->
+
+Japanese is the authoritative version of this repository for technical accuracy; report any
+discrepancy you find here.
+
+<!-- Source: the design considerations, compatibility notes and performance considerations of the
+     sibling repository fsxn-s3ap-serverless-patterns, reorganised for this architecture's point of
+     view. https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns -->
+
+This covers the detail worth knowing when designing this architecture's collect layer (the S3 Access
+Point). The limits are on [a separate page](s3-access-point.md); the architecture as a whole is in
+[Architecture](../../architecture.md).
+
+## Supported S3 operations
+
+The FSx for ONTAP S3 AP is "S3 compatible" but not "identical to Amazon S3".
+
+### Confirmed working
+
+| Operation | Note |
+|---|---|
+| GetObject | Range GET supported. No size limit on download |
+| PutObject | A single PUT is up to 5 GiB |
+| ListObjectsV2 | Prefix / Delimiter / MaxKeys supported |
+| HeadObject | — |
+| DeleteObject | — |
+| MultipartUpload | CreateMultipartUpload / UploadPart / CompleteMultipartUpload |
+| CopyObject | Within the same AP only |
+
+### Not supported (an error is returned)
+
+| Operation | Returns | Alternative |
+|---|---|---|
+| Conditional writes (If-None-Match) | 501 NotImplemented | Mutual exclusion in the application |
+| S3 Annotations (PutObjectAnnotation and similar) | 501 NotImplemented | Write to a standard S3 bucket and annotate there |
+| UploadPartCopy | 404 NoSuchKey (measured) | CopyObject, or move over NFS / SMB |
+
+### Features that do not exist
+
+| Feature | Alternative |
+|---|---|
+| S3 Event Notification | FPolicy + EventBridge, or polling |
+| Lifecycle rules | FabricPool / ONTAP tiering policy |
+| Versioning | ONTAP Snapshot |
+| Object Lock / WORM | SnapLock Compliance / Enterprise |
+| S3 Select | Athena + Glue Data Catalog |
+| SSE-S3 / SSE-KMS | NAE / NVE (ONTAP volume encryption) |
+| Cross-AP Copy | DataSync / rsync |
+
+### Presigned URL
+
+The public documentation states "Not supported", but it works at the ONTAP layer
+(SigV4 from 9.11.1, SigV2 + SigV4 from 9.16.1).
+AWS Support has submitted a documentation correction, but it is **not published**.
+Depending on it in a production workload is not recommended.
+
+## Designing concurrency and throughput
+
+**The S3 AP, NFS and SMB all share the same FSx for ONTAP provisioned throughput.**
+When the collect layer (S3 AP writes) and the serve layer (FlexCache NFS / SMB reads) sit on the same
+file system, they contend for bandwidth. In this architecture the Origin and the Cache are separate
+clusters, so it is not normally a problem — but **if a client mounts NFS directly against the Origin
+cluster**, the throughput split has to be accounted for.
+
+### Recommended concurrency (S3 AP writes only, no other traffic)
+
+| FSx for ONTAP Throughput Capacity | Recommended concurrent requests | Intended use |
+|---|---|---|
+| 128 MBps | 2–5 | PoC / small-scale verification |
+| 256 MBps | 5–10 | Development and test |
+| 512 MBps | 10–20 | Small production |
+| 1,024 MBps | 20–50 | Medium production |
+| 2,048+ MBps | 50–100 | Large production |
+
+Formula: `max concurrency ≈ provisioned throughput ÷ bandwidth consumed per request`
+
+**Where an existing NFS / SMB workload is present, subtract its share when designing.**
+
+### Behaviour when throughput saturates
+
+When FSx for ONTAP throughput saturates, the S3 API returns `SlowDown` (503).
+Handle it with exponential backoff (base 1 second, max 30 seconds).
+boto3's `adaptive` retry mode is recommended.
+
+## Directory design
+
+### Files per directory
+
+| Scenario | Recommended ceiling | Basis |
+|---|---|---|
+| General workload | 100,000 or fewer | The practical ceiling for readdir response time and ListObjectsV2 responses |
+| High-frequency writes (IoT / logs) | 10,000 or fewer | Where write frequency is high, partition more finely |
+| Using FlexGroup | 50,000 or fewer per constituent | To keep the distribution across constituents even |
+
+Above 100,000, the in-memory sort cost of ListObjectsV2 grows, and there is also a risk of file
+creation failing on reaching `maxdir-size`.
+
+### Recommended partition design
+
+In this architecture's collect layer, the key of an S3 PutObject maps directly onto the directory
+structure.
+
+```text
+# Hive-style date partitions (recommended)
+s3://<ap-alias>/data/year=2026/month=08/day=10/sensor_001.json
+
+# Tenant and date hybrid
+s3://<ap-alias>/tenant-a/2026/08/10/report.pdf
+
+# Hash buckets (a large number of uniform files)
+s3://<ap-alias>/objects/a3/b2/object-uuid-001.bin
+```
+
+### Anti-patterns
+
+| What not to do | The problem | The fix |
+|---|---|---|
+| A full LIST at the root `/` | Scans the whole volume. Tens of seconds to a timeout at a few hundred thousand objects | Always specify a Prefix |
+| Ingesting many flat keys without slashes | Every file concentrates in the root directory | Use hierarchical partitions |
+| Recursive LIST (no Delimiter) | Recursively walks every subdirectory | LIST one level at a time |
+| Putting a FlexCache on the ingest volume | There is no point caching a write destination, and they contend for throughput | Separate the ingest and consume volumes |
+| `find /mnt/vol/` on the NFS side | Ignores the partition structure and walks everything | Use a manifest, or generate the path |
+
+### Choosing the partition granularity
+
+Partition down to a granularity that satisfies
+**"files ingested per hour ÷ number of partitions < 10,000"**.
+
+| Ingest rate | Recommended granularity | Example |
+|---|---|---|
+| Hundreds per day | `year/month/day/` | Batch ingest, reports |
+| Thousands per hour | `year/month/day/hour/` | IoT telemetry |
+| Tens of thousands per hour | `year/month/day/hour/` plus per device | Large-scale IoT |
+| Hundreds of thousands per hour | Two-character hash buckets (256 ways) | UUID-based objects |
+
+## Volume design — separate ingest from consume
+
+**An S3 key design is the NFS-side directory structure.** When heavy ingest and NFS reads share one
+volume, throughput contention and directory bloat happen at the same time.
+
+### Recommended layout
+
+```text
+Origin FS (FSx for ONTAP)
+├── vol_ingest_telemetry    ← S3 AP attached (IoT ingest)
+│   └── /year=YYYY/month=MM/day=DD/hour=HH/{device}_{uuid}.json
+├── vol_ingest_artifacts    ← S3 AP attached (CI/CD artefacts)
+│   └── /{repo}/{branch}/{build_id}/{artifact}
+├── vol_shared_data         ← S3 AP attached (design data, shared assets)
+│   └── /{project}/{version}/{filename}
+└── vol_processed           ← NFS only (processed, for distribution)
+    └── /{output_type}/{date}/{result}
+
+Cache Site (FlexCache)
+├── fc_shared_data          ← a cache of vol_shared_data
+└── fc_processed            ← a cache of vol_processed
+    (vol_ingest_* is not cached)
+```
+
+### Design principles
+
+| Principle | Reason |
+|---|---|
+| Do not put a FlexCache on an ingest volume | There is no point caching a write destination. It wastes throughput |
+| FlexCache the consume volumes only | Only the data that is needed gets pulled |
+| Separate the ingest and consume volumes | Avoids throughput contention, and lets size and tiering be set independently for each |
+| Attach the S3 AP to the ingest volume | NFS / SMB alone is enough for the consume side |
+
+### Tiering on the ingest volume
+
+`AUTO` tiering works for data that is ingested frequently, consumed soon after, and then goes cold.
+Data past the 31-day default cooling period moves to the capacity tier, holding down SSD cost.
+The FlexCache side holds only hot data, so it is unaffected by tiering.
+
+## Strategies for finding files on the NFS side
+
+When consuming data ingested through the S3 AP over NFS / SMB, provide **a way to know what was
+ingested** rather than walking the directory.
+
+### The manifest pattern (recommended)
+
+Write a manifest file when ingest completes, and have the NFS side read only that:
+
+```text
+# At the end of the ingest side (Lambda / pipeline)
+s3://ap-alias/data/year=2026/month=08/day=10/_manifest_14.json
+Contents: {"files": ["hour=14/sensor_001.json", ...], "count": 42, "timestamp": "..."}
+
+# A script on the NFS side
+cat /mnt/cache/data/year=2026/month=08/day=10/_manifest_14.json | jq -r '.files[]'
+# → processes only the ingested files, without walking the directory
+```
+
+### The path generation pattern
+
+Where the partition structure is known, generate the path in the script and access it directly:
+
+```bash
+# A script that processes yesterday's data — without using find
+YESTERDAY=$(date -d "yesterday" +%Y/month=%m/day=%d)
+for f in /mnt/cache/data/year=$YESTERDAY/*.json; do
+  process "$f"
+done
+```
+
+### inotifywait / FPolicy events
+
+Where real-time processing is needed, use `inotifywait` on the NFS side or FPolicy events on the
+server side to make it event driven: process the file when it appears. Polling with a periodic `ls`
+does not scale.
+
+## Multiprotocol consistency
+
+In this architecture the main path is "write through the S3 AP, read over NFS / SMB". The reverse
+direction and simultaneous writes need care.
+
+| Scenario | Behaviour | Risk |
+|---|---|---|
+| **S3 AP PutObject completes, then an NFS / SMB read** | **Consistent data is readable immediately** (WAFL's atomic commit) | None. This is the main path |
+| An S3 AP GET during an NFS write | Data mid-write may be read (a partial read) | Data inconsistency |
+| An S3 AP write plus FlexCache write-back on the same file | The cache's dirty data is discarded (XLD revoke) | Data conflict |
+| An S3 AP GET on the old key straight after an NFS rename | NotFound on the old key (the rename propagates immediately) | Key management in the application |
+
+### Using it safely in this architecture
+
+**The main path (S3 AP to FlexCache NFS / SMB) is safe.** Once the S3 AP's PutObject completes,
+consistent data is visible to an NFS / SMB read through FlexCache as well (there is propagation to wait
+for, but once visible the data is always complete).
+
+**Patterns to avoid:**
+
+- Writing to the same file through the S3 AP and over NFS / SMB at the same time
+- FlexCache write-back and an S3 AP write targeting the same file
+  (this architecture confines the Cache to reads, so it does not normally arise)
+
+## Choosing between FlexVol and FlexGroup
+
+| Criterion | FlexVol | FlexGroup |
+|---|---|---|
+| Maximum size | About 100 TB (the practical ceiling) | PB scale |
+| File count ceiling | About 2 billion | number of constituents × 2 billion |
+| FlexCache origin support | ONTAP 9.12.1 or later | ONTAP 9.13.1 or later (with constraints) |
+| S3 AP support | ✅ | ✅ |
+| Intended use | A single workload / PoC | Large-scale data / multi-tenant |
+| Recommendation here | Start from verification and small scale | Large-scale production |
+
+On a FlexCache whose origin is a FlexGroup, a NAS bucket can be created (and with
+`-is-s3-enabled true`, [S3 data access works too](../../verification/cross-protocol-directions.md)).
+
+## Procedure for designing the read-side cost
+
+When the consuming side sits outside AWS, read-side charges come from **data transfer** and
+**requests**, and different measures work on each. A design that looks at only one gets the other back.
+The monetary estimates are in
+[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese); only the procedure is here.
+
+### Step 1 — establish four quantities
+
+Nothing can be judged without these. Do not fill them in by guessing.
+
+| Quantity | What to measure | Example of how |
+|---|---|---|
+| Dataset size | The logical bytes held | S3 Storage Lens, `aws s3 ls --summarize`, volume usage |
+| Working set size | The unique bytes actually touched in a month | From S3 server access logs or CloudTrail data events, total the size of the unique keys |
+| Average object size | Dataset size ÷ object count | The object count from S3 Storage Lens |
+| Reads of the same data | How many times the same key is read in a month | The distribution of GET counts per key in the access log. Look at the median and the top, not the mean |
+
+**Do not flatten the read count into a mean.** A distribution where a few files are read hundreds of
+times is common, and in that case judge from the top keys rather than the overall average.
+
+### Step 2 — calculate which term dominates
+
+```text
+monthly transfer     = working set size × read count
+transfer charge      = monthly transfer × transfer unit price (tiered over the internet, flat on DX)
+
+monthly requests     = (working set size ÷ average object size) × read count
+request charge       = monthly requests × GET unit price
+
+request share        = request charge ÷ (transfer charge + request charge)
+```
+
+The share changes what to do. The rough guide is in the "looking at transfer and requests together"
+table in [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+
+| Share | Dominant term | What to do |
+|---|---|---|
+| Roughly under 5% | Transfer | Reduce the bytes carried. Place only the working set on the serve side |
+| 5 to 30% | Transfer-leaning, but requests matter too | Transfer first, then how objects are grouped |
+| 30% or more | Both | Combine grouping (requests) with caching (transfer). One alone leaves the other |
+
+### Step 3 — design according to the dominant term
+
+**When transfer dominates.** What is reduced is bytes.
+
+- Place only the working set on the serve side. A full copy means carrying some multiple of the working
+  set
+- If the consuming side can move to AWS, that is what works best (within one Region it is free)
+- Lower the unit price with Direct Connect. Port and circuit charges are separate, so judge it against
+  the transfer volume
+- **Making objects larger does not reduce transfer.** The count falls; the bytes do not
+
+**When requests dominate.** What is reduced is the number of calls.
+
+- Group at the collection stage. A larger file also means fewer reads
+- Move reads onto the file protocol. An NFS / SMB read is not an S3 request
+- Reduce listing. `ListObjectsV2` is priced as Tier1, an order of magnitude above GET
+
+**When both dominate.** Do both. With one alone, the remaining side becomes dominant.
+
+### Step 4 — check it does not collide with the collect-side design
+
+Grouping objects larger for the read side runs into the collect side's constraints.
+
+| The result of grouping | The constraint hit |
+|---|---|
+| A single object exceeds 5 GiB | The S3 AP's single `PutObject` limit. Split it into multipart |
+| A whole object exceeds 50 GiB | The S3 AP limit. The judgement comes after transfer, so validate on the client before sending |
+| Larger than the granularity the consuming side needs | Parts that go unused get carried too, increasing transfer. Match the read unit |
+
+Conversely, splitting finer than the consuming side's read unit means several reads per operation, which
+increases the request count. **Matching the grouping granularity to the consuming side's read unit** is
+the criterion.
+
+### Step 5 — watch in operation for the premises breaking
+
+An estimate rests on assumptions. If any of these three drift, the conclusion changes.
+
+| What to monitor | What happens when it drifts | Where to look |
+|---|---|---|
+| Cache hit rate | If the working set is larger than assumed, misses rise and transfer exceeds the estimate | The FlexCache hit rate (obtainable through Harvest) |
+| The distribution of read counts | If the count falls, the cache's fixed cost stops being earned back | GET counts per key in the access log |
+| Transfer volume | Crossing a tier boundary changes the unit price | `APN1-DataTransfer-Out-Bytes` in Cost Explorer |
+
+The response to a falling hit rate is to grow the Cache, but **a Cache volume cannot be tiered**, so
+the added capacity is SSD cost outright. Growth in the working set goes straight to the bill.
+
+## Boundaries that span layers, and the traps in them
+
+The limits themselves are on [a separate page](s3-access-point.md).
+Collected here are **the combinations where limits from different layers interact and become a
+problem**. None of them is easy to notice from reading a single page.
+
+### The size boundaries differ by layer
+
+| Boundary | Value | Layer it applies to | Stage |
+|---|---|---|---|
+| S3 AP single `PutObject` | 5 GiB | collect | verified |
+| S3 AP one `UploadPart` | 5 GiB | collect | verified |
+| S3 AP whole object | 50 GiB | collect | verified |
+| S3 AP `GetObject` | No size limit (Range GET supported) | collect | verified |
+| File size FlexCache write-back has been verified to | Under 100 GB | serve | documented ([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)) |
+| WAN round trip FlexCache write-back has been verified to | Within 200 ms | serve | As above |
+
+**As long as collection goes through the S3 AP, these two do not collide.** A whole object stops at
+50 GiB, so it necessarily stays inside write-back's verified range of 100 GB.
+
+The collision arrives when the path changes. **When a file is written directly from NFS / SMB on the
+Cache side, there is nothing on the S3 AP side to stop the size.** With write-back enabled, a file past
+100 GB leaves the verified range. In a design where the serve side generates large files — rendering
+output, simulation results, assembling an archive — confirm this boundary at design time.
+
+### The 50 GiB judgement happens after the payload has been transferred
+
+The 50 GiB whole-object limit is judged at `CompleteMultipartUpload`. That is, **it fails after every
+part has been transferred**. The time spent transferring and the request charges do not come back.
+Validate the size on the client before sending.
+
+### Snapshot interval and write-back
+
+Taking a snapshot on the Origin **reclaims outstanding dirty data from every write-back Cache tied to
+that Origin volume**. During a period of heavy writing, this reclaim needs several retries
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+
+Taking snapshots at a short interval for protection sits badly with write-back. If both are required,
+offset the snapshot interval from the write peak, or consolidate serve-side writes on the Origin.
+
+### Thin provisioning and write-back switching silently
+
+A write-back Cache **switches automatically to write-around once the Origin volume's free space falls
+to 20% or below**. The threshold is evaluated against **both** the free space the Origin reports and the
+aggregate's physical free space. If the Origin is overprovisioned, it switches sooner than expected
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+
+No error is raised when it switches. It shows up as increased write latency. In a design that runs
+capacity tight, do not place a performance premise on write-back.
+
+### A Cache cannot be tiered, so growth in the working set becomes SSD outright
+
+A Cache volume is not tiered ([supported and unsupported features](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)).
+Even where `AUTO` tiering on the Origin keeps its SSD small, **the serve side has no such escape**.
+Whatever the working set grows by becomes added SSD.
+
+The sizing guidance is at least 10% of the origin, and 10% is also the default at creation
+([sizing guidance](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html)).
+On a small origin, the 1 TiB SSD floor bites before the ratio does.
+How the cost falls out is collected in
+[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese).
+
+### The Cache has to be a FlexGroup; write-back recommends a single constituent
+
+AWS documentation requires **the FlexCache volume to be a FlexGroup**
+([creating a FlexCache](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/create-flexcache.html)).
+The write-back guidelines, meanwhile, recommend **configuring the whole Cache volume as a single
+constituent** to avoid unintended eviction
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+Satisfying both gives "a FlexGroup with one constituent".
+
+In addition, this architecture's verification found that **attempting to create a FlexGroup through the
+ONTAP CLI produced a compatibility error with the FabricPool aggregate, and it had to be created through
+the FSx for ONTAP API**
+([verification record](../../verification/cross-protocol-directions.md)).
+Whether it succeeds depends on the creation path, so a CLI failure is not grounds for concluding it is
+impossible.
+
+### Above 10 origin volumes, write-around
+
+AWS documentation cites write-around for read-centric, latency-insensitive cases,
+**or where a FlexCache origin volume count on the origin file system exceeds 10**
+([replication with FlexCache](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)).
+In a fan-out design that adds sites, this count bears on whether write-back is available.
+
+### A rename is expensive in both layers
+
+An S3 key is the NFS-side path, so re-partitioning is a directory rename.
+With write-back enabled, **a renamed file is evicted from the Cache, and no other operation can proceed
+until the dirty data has drained to the Origin**
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+
+Do not operate on the assumption that the key design can be redone. Build a structure that does not have
+to move in the first place.
+(If S3 Files is taken as the alternative, a rename there is also a copy and delete of every object under
+the prefix. The detail is in
+[FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese))
+
+### A name collision can only be prevented at the key design stage
+
+`part1/part2` and `part1/part2/part3` cannot both exist on NAS.
+The former requires a file and the latter a directory of the same name
+([NAS data requirements](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)).
+
+Placing a manifest at `.../day=10/_manifest_14.json` and also creating `.../day=10/_manifest_14/` at the
+same level collides. Do not use the same name for a leaf and for the level beneath it.
+
+### With write-back, only some attributes can be changed from the Cache side
+
+On a write-back-enabled Cache, only timestamps, mode bits, NT ACLs, owner, group and size can be set.
+Any other attribute change is forwarded to the Origin, and **the file may be evicted from the Cache**
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+Where an application using extended attributes runs on the serve side, confirm this beforehand.
+
+### SMB write oplocks are unavailable with write-back
+
+On a write-back-enabled Cache, SMB Opportunistic Locks for writes are not supported
+([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)).
+Where an SMB client's performance premise depends on oplocks, it cannot be combined with write-back.
+
+### The version requirements apply to both the Origin and the Cache
+
+| Item | Requirement |
+|---|---|
+| S3 AP (collect layer) | ONTAP 9.17.1 or later |
+| FlexCache write-back | Available from ONTAP 9.15.1. Important improvements landed in 9.17.1P1, and that or later is strongly recommended on both the Origin and the Cache. 9.15.1 is not recommended for production ([guidelines](https://docs.netapp.com/us-en/ontap/flexcache-writeback/flexcache-write-back-guidelines.html)) |
+| FlexCache duality (NAS bucket) | ONTAP 9.18.1 or later, plus `-is-s3-enabled true` (advanced privilege) |
+
+Deciding the version from the collect layer's requirement alone leaves it short at the point where
+write-back is used on the serve side.
+**Add both sides' requirements together first, then decide the version.**
+
+## Related documents
+
+| Document | Contents |
+|---|---|
+| [Limits](s3-access-point.md) | Size, name and configuration prerequisites |
+| [FinOps cost structure](../../../ja/reference/comparison/finops-s3-vs-s3ap.md) (Japanese) | Billing dimensions, estimates per configuration, and the alternatives' specification constraints |
+| [Support matrix](../../support-matrix.md) | The support matrix for the collect and serve layers |
+| [Architecture](../../architecture.md) | What this architecture solves and does not solve |
+| [Decisions that come first](../../design-first-decisions.md) | The order for deciding security style and volume design |
+| [PoC checklist](../../poc-checklist.md) | What to confirm, and in what order |
+| [Sibling repository: compatibility notes](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | The detail of the Lambda / Step Functions integration |
+
+---
+
+<!-- lang-switcher:start -->
+🌐 [日本語](../../../ja/reference/limits/s3ap-design-guide.md) | [English](s3ap-design-guide.md) | [🏠 Repository home](../../README.md)
+<!-- lang-switcher:end -->
