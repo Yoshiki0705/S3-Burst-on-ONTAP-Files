@@ -3,10 +3,10 @@ PY ?= python3
 
 # Every target is declared here. A target that is not phony is skipped when a path of the same
 # name exists, and make then reports "up to date" without running the recipe — a gate that never
-# runs is indistinguishable from a gate that passes. `tests/test_makefile_phony.py` fails when a
+# runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
-        audit secrets pinning links links-external budget en-lang xlang counts test all new-pattern \
+        audit secrets pinning zizmor links links-external budget en-lang xlang counts test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write \
         commit-gate clean
@@ -105,6 +105,22 @@ secrets: ## Secret scan (skipped when gitleaks is not installed)
 pinning: ## Every GitHub Action must be pinned to a commit SHA
 	@$(PY) tools/check_actions_pinning.py
 
+ZIZMOR_PINNED := $(shell sed -n 's/^zizmor==//p' requirements-dev.txt)
+zizmor: ## Audit the workflow files for CI security problems
+	@if command -v zizmor >/dev/null 2>&1; then \
+		installed=$$(zizmor --version | awk '{print $$2}'); \
+		if [ "$$installed" != "$(ZIZMOR_PINNED)" ]; then \
+			echo "warning: zizmor $$installed installed, this repository pins $(ZIZMOR_PINNED)."; \
+			echo "         Rule sets differ between versions, so a local pass does not"; \
+			echo "         mean CI passes. Install the pinned version:"; \
+			echo "         pip install -r requirements-dev.txt"; \
+		fi; \
+		zizmor --no-online-audits --persona=pedantic .github/workflows; \
+	else \
+		echo "zizmor not installed - skipping"; \
+		echo "  install the pinned version: pip install -r requirements-dev.txt"; \
+	fi
+
 links: ## Check internal link resolution
 	@$(PY) tools/check_links.py
 
@@ -129,7 +145,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang audit secrets pinning links budget en-lang counts finops test ## Commit gate
+all: lint i18n-check switcher-check xlang audit secrets pinning zizmor links budget en-lang counts finops test ## Commit gate
 	@echo "All checks passed."
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x

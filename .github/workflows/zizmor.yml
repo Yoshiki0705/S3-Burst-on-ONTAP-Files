@@ -1,0 +1,63 @@
+name: zizmor
+
+# Audits the workflow files themselves. The other gates read the repository's documents and code;
+# nothing until now read the files that run with a token.
+#
+# Separate from `ci` rather than a step in it, for two reasons. It needs a schedule, and `ci` has
+# none: the rule set grows, so a workflow that is clean today can stop being clean without anyone
+# editing it, and a pinned linter cannot notice that on its own. And it only reads `.github/` and the
+# pin, so running it on every documentation change would be noise.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'requirements-dev.txt'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'requirements-dev.txt'
+  schedule:
+    # Weekly, so a rule added after the pin was last moved still reaches us. The pin is what keeps
+    # the verdict reproducible; this is what keeps it from going stale silently.
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: workflow audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Install pinned toolchain
+        run: pip install -r requirements-dev.txt
+
+      # Offline explicitly, not by accident. zizmor runs offline whenever no token is present, so a
+      # runner that happens to have one would audit more than a developer's machine does — and a
+      # gate whose rule set depends on where it runs cannot tell you whether your change is clean.
+      # The one thing the online audits add that matters here, checking that a pinned ref still
+      # exists, is covered by tools/check_actions_pinning.py and by the dependency bot.
+      #
+      # Pedantic, not the default persona. The two `concurrency` gaps this found on its first run
+      # were both real and both below the default threshold, so the default would have reported a
+      # clean repository. What pedantic asks for and cannot be given — a `permissions:` explanation
+      # short enough to sit on the line — is suppressed inline, with the reason, at the one place it
+      # applies. That way a finding is either fixed or answered, never merely unseen.
+      - name: Run zizmor
+        run: zizmor --no-online-audits --persona=pedantic .github/workflows

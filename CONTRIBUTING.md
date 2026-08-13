@@ -6,7 +6,7 @@ Issue と Pull Request を歓迎します。この文書は執筆・実装の規
 ## 環境を用意する
 
 ```bash
-pip install -r requirements-dev.txt   # ruff / pytest / cfn-lint（バージョン固定）
+pip install -r requirements-dev.txt   # ruff / pytest / cfn-lint / zizmor（バージョン固定）
 npm install -g markdownlint-cli2      # pip では入らない
 brew install gitleaks                 # pip では入らない
 ```
@@ -32,6 +32,7 @@ make all     # コミットゲート
 | `make switcher-check` | 言語スイッチャーが実在する言語と一致しているか、他言語へ誘導していないか |
 | `make audit` | 命名・出典マーカー・比較の書き方・個人情報・機構の混同 |
 | `make secrets` | gitleaks |
+| `make zizmor` | ワークフローファイル自体の CI セキュリティ監査（pedantic） |
 | `make links` | 内部リンクの解決（`make links-external` で外部 URL も） |
 | `make budget` | AGENTS.md のサイズと `.kiro/` ローダーの到達性 |
 | `make en-lang` | 英語ドキュメントに日本語が残っていないか |
