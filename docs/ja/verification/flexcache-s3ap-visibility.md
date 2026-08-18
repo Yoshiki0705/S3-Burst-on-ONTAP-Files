@@ -14,7 +14,7 @@
 | 計測日 | 2026-08-09（UTC） |
 | リージョン | ap-northeast-1 |
 | Origin クラスタ | ファイルシステム 1（`fs-0123456789abcdef0`、Origin 役）、SINGLE_AZ_1、128 MBps、1 HA ペア |
-| Cache クラスタ | ファイルシステム 2（`fs-0123456789abcdef0`、オンプレミス相当の Cache 役）、SINGLE_AZ_1、128 MBps、1 HA ペア |
+| Cache クラスタ | ファイルシステム 2（`fs-0abcdef1234567890`、オンプレミス相当の Cache 役）、SINGLE_AZ_1、128 MBps、1 HA ペア |
 | **ONTAP バージョン** | **NetApp Release 9.18.1P3D1**（両クラスタ同一） |
 | 接続 | VPC ピアリング（同一リージョン、同一アカウント） |
 | Origin ボリューム | `s3burst_origin_vol2`、SVM `fsxsvm02`、セキュリティスタイル UNIX |

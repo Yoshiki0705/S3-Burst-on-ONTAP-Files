@@ -171,6 +171,9 @@ def test_sanctioned_placeholders_pass() -> None:
         "The management LIF is 10.0.x.x",
         "Contact reviewer@example.com",
         "The file system is fs-0123456789abcdef0.",
+        # Two placeholders, because the architecture has an origin and a cache and masking
+        # both to one string makes a two-cluster measurement read as one cluster.
+        "The cache file system is fs-0abcdef1234567890.",
     ):
         assert "pii" not in categories(line), line
 

@@ -10,7 +10,8 @@ description = "Sanctioned documentation placeholders"
 regexTarget = "match"
 regexes = [
   '''123456789012''',                 # placeholder AWS account ID
-  '''fs-0123456789abcdef0''',         # placeholder file system ID
+  '''fs-0123456789abcdef0''',         # placeholder file system ID (origin)
+  '''fs-0abcdef1234567890''',         # second one, for the cache: this architecture has two
   '''svm-0123456789abcdef0''',
   '''fsvol-0123456789abcdef0''',
   '''vpc-0123456789abcdef0''',

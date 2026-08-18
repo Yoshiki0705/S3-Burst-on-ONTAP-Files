@@ -20,7 +20,7 @@ checked whether an ONTAP NAS bucket (FlexCache duality) can be enabled on FSx fo
 | Region | ap-northeast-1 |
 | ONTAP version | NetApp Release 9.18.1P3D1 (both clusters) |
 | Origin cluster | File system 1 (`fs-0123456789abcdef0`, acting as Origin), SINGLE_AZ_1, 128 MBps |
-| Cache cluster | File system 2 (`fs-0123456789abcdef0`, acting as the on-premises-equivalent Cache), SINGLE_AZ_1, 128 MBps |
+| Cache cluster | File system 2 (`fs-0abcdef1234567890`, acting as the on-premises-equivalent Cache), SINGLE_AZ_1, 128 MBps |
 | Connection | VPC peering (same Region, same account) |
 | Origin volume | `s3burst_origin_vol2`, SVM `fsxsvm02`, UNIX |
 | Cache volume | `s3burst_cache_vol2`, FlexCache |
