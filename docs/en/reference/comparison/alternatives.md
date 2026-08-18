@@ -92,12 +92,12 @@ For reading large objects from Linux on AWS, it can come out cheaper than this a
 ## Breaking the problem down by axis
 
 Whichever approach is taken, a cost appears somewhere on the following axes.
-This architecture addresses mainly 1 to 4, and does not address 5 or part of 6.
+This architecture addresses mainly 1, 3 and 4, addresses 2 only partly, and does not address 5 or part of 6.
 
 | # | Axis | What actually happens |
 |---|---|---|
 | 1 | Consistency and freshness | Copy lag, partial sync, deletions that do not propagate. "As of when is the data at the destination" cannot be answered |
-| 2 | A single origin of permission | Two permission systems. Every review costs the work of reconciling both |
+| 2 | Permissions spread across origins | Two permission systems. Every review costs the work of reconciling both. **This architecture does not remove that.** It changes two systems over two copies into two layers over one copy — the AWS side and the file system side — which is still not a single basis |
 | 3 | Capacity and cost | The same data billed twice. Transfer and API request charges. A gateway that runs even when idle |
 | 4 | Operational load | Monitoring and re-running sync jobs becomes routine work. During an incident, "which side do we fix" has to be decided |
 | 5 | Mismatched performance characteristics | Objects are strong at large sequential reads, NAS at metadata operations and random access. Leaning to one degrades the other |
@@ -117,6 +117,10 @@ This is a role-based summary. It is not based on interviews with real individual
 
 That fork in the requirement — collect over S3, consume over NFS / SMB — is exactly the situation this
 architecture is for.
+
+**This architecture's permission model is two layers as well, and it is not a single basis.** What it
+can and cannot account for is in [Architecture](../../architecture.md) (both layers measured in
+[Access point authorization layers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)).
 
 ## Related documents
 

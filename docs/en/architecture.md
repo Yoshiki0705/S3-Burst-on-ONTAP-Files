@@ -84,9 +84,16 @@ Get Started, so it is kept apart from the other design decisions.
 
 - Collection is taken over the S3 API while the consuming side stays on NFS / SMB, with no copy job
   between the two
-- The origin of permission stays single. Authorization on the object side reduces to "which file
-  system identity is being acted for"
-  ([dual-layer authorization in FSx for ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html))
+- The write path can be consolidated onto the S3 Access Point on the origin. **Authorization,
+  however, is not a single layer.** A request passes two independent layers in order and has to clear
+  both. Layer 1 (the AWS side) evaluates the calling principal and the `s3:` action, and what
+  restricts it there is an **explicit Deny**: within one account the identity policy and the access
+  point policy are combined, so narrowing the `Allow` is not a restriction. Layer 2 (the file system
+  side) evaluates the file permissions — mode bits or ACLs — held by the one identity fixed on the
+  access point. **Neither layer subtracts from the other**
+  ([dual-layer authorization](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html),
+  and both layers measured in
+  [Access point authorization layers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md))
 - Localized reads. Only the range that is needed is brought to the consuming site
 - Replacing the collect layer with another platform does not change the design of the serve layer
   ([Portability](portability.md))
