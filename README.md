@@ -1,6 +1,6 @@
 # S3 Burst on ONTAP Files
 
-![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-verified-brightgreen)
+![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) [![verification](https://img.shields.io/badge/verification-scope%20per%20claim-blue)](docs/ja/verification-status.md)
 
 <!-- lang-switcher:start -->
 🌐 [日本語](README.md) | [English](docs/en/README.md)
@@ -119,12 +119,16 @@ Origin のセキュリティスタイルがファンアウト先のプロトコ�
 | 実測値と測定条件を見る | [検証記録](docs/ja/verification/s3ap-nfs-visibility.md) | 10 分 |
 | 実機で確かめる | [PoC チェックリスト](docs/ja/poc-checklist.md) | 10 分 |
 
-> **この構成の中核は検証済みです。** S3 Access Point で Origin に書いたオブジェクトは、
-> FlexCache の Cache ボリューム上の NFS マウントから **p50 14 ms** で読めました
-> （ONTAP 9.18.1P3D1、同一リージョン VPC ピアリング、`actimeo=0`、n=30）。
-> FlexCache が加える遅延は同一ボリュームに対して約 +5 ms です。
-> 詳細は[FlexCache 検証記録](docs/ja/verification/flexcache-s3ap-visibility.md)にあります。
-> 未検証と未確認の区別は[検証状況](docs/ja/verification-status.md)に明示してあります。
+> **中核の end-to-end は、Cache 側も FSx for ONTAP という条件で検証済みです。**
+> S3 Access Point で Origin に書いたオブジェクトは、FlexCache の Cache ボリューム上の NFS マウントから
+> **p50 14 ms** で読めました（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、
+> 同一リージョンの VPC ピアリング、NFSv3、UNIX、64 B、`actimeo=0`、n=30）。
+> SMB でも同条件で測っています（[FlexCache 検証記録](docs/ja/verification/flexcache-s3ap-visibility.md)、
+> [全方向比較](docs/ja/verification/cross-protocol-directions.md)）。
+>
+> **主経路として掲げている「Cache をオンプレミス ONTAP に置く形」は未検証です。**
+> 遠隔・高レイテンシ経路、NTFS、Cache 複数も未検証です。
+> 検証済みの範囲と未検証の範囲は[検証状況](docs/ja/verification-status.md)に 1 か所でまとめてあります。
 > 実測していない性能値・コスト値はこのリポジトリには書きません。
 
 ## 実装パターン
@@ -232,7 +236,8 @@ make all     # コミットゲート
 | [`AGENTS.md`](AGENTS.md) | 規約・禁止事項・検証手順 |
 | [`docs/ja/verification-status.md`](docs/ja/verification-status.md) | 主張ごとの段階（検証済み / ドキュメント記載 / 未検証 / 未確認） |
 
-**引用する側への注意**: このリポジトリの中核的な主張は未検証です。
+**引用する側への注意**: 主張ごとに段階が違います。中核の end-to-end は Cache 側も
+FSx for ONTAP という条件で検証済みですが、**主経路であるオンプレミス ONTAP Cache は未検証です。**
 段階を確認せずに事実として引用しないでください。「未確認」は「できない」ではありません。
 数値は環境（リージョン、ONTAP バージョン、構成、オブジェクトサイズ、並列度）と
 併せてのみ意味を持ちます。

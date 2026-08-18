@@ -43,9 +43,9 @@ Secrets Manager はすべて AWS のリソースなので、CloudFormation で 1
 
 ## 検証状況
 
-**この構成の中核はまだ未検証です。** S3 Access Point 経由で書いたオブジェクトが
-FlexCache の Cache ボリューム側でいつ見えるかは確かめていません。
-Origin ボリューム自体を両プロトコルから読み書きする部分は実測済みです
-（[検証記録](../docs/ja/verification/s3ap-nfs-visibility.md)）。両者は別の問いです。
+**中核の end-to-end は、Cache 側も FSx for ONTAP という条件で検証済みです**
+（[FlexCache 検証記録](../docs/ja/verification/flexcache-s3ap-visibility.md)）。
+**このディレクトリの `onprem-cache/` が対象とする「Cache をオンプレミス ONTAP に置く形」は未検証です。**
+検証済みの範囲と未検証の範囲は[検証状況](../docs/ja/verification-status.md)にまとめてあります。
 
 確かめる順序は [PoC チェックリスト](../docs/ja/poc-checklist.md)にあります。

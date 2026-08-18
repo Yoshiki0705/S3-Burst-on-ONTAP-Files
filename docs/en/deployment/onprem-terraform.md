@@ -110,11 +110,14 @@ appearing in a directory the client has already listed can be invisible for up t
 measured on the collect side — see the
 [verification record](../verification/s3ap-nfs-visibility.md).
 
-> **Stated as unverified**: **when an object written through the S3 Access Point becomes visible on
-> this cache volume has not been verified.** The figures published so far are for the origin volume
-> itself across both protocols, which is a different question. Record whatever you observe here, with
-> its environment, in [Verification status](../verification-status.md). A negative
-> result is as valuable as a positive one.
+> **Stated as unverified**: that an object written through the S3 Access Point becomes readable over
+> NFS on the cache side **is verified with FSx for ONTAP on the cache side too**
+> ([FlexCache verification record](../verification/flexcache-s3ap-visibility.md)).
+> **With on-premises ONTAP as the cache, which is what this guide covers, it is unverified.** The
+> latency of that path, and whether the security style is inherited, are both first answered there.
+> Record whatever you observe here, with its environment, in
+> [Verification status](../verification-status.md). A negative result is as valuable as a positive
+> one.
 
 ## 5. Tear down
 

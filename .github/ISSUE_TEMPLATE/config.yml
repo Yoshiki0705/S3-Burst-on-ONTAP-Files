@@ -16,5 +16,5 @@ contact_links:
   - name: What is verified and what is not
     url: https://github.com/Yoshiki0705/s3-burst-on-ontap-files/blob/main/docs/ja/verification-status.md
     about: >-
-      The central claim of this architecture is unverified. Check the stage of a statement before
-      reporting it as wrong.
+      The stage differs per claim, and the central claim is verified only with FSx for ONTAP on the
+      cache side. Check the stage of a statement before reporting it as wrong.

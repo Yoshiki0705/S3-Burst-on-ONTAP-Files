@@ -36,6 +36,12 @@ Environment needed: two existing FSx for ONTAP file systems, or FSx for ONTAP an
 While this is open, "can the site read it as soon as it is collected" has no answer. It is the core of
 the architecture.
 
+**With two FSx for ONTAP file systems this is verified and the checks below are done**
+([FlexCache verification record](verification/flexcache-s3ap-visibility.md); NFSv3 and SMB, UNIX,
+64 B, `actimeo=0`). **They still apply as written when confirming it in your own environment, or with
+the cache on on-premises ONTAP.** The conditions that remain are under "The scope of the central
+claim" in [verification status](verification-status.md).
+
 - [ ] Attach an S3 Access Point to the Origin volume
 - [ ] Write an object with `PutObject`
 - [ ] Confirm the same file is visible from the NFS / SMB mount on the cache side
