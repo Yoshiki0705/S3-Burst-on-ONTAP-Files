@@ -113,7 +113,7 @@ Proceeding to step 4 with any of steps 1 to 3 still open removes the choice at s
 | Operation | Impact |
 |---|---|
 | Changing the origin's security style | The cache has to be deleted and recreated (if the premise above holds) |
-| The S3 Access Point's `NetworkOrigin` | Cannot be changed after creation. An `Internet` origin is not reachable from an S3 Gateway VPC endpoint |
+| The S3 Access Point's `NetworkOrigin` | Cannot be changed after creation. Changing it means deleting and recreating the access point, which changes the alias. The reachability conditions are in [support matrix](support-matrix.md) |
 | The FlexCache deletion order | Do not delete the origin side while a cache still exists. Releasing the cache and the SVM peer comes before removing the peering |
 | Enabling SnapLock or tamperproof snapshots | Cannot be undone. **Do not enable it without an instruction that names the retention period.** See the irreversible operations section of [AGENTS.md](../../AGENTS.md) |
 

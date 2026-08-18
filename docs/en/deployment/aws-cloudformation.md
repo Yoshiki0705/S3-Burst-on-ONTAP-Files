@@ -106,7 +106,7 @@ Two decisions:
 | Setting | What it means |
 |---|---|
 | `FileSystemIdentity` | **Every request through the access point is authorized as this one identity**, so callers are indistinguishable from each other. **Restriction lives in two places:** an explicit Deny in the access point policy on the AWS side (narrowing the `Allow` is not a restriction), and the file permissions — mode bits or ACLs — held by this identity on the file system side. **To make writes impossible, give the access point an identity that has no write permission.** It cannot be changed after creation, so split access points by purpose ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). |
-| `NetworkOrigin` | **Immutable after creation.** `VPC` keeps a single-host measurement off the public path. `Internet` is writable from outside but is not reachable through an S3 Gateway VPC endpoint. |
+| `NetworkOrigin` | **Immutable after creation.** `VPC` keeps a single-host measurement off the public path. `Internet` is writable from outside the VPC as well. **Either way, a caller inside the VPC needs an S3 VPC endpoint whose route is associated with that subnet's route table.** A sibling repository has observed connection timeouts from an in-VPC Lambda that had no such route. |
 
 ## 4. Mount and check
 

@@ -37,7 +37,7 @@
 | 最小 ONTAP バージョン | 9.17.1 | ドキュメント記載 | [制限事項](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-point-for-fsxn-restrictions-limitations-naming-rules.html) |
 | リージョン | アクセスポイントとボリュームが同一リージョン | ドキュメント記載 | 同上 |
 | アカウント | アクセスポイントとボリュームが同一アカウント | ドキュメント記載 | 同上 |
-| `NetworkOrigin` | 作成後は変更できない | ドキュメント記載 | 同上。`Internet` origin は S3 Gateway VPC エンドポイントからは到達しない |
+| `NetworkOrigin` | 作成後は変更できない | ドキュメント記載 | 同上。**到達性は origin の種別ではなく呼び出し元の位置とルーティングで決まる。** Gateway エンドポイントは VPC 内で発生したトラフィックだけをルーティングし、VPN / Direct Connect / ピア VPC / Transit Gateway 経由の呼び出しには Interface エンドポイントが必要（[ネットワークアクセス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)） |
 | 認可 | AWS 側と ONTAP 側の両方が許可する必要がある | ドキュメント記載 | [二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
 
 ## 対象外の機能
