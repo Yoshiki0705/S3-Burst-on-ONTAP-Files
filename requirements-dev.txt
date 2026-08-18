@@ -18,6 +18,16 @@ cfn-lint==1.52.1
 # pinning is that a new rule does not reach us until the pin moves, which is why the workflow also
 # runs on a schedule — see .github/workflows/zizmor.yml.
 zizmor==1.29.0
+# checkov scans the CloudFormation and the workflow files for security posture, which cfn-lint has no
+# opinion about: cfn-lint proves a template is well formed, not that a function is unbounded or a
+# secret unencrypted. Pinned for the same reason as the rest, and with the same consequence -- a new
+# policy does not reach us until the pin moves. It is a heavy install (a large transitive tree), so
+# `make iac-security` skips with a message when it is absent rather than failing, the way the
+# gitleaks and markdownlint targets do for the tools that are not pip-installable.
+#
+# Findings are triaged in the templates with `# checkov:skip=<id>: <reason>`. A skip without a reason
+# is rejected by tests/test_iac_security.py, because an unexplained skip is how a scanner goes quiet.
+checkov==3.3.11
 
 # Not installable via pip — install separately, see CONTRIBUTING.md:
 #   markdownlint-cli2   npm install -g markdownlint-cli2@0.22.1

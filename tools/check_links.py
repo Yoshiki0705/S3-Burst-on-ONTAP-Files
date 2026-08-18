@@ -194,7 +194,10 @@ PUBLISHED_REPOS = frozenset(
         "FSx-for-ONTAP-Adoption-Playbook",
     }
 )
-OWNER_URL = re.compile(rf"https://github\.com/{OWNER}/([^/#?\s)]+)")
+# The character class excludes quotes and commas as well as the obvious delimiters: in prose and
+# in Python fixtures a URL is routinely followed by one, and capturing it turns a correct name
+# into an unknown one.
+OWNER_URL = re.compile(rf"https://github\.com/{OWNER}/([^/#?\s)\"',]+)")
 
 
 def check_owner_repo(url: str) -> str | None:

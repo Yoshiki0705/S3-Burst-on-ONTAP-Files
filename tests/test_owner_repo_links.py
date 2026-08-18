@@ -26,11 +26,17 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# This file's own fixtures are the shape the corpus check forbids, the same situation the audit
+# handles with a file-level allowance. Excluded by path rather than by pattern, so that a real link
+# added to it would still be a fixture and never a citation.
+SELF = Path(__file__).name
+
+
 def tracked_text_files() -> list[Path]:
     listing = subprocess.run(
         ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout.split()
-    return [ROOT / name for name in listing]
+    return [ROOT / name for name in listing if not name.endswith(SELF)]
 
 
 def test_the_published_list_is_not_empty() -> None:

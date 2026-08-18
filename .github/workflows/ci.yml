@@ -89,6 +89,13 @@ jobs:
           # shellcheck disable=SC2086
           cfn-lint --non-zero-exit-code error $templates
 
+      # Named frameworks, not auto-detection: a gate whose scope depends on the checkov version
+      # cannot tell you whether the change is clean. --skip-download keeps it offline, so the verdict
+      # does not depend on reaching Prisma Cloud's policy endpoint from the runner.
+      - name: Scan templates and workflows for security posture
+        run: |
+          checkov -d . --framework cloudformation --framework github_actions \
+            --compact --quiet --skip-download
       # One pytest process per directory. Patterns each ship their own `functions/` package, so
       # collecting two in a single run resolves the second import of `functions.<name>` to whatever
       # sys.modules cached from the first.

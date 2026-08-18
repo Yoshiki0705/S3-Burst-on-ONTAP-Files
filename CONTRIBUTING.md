@@ -32,6 +32,7 @@ make all     # コミットゲート
 | `make switcher-check` | 言語スイッチャーが実在する言語と一致しているか、他言語へ誘導していないか |
 | `make audit` | 命名・出典マーカー・比較の書き方・個人情報・機構の混同・誇張語 |
 | `make secrets` | gitleaks |
+| `make iac-security` | テンプレートとワークフローのセキュリティ姿勢（checkov）。抑制には `# checkov:skip=<id>: 理由` で理由を必ず書きます |
 | `make zizmor` | ワークフローファイル自体の CI セキュリティ監査（pedantic） |
 | `make links` | 内部リンクの解決（`make links-external` で外部 URL も） |
 | `make budget` | AGENTS.md のサイズと `.kiro/` ローダーの到達性 |
