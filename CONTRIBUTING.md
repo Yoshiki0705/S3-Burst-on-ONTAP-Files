@@ -40,6 +40,11 @@ make all     # コミットゲート
 | `make pattern-status` | 各パターンの README が、定義された 5 つの状態のどれかで始まっているか |
 | `make test` | 検出したテストディレクトリを 1 プロセスずつ |
 
+`make links` は内部リンクだけを見ます。外部 URL は毎週 `.github/workflows/link-rot.yml` が
+`make links-external` と同じ検査を回し、届かない URL があれば Issue に報告します。
+**プルリクエストでは落としません。** 外部サイトの都合で赤くなる検査は、無関係な変更のときに
+赤を無視する習慣を作るためです。手元で確かめるなら `make links-external`（ネットワークが必要）。
+
 ## ドキュメントを書く
 
 - 日本語が正典です。英語は Tier 1（ハブと `docs/i18n-manifest.txt` に列挙したもの）だけ。
