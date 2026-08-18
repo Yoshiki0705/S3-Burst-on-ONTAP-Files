@@ -23,22 +23,34 @@
     "VolumeId": "fsvol-0123456789abcdef0",
 
     "_FileSystemIdentity_comment": [
-      "Every request through the access point is authorized as this one file system identity, so the",
-      "per-file ownership on the volume does not carry into anything reading through it. Scope access",
-      "with the access point policy and IAM, not with file permissions.",
+      "Every request through the access point is authorized as this one file system identity, so",
+      "callers are indistinguishable from each other through it. Restriction lives in two places, and",
+      "both apply: an explicit Deny in the access point policy on the AWS side, and the file",
+      "permissions this identity holds on the volume. Narrowing the Allow is not a restriction --",
+      "within one account the caller's identity policy can grant the action on its own.",
       "",
-      "UNIX pairs with a UNIX security style volume and NFS on the fan-out side. For NTFS and SMB use",
-      "a WINDOWS identity, which requires the SVM to be joined to Active Directory — and then every",
-      "data operation through the access point needs a reachable domain controller. HeadBucket still",
-      "succeeds when the controller is unreachable, so it cannot be used to check that.",
+      "Measured in the sibling repository: with no access point policy attached at all, changing only",
+      "the volume root's uid/gid/mode bits flipped PutObject between AccessDenied and success. So file",
+      "permissions do gate access, and they are the harder of the two to bypass.",
+      "",
+      "The name below is not root on purpose. All requests carry this one identity, so root (uid 0)",
+      "removes the file-permission layer entirely. Create the user on the SVM first and give it",
+      "ownership of the target directory. FileSystemIdentity cannot be changed after creation, so a",
+      "read-only consumer and a writer need separate access points.",
+      "",
+      "The API takes a user *name*, not a uid/gid pair (OntapUnixFileSystemUser has a single Name",
+      "field). UNIX pairs with a UNIX security style volume and NFS on the fan-out side; for NTFS and",
+      "SMB use a WINDOWS identity. Joining the SVM to Active Directory is not required for either --",
+      "a workgroup-mode CIFS server with local users is documented and was measured. But on an",
+      "AD-joined SVM every data operation through the access point needs a reachable domain",
+      "controller, and HeadBucket still succeeds when it is unreachable, so it cannot check that.",
       "",
       "Delete the _comment keys before use."
     ],
     "FileSystemIdentity": {
       "Type": "UNIX",
       "UnixUser": {
-        "Uid": 0,
-        "Gid": 0
+        "Name": "s3ap-writer"
       }
     }
   },

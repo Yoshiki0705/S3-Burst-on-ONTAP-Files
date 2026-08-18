@@ -319,9 +319,15 @@ Outputs:
   PostDeploySteps:
     Description: Steps to complete after stack creation
     Value: !Sub |
-      1. Create S3 Access Point:
+      0. Create the UNIX user on the SVM and give it the target directory (ONTAP CLI):
+         vserver services name-service unix-user create -vserver ${OriginSvmName} \
+           -user s3ap-writer -id 7101 -primary-gid 7100
+         # then, from an NFS client: chown 7101:7100 <mount>/  (the identity below needs write
+         # permission on the volume root -- with no access point policy at all, the mode bits and
+         # owner alone decide whether PutObject succeeds)
+      1. Create S3 Access Point (this one identity authorizes every request; not root on purpose):
          aws fsx create-and-attach-s3-access-point --name s3burst-verify-ap --type ONTAP \
-           --ontap-configuration '{"VolumeId":"${OriginVolume}","FileSystemIdentity":{"Type":"UNIX","UnixUser":{"Name":"root"}}}'
+           --ontap-configuration '{"VolumeId":"${OriginVolume}","FileSystemIdentity":{"Type":"UNIX","UnixUser":{"Name":"s3ap-writer"}}}'
       2. Create cluster peer (SSH to cache cluster management):
          cluster peer create -peer-addrs <origin_intercluster_ip1>,<origin_intercluster_ip2>
       3. Create SVM peer:
