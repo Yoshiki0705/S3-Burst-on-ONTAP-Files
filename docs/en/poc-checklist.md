@@ -30,6 +30,26 @@ jump to 4 or 5.
 
 The stage of each item corresponds to [verification status](verification-status.md).
 
+## Decide pass and fail before measuring
+
+**Decide afterwards and whatever came out becomes a pass.** Write these three down before starting a
+phase, and keep them with the result. A blank among them means the phase is not ready to start.
+
+| To decide | How to write it | What a blank costs |
+|---|---|---|
+| What is measured | One figure or one boolean. Not "is it fast" but "p50 from the `PutObject` response to a successful `open` over NFS on the cache side" | The definition moves between runs and nothing is comparable |
+| The pass line | A threshold drawn from the workload, with the reasoning. "A replay reads 200 files, so above 50 ms per file the preparation exceeds ten seconds, which we cannot absorb" | Whatever came out reads as a pass |
+| What happens on a fail | The move to make, and who decides if there is none | A fail turns into "measure it again" |
+
+**Do not adopt this repository's figures as your pass line.** Phase 1's p50 8 ms was measured in one
+Region over VPC peering under sub-millisecond network latency; a path that reaches a site is a
+different number ([verification status](verification-status.md)). Use it as a reference by running
+the same procedure in your own environment and comparing your own figure against it.
+
+**Not being able to measure is also a result.** "Peering could not be established, so phase 2 was
+never entered" is stronger information than "unverified", and it saves the time of the next person
+down the same path.
+
 ## 1. Whether something written through the S3 Access Point can be read on the cache side
 
 Environment needed: two existing FSx for ONTAP file systems, or FSx for ONTAP and on-premises ONTAP.
@@ -64,13 +84,37 @@ Environment needed: peering with on-premises ONTAP.
 This is the main path. AWS states it as a supported configuration, but it has not been confirmed on
 hardware.
 
+**The peering path is outside this repository.** Neither the Terraform nor the CloudFormation
+creates a cluster or SVM peer. That absence is the most common reason a FlexCache creation fails, so
+settle the preconditions first ([deploying the on-premises side](deployment/onprem-terraform.md)).
+
+Preconditions, before peering
+
+- [ ] Check the on-premises ONTAP version (FlexCache needs 9.5 or later, write-back 9.15.1 or later;
+      [support matrix](support-matrix.md))
+- [ ] Confirm both clusters have intercluster LIFs and can reach each other
+- [ ] Confirm the ports ONTAP cluster peering uses are open along the path -- both the AWS security
+      group and the firewall at the site
+- [ ] Check the MTU along the path. An uneven MTU over Direct Connect or VPN stalls large reads
+- [ ] Measure the round-trip latency of the path first. **It is the baseline for comparing against
+      phase 1**, whose figures were taken under sub-millisecond latency, and it is what explains the
+      difference
+- [ ] Confirm the cache volume can be created as a FlexGroup, which is what a cache is
+
+Steps
+
 - [ ] Establish the cluster peer and the SVM peer
 - [ ] Create the Cache volume
 - [ ] Confirm whether the origin's security style is inherited by the cache
       (the unconfirmed item in [decisions that come first](design-first-decisions.md))
 - [ ] Confirm both UNIX + NFS and NTFS + SMB (mixed is out of scope, being not recommended)
 - [ ] Confirm that only the range actually read is transferred
-- [ ] Confirm the deletion order (whether it releases in the order cache, SVM peer, cluster peer)
+- [ ] **Repeat phase 1's measurement over this path.** Same script, same object size, same
+      `actimeo`. Change the conditions and there is no telling whether the difference is the path or
+      the settings
+- [ ] Record that a second read is faster, meaning it landed in the cache, and by how much
+- [ ] Confirm the deletion order (whether it releases in the order cache, SVM peer, cluster peer).
+      **Do not delete the origin side while a cache still exists**
 
 ## 3. Behaviour as the number of fan-out targets grows
 
