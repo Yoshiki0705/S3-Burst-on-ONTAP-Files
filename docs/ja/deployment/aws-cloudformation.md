@@ -32,10 +32,13 @@
   検証ホストは受信ルールを持たず、キーペアも使いません
 - `aws` CLI が認証済みであること
 
-> **セキュリティに関する補足**: `NTFS` を選ぶ場合、SVM の Active Directory 参加が前提になります。
-> このテンプレートは参加を行いません。AD 参加 SVM では、S3 Access Point 経由の**すべての
-> データ操作**にドメインコントローラーへの到達性が必要です。`HeadBucket` は AD が到達不能でも
-> 成功するため、疎通確認には使えません。確認は必ずデータ操作で行ってください。
+> **セキュリティに関する補足**: `NTFS` を選ぶ場合、SVM に CIFS サーバーが必要です。
+> **このテンプレートは CIFS サーバーの作成も Active Directory 参加も行いません。**
+> AD 参加は必須ではなく、ドメインが利用できない場合は workgroup モードで構成できます
+> （[公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみで Kerberos は非対応）。
+> **AD 参加を選んだ場合**は、S3 Access Point 経由の**すべてのデータ操作**にドメインコントローラーへの
+> 到達性が必要です。`HeadBucket` は AD が到達不能でも成功するため、疎通確認には使えません。
+> 確認は必ずデータ操作で行ってください。
 
 ## 2. スタックの作成
 

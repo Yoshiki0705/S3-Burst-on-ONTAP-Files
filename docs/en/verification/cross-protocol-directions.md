@@ -220,7 +220,7 @@ measurement — and **it does not occur in production, where persistent connecti
 
 - The consume (read) layer of this architecture delivers the same performance over NFS and over SMB
 - The protocol choice follows from the client OS and the security model, not from performance
-- Using SMB requires Active Directory (FSx for ONTAP does not support workgroup mode)
+- Using SMB means the SVM needs a CIFS server. **An Active Directory join is not required** ([workgroup mode procedure](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html); NTLM only, no Kerberos, and no GPO, VSS or SMB3 CA shares). A local Windows user on a workgroup-mode CIFS server has been measured to work as the S3 Access Point's Windows identity ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). **This measurement ran against an AWS Managed AD joined environment; workgroup mode was not tried here**
 - Accessing an Origin with the UNIX security style over SMB applies access control based on UNIX
   permissions rather than NTFS ACLs
 

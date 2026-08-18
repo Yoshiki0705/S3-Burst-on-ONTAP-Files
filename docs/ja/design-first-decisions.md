@@ -40,7 +40,7 @@ Azure NetApp Files のキャッシュボリューム要件が示している対�
 | Origin のセキュリティスタイル | Cache のプロトコル | S3 AP 対応 |
 |---|---|---|
 | UNIX | NFS（SMB も可、name-mapping 必須） | ✅ 対応 |
-| NTFS | SMB（AD 参加 SVM が前提） | ✅ 対応（Windows 識別情報） |
+| NTFS | SMB（SVM に CIFS サーバーが必要） | ✅ 対応（Windows 識別情報） |
 | MIXED | NFS または SMB | ⚠️ 非推奨（下記参照） |
 
 ### MIXED セキュリティスタイルについて
@@ -59,14 +59,21 @@ mixed の問題:
 
 **この構成では mixed を使いません。** UNIX か NTFS のどちらかを選んでください。
 
-FSx for ONTAP 側で S3 Access Point に
-Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）と、UNIX 識別情報を使う構成の
+FSx for ONTAP 側で S3 Access Point に Windows 識別情報を使う構成と UNIX 識別情報を使う構成の
 どちらを採るかが、そのままファンアウト先のプロトコル選択と結びつく。
 
-> **セキュリティに関する補足**: Active Directory 参加 SVM では、S3 Access Point 経由の
+識別情報は、その SVM が名前解決できるユーザーであれば足りる。**どちらの型でも外部の
+ディレクトリサービスは必須ではない。** UNIX 識別情報は LDAP や NIS を使わず SVM のローカルユーザーで、
+Windows 識別情報は workgroup モードの CIFS サーバーに作ったローカルユーザーで、それぞれ読み書きが
+通った実測がある（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。workgroup モードは Active Directory ドメインが利用できない場合の
+代替として公式に手順が示されている（[SMB server in a workgroup](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)）。
+ただし NTLM 認証のみで Kerberos に対応せず、GPO・VSS・SMB3 CA 共有なども対象外になる。
+
+> **セキュリティに関する補足**: Active Directory 参加 SVM を選んだ場合は、S3 Access Point 経由の
 > **すべてのデータ操作**に AD ドメインコントローラーへの到達性が必要になる。`HeadBucket` は
 > AD が到達不能でも成功するため、疎通確認には使えない。到達性の確認は必ずデータ操作で行う。
 > この挙動は姉妹リポジトリで検証済みとして扱っている（[検証状況](verification-status.md)）。
+> **AD 参加を選ばなければ、この依存は生じない。**
 
 ## 同じ要件文が挙げているその他の前提
 
@@ -83,8 +90,10 @@ Windows 識別情報を使う構成（Active Directory 参加 SVM が前提）�
 
 1. **利用拠点のプロトコルを決める** — NFS か SMB か。装置やアプリが決めているなら、それが答え
 2. **Origin のセキュリティスタイルを決める** — 1 に対応するものを選ぶ。UNIX（NFS 主体）か NTFS（SMB 主体）の 2 択。mixed は使わない
-3. **S3 Access Point の識別情報を決める** — 2 と整合させる。NTFS 側を選ぶなら SVM の
-   Active Directory 参加が前提になり、AD 到達性が定常的な依存になる
+3. **S3 Access Point の識別情報を決める** — 2 と整合させる。NTFS 側なら Windows 識別情報、
+   UNIX 側なら UNIX 識別情報で、いずれも SVM が名前解決できるユーザーを先に作る。
+   **Active Directory 参加を選んだ場合に限り、AD 到達性が定常的な依存になる。**
+   識別情報は作成後に変更できないので、書き込み用と読み取り用を分けるならアクセスポイントも分ける
 4. **Origin ボリュームを作る**
 5. **Cache を作る** — この時点でセキュリティスタイルは選べない
 
