@@ -128,8 +128,9 @@ nothing to lose if it does not. Detail and sources are in
 
 > **The end-to-end core is verified with FSx for ONTAP on the cache side too.** An object written to
 > the origin through the S3 Access Point was readable on the FlexCache cache volume over NFS in
-> **p50 14 ms** (2026-08-09, ap-northeast-1, ONTAP 9.18.1P3D1 on both clusters, same-Region VPC
-> peering, NFSv3, UNIX, 64 B, `actimeo=0`, n=30). SMB was measured under the same conditions
+> **p50 8 ms** (2026-08-09, ap-northeast-1, ONTAP 9.18.1P3D1 on both clusters, same-Region VPC
+> peering, NFSv3, UNIX, 64 B, `actimeo=0`, n=30, boto3 persistent session).
+> **The same direction was measured three times and p50 ranges from 7 to 14 ms.** SMB was measured under the same conditions
 > ([FlexCache verification record](verification/flexcache-s3ap-visibility.md),
 > [all directions](verification/cross-protocol-directions.md)).
 >

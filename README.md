@@ -121,8 +121,9 @@ Origin のセキュリティスタイルがファンアウト先のプロトコ�
 
 > **中核の end-to-end は、Cache 側も FSx for ONTAP という条件で検証済みです。**
 > S3 Access Point で Origin に書いたオブジェクトは、FlexCache の Cache ボリューム上の NFS マウントから
-> **p50 14 ms** で読めました（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、
-> 同一リージョンの VPC ピアリング、NFSv3、UNIX、64 B、`actimeo=0`、n=30）。
+> **p50 8 ms** で読めました（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、
+> 同一リージョンの VPC ピアリング、NFSv3、UNIX、64 B、`actimeo=0`、n=30、boto3 の持続セッション）。
+> **同じ方向を 3 回測っており、p50 は 7〜14 ms に散ります。**
 > SMB でも同条件で測っています（[FlexCache 検証記録](docs/ja/verification/flexcache-s3ap-visibility.md)、
 > [全方向比較](docs/ja/verification/cross-protocol-directions.md)）。
 >
