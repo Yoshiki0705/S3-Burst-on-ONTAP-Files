@@ -43,6 +43,25 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM
 ```
 
+### Narrow the test host's permissions after step 1
+
+The access point is created after the stack, so its ARN is not known at first deployment.
+`S3AccessPointArn` therefore defaults to `*`, which grants `PutObject` and `GetObject` on every
+bucket the role can reach. That is tolerable only in an isolated verification account. Once
+`create-and-attach-s3-access-point` has returned an ARN, update the stack with it:
+
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name s3burst-verify \
+  --parameter-overrides S3AccessPointArn=<ACCESS_POINT_ARN> \
+  --capabilities CAPABILITY_IAM
+```
+
+`SmbCredentialSecretName` bounds the Secrets Manager read to one secret. It defaults to
+`s3burst/smb-reader`, matching the `--secret-id` used under [Measure](#measure). If the secret is
+named something else, set the parameter, otherwise `GetSecretValue` is denied.
+
 ## Measure
 
 After completing post-deploy steps, connect to the test host via SSM:
