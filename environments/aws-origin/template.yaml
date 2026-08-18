@@ -119,8 +119,9 @@ Parameters:
       UNIX pairs with NFS on the fan-out side, NTFS pairs with SMB. MIXED is deliberately not
       offered: it is reported as unsupported for cache volumes, and the choice is treated as
       inherited at cache creation time rather than settable on the cache. Decide this before the
-      volume exists — changing it later means rebuilding the serve layer. NTFS additionally requires
-      the SVM to be joined to Active Directory, which this template does not do.
+      volume exists — changing it later means rebuilding the serve layer. NTFS additionally needs a
+      CIFS server on the SVM, which this template does not create; an Active Directory join is one
+      way to get one, workgroup mode is the documented alternative.
 
   DeployVerificationHost:
     Type: String

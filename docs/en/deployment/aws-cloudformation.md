@@ -35,10 +35,12 @@ and [the environments index](../../../environments/README.md) for why.
   host has no inbound rule and no key pair.
 - An authenticated `aws` CLI.
 
-> **Security note**: choosing `NTFS` requires the SVM to be joined to Active Directory, which this
-> template does not do. On an AD-joined SVM **every** data operation through the S3 Access Point
-> needs a reachable domain controller. `HeadBucket` succeeds even when the controller is unreachable,
-> so it cannot be used to check connectivity. Always verify with a data operation.
+> **Security note**: choosing `NTFS` means the SVM needs a CIFS server. **This template creates
+> neither a CIFS server nor an Active Directory join.** Joining AD is not required — where a domain is
+> not available, workgroup mode is the documented alternative ([procedure](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html); NTLM only, no
+> Kerberos). **If you do join AD**, every data operation through the S3 Access Point then needs a
+> reachable domain controller. `HeadBucket` succeeds even when the controller is unreachable, so it
+> cannot be used to check connectivity. Always verify with a data operation.
 
 ## 2. Create the stack
 

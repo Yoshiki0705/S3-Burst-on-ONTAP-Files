@@ -214,7 +214,7 @@ flexcache config modify -vserver snapmirror-s3-test -volume duality_fc_s3en -is-
 
 - この構成の「利用（読み取り）」層は NFS でも SMB でも同じパフォーマンスが得られます
 - プロトコル選択は性能ではなく、クライアント OS とセキュリティモデルで決まります
-- SMB を使う場合は Active Directory が必要です（FSx for ONTAP は workgroup モード非対応）
+- SMB を使う場合、SVM に CIFS サーバーが必要です。**Active Directory 参加は必須ではありません**（[workgroup モードの公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみで Kerberos 非対応、GPO・VSS・SMB3 CA 共有も対象外）。workgroup モードのローカル Windows ユーザーで S3 Access Point の Windows 識別情報が機能した実測があります（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。**この測定は AWS Managed AD 参加の環境で行っており、workgroup モードは試していません**
 - UNIX セキュリティスタイルの Origin に SMB でアクセスする場合、NTFS ACL ではなく
   UNIX パーミッションに基づくアクセス制御が適用されます
 

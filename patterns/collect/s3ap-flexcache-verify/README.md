@@ -52,7 +52,9 @@ sudo python3 /opt/s3burst/measure_visibility.py \
   --output /tmp/results.json
 ```
 
-For SMB measurement (requires AD + CIFS configured on the SVM):
+For SMB measurement (the SVM needs a CIFS server; an Active Directory join is one way to get one,
+[workgroup mode](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html) is the
+documented alternative):
 
 ```bash
 sudo python3 /opt/s3burst/measure_visibility.py \

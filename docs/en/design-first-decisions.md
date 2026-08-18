@@ -44,7 +44,7 @@ Azure NetApp Files' cache volume requirements state the following mapping.
 | Origin security style | Cache protocol | S3 AP support |
 |---|---|---|
 | UNIX | NFS (SMB is also possible, name-mapping required) | ✅ supported |
-| NTFS | SMB (an AD joined SVM is a precondition) | ✅ supported (Windows identity) |
+| NTFS | SMB (the SVM needs a CIFS server) | ✅ supported (Windows identity) |
 | MIXED | NFS or SMB | ⚠️ not recommended (see below) |
 
 ### On the MIXED security style
@@ -65,15 +65,21 @@ The problems with mixed:
 
 **This architecture does not use mixed.** Choose either UNIX or NTFS.
 
-Which identity the S3 Access Point uses on the FSx for ONTAP side — Windows identity, which
-presupposes an Active Directory joined SVM, or UNIX identity — ties directly to the protocol choice on
-the fan-out side.
+Which identity the S3 Access Point uses on the FSx for ONTAP side, Windows or UNIX, ties directly to
+the protocol choice on the fan-out side.
 
-> **Security note**: on an Active Directory joined SVM, **every data operation** through the S3 Access
-> Point needs reachability to an AD domain controller. `HeadBucket` succeeds even when AD is
-> unreachable, so it cannot be used as a connectivity check. Always confirm reachability with a data
-> operation. This behaviour is treated as verified in the sibling repository
-> ([verification status](verification-status.md)).
+The identity only has to be a user the SVM can resolve. **Neither type requires an external directory
+service.** A UNIX identity served reads and writes as an SVM-local user with no LDAP or NIS, and a
+Windows identity did the same as a local user on a workgroup-mode CIFS server ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)).
+Workgroup mode is documented as the alternative when an Active Directory domain is not available
+([SMB server in a workgroup](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)). It supports NTLM authentication only, not Kerberos, and leaves
+out GPO, VSS and SMB3 CA shares among others.
+
+> **Security note**: if you do join the SVM to Active Directory, **every data operation** through the
+> S3 Access Point then needs reachability to an AD domain controller. `HeadBucket` succeeds even when
+> AD is unreachable, so it cannot be used as a connectivity check. Always confirm reachability with a
+> data operation. This behaviour is treated as verified in the sibling repository
+> ([verification status](verification-status.md)). **Not joining AD does not incur this dependency.**
 
 ## Other preconditions the same requirements text lists
 
@@ -93,8 +99,10 @@ for investigation.
    decides it, that is the answer
 2. **Decide the origin's security style** — pick the one matching step 1. UNIX (mainly NFS) or NTFS
    (mainly SMB). mixed is not used
-3. **Decide the S3 Access Point's identity** — make it consistent with step 2. Choosing the NTFS side
-   presupposes joining the SVM to Active Directory, which makes AD reachability a standing dependency
+3. **Decide the S3 Access Point's identity** — make it consistent with step 2: a Windows identity for
+   NTFS, a UNIX identity for UNIX, and in both cases create a user the SVM can resolve first.
+   **Only joining Active Directory makes AD reachability a standing dependency.** The identity cannot
+   be changed after creation, so separate write and read use onto separate access points
 4. **Create the origin volume**
 5. **Create the cache** — at this point the security style is no longer selectable
 
