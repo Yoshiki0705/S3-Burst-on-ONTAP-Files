@@ -12,7 +12,7 @@
 
 ## 対応 S3 オペレーション
 
-FSx for ONTAP の S3 AP は「S3 互換」だが「Amazon S3 と同一」ではない。
+FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon S3 と同一ではない（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)）。
 
 ### 動作確認済み
 

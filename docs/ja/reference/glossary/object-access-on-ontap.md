@@ -16,7 +16,7 @@
 | ONTAP S3（native bucket） | NetApp | ONTAP 自身が S3 オブジェクトサーバとして専用バケットを提供する | ONTAP 9.8 以降、AFF / FAS / ONTAP Select。S3 ライセンスは無償だが必要（[対応プラットフォーム](https://docs.netapp.com/us-en/ontap/s3-config/ontap-version-support-s3-concept.html)） | 参考。AWS 外に収集層を置く場合の対応物 |
 | ONTAP S3 NAS bucket（S3 マルチプロトコル） | NetApp | **既存の** NFS / SMB ボリュームのディレクトリを S3 バケットとして写像する | ONTAP 9.12.1 以降（[概要](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/index.html)） | 参考。同上 |
 | FlexCache duality | NetApp | **Cache ボリューム**に ONTAP 自身の S3 アクセスを許可する | ONTAP 9.18.1 以降、`-is-s3-enabled true`（[FlexCache duality](https://docs.netapp.com/us-en/ontap/flexcache/enable-flexcache-duality.html)） | **使わない。** 1 行目とは別の機構であり、同一視しない |
-| object REST API | Microsoft | Azure NetApp Files のディレクトリを S3 互換バケットとして写像する | [object REST API](https://learn.microsoft.com/en-us/azure/azure-netapp-files/object-rest-api-introduction)。キャッシュボリュームでは非対応 | 参考 |
+| object REST API | Microsoft | Azure NetApp Files のディレクトリを、S3 API で読み書きできるバケットとして写像する | [object REST API](https://learn.microsoft.com/en-us/azure/azure-netapp-files/object-rest-api-introduction)。キャッシュボリュームでは非対応 | 参考 |
 | S3 multiprotocol | Google | Google Cloud NetApp Volumes で S3 アクセスを提供する | ONTAP モードのみ（[概要](https://docs.cloud.google.com/netapp/volumes/docs/discover/overview)） | 参考 |
 
 ## 混同すると何を間違えるか

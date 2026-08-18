@@ -114,7 +114,7 @@ Get Started, so it is kept apart from the other design decisions.
 
 ## What this architecture does not solve
 
-"S3-compatible" is not "identical to S3". Being able to tell early which workloads do not apply
+**An S3 Access Point attached to FSx for ONTAP supports a subset of the S3 API, not the whole of Amazon S3** ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)). Being able to tell early which workloads do not apply
 accounts for half the value of considering this architecture.
 
 | Expectation | Reality |

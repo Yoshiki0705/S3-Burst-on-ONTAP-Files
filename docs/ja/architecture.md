@@ -100,7 +100,7 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 
 ## この構成が解かないこと
 
-「S3 互換」は「S3 と同一」ではない。適用できないワークロードを早い段階で判別できることは、
+**FSx for ONTAP に接続された S3 Access Point が対応するのは S3 API の一部で、Amazon S3 の全機能ではない**（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)）。適用できないワークロードを早い段階で判別できることは、
 この構成を検討する価値の半分を占める。
 
 | 期待 | 実際 |

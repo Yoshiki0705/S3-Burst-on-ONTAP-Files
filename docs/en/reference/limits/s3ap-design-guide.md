@@ -17,7 +17,7 @@ Point). The limits are on [a separate page](s3-access-point.md); the architectur
 
 ## Supported S3 operations
 
-The FSx for ONTAP S3 AP is "S3 compatible" but not "identical to Amazon S3".
+The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to Amazon S3 ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)).
 
 ### Confirmed working
 

@@ -20,7 +20,7 @@ considering portability or a future variant.
 | ONTAP S3 (native bucket) | NetApp | ONTAP itself acts as an S3 object server and serves a dedicated bucket | ONTAP 9.8 or later, AFF / FAS / ONTAP Select. The S3 licence is free but required ([supported platforms](https://docs.netapp.com/us-en/ontap/s3-config/ontap-version-support-s3-concept.html)) | Reference. The counterpart when the collect layer sits outside AWS |
 | ONTAP S3 NAS bucket (S3 multiprotocol) | NetApp | Maps a directory in an **existing** NFS / SMB volume as an S3 bucket | ONTAP 9.12.1 or later ([overview](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/index.html)) | Reference. As above |
 | FlexCache duality | NetApp | Permits ONTAP's own S3 access on the **cache volume** | ONTAP 9.18.1 or later, `-is-s3-enabled true` ([FlexCache duality](https://docs.netapp.com/us-en/ontap/flexcache/enable-flexcache-duality.html)) | **Not used.** These are separate mechanisms from the first row and are never treated as one |
-| object REST API | Microsoft | Maps an Azure NetApp Files directory as an S3-compatible bucket | [object REST API](https://learn.microsoft.com/en-us/azure/azure-netapp-files/object-rest-api-introduction). Not supported on cache volumes | Reference |
+| object REST API | Microsoft | Maps an Azure NetApp Files directory as a bucket readable and writable over the S3 API | [object REST API](https://learn.microsoft.com/en-us/azure/azure-netapp-files/object-rest-api-introduction). Not supported on cache volumes | Reference |
 | S3 multiprotocol | Google | Provides S3 access on Google Cloud NetApp Volumes | ONTAP mode only ([overview](https://docs.cloud.google.com/netapp/volumes/docs/discover/overview)) | Reference |
 
 ## What conflating them gets wrong
