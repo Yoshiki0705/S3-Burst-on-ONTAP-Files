@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- audit-file-allow: naming,neutrality,conflation,pii -->
+<!-- audit-file-allow: naming,neutrality,conflation,pii,hype -->
 <!-- This document defines the naming, neutrality, conflation and public-output rules, so it
      necessarily quotes the shapes it forbids. The file-level allowance above exempts it from the
      audit that enforces those rules everywhere else. Do not copy this declaration into a content
@@ -96,8 +96,8 @@ sets widen between releases. Install the pinned version instead of working past 
 
 State each option's exclusion conditions at the same granularity, this architecture's own included.
 Then a reader can choose. Do not announce that the comparison is even-handed: `make audit` rejects
-the words for it, because a sentence declaring even-handedness reads as a defence and invites the
-framing it is trying to avoid.
+the words for it, since declaring even-handedness reads as a defence and invites the framing it
+avoids.
 
 Forbidden: `beats X`, `X is inferior`, `competing tools`, `競合ツール`, `より優れて`, `優位性`,
 `game-changer`, `best-in-class`, and any vendor-versus positioning. Every comparison carries a
@@ -114,6 +114,9 @@ Four stages, defined in [docs/ja/verification-status.md](docs/ja/verification-st
 - Numbers are meaningless without the environment. A performance or cost figure needs the date,
   Region, ONTAP version, file system generation and throughput configuration, object size and
   concurrency, and what was measured. **If it was not measured, it is not written.**
+- Degree goes in figures, not adjectives: `make audit` rejects intensifiers (`大幅に`, `seamless`,
+  `zero-copy`, `リアルタイム`) because each stands in for a number that should be there instead, or
+  for one that does not exist. What this architecture removes is the copy *job*, not the movement.
 - Separate "sample run" from "production estimate", and "design consideration" from
   "legal / compliance judgement".
 - Lowering a stage needs no justification. Raising one needs the evidence attached.

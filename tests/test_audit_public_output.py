@@ -197,6 +197,49 @@ def test_a_topic_labeled_callout_passes() -> None:
         assert "role-label" not in categories(line)
 
 
+# --- hype --------------------------------------------------------------------------------------
+
+
+def test_an_intensifier_standing_in_for_a_figure_is_flagged() -> None:
+    for line in (
+        "スループットが劇的に向上します。",
+        "レイテンシが大幅に下がります。",
+        "Throughput improves dramatically.",
+        "Reads are blazingly fast.",
+    ):
+        assert "hype" in categories(line), line
+
+
+def test_the_claims_this_repository_kept_making_are_flagged() -> None:
+    """The four this repository actually shipped, in its README and in two published articles."""
+    for line in (
+        "ゼロコピーで配布します。",
+        "A zero-copy architecture.",
+        "リアルタイムに反映されます。",
+        "追加コストなしで利用できます。",
+        "Available at no extra cost.",
+        "シームレスに連携します。",
+        "Seamlessly integrates with the pipeline.",
+    ):
+        assert "hype" in categories(line), line
+
+
+def test_a_figure_with_its_environment_passes() -> None:
+    """The replacement the messages ask for must not itself be a finding."""
+    for line in (
+        "p50 8 ms（ap-northeast-1、ONTAP 9.18.1P3D1、NFSv3、64 B、n=30）。",
+        "3.2x faster: 120 to 385 MB/s in the same environment.",
+        "AZ 障害では自動フェイルオーバし、RPO は 0 です。",
+        "No copy job runs between the two layers; FlexCache pulls what is read.",
+    ):
+        assert "hype" not in categories(line), line
+
+
+def test_the_category_can_be_suppressed_on_a_line() -> None:
+    """A review document has to quote the shape it forbids."""
+    assert "hype" not in categories("劇的に速い <!-- allow:hype -->")
+
+
 # --- escape hatches ----------------------------------------------------------------------------
 
 

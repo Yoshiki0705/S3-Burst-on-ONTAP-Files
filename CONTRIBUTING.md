@@ -30,7 +30,7 @@ make all     # コミットゲート
 | `make lint` | Markdown / Python / CloudFormation |
 | `make i18n-check` | 日本語版と英語版の節構成が一致しているか |
 | `make switcher-check` | 言語スイッチャーが実在する言語と一致しているか、他言語へ誘導していないか |
-| `make audit` | 命名・出典マーカー・比較の書き方・個人情報・機構の混同 |
+| `make audit` | 命名・出典マーカー・比較の書き方・個人情報・機構の混同・誇張語 |
 | `make secrets` | gitleaks |
 | `make zizmor` | ワークフローファイル自体の CI セキュリティ監査（pedantic） |
 | `make links` | 内部リンクの解決（`make links-external` で外部 URL も） |

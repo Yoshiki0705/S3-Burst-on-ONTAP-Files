@@ -18,6 +18,13 @@ Divergences, all additive:
   Point to a volume are separate mechanisms. Treating one as evidence for the other is the single
   most likely factual error in this repository, so a line naming both must also say they differ.
 
+* **`hype` category.** Degree stated as an adjective rather than a figure. This repository's rule is
+  that a performance or cost claim carries the number and the environment it was measured in, and
+  that an unmeasured one is not written -- which makes an intensifier a signal either that a
+  measured figure is being paraphrased, or that there is no figure at all. `ゼロコピー` /
+  `zero-copy` is included for a second reason: what this architecture removes is the copy *job*, not
+  the data movement, since FlexCache pulls what is read.
+
 Escape hatches, because there are two genuinely different reasons for a false positive.
 
 Line level - a single line legitimately contains a flagged pattern:
@@ -64,9 +71,17 @@ SKIP_DIRS = (
 )
 SCAN_SUFFIXES = {".md", ".txt", ".yml", ".yaml", ".json"}
 
-CATEGORIES = ("naming", "vendor-ref", "neutrality", "pii", "role-label", "conflation")
+CATEGORIES = (
+    "naming",
+    "vendor-ref",
+    "neutrality",
+    "pii",
+    "role-label",
+    "conflation",
+    "hype",
+)
 ALLOW = re.compile(
-    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|all)"
+    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|hype|all)"
 )
 # Bounded so the trailing "-->" of the HTML comment is not swallowed into the category list.
 FILE_ALLOW = re.compile(r"audit-file-allow:\s*([a-z-]+(?:\s*,\s*[a-z-]+)*)")
@@ -139,6 +154,77 @@ NEUTRALITY_RULES: list[tuple[re.Pattern[str], str]] = [
         ),
     ),
 ]
+
+# ---------------------------------------------------------------- hype
+
+# Degree stated as an adjective rather than a figure. The rule in this repository is that a
+# performance or cost claim carries the number and the environment it was measured in, and that an
+# unmeasured one is not written at all -- so an intensifier is standing in either for a number that
+# exists, and should be there instead, or for one that does not, in which case the claim should go.
+#
+# Deliberately narrow. Words that name a property the surrounding text then substantiates are not
+# listed: "resilient", followed by what fails over and what the RPO is, is a claim a reader can
+# check. A rule that fired on that would teach contributors to suppress the category instead of
+# reading the message, which costs more than the rule saves.
+HYPE_RULES: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r"劇的|飛躍的|画期的|圧倒的|究極|最強|革命的|驚異的"),
+        "state the figure and its environment instead of the degree",
+    ),
+    (
+        re.compile(r"大幅(に|な)|著しく|格段に"),
+        "quantify it: how much, measured how, in what environment",
+    ),
+    (
+        re.compile(r"シームレス|魔法のように"),
+        "say which manual step stops being necessary",
+    ),
+    (
+        re.compile(r"堅牢|強固"),
+        "say what happens on failure instead: what fails over, what the RPO is",
+    ),
+    (
+        re.compile(r"ゼロコピー|\bzero[- ]copy\b", re.IGNORECASE),
+        (
+            "say what is not created instead: there is no copy job between the two layers, "
+            "which is not the same as no data movement -- FlexCache pulls what is read"
+        ),
+    ),
+    (
+        re.compile(r"リアルタイム|\breal[- ]time\b", re.IGNORECASE),
+        "state the latency the design needs as a figure, and what was measured against it",
+    ),
+    (
+        re.compile(
+            r"追加(コスト|費用)なし|\b(?:no additional cost|at no extra cost)\b",
+            re.IGNORECASE,
+        ),
+        "name the charge that does not apply, and the ones that still do",
+    ),
+    (
+        re.compile(
+            r"\b(?:dramatic(?:ally)?|drastically|blazing(?:ly)?|lightning[- ]fast"
+            r"|effortless(?:ly)?|supercharges?)\b",
+            re.IGNORECASE,
+        ),
+        "state the figure and its environment instead of the degree",
+    ),
+    (
+        re.compile(
+            r"\b(?:seamless(?:ly)?|frictionless|zero[- ]effort)\b", re.IGNORECASE
+        ),
+        "say which manual step stops being necessary",
+    ),
+    (
+        re.compile(
+            r"\b(?:revolutionary|unparalleled|unmatched|world[- ]class"
+            r"|state[- ]of[- ]the[- ]art|cutting[- ]edge|bulletproof|rock[- ]solid)\b",
+            re.IGNORECASE,
+        ),
+        "drop the superlative; show the property with a figure or a behaviour",
+    ),
+]
+
 
 # ---------------------------------------------------------------- conflation
 
@@ -252,6 +338,10 @@ def audit_line(
         for pattern, message in NEUTRALITY_RULES:
             if pattern.search(line):
                 findings.append(("neutrality", message))
+    if "hype" not in allowed:
+        for pattern, message in HYPE_RULES:
+            if pattern.search(line):
+                findings.append(("hype", message))
 
     if "pii" not in allowed:
         for pattern, message in PII_RULES:
