@@ -11,7 +11,9 @@
 > **Implementation patterns for collecting data over an Amazon FSx for NetApp ONTAP S3 Access Point,
 > keeping the origin volume as the source of truth, and serving it on demand to NFS / SMB consuming
 > sites through FlexCache — with no separate copy or scheduled replication job between the two.**
-> The collect side can stay on the S3 API and the consume side on NFS / SMB.
+> The collect side can stay on the S3 API and the consume side on NFS / SMB. **Speaking S3 is not
+> sufficient on its own**: whether an application or AWS service accepts an access point ARN or alias,
+> and whether the operations it needs are supported, has to be checked case by case.
 >
 > **Nothing is copied up front: data that gets read is pulled into the FlexCache cache on demand.**
 > "No copy job" is not "no data transfer". Transfer happens for the range that is read, and the cache
