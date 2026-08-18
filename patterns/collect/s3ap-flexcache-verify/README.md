@@ -64,15 +64,20 @@ For SMB measurement (the SVM needs a CIFS server; an Active Directory join is on
 [workgroup mode](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html) is the
 documented alternative):
 
+The password is not a command-line argument. Supply it through the environment, or from Secrets
+Manager with `--smb-cred-secret`. Use an account that can read the share; an administrator is not
+needed.
+
 ```bash
-sudo python3 /opt/s3burst/measure_visibility.py \
+sudo SMB_PASSWORD="$(aws secretsmanager get-secret-value \
+  --secret-id s3burst/smb-reader --query SecretString --output text)" \
+  python3 /opt/s3burst/measure_visibility.py \
   --s3ap-alias <S3_AP_ALIAS> \
   --nfs-lif <CACHE_DATA_LIF_IP> \
   --fc-path /s3burst_verify_fc \
   --origin-path /s3burst_verify \
   --smb-share smbtest \
-  --smb-user "DOMAIN\\Admin" \
-  --smb-pass "Password" \
+  --smb-user "DOMAIN\\smbreader" \
   --output /tmp/results.json
 ```
 
