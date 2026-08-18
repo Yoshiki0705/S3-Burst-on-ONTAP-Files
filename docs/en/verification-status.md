@@ -19,6 +19,24 @@ stage is stated explicitly and nothing unverified is written in the assertive fo
 
 "The documentation says so" and "it works" are different claims. Do not cite the first as the second.
 
+## The scope of the central claim
+
+The central claim of this architecture is when an object written to the origin through the S3 Access
+Point becomes readable over NFS / SMB on a FlexCache cache volume. **The verified scope and the
+unverified scope are stated separately.**
+
+| Scope | Stage |
+|---|---|
+| Cache on **FSx for ONTAP** (same Region, VPC peering), NFSv3, UNIX, 64 B, `actimeo=0` | **verified** (2026-08-09, ap-northeast-1, ONTAP 9.18.1P3D1 on both clusters, n=30) |
+| The same conditions over SMB (AWS Managed AD joined, `cache=none`) | **verified** (2026-08-10, same environment, n=30) |
+| Cache on **on-premises ONTAP** (this architecture's main path) | **unverified**. Present in AWS's supported configurations, not followed through on hardware |
+| A remote site or a high-latency path | Unverified. The measurement ran under sub-millisecond network latency |
+| NTFS security style, mount options other than `actimeo=0`, more than one cache | Unverified |
+
+**Do not state "the central claim is verified" in one word.** What was verified had FSx for ONTAP on
+the cache side too; the on-premises ONTAP cache held out as the main path is unverified. This section
+is the single source for the stage, and other documents link here.
+
 ## Current state
 
 | Item | Stage | Basis |

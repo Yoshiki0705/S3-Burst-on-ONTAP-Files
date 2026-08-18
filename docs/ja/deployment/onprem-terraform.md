@@ -111,9 +111,11 @@ sudo mount -t nfs -o nfsvers=3,actimeo=0 <cache-svm-nfs-ip>:/cache_vol /mnt/cach
 クライアントが既に一覧を取得したディレクトリに現れたファイルが最大 1 分見えないことがあります。
 これは収集側で実測しています（[検証記録](../verification/s3ap-nfs-visibility.md)）。
 
-> **未検証であることの明示**: **S3 Access Point 経由で書いたオブジェクトが、この Cache
-> ボリューム側でいつ見えるようになるかは未検証です。** 実測して公開しているのは Origin
-> ボリューム自体を両プロトコルから読み書きした場合の値で、別の問いです。
+> **未検証であることの明示**: S3 Access Point 経由で書いたオブジェクトが Cache 側の NFS で読めることは、
+> **Cache 側も FSx for ONTAP という条件で検証済みです**
+> （[FlexCache 検証記録](../verification/flexcache-s3ap-visibility.md)）。
+> **このガイドが対象とするオンプレミス ONTAP を Cache にした場合は未検証です。**
+> 経路の遅延も、セキュリティスタイルの継承も、そこで初めて確かめられます。
 > ここで観測した値は[検証状況](../verification-status.md)に環境情報と併せて記録してください。
 > 否定的な結果も同じ価値があります。
 

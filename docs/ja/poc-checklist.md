@@ -29,6 +29,11 @@
 必要な環境: 既存の FSx for ONTAP 2 台、または FSx for ONTAP とオンプレミス ONTAP。
 これが未解決だと、「収集した直後に現場で読めるのか」に答えられない。構成の中核である。
 
+**FSx for ONTAP を 2 台使う形は検証済みで、下のチェック項目は済んでいる**
+（[FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)、NFSv3 / SMB、UNIX、64 B、
+`actimeo=0`）。**自分の環境で、または Cache をオンプレミス ONTAP に置いて確かめる場合は
+そのまま使える。** 残っている条件は[検証状況](verification-status.md)の「中核の検証範囲」にある。
+
 - [ ] Origin ボリュームに S3 Access Point を接続する
 - [ ] `PutObject` でオブジェクトを書く
 - [ ] Cache 側の NFS / SMB マウントから同じファイルが見えることを確認する

@@ -1,6 +1,6 @@
 # S3 Burst on ONTAP Files
 
-![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) ![core claim](https://img.shields.io/badge/core%20claim-verified-brightgreen)
+![docs](https://img.shields.io/badge/docs-lint%20passing-brightgreen) ![i18n](https://img.shields.io/badge/i18n-ja%20%2F%20en-blue) ![license](https://img.shields.io/badge/license-MIT-blue) [![verification](https://img.shields.io/badge/verification-scope%20per%20claim-blue)](verification-status.md)
 
 <!-- lang-switcher:start -->
 🌐 [日本語](../../README.md) | [English](README.md)
@@ -126,13 +126,17 @@ nothing to lose if it does not. Detail and sources are in
 | Read the measured figures and their conditions | [Verification record](verification/s3ap-nfs-visibility.md) | 10 min |
 | Confirm it on real hardware | [PoC checklist](poc-checklist.md) | 10 min |
 
-> **The central claim of this architecture is verified.** An object written to the origin through
-> the S3 Access Point is readable on the FlexCache cache volume over NFS in **p50 14 ms**
-> (ONTAP 9.18.1P3D1, same-Region VPC peering, `actimeo=0`, n=30). FlexCache adds approximately
-> +5 ms over reading the same volume directly.
-> Full results: [FlexCache verification record](verification/flexcache-s3ap-visibility.md). The difference between "unverified" and "unconfirmed" is stated explicitly in
-> [Verification status](verification-status.md). Performance and cost figures that were not
-> measured are not published here.
+> **The end-to-end core is verified with FSx for ONTAP on the cache side too.** An object written to
+> the origin through the S3 Access Point was readable on the FlexCache cache volume over NFS in
+> **p50 14 ms** (2026-08-09, ap-northeast-1, ONTAP 9.18.1P3D1 on both clusters, same-Region VPC
+> peering, NFSv3, UNIX, 64 B, `actimeo=0`, n=30). SMB was measured under the same conditions
+> ([FlexCache verification record](verification/flexcache-s3ap-visibility.md),
+> [all directions](verification/cross-protocol-directions.md)).
+>
+> **The main path this repository holds out — the cache on on-premises ONTAP — is unverified.** So are
+> remote or high-latency paths, NTFS, and more than one cache. The verified and unverified scopes are
+> collected in one place in [Verification status](verification-status.md). Performance and cost
+> figures that were not measured are not published here.
 
 ## Implementation patterns
 
@@ -243,8 +247,9 @@ that exist. Translated terms and the do-not-translate list are in
 | [`AGENTS.md`](../../AGENTS.md) | Conventions, prohibitions, verification steps |
 | [`docs/ja/verification-status.md`](verification-status.md) | The stage of each claim (verified / documented / unverified / unconfirmed) |
 
-**If you quote this repository**: its central claim is unverified. Do not cite content as
-established fact without checking its stage. "Unconfirmed" does not mean "unsupported". Numbers are
+**If you quote this repository**: the stage differs per claim. The end-to-end core is verified with
+FSx for ONTAP on the cache side, but **the main path — the cache on on-premises ONTAP — is
+unverified.** Do not cite content as established fact without checking its stage. "Unconfirmed" does not mean "unsupported". Numbers are
 only meaningful together with the environment they were measured in — Region, ONTAP version,
 configuration, object size, concurrency.
 

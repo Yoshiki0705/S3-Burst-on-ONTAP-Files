@@ -86,7 +86,7 @@ For reading large objects from Linux on AWS, it can come out cheaper than this a
 | Write path | The cache is writable. The default write-around responds only once the origin has committed, so its latency is high; write-back (ONTAP 9.15.1 or later) commits on the cache and writes to the origin asynchronously ([replication with FlexCache](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)). This architecture is described on the premise that collection is consolidated on the origin through the S3 Access Point |
 | Object access on the cache side | Not provided. If a site needs the S3 API, consider a different architecture |
 | Version prerequisites | The collect layer needs ONTAP 9.17.1 or later. If an existing cluster is below that, an upgrade has to be considered first |
-| The unverified core | The behaviour until something written is readable on the cache side is unverified ([verification status](../../verification-status.md)) |
+| The unverified scope | The behaviour until something written is readable on the cache side is verified with FSx for ONTAP on the cache side. **With on-premises ONTAP as the cache — the main path — it is unverified** ([verification status](../../verification-status.md)) |
 | Ordering in the design | The consuming side's protocol has to be decided before the origin is created ([decisions that come first](../../design-first-decisions.md)) |
 
 ## Breaking the problem down by axis

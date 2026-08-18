@@ -78,7 +78,7 @@ S3 を正典に保ったまま、ファイルシステムのセマンティク�
 | 書き込み経路 | Cache は書き込み可能。既定の write-around は Origin が確定してから応答するため遅延が大きく、write-back (ONTAP 9.15.1 以降) は Cache で確定して Origin へ非同期に書く ([FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html))。この構成は収集を S3 AP で Origin に集約する前提で説明している |
 | Cache 側のオブジェクトアクセス | 提供しない。拠点で S3 API が必要なら別の構成を検討する |
 | 前提となるバージョン | 収集層に ONTAP 9.17.1 以降が必要。既存クラスタが下回る場合は先にアップグレードの検討が要る |
-| 未検証の中核 | 書いたものが Cache 側で読めるまでの挙動は未検証（[検証状況](../../verification-status.md)） |
+| 未検証の範囲 | 書いたものが Cache 側で読めるまでの挙動は、Cache 側も FSx for ONTAP なら検証済み。**主経路であるオンプレミス ONTAP Cache は未検証**（[検証状況](../../verification-status.md)） |
 | 設計の前後関係 | 利用側のプロトコルを Origin 作成前に決める必要がある（[最初に決めること](../../design-first-decisions.md)） |
 
 ## 課題を軸で分解する

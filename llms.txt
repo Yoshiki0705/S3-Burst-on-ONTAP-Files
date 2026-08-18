@@ -35,9 +35,14 @@ Do not present unverified or unconfirmed content as established fact, and do not
 without the environment it was measured in. Performance and cost figures are omitted rather than
 estimated: if it was not measured, it is not written.
 
-The central claim of the architecture — how and when an object written through the S3 Access Point
-becomes visible over NFS / SMB on the cache side — is currently **unverified** and is the first item
-on the PoC checklist.
+The central claim of the architecture is how and when an object written through the S3 Access Point
+becomes visible over NFS / SMB on the cache side. **The stage differs by scope, so do not restate it
+in one word.** With FSx for ONTAP on the cache side in one Region it is **verified** (2026-08-09,
+ap-northeast-1, ONTAP 9.18.1P3D1, NFSv3 and SMB, `actimeo=0`, n=30). With the cache on on-premises
+ONTAP — the main path this repository holds out — it is **unverified**, as are remote or high-latency
+paths, NTFS, and more than one cache. The scopes are listed in one place under "The scope of the
+central claim" in the verification status document, which is where any restatement should be checked
+against.
 
 ## Entry points
 
