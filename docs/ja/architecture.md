@@ -75,8 +75,14 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 ## この構成が解くこと
 
 - 収集を S3 API で受けつつ、利用側は NFS / SMB のまま。両者の間にコピージョブを置かない
-- 権限の起点を 1 つに保つ。オブジェクト側の認可は「どのファイルシステム識別情報を代行するか」に
-  還元される（[FSx for ONTAP の二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)）
+- 書き込み経路を Origin 側の S3 Access Point に集約できる。**ただし認可は単一層ではない。**
+  独立した 2 層を順に通り、両方を通らなければデータに届かない。Layer 1（AWS 側）は呼び出し元の
+  プリンシパルと `s3:` アクションを評価し、絞り込みを担うのは**明示的な拒否**である。
+  同一アカウントでは identity-based ポリシーとアクセスポイントポリシーが結合されるため、
+  `Allow` を狭く書くことは絞り込みにならない。Layer 2（ファイルシステム側）はアクセスポイントに
+  固定した識別情報が持つファイル権限（mode bits / ACL）を評価する。**層をまたいだ引き算は起きない**
+  （[二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)、
+  および両層の実測記録: [S3 Access Point の権限設計](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）
 - 読み取りの局所化。必要な範囲だけを利用拠点に持ち込む
 - 収集層を別のプラットフォームに置き換えても、配布層の設計が変わらない
   （[移植性](portability.md)）

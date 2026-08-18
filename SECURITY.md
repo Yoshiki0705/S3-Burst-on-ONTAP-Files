@@ -33,12 +33,18 @@ AWS のサービス自体、または ONTAP 製品自体の脆弱性は、それ
 これは意図的で、動く広い権限を置くと、そのまま本番に届くためです。
 
 デプロイする前に、そのパターンが実際に必要とする最小権限に置き換えてください。
-FSx for ONTAP に対する S3 呼び出しはアクセスポイント形式の ARN が必要で、
-バケット形式の ARN では動きません。オブジェクト操作には `/object/*` を付けます。
+FSx for ONTAP に対する S3 呼び出しでは、アクセスポイント形式の ARN
+（`arn:aws:s3:<region>:<account>:accesspoint/<name>`、オブジェクト操作には `/object/*` を付ける）を
+使います。バケット形式の ARN では動かないと報告されていますが、このリポジトリでは確認していません
+（[姉妹リポジトリの認可モデル](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/s3ap-authorization-model.md)）。
 
 認可は二層です。AWS 側（IAM とアクセスポイントポリシー）と
 ONTAP 側（ファイルシステム識別情報）の両方が許可する必要があります。
 片方だけを絞っても、もう片方が広ければ実効権限は広いままです。
+
+**AWS 側で絞るのは明示的な拒否です。** 同一アカウントでは identity-based ポリシーと
+アクセスポイントポリシーが結合されるため、`Allow` を狭く書くことは絞り込みになりません
+（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。
 
 ## 不可逆操作
 
