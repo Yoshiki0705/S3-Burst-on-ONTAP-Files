@@ -231,8 +231,18 @@ done
 
 ### inotifywait / FPolicy イベント
 
-リアルタイム処理が必要な場合は、NFS 側で `inotifywait` またはサーバー側で FPolicy イベントを
-使い、「ファイルが現れたら処理」のイベント駆動にする。ポーリング（定期的な `ls`）はスケールしない。
+検出の遅れを詰めたい場合は、「ファイルが現れたら処理」のイベント駆動にする。ただし
+**`inotify` はこの構成では使えない。** `inotify` はローカルカーネルの VFS を見る仕組みで、
+ネットワークファイルシステムを監視している場合、**変更がリモートで行われたイベントは通知されない**
+（[inotify(7)](https://man7.org/linux/man-pages/man7/inotify.7.html)）。この構成の書き込みは S3 Access Point 経由で Origin に届き、
+Cache は後からそれを取り込むため、Cache をマウントしているクライアントの `inotify` は発火しない。
+
+サーバー側で検出する場合は [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html)になる。**この構成では未検証である。**
+FPolicy が S3 Access Point 経由の書き込みをイベントとして扱うか、Cache 側で発火するかは
+確かめていない。検証していない機構を前提に設計しないこと。
+
+ポーリング（定期的な `ls`）はコストがディレクトリのエントリ数に比例して増える。
+[ディレクトリあたりのファイル数](#ディレクトリ設計)で分割してあれば実用になる。
 
 ## マルチプロトコル一貫性
 

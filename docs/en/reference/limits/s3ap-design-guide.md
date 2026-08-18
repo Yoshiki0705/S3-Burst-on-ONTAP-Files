@@ -239,9 +239,18 @@ done
 
 ### inotifywait / FPolicy events
 
-Where real-time processing is needed, use `inotifywait` on the NFS side or FPolicy events on the
-server side to make it event driven: process the file when it appears. Polling with a periodic `ls`
-does not scale.
+To shorten the delay before a file is noticed, make it event driven: process the file when it
+appears. **`inotify` cannot do that here.** It watches the local kernel's VFS, and when watching a
+network filesystem, **events are not reported if the change was made on a remote system**
+([inotify(7)](https://man7.org/linux/man-pages/man7/inotify.7.html)). Writes in this architecture arrive at the origin over the S3 Access Point
+and the cache pulls them in afterwards, so `inotify` on a client mounting the cache does not fire.
+
+Detecting server-side means [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html). **That is unverified here.** Whether FPolicy treats
+a write arriving over the S3 Access Point as an event, and whether it fires on the cache side, has
+not been checked. Do not design on a mechanism that has not been verified.
+
+Polling with a periodic `ls` costs in proportion to the number of directory entries. It is workable
+where the tree is split as described under [directory design](#directory-design).
 
 ## Multiprotocol consistency
 
