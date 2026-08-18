@@ -53,10 +53,22 @@ FSx for ONTAP の S3 AP は「S3 互換」だが「Amazon S3 と同一」では�
 
 ### Presigned URL
 
-公開ドキュメントは「Not supported」と記載するが、ONTAP レイヤーでは動作する
-（9.11.1 以降で SigV4、9.16.1 以降で SigV2 + SigV4）。
-AWS サポートがドキュメント修正を提出済みだが**未公開**。
-本番ワークロードでの依存は非推奨。
+**公式対応表は現時点で `Presign — Not supported` と記載している**（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)）。
+
+一方で、presigning はクライアント側の署名計算であってサーバーへの API 呼び出しではない。
+生成された URL が実行するのは通常の `GetObject` で、署名が Authorization ヘッダーではなく
+クエリパラメータに入るだけである。`GetObject` は対応済みなので、`GetObject` 自体を壊さずに
+presigned URL 経由だけを止めることはできない。姉妹リポジトリでは `GetObject` の presigned URL が
+成功することを実測している（ONTAP 9.18.1P3D1）。ONTAP のバージョン別のサポート範囲は
+NetApp KB に記載がある（9.11.1 以降で v4、9.16.1 以降で v2 + v4）。
+機構の説明、バージョン要件、代替手段の一覧は
+[姉妹リポジトリの互換性ノート](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/s3ap-compatibility-notes.md)にある。
+
+**公開ドキュメントが `Not supported` としている間は、本番ワークロードを依存させない。**
+非推奨通知なしに挙動が変わる可能性がある。時間制限つきのアクセスが必要なら、
+API Gateway + Lambda、CloudFront signed URL、一時的な STS 認証情報のいずれかを設計する。
+実測されているのは `GetObject` で、**`PutObject` と `HeadObject` は未検証**である。
+この構成の経路では presigned URL を使わない。
 
 ## 並行度とスループットの設計
 

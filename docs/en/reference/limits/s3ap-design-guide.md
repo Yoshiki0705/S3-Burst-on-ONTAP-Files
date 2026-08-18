@@ -58,9 +58,21 @@ The FSx for ONTAP S3 AP is "S3 compatible" but not "identical to Amazon S3".
 
 ### Presigned URL
 
-The public documentation states "Not supported", but it works at the ONTAP layer
-(SigV4 from 9.11.1, SigV2 + SigV4 from 9.16.1).
-AWS Support has submitted a documentation correction, but it is **not published**.
+**The compatibility table currently states `Presign — Not supported`** ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)).
+
+At the same time, presigning is a client-side signature computation, not an API call to the server.
+The URL it produces executes an ordinary `GetObject`, with the signature in query parameters instead
+of the Authorization header. Since `GetObject` is supported, presigned URL access cannot be blocked
+without breaking `GetObject` itself. A sibling repository has measured a presigned `GetObject`
+succeeding (ONTAP 9.18.1P3D1). The version-dependent scope is stated in NetApp KB articles (v4 from
+9.11.1, v2 and v4 from 9.16.1). The mechanism, the version requirements and a list of alternatives
+are in the [sibling repository's compatibility notes](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/s3ap-compatibility-notes.md).
+
+**While the public documentation says `Not supported`, do not let a production workload depend on
+it.** The behaviour can change without a deprecation notice. Where time-limited access is needed,
+design for API Gateway plus Lambda, CloudFront signed URLs, or temporary STS credentials. What has
+been measured is `GetObject`; **`PutObject` and `HeadObject` are unverified**. This architecture's
+path does not use presigned URLs.
 Depending on it in a production workload is not recommended.
 
 ## Designing concurrency and throughput
