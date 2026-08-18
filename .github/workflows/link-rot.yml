@@ -1,0 +1,78 @@
+name: link-rot
+
+# Every claim in this repository that is not measured is carried by a link, so a dead link is not a
+# cosmetic problem: it is a citation the reader cannot check, which puts the claim back to
+# unconfirmed. AWS and NetApp reorganise their documentation without redirects often enough that this
+# happens without anyone touching the repository.
+#
+# Scheduled rather than run on a pull request, and reported rather than blocking, because the failure
+# it looks for is caused by someone else's change. A gate that can turn red on an unrelated pull
+# request teaches contributors to ignore red.
+on:
+  schedule:
+    # Mondays, 21:00 UTC. Deliberately not near midnight UTC, where GitHub's scheduled-job queue is
+    # busiest and a run can be delayed or dropped.
+    - cron: '0 21 * * 1'
+  workflow_dispatch:
+
+# Read-only at the workflow level; the one job that files the report widens it for itself.
+permissions:
+  contents: read
+
+concurrency:
+  group: link-rot
+  cancel-in-progress: false
+
+jobs:
+  external-links:
+    name: external links
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed to file the report. Nothing here consumes untrusted input: the run is scheduled, so
+      # there is no pull-request body or branch name to interpolate, and the issue body is the
+      # checker's own output passed through an environment variable.
+      #
+      # zizmor wants that as a trailing comment on the line, where it does not fit. Same reasoning as
+      # gitleaks.yml: shortening it to fit would drop why the grant is safe, which is the part worth
+      # keeping.
+      issues: write # zizmor: ignore[undocumented-permissions]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+      # The repository's own checker, not a third-party link crawler. It already knows which paths to
+      # skip and which links are internal, so a second tool would need that configuration duplicated
+      # and would drift from it.
+      - name: Probe external URLs
+        id: probe
+        run: |
+          set -o pipefail
+          python3 tools/check_links.py --external 2>&1 | tee /tmp/link-report.txt
+      - name: Report unreachable links
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='External links unreachable'
+          # One open issue at a time, matched by title rather than by label: a label has to exist
+          # before it can be used, and `gh issue create` fails outright on an unknown one. Without
+          # the dedupe, a documentation site that moves a whole section opens a fresh issue every
+          # Monday until someone notices.
+          existing=$(gh issue list --repo "$REPO" --state open --search "$title in:title" \
+            --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          body=$(printf 'The scheduled external link check could not reach one or more URLs.\n\n%s\n\n```\n%s\n```\n\nA dead citation puts the claim it carries back to unconfirmed. Either find where the page moved, or lower the stage of the claim.\n' \
+            "$RUN_URL" "$(tail -c 40000 /tmp/link-report.txt)")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
