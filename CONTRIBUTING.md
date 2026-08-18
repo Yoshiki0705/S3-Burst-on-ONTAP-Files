@@ -37,6 +37,7 @@ make all     # コミットゲート
 | `make budget` | AGENTS.md のサイズと `.kiro/` ローダーの到達性 |
 | `make en-lang` | 英語ドキュメントに日本語が残っていないか |
 | `make counts` | 本文に書かれた数がファイルシステムと一致しているか |
+| `make pattern-status` | 各パターンの README が、定義された 5 つの状態のどれかで始まっているか |
 | `make test` | 検出したテストディレクトリを 1 プロセスずつ |
 
 ## ドキュメントを書く

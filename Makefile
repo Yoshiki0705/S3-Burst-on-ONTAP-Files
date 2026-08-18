@@ -6,7 +6,8 @@ PY ?= python3
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
-        audit secrets pinning zizmor links links-external budget en-lang xlang counts test all new-pattern \
+        audit secrets pinning zizmor links links-external budget en-lang xlang counts \
+        pattern-status test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write \
         commit-gate clean
@@ -136,6 +137,9 @@ en-lang: ## Catch untranslated Japanese in docs/en/
 counts: ## Verify every count stated in prose against the filesystem
 	@$(PY) tools/check_derived_counts.py
 
+pattern-status: ## Verify every pattern README opens with a defined status word
+	@$(PY) tools/check_pattern_status.py
+
 finops: ## Verify the generated cost tables match the model
 	@$(PY) tools/finops_model.py --check
 
@@ -145,7 +149,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang audit secrets pinning zizmor links budget en-lang counts finops test ## Commit gate
+all: lint i18n-check switcher-check xlang audit secrets pinning zizmor links budget en-lang counts pattern-status finops test ## Commit gate
 	@echo "All checks passed."
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x
