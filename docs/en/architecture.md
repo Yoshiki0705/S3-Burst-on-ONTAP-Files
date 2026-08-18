@@ -158,7 +158,7 @@ The mapping below is this repository's own arrangement, not a claim made by that
 | The circumstances on the HiL side | How this architecture takes them |
 |---|---|
 | The test bench contains the actual ECU, so it is physically on-premises. It cannot be relocated | Place a Cache volume on the bench side and mount it over NFS / SMB |
-| Collection, pre-processing and cataloguing are to run on the cloud side | `PutObject` to the S3 Access Point. The collect-side toolchain can stay as it is, written for S3 |
+| Collection, pre-processing and cataloguing are to run on the cloud side | `PutObject` to the S3 Access Point. **Speaking S3 is not sufficient on its own:** check per application or AWS service whether it accepts an access point ARN or alias, and whether the operations it needs are in the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) |
 | Replay uses the part needed for that test, not the whole data set | FlexCache is a sparse cache that pulls in only what is needed; it does not replicate everything |
 | The same data set is used on several benches and at several sites | Fan out from one Origin to several Cache volumes |
 | Nothing is written back during replay (results are produced elsewhere) | The Cache is read-centric, which matches what FlexCache is suited to |
