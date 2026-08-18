@@ -117,7 +117,8 @@ def scaffold(axis: str, slug: str, *, root: Path = ROOT) -> Path:
         "  1. replace the placeholder Deny policy in template.yaml with least privilege\n"
         "  2. implement functions/handler.py and keep the contract tests\n"
         "  3. fill in README.md and delete its 'still from the template' section\n"
-        "  4. make all"
+        "  4. set the status line at the top of README.md, with its evidence\n"
+        "  5. make all"
     )
     return destination
 
