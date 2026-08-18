@@ -67,6 +67,11 @@ TRANSLATIONS: dict[str, str] = {
     "{region_label} (`{region}`)、オンデマンド、税別。"
     "AWS Price List API から {snapshot} に取得したもので、`effective` は API が返した適用開始日である。": "{region_label} (`{region}`), on demand, excluding tax. "
     "Read from the AWS Price List API on {snapshot}; `effective` is the date the API returned as the start of applicability.",
+    "**この表は取得時点の値である。** 現在の単価は"
+    "[S3 料金]({source_s3})と[FSx for ONTAP 料金]({source_fsx})で確認し、"
+    "更新するときは `make finops-write` で再生成する（`make finops` が食い違いを検出する）。": "**These are the values as read on that date.** Check the current ones against "
+    "[S3 pricing]({source_s3}) and [FSx for ONTAP pricing]({source_fsx}), and regenerate with "
+    "`make finops-write` when updating them (`make finops` detects the drift).",
     "サービス": "Service",
     "課金項目": "Billed item",
     "単価": "Unit price",

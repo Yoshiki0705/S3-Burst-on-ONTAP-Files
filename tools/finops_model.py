@@ -913,6 +913,14 @@ def render_prices() -> list[str]:
             snapshot=PRICE_SNAPSHOT,
         ),
         "",
+        t(
+            "**この表は取得時点の値である。** 現在の単価は"
+            "[S3 料金]({source_s3})と[FSx for ONTAP 料金]({source_fsx})で確認し、"
+            "更新するときは `make finops-write` で再生成する（`make finops` が食い違いを検出する）。",
+            source_s3=SOURCE_S3,
+            source_fsx=SOURCE_FSX,
+        ),
+        "",
     ]
     rows = []
     for group, rates in (

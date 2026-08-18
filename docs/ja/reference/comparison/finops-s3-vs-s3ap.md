@@ -160,7 +160,8 @@ cooling period が短い構成や `All` ポリシーでは 0% に寄る。
 
 ## 算定
 
-以下は `tools/finops_model.py` が生成する。単価を更新したらこのブロックを再生成する。
+以下は `tools/finops_model.py` が生成する。単価を更新したら `make finops-write` で再生成する。
+`make finops` が、生成物と現在のモデルの食い違いを検出する（コミットゲートに入っている）。
 
 <!-- finops-model:begin -->
 
@@ -169,6 +170,8 @@ cooling period が短い構成や `All` ポリシーでは 0% に寄る。
 ### 単価表
 
 アジアパシフィック (東京) (`ap-northeast-1`)、オンデマンド、税別。AWS Price List API から 2026-08-09 に取得したもので、`effective` は API が返した適用開始日である。
+
+**この表は取得時点の値である。** 現在の単価は[S3 料金](https://aws.amazon.com/s3/pricing/)と[FSx for ONTAP 料金](https://aws.amazon.com/fsx/netapp-ontap/pricing/)で確認し、更新するときは `make finops-write` で再生成する（`make finops` が食い違いを検出する）。
 
 | サービス | 課金項目 | 単価 | effective |
 |---|---|---|---|
@@ -1216,7 +1219,7 @@ FinOps の対象は請求書だけではない。
 | キャッシュの再取得率 | 作業セットに対する割合として仮定。読み取り中心の参照系では妥当な範囲として扱っているが、実機で測った値ではない。実際の値は変更頻度と退避の設定で決まる |
 | 作業セットの割合 | データセット全体の 1 割として仮定。同じく妥当な範囲として扱っているが実測ではない。この割合が大きくなるほどキャッシュの利点は薄れ、全量コピーとの差が縮む |
 | 遅延の値 | 姉妹リポジトリ [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) の実測。環境が違えば変わる |
-| 再計算 | `python3 tools/finops_model.py --write` |
+| 再計算 | `make finops-write`（`python3 tools/finops_model.py --write`） |
 
 単価は変わる。この文書の数値をそのまま見積りに使う前に、
 `python3 tools/finops_model.py --show-prices` で現在の想定を確認し、
