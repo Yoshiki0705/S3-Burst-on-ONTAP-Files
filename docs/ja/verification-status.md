@@ -23,7 +23,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 
 | 範囲 | 段階 |
 |---|---|
-| Cache が **FSx for ONTAP**（同一リージョン、VPC ピアリング）、NFSv3、UNIX、64 B、`actimeo=0` | **検証済み**（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、n=30） |
+| Cache が **FSx for ONTAP**（同一リージョン、VPC ピアリング）、NFSv3、UNIX、64 B、`actimeo=0` | **検証済み**（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、n=30）。p50 は 3 回の測定で 7〜14 ms に散り、代表値は 8 ms |
 | 同条件で SMB（AWS Managed AD 参加、`cache=none`） | **検証済み**（2026-08-10、同環境、n=30） |
 | Cache が **オンプレミス ONTAP**（この構成の主経路） | **未検証**。AWS の対応構成に記載はあるが実機で追っていない |
 | 遠隔拠点・高レイテンシ経路 | 未検証。測定はサブミリ秒のネットワーク遅延下 |
@@ -46,7 +46,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 | NFS 書き込み（Origin）→ S3 AP 経由で読めるまで | 検証済み | [全方向比較](verification/cross-protocol-directions.md)。p50 44 ms（boto3 persistent session）。**初回の 873 ms は CLI 起動コストの誤計測であり撤回** |
 | NFS 書き込み（Origin）→ FlexCache Cache NFS で読めるまで | 検証済み | 同記録。p50 6 ms。NFS は Origin に直接コミットされるため S3 経由より速い |
 | ONTAP S3 NAS バケット（FlexCache duality — S3 Access Point とは別の機構）の FSx for ONTAP での利用可否 | **通常ボリューム: 動作 / FlexCache: データアクセス不可** | [全方向比較](verification/cross-protocol-directions.md)。通常ボリュームでは NFS 書き込み → ONTAP S3 GetObject が成功（CLI 経由で S3 ユーザー作成可能）。FlexCache ボリュームでは NAS バケット作成と HeadBucket は成功するが GetObject / ListObjects は AccessDenied。ONTAP 9.18.1P3D1、FSx for ONTAP |
-| S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | **検証済み** | [FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)。2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、VPC ピアリング経由、UNIX、NFSv3、`actimeo=0`、n=30。**S3 → FlexCache NFS は p50 14 ms**。部分マルチパートは `CompleteMultipartUpload` まで見えない。削除の反映は 9 ms |
+| S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | **検証済み** | [FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)。2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、VPC ピアリング経由、UNIX、NFSv3、`actimeo=0`、n=30。**S3 → FlexCache NFS は p50 8 ms**（boto3 の持続セッション。3 回の測定で 7〜14 ms に散り、差は S3 クライアント側の測定方法）。同一セッション内で FlexCache が加えるのは +5 ms。部分マルチパートは `CompleteMultipartUpload` まで見えない。削除の反映は 9 ms |
 | セキュリティスタイルとファンアウト先プロトコルの対応、および Cache 作成時の継承 | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路で同じ規則が成り立つかは確かめていない（[最初に決めること](design-first-decisions.md)） |
 | FSx for ONTAP を Origin としたときの Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes の Cache 可否 | 未確認 | AWS の対応構成表に記載がない |
 | Origin あたりの Cache 数を増やしたときの挙動 | 未検証 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨しており、ファンアウト数の設計に影響する可能性がある |

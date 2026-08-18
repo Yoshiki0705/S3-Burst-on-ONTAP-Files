@@ -29,6 +29,7 @@ volume in a different cluster, by way of FlexCache.
 | Object size | 64 B |
 | Concurrency | 1 |
 | Method | The write (S3 PutObject) and the read (NFS `cat`) run on the **same host against the same clock** |
+| S3 client | `aws s3api`, launched per request. The re-measurement with a persistent session is in [all directions](cross-protocol-directions.md) |
 
 > **Note on the identity**: this measurement used the UNIX root user as the access point identity. Every request through the access point is authorized as that one identity, so root removes the file-permission layer entirely ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). It is recorded as the condition it was, not as a recommendation. Use a dedicated user holding only the permissions the write path needs, and split access points by purpose (`FileSystemIdentity` cannot be changed after creation).
 
@@ -60,6 +61,28 @@ volume in a different cluster, by way of FlexCache.
 |---|---|
 | S3 DeleteObject until gone from Cache NFS (`actimeo=0`) | 9 ms |
 
+## The same direction was measured three times — which one to quote
+
+This direction (S3 AP `PutObject` to a read over NFS on the FlexCache cache) was measured three
+times under varying conditions. **The absolute value ranges from 7 to 14 ms.** When quoting it, carry
+the measurement method along with the figure.
+
+| Measurement | Date | S3 client | p50 | Record |
+|---|---|---|---|---|
+| This record | 2026-08-09 | `aws s3api` (launched per request) | 14 ms | this page |
+| Direction 3 of the all-directions comparison | 2026-08-09 | boto3 persistent session | 8 ms | [all directions](cross-protocol-directions.md) |
+| The NFS control in the SMB measurement | 2026-08-10 | boto3 persistent session | 7 ms | as above |
+
+**The spread is the measurement method on the S3 client side.** The Region, the clusters, the
+volumes, the mount options and the object size were all the same; what differs is whether the
+connection was reused. The same kind of error showed up far larger in the NFS to S3 AP direction
+(p50 873 ms with `aws s3api` launched per request, 44 ms with a persistent session). **The launch cost
+was not isolated per call in this direction**, so it cannot be said that all 6 ms of the gap is
+launch cost.
+
+**Quote 8 ms as the representative figure.** Its method is recorded and it agrees with the
+re-measurement the following day (7 ms). Treat 14 ms as an observation at the upper end.
+
 ## Compared with the same-volume measurement
 
 | Direction | Same volume p50 | Through FlexCache p50 | Difference |
@@ -67,13 +90,22 @@ volume in a different cluster, by way of FlexCache.
 | S3 PutObject until readable over NFS | 9 ms | 14 ms | +5 ms |
 | S3 DeleteObject until gone from NFS | 7 ms | 9 ms | +2 ms |
 
-**FlexCache adds about 5 ms.** Under these conditions — same Region, over VPC peering, client in the
-same subnet — whether FlexCache is in the path is barely visible.
+**This table puts figures from separate sessions side by side.** The same-volume measurement ran on a
+different file system, and its ONTAP version could not be determined
+([same-volume verification record](s3ap-nfs-visibility.md)).
+
+**Measured within one session, the increment FlexCache adds is +5 ms** (3 ms to 8 ms; directions 4
+and 3 of the [all-directions comparison](cross-protocol-directions.md)). It agrees with the +5 ms in
+the table above, but the within-session figure is the stronger evidence. Under these conditions —
+same Region, over VPC peering, client in the same subnet — whether FlexCache is in the path is barely
+visible.
 
 ## What can be read from this
 
 - **This architecture's central claim holds.** An object written to the Origin through the S3 Access
-  Point is readable over an NFS mount on the Cache volume, by way of FlexCache, in 10 to 19 ms
+  Point is readable over an NFS mount on the Cache volume by way of FlexCache (10 to 19 ms in this
+  measurement; the representative figure is p50 8 ms from another session, and as noted above the
+  absolute value ranges from 7 to 14 ms)
 - **A partial object does not appear on the Cache side either.** There is no need to worry about
   reading a half-written file during a multipart upload
 - **Deletions also propagate in milliseconds.** 9 ms under `actimeo=0`
