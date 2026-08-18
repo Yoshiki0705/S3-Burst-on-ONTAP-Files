@@ -40,7 +40,7 @@ flowchart LR
 | 収集（書き込み） | Amazon FSx for NetApp ONTAP の S3 Access Point | S3 API |
 | 正本 | FSx for ONTAP の Origin ボリューム | — |
 | 配布 | FlexCache | ONTAP 間のクラスタ / SVM ピアリング |
-| 利用（読み取り） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
+| 利用（本リポジトリの基準構成では読み取り専用） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
 
 **「正本データ」は、書き込み先として管理するボリュームを指す。** この構成では Origin ボリュームである。
 書き込み経路を 1 つに定めるという設計上の約束であり、**複数プロトコル間の競合解決、分散ロック、
@@ -51,10 +51,10 @@ flowchart LR
 
 この 1 点が設計を大きく単純にする。Cache 側は S3 を提供せず、NFS / SMB で使う。
 
-- **書き込み経路が 1 本になる。** 正本は Origin であり、書き込みは常に AWS 側の S3 Access Point を
-  通る。Cache 側からの書き戻し（write-back / write-around）の設計判断が主題から外れ、Cache は
-  読み取り中心という FlexCache 本来の適性に収まる
-  （[FlexCache は読み取り主体のワークフローに適する](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。
+- **書き込み経路が 1 本になる。** 正本データは Origin であり、書き込みは常に AWS 側の S3 Access Point を
+  通る。**FlexCache は書き込みを扱える**（既定の write-around、ONTAP 9.15.1 以降の write-back）が、
+  **本リポジトリの基準構成では** Cache を読み取り用途に限定し、書き戻しの設計判断を主題から外している。
+  AWS は FlexCache を読み取り主体のワークフローに適するとしている（[FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。
 - **ファンアウト先に S3 の実装差を持ち込まない。** 「ファイルを S3 で見せる」機能は
   プラットフォームごとに別実装だが（[用語の整理](reference/glossary/object-access-on-ontap.md)）、
   この構成ではその機能を Origin 側の 1 か所だけで使う。Cache 側に要求するのは FlexCache と
@@ -109,7 +109,7 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 | 任意のオブジェクト名が使える | 使えない。S3 名は 1024 バイト、ファイル / ディレクトリ名は 255 文字まで。`part1/part2` と `part1/part2/part3` は NAS 上で同時に存在できない（[NAS データ要件](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)） |
 | オブジェクトストア並みにフラットな名前空間を扱える | 扱えない。スラッシュを含まない名前はすべてルートディレクトリに集まり、数が多いと性能問題になる。上記出典は、NAS フレンドリでない名前を多用するアプリにはオブジェクトストアのほうが適すると明記している |
 | Cache 側でも S3 で読める | この構成では読めない。上記のとおり FlexCache duality と S3 Access Point の接続は別の機構であり、前者の対応状況は後者の根拠にならない |
-| Cache 側に書けば速い | この構成は Cache を読み取り用途とする。書き込みは Origin 側の S3 Access Point に集約する |
+| Cache 側に書けば速い | FlexCache は書き込みを扱えるが、この構成は Cache を読み取り用途とし、書き込みを Origin 側の S3 Access Point に集約する |
 | S3 バケットと同じ料金体系になる | ならない。SSD 容量、キャパシティプール、SSD IOPS、スループットキャパシティ、バックアップに加えて、**S3 Access Point 経由のリクエストとデータ転送も課金される**（[FSx for ONTAP 料金](https://aws.amazon.com/fsx/netapp-ontap/pricing/)）。次元の対応は[FinOps の費用構造](reference/comparison/finops-s3-vs-s3ap.md) |
 | どのプラットフォームでも同じ手順 | 同じではない。対応構成と最小バージョンが異なる（[移植性](portability.md)） |
 

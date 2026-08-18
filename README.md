@@ -39,7 +39,7 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 | 収集（書き込み） | FSx for ONTAP の S3 Access Point。**Origin ボリュームにだけ付ける** | S3 API |
 | 正本データ | FSx for ONTAP の Origin ボリューム | — |
 | 配布 | FlexCache | ONTAP 間のクラスタ / SVM ピアリング |
-| 利用（読み取り） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
+| 利用（本リポジトリの基準構成では読み取り専用） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
 
 **このリポジトリでは、書き込み先として管理する Origin ボリュームを正本データと呼びます。**
 これは書き込み経路を 1 つに定めるという設計上の約束です。**複数プロトコル間の競合解決、
@@ -47,7 +47,12 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 （文書の版を指す「正典」とは別の語です。日本語版が正典であるという記述は多言語ポリシーの節にあります。）
 
 書き込みは常に Origin 側の S3 Access Point を通り、Cache 側には S3 を出しません。
-これで書き込み経路が 1 本になり、Cache は読み取り中心という FlexCache 本来の適性に収まります。
+これで書き込み経路が 1 本になります。
+
+**FlexCache は書き込みも扱えます。** 既定の write-around と、ONTAP 9.15.1 以降の write-back です
+（[FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。**本リポジトリの基準構成では**、競合・ロック・切断時の動作・書き戻しの
+設計範囲を抑えるため Cache を読み取り用途に限定し、書き込みを Origin 側に集約しています。
+AWS は FlexCache を読み取り主体のワークフローに適するとしています。
 全体像は[構成の形](docs/ja/architecture.md)にあります。
 
 ## 利用拠点が Origin と同じとき

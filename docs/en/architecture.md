@@ -46,7 +46,7 @@ in a table or in the prose as well.
 | Collect (write) | The S3 Access Point of Amazon FSx for NetApp ONTAP | S3 API |
 | Source of truth | The Origin volume on FSx for ONTAP | — |
 | Distribute | FlexCache | cluster / SVM peering between ONTAP systems |
-| Consume (read) | The Cache volume at the fan-out target | NFS / SMB only |
+| Consume (read-only in this repository's baseline) | The Cache volume at the fan-out target | NFS / SMB only |
 
 **"Source of truth" names the volume that writes are directed to** — the Origin volume here. It is a
 design commitment about the write path, and **not a claim that FlexCache resolves conflicts between
@@ -60,10 +60,10 @@ This one point simplifies the design considerably. The Cache side offers no S3; 
 NFS / SMB.
 
 - **The write path becomes a single path.** The source of truth is the Origin, and writes always go
-  through the AWS-side S3 Access Point. Design decisions about writing back from the Cache side
-  (write-back / write-around) drop out of the subject, and the Cache settles into what FlexCache is
-  suited to, which is read-centric use
-  ([FlexCache suits read-oriented workflows](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)).
+  through the AWS-side S3 Access Point. **FlexCache can take writes** — write-around by default,
+  write-back from ONTAP 9.15.1 — but **this repository's baseline** confines the Cache to reads, which
+  keeps the write-back design decisions out of the subject. AWS describes FlexCache as best suited to
+  read-intensive workflows ([replicating with FlexCache](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)).
 - **No S3 implementation differences are carried into the fan-out targets.** The feature that
   "presents files over S3" is implemented separately on each platform
   ([Glossary](reference/glossary/object-access-on-ontap.md)), and this architecture uses that feature in
@@ -123,7 +123,7 @@ accounts for half the value of considering this architecture.
 | Any object name can be used | It cannot. An S3 name is up to 1024 bytes and a file / directory name up to 255 characters. `part1/part2` and `part1/part2/part3` cannot exist at the same time on NAS ([NAS data requirements](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)) |
 | A flat namespace can be handled the way an object store handles it | It cannot. Every name without a slash collects in the root directory, and in quantity that becomes a performance problem. The source above states explicitly that an object store is the more suitable choice for applications that make heavy use of names that are not NAS-friendly |
 | Reads over S3 work on the Cache side as well | Not in this architecture. As above, FlexCache duality and attaching an S3 Access Point are separate mechanisms, and the support status of the former is not evidence for the latter |
-| Writing to the Cache side is faster | This architecture treats the Cache as read-oriented. Writes are consolidated on the Origin-side S3 Access Point |
+| Writing to the Cache side is faster | FlexCache can take writes, but this architecture confines the Cache to reads and consolidates writes on the Origin-side S3 Access Point |
 | Billing works the same way as an S3 bucket | It does not. On top of SSD capacity, the capacity pool, SSD IOPS, throughput capacity and backups, **requests and data transfer through the S3 Access Point are charged as well** ([FSx for ONTAP pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/)). The dimensions are mapped in [FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md) |
 | The procedure is the same on any platform | It is not. Supported configurations and minimum versions differ ([Portability](portability.md)) |
 
