@@ -112,14 +112,21 @@ boto3's `adaptive` retry mode is recommended.
 
 ### Files per directory
 
-| Scenario | Recommended ceiling | Basis |
-|---|---|---|
-| General workload | 100,000 or fewer | The practical ceiling for readdir response time and ListObjectsV2 responses |
-| High-frequency writes (IoT / logs) | 10,000 or fewer | Where write frequency is high, partition more finely |
-| Using FlexGroup | 50,000 or fewer per constituent | To keep the distribution across constituents even |
+**What sets the ceiling is the volume's `maxdir-size`.** When a directory reaches it, the client gets
+an out-of-space error (`ENOSPC`) and can no longer create files. The value is a per-volume setting and
+can be raised with `volume modify -maxdir-size`, but **the documentation states plainly that raising
+it could affect performance** ([maximum directory size](https://docs.netapp.com/us-en/ontap/volumes/cautions-increasing-maximum-directory-size-concept.html)).
 
-Above 100,000, the in-memory sort cost of ListObjectsV2 grows, and there is also a risk of file
-creation failing on reaching `maxdir-size`.
+So there are two things to check at design time.
+
+1. **The current `maxdir-size` on the target volume.** The default depends on the ONTAP version and
+   on system memory
+2. **The number of entries you expect in one directory.** As entries grow, `readdir` and
+   `ListObjectsV2` take longer
+
+**This repository has no measurement of entry count against response time.** That is why it carries
+no threshold in file counts: check `maxdir-size` in your own environment and partition finely enough
+that the expected entry count stays well short of it.
 
 ### Recommended partition design
 
@@ -149,10 +156,11 @@ s3://<ap-alias>/objects/a3/b2/object-uuid-001.bin
 
 ### Choosing the partition granularity
 
-Partition down to a granularity that satisfies
-**"files ingested per hour ÷ number of partitions < 10,000"**.
+**Partition down to a granularity where the entries in one directory stay well short of
+`maxdir-size`.** The table below is a starting shape, **not a figure derived from measurement.** Work
+out the number of partitions you need from your own ingest rate and `maxdir-size` before using it.
 
-| Ingest rate | Recommended granularity | Example |
+| Ingest rate | Granularity to start from | Example |
 |---|---|---|
 | Hundreds per day | `year/month/day/` | Batch ingest, reports |
 | Thousands per hour | `year/month/day/hour/` | IoT telemetry |
