@@ -51,6 +51,9 @@ claim" in [verification status](verification-status.md).
       partial file appears, or nothing until `CompleteMultipartUpload`)
 - [ ] Confirm how a deletion on the origin side appears on the cache side
 - [ ] Confirm how an overwrite propagates
+- [ ] Try `UploadPartCopy` with **a source inside the same access point**. AWS documents it as
+      supported for same-AP, same-Region copies, and this repository's observation (`404 NoSuchKey`)
+      was taken with a source that was not inside the same AP
 
 Record results in the table in [verification status](verification-status.md). When writing a figure,
 always state the environment with it.

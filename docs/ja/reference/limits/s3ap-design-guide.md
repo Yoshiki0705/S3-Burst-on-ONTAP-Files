@@ -24,7 +24,7 @@ FSx for ONTAP の S3 AP は「S3 互換」だが「Amazon S3 と同一」では�
 | HeadObject | — |
 | DeleteObject | — |
 | MultipartUpload | CreateMultipartUpload / UploadPart / CompleteMultipartUpload |
-| CopyObject | 同一 AP 内のみ |
+| CopyObject | 同一 AP 内・同一リージョンのみ。`x-amz-object-annotation-directive` ヘッダーは非対応（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)） |
 
 ### 非対応（エラーが返る）
 
@@ -32,7 +32,12 @@ FSx for ONTAP の S3 AP は「S3 互換」だが「Amazon S3 と同一」では�
 |---|---|---|
 | 条件付き書き込み（If-None-Match） | 501 NotImplemented | アプリケーション側の排他制御 |
 | S3 Annotations（PutObjectAnnotation 等） | 501 NotImplemented | 標準 S3 バケットに出力して annotation 付与 |
-| UploadPartCopy | 404 NoSuchKey（実測） | CopyObject または NFS/SMB で移動 |
+
+### 条件つきで対応（この構成では未測定）
+
+| オペレーション | 条件 | このリポジトリでの状態 |
+|---|---|---|
+| UploadPartCopy | 同一 AP 内・同一リージョンのみ対応（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)） | ソースが同一 AP 内にない条件で `404 NoSuchKey` を 1 回観測した。**同一 AP 内をソースにした再測定は未実施。** 1 回の観測から非対応と一般化しない |
 
 ### 機能として存在しない
 
