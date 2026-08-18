@@ -48,6 +48,12 @@ in a table or in the prose as well.
 | Distribute | FlexCache | cluster / SVM peering between ONTAP systems |
 | Consume (read) | The Cache volume at the fan-out target | NFS / SMB only |
 
+**"Source of truth" names the volume that writes are directed to** — the Origin volume here. It is a
+design commitment about the write path, and **not a claim that FlexCache resolves conflicts between
+protocols, provides distributed locking, or guarantees application-level consistency.** How
+simultaneous writes behave is in the
+[S3 AP design guide](reference/limits/s3ap-design-guide.md).
+
 ## The S3 Access Point is attached on the Origin side only
 
 This one point simplifies the design considerably. The Cache side offers no S3; it is used over

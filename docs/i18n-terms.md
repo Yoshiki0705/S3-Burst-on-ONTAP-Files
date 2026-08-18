@@ -26,7 +26,8 @@
 |---|---|---|
 | 収集層 | collect layer | S3 API で書き込みを受ける側 |
 | 配布層 | serve layer | FlexCache でファンアウトする側 |
-| 正典 | source of truth | 文書の正典（authoritative version）とは別の意味なので文脈で使い分ける |
+| 正本データ | source of truth | データ側。書き込み先として管理するボリューム。保証の含意を持たせない |
+| 正典 | authoritative version | 文書の版。データ側には使わない（かつて両方に使っていて混同を招いた） |
 | ファンアウト | fan-out | 1 つの Origin から複数の Cache へ配ること |
 | 利用拠点 | consuming site | 読み取り側の物理的な場所 |
 | 検証済み | verified | 実環境で再現した |

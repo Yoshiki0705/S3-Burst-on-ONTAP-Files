@@ -139,7 +139,7 @@ TRANSLATIONS: dict[str, str] = {
     # --- cost line items -----------------------------------------------------------------------
     "ストレージ (S3 Standard)": "Storage (S3 Standard)",
     "ストレージ (S3 Standard、着信面 {size})": "Storage (S3 Standard, landing area {size})",
-    "ストレージ (S3 Standard、正典はバケットに残る)": "Storage (S3 Standard; the authoritative copy stays in the bucket)",
+    "ストレージ (S3 Standard、正本はバケットに残る)": "Storage (S3 Standard; the authoritative copy stays in the bucket)",
     "PUT リクエスト": "PUT requests",
     "GET リクエスト": "GET requests",
     "PUT リクエスト (S3 バケット宛)": "PUT requests (to an S3 bucket)",
@@ -531,7 +531,7 @@ TRANSLATIONS.update(
         "各ワークロードの試算にある S3 単独の金額が下限になる。": "This table assumes the data is delivered to the consumers as files. "
         "If the S3 API is enough for them, no distribution layer is needed at all, and the S3-alone figure in each workload's estimate is the floor.",
         "3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。"
-        "FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。"
+        "FSx for ONTAP を持たないため固定費の下限がなく、正本はバケットに残る。"
         "対応プロトコルは NFSv4.1 と NFSv4.2 で、**NFSv3 と SMB は対象外**である"
         " ([非対応事項とクォータ]({quotas_url}))。"
         "EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) が必要で、"

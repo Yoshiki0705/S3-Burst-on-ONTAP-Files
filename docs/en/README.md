@@ -38,6 +38,10 @@ does not render.
 | Distribute | FlexCache | cluster / SVM peering between ONTAP systems |
 | Consume (read) | Cache volume at the consuming site | NFS / SMB only |
 
+**"Source of truth" here means the origin volume is the one place writes are directed to.** It is a
+design commitment about the write path. **It does not mean FlexCache resolves conflicts between
+protocols, provides distributed locking, or guarantees application-level consistency.**
+
 Writes always pass through the S3 Access Point on the origin, and no S3 access is exposed on the
 cache side. That keeps the write path single and leaves the cache read-oriented, which is where
 FlexCache fits best. The full picture is in

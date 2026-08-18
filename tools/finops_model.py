@@ -680,7 +680,7 @@ def s3_files_option(sc: Scenario) -> dict[str, float] | None:
     metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
 
     lines: dict[str, float] = {
-        t("ストレージ (S3 Standard、正典はバケットに残る)"): tiered_s3_storage(
+        t("ストレージ (S3 Standard、正本はバケットに残る)"): tiered_s3_storage(
             sc.stored_gib
         ),
         t("PUT リクエスト (S3 バケット宛)"): sc.objects_per_month * S3["tier1"].usd,
@@ -2084,7 +2084,7 @@ def render_whole_system() -> list[str]:
         "",
         t(
             "3 列目の S3 Files は、S3 バケットをファイルシステムとしてマウントする選択肢である。"
-            "FSx for ONTAP を持たないため固定費の下限がなく、正典はバケットに残る。"
+            "FSx for ONTAP を持たないため固定費の下限がなく、正本はバケットに残る。"
             "対応プロトコルは NFSv4.1 と NFSv4.2 で、**NFSv3 と SMB は対象外**である"
             " ([非対応事項とクォータ]({quotas_url}))。"
             "EC2 では S3 Files のマウントヘルパー (`amazon-efs-utils` に含まれる) が必要で、"

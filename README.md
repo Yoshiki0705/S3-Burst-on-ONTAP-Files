@@ -37,9 +37,14 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 | 層 | 何を使うか | プロトコル |
 |---|---|---|
 | 収集（書き込み） | FSx for ONTAP の S3 Access Point。**Origin ボリュームにだけ付ける** | S3 API |
-| 正典 | FSx for ONTAP の Origin ボリューム | — |
+| 正本データ | FSx for ONTAP の Origin ボリューム | — |
 | 配布 | FlexCache | ONTAP 間のクラスタ / SVM ピアリング |
 | 利用（読み取り） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
+
+**このリポジトリでは、書き込み先として管理する Origin ボリュームを正本データと呼びます。**
+これは書き込み経路を 1 つに定めるという設計上の約束です。**複数プロトコル間の競合解決、
+分散ロック、アプリケーションレベルの整合性を FlexCache が保証するという意味ではありません。**
+（文書の版を指す「正典」とは別の語です。日本語版が正典であるという記述は多言語ポリシーの節にあります。）
 
 書き込みは常に Origin 側の S3 Access Point を通り、Cache 側には S3 を出しません。
 これで書き込み経路が 1 本になり、Cache は読み取り中心という FlexCache 本来の適性に収まります。
@@ -48,7 +53,7 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 ## 利用拠点が Origin と同じとき
 
 利用拠点が Origin と同じ場所にあるなら、**この構成は不要です。** S3 Access Point だけで
-「S3 で集めてファイルで読む」が満たせます。正典を S3 バケットに置いたまま同じことを実現する
+「S3 で集めてファイルで読む」が満たせます。正本データを S3 バケットに置いたまま同じことを実現する
 手段が S3 Files で、分かれ目は費用ではなく対応プロトコルです。
 
 ![A は Amazon S3 Access Point から Amazon FSx for NetApp ONTAP へ書き NFS v3 / v4.x と SMB で読む形、B は Amazon S3 Bucket から Amazon S3 Files を介して NFS v4.1 / v4.2 で読む形](docs/_assets/images/s3burst-single-site-options.svg)
@@ -59,7 +64,7 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 | 方式 | 向く条件 | 向かない条件 |
 |---|---|---|
 | A. FSx for ONTAP S3 Access Point のみ | 利用側が NFSv3 や SMB を使う。Snapshot や FlexClone を収集直後のデータに効かせたい | 固定費の下限（SSD 1 TiB とスループット 1 段）を回収できない。利用側が S3 API で足りる |
-| B. S3 バケット + S3 Files | 利用側が AWS 上の Linux コンピュート（Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS）で、マウントヘルパーを入れられる。正典を S3 バケットに残したい | NFSv3、SMB、AWS 外の利用側。ファイルシステム側の書き込みを 60 秒以内に S3 へ出したい。アーカイブ系ストレージクラスからファイルで読みたい |
+| B. S3 バケット + S3 Files | 利用側が AWS 上の Linux コンピュート（Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS）で、マウントヘルパーを入れられる。正本データを S3 バケットに残したい | NFSv3、SMB、AWS 外の利用側。ファイルシステム側の書き込みを 60 秒以内に S3 へ出したい。アーカイブ系ストレージクラスからファイルで読みたい |
 
 B の対応プロトコルは NFSv4.1 と NFSv4.2 だけで、NFSv3 と SMB は対象外です
 （[非対応事項とクォータ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html)）。
@@ -76,7 +81,7 @@ NFSv3 で固定された装置や Windows の工程があるなら、費用を�
 |---|---|---|
 | S3 に書いてファイルで読めるまで | p50 9 ms（同一ボリューム、64 B、`actimeo=0`、n=30） | 通常は数秒。ただし高性能ストレージに現在データがあるファイルに限る |
 | ファイルに書いて S3 で読めるまで | p50 44 ms（boto3 の持続セッション） | 書き込みが**約 60 秒止まってから** |
-| 書きかけのデータの見え方 | `CompleteMultipartUpload` まで見えない | 両側が同じファイルを変更するとバケットが正典。ファイル側は lost and found へ移る |
+| 書きかけのデータの見え方 | `CompleteMultipartUpload` まで見えない | 両側が同じファイルを変更するとバケットが優先。ファイル側は lost and found へ移る |
 | 反映レートの上限 | 記載なし | 取り込み 2,400 オブジェクト/秒・700 MB/秒、書き出し 800 ファイル/秒・2,700 MB/秒（ファイルシステムあたり） |
 | 前提条件 | 収集層では S3 のイベント通知・ライフサイクル・バージョニングが対象外 | バケットで S3 バージョニングが必須。`chmod` や `chown` も新しいバージョンを作る |
 
