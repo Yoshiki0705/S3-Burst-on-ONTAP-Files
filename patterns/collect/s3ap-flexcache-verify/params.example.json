@@ -17,5 +17,7 @@
   "InstanceType": "t3.micro",
   "OriginVolumeName": "s3burst_verify",
   "OriginVolumeSizeMB": "5120",
-  "SecurityStyle": "UNIX"
+  "SecurityStyle": "UNIX",
+  "S3AccessPointArn": "*",
+  "SmbCredentialSecretName": "s3burst/smb-reader"
 }

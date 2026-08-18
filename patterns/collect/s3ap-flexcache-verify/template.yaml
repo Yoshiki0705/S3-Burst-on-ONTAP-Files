@@ -43,6 +43,11 @@ Metadata:
           - OriginVolumeName
           - OriginVolumeSizeMB
           - SecurityStyle
+      - Label:
+          default: Least Privilege (narrow after the post-deploy steps)
+        Parameters:
+          - S3AccessPointArn
+          - SmbCredentialSecretName
 
 Parameters:
   # --- Origin ---
@@ -114,6 +119,30 @@ Parameters:
     Default: UNIX
     AllowedValues: [UNIX, NTFS]
     Description: "UNIX for NFS + S3 AP (recommended). NTFS for SMB-primary."
+
+  # The access point is created after this stack, out of band (step 2 of the post-deploy steps),
+  # so its ARN cannot be known at first deployment. Deploy once with the default, then update the
+  # stack with the ARN that `create-and-attach-s3-access-point` returned. Leaving it at "*" grants
+  # the four object actions on every bucket the role can reach, which is only tolerable in an
+  # isolated verification account.
+  S3AccessPointArn:
+    Type: String
+    Default: "*"
+    Description: >-
+      Access point ARN from the post-deploy step, or "*" on first deployment.
+      Update the stack with the real ARN once the access point exists.
+
+  # `secret:*` matches every secret in the account. The measurement reads exactly one.
+  SmbCredentialSecretName:
+    Type: String
+    Default: s3burst/smb-reader
+    AllowedPattern: "^[a-zA-Z0-9/_+=.@-]+$"
+    Description: >-
+      Name of the Secrets Manager secret holding the SMB password, passed to
+      measure_visibility.py as --smb-cred-secret. Only this secret is readable.
+
+Conditions:
+  S3AccessPointUnset: !Equals [!Ref S3AccessPointArn, "*"]
 
 Resources:
   # --- VPC Peering ---
@@ -246,18 +275,30 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Sid: S3AP
+              # ListBucket and HeadBucket are bucket-level; PutObject and GetObject are
+              # object-level. Both are expressed against the access point ARN because the
+              # access point is what the measurement addresses, and the object-level form
+              # is that ARN followed by /object/*.
+              # `s3:HeadBucket` is not an IAM action: HeadBucket is authorised by
+              # `s3:ListBucket`. It was listed here and had no effect.
+              - Sid: S3AccessPointBucketLevel
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Ref S3AccessPointArn
+              - Sid: S3AccessPointObjectLevel
                 Effect: Allow
                 Action:
                   - s3:PutObject
                   - s3:GetObject
-                  - s3:ListBucket
-                  - s3:HeadBucket
-                Resource: "*"
-              - Sid: Secrets
+                Resource: !If
+                  - S3AccessPointUnset
+                  - "*"
+                  - !Sub "${S3AccessPointArn}/object/*"
+              - Sid: SmbCredential
                 Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*"
+                Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SmbCredentialSecretName}-*"
       Tags:
         - Key: Purpose
           Value: s3burst-verification
