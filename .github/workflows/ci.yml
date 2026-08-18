@@ -46,8 +46,13 @@ jobs:
       - name: Check i18n parity
         run: python3 tools/check_i18n_parity.py
 
-      - name: Check language switchers and cross-language links
+      - name: Check language switchers
         run: python3 tools/sync_lang_switcher.py
+      # A separate script, and for a while it ran nowhere but on a maintainer's machine: the step
+      # above was named as though it covered this and does not. An unmarked link from an English page
+      # into a Japanese one is how a reader lands in a language they cannot read.
+      - name: Check cross-language links
+        run: python3 tools/check_cross_language_links.py
 
       - name: Audit public output
         run: python3 tools/audit_public_output.py
@@ -60,6 +65,13 @@ jobs:
 
       - name: Check derived counts
         run: python3 tools/check_derived_counts.py
+      - name: Check pattern status words
+        run: python3 tools/check_pattern_status.py
+      # The cost tables are generated. Checking here catches the case where the model was edited and
+      # the tables were not regenerated, which otherwise reaches a reader as prices that no figure in
+      # the repository produces.
+      - name: Check generated cost tables
+        run: python3 tools/finops_model.py --check
 
       # `.kiro/` is gitignored, so the loader half of this check is skipped here by design. The
       # AGENTS.md budget and the reachability of its index are still enforced.

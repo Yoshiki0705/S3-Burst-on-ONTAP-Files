@@ -9,8 +9,15 @@ vectors. A silent no-op is the worst kind of gate, because its output is indisti
 success.
 
 The second half is new: a target can be correct, declared, and still never run because nobody
-wired it into the aggregate. `make all` is what the commit gate and CI invoke, so a validator
-missing from its prerequisite list is a validator that exists and does nothing.
+wired it into the aggregate. `make all` is what the commit gate invokes, so a validator missing from
+its prerequisite list is a validator that exists and does nothing.
+
+The third part closes the other end of the same hole. CI does not run `make all`; it invokes each
+validator as its own step, so that a failure names the concern instead of reporting that the
+aggregate failed. The cost of that choice is a second list to keep in step: a validator added to
+`make all` runs for whoever commits locally and for nobody else, and a contributor without the local
+toolchain -- or a merge from a fork -- passes checks the maintainer's machine would have failed. So the
+script each `make all` member runs is asserted to appear in the CI workflow.
 """
 
 from __future__ import annotations
@@ -129,3 +136,77 @@ def test_the_exclusion_list_names_only_real_targets() -> None:
     assert not unknown, (
         "NOT_IN_ALL names targets the Makefile does not define: " + ", ".join(unknown)
     )
+
+
+# --- CI parity ---------------------------------------------------------------------------------
+
+CI = ROOT / ".github" / "workflows" / "ci.yml"
+
+# Gates CI reaches by another route. Each is a dedicated workflow, so the concern is covered but the
+# script name does not appear in ci.yml.
+COVERED_ELSEWHERE = {
+    "secrets": "gitleaks.yml",
+    "zizmor": "zizmor.yml",
+    # `pinning` checks that actions are SHA-pinned. zizmor's own pedantic pass reports unpinned
+    # actions, so the concern is covered in that workflow.
+    "pinning": "zizmor.yml",
+    # `lint` is an aggregate; its members are checked individually below.
+    "lint": "its members are asserted individually",
+}
+
+
+def recipe(target: str) -> str:
+    """The recipe body of a target: every indented line following its rule."""
+    match = re.search(
+        rf"^{re.escape(target)}:[^\n]*\n((?:\t[^\n]*\n|\n(?=\t))*)",
+        text(),
+        re.MULTILINE,
+    )
+    return match.group(1) if match else ""
+
+
+def scripts_invoked(target: str) -> set[str]:
+    """The tools/ and scripts/ files a target runs, directly or through its prerequisites."""
+    found: set[str] = set()
+    for name in {target} | prerequisites(target):
+        found |= set(re.findall(r"(?:tools|scripts)/([A-Za-z0-9_]+\.py)", recipe(name)))
+    return found
+
+
+def test_every_make_all_gate_runs_in_ci() -> None:
+    assert CI.is_file(), "the CI workflow must exist for this to mean anything"
+    workflow = CI.read_text(encoding="utf-8")
+    missing: list[str] = []
+    for gate in sorted(prerequisites("all")):
+        if gate in COVERED_ELSEWHERE:
+            continue
+        invoked = scripts_invoked(gate)
+        if not invoked:
+            # A gate that runs no script of its own (`test` runs one; `cfn` runs cfn-lint) is
+            # matched by name instead, which is why the assertion below is on the union.
+            continue
+        if not any(script in workflow for script in invoked):
+            missing.append(f"{gate} ({', '.join(sorted(invoked))})")
+    assert not missing, (
+        "these `make all` gates do not run in ci.yml: "
+        + "; ".join(missing)
+        + ". CI invokes validators individually rather than running `make all`, so a gate added to "
+        "the Makefile alone runs only for whoever commits locally."
+    )
+
+
+def test_the_ci_exemptions_name_real_gates() -> None:
+    """A stale exemption would silently excuse a gate from CI."""
+    unknown = sorted(set(COVERED_ELSEWHERE) - set(targets()))
+    assert not unknown, (
+        "COVERED_ELSEWHERE names targets the Makefile does not define: "
+        + ", ".join(unknown)
+    )
+
+
+def test_the_workflows_the_exemptions_point_at_exist() -> None:
+    for gate, where in COVERED_ELSEWHERE.items():
+        if where.endswith(".yml"):
+            assert (ROOT / ".github" / "workflows" / where).is_file(), (
+                f"{gate} is exempted because {where} covers it, but that workflow is missing"
+            )
