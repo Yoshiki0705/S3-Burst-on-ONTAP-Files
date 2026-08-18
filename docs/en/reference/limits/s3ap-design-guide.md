@@ -250,16 +250,23 @@ direction and simultaneous writes need care.
 
 | Scenario | Behaviour | Risk |
 |---|---|---|
-| **S3 AP PutObject completes, then an NFS / SMB read** | **Consistent data is readable immediately** (WAFL's atomic commit) | None. This is the main path |
+| **S3 AP PutObject completes, then an NFS / SMB read** | **Whatever is visible is always the complete object.** Propagation still takes time (p50 9 ms on the same volume, p50 8 ms through FlexCache; [verification record](../../verification/flexcache-s3ap-visibility.md)) | Low. This is the main path. **The client-side cache dominates, though** — at the mount defaults (`acdirmin=30` / `acdirmax=60`) a file can stay invisible for up to a minute |
 | An S3 AP GET during an NFS write | Data mid-write may be read (a partial read) | Data inconsistency |
 | An S3 AP write plus FlexCache write-back on the same file | The cache's dirty data is discarded (XLD revoke) | Data conflict |
 | An S3 AP GET on the old key straight after an NFS rename | NotFound on the old key (the rename propagates immediately) | Key management in the application |
 
 ### Using it safely in this architecture
 
-**The main path (S3 AP to FlexCache NFS / SMB) is safe.** Once the S3 AP's PutObject completes,
-consistent data is visible to an NFS / SMB read through FlexCache as well (there is propagation to wait
-for, but once visible the data is always complete).
+**On the main path (S3 AP to FlexCache NFS / SMB) a half-written object is never read.** A multipart
+upload does not appear on the NFS side until `CompleteMultipartUpload`, and a single `PutObject` is
+always complete once visible
+([verification record](../../verification/flexcache-s3ap-visibility.md)).
+
+**That is not the same as "visible the moment it completes".** Propagation on the server side takes
+some milliseconds, and the client-side cache expiry sits on top of it. At the mount defaults a
+deletion took 2,171 ms to show up
+([same-volume verification record](../../verification/s3ap-nfs-visibility.md)). Where freshness is a
+requirement, set `actimeo` explicitly.
 
 **Patterns to avoid:**
 
