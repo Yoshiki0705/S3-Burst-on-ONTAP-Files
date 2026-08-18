@@ -29,7 +29,7 @@ The FSx for ONTAP S3 AP is "S3 compatible" but not "identical to Amazon S3".
 | HeadObject | — |
 | DeleteObject | — |
 | MultipartUpload | CreateMultipartUpload / UploadPart / CompleteMultipartUpload |
-| CopyObject | Within the same AP only |
+| CopyObject | Within the same AP and the same Region only. The `x-amz-object-annotation-directive` header is not supported ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)) |
 
 ### Not supported (an error is returned)
 
@@ -37,7 +37,12 @@ The FSx for ONTAP S3 AP is "S3 compatible" but not "identical to Amazon S3".
 |---|---|---|
 | Conditional writes (If-None-Match) | 501 NotImplemented | Mutual exclusion in the application |
 | S3 Annotations (PutObjectAnnotation and similar) | 501 NotImplemented | Write to a standard S3 bucket and annotate there |
-| UploadPartCopy | 404 NoSuchKey (measured) | CopyObject, or move over NFS / SMB |
+
+### Supported with conditions (not measured here)
+
+| Operation | Condition | State in this repository |
+|---|---|---|
+| UploadPartCopy | Supported when source and destination are within the same AP, same-Region copies only ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)) | `404 NoSuchKey` was observed once, with a source that was not within the same AP. **A re-measurement with a same-AP source has not been done.** One observation does not generalise to unsupported |
 
 ### Features that do not exist
 
