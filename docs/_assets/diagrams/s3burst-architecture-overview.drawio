@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2026-08-10T00:00:00.000Z" agent="build_diagrams.py" version="24.0.0" type="device">
   <diagram id="s3burst-overview" name="s3burst-architecture-overview">
-    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="635" math="0" shadow="0">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="665" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -47,8 +47,8 @@
         <mxCell id="e4" value="NFS / SMB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=11;fontColor=#232F3E;" edge="1" source="cache_platform" target="nfs_client" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="note" value="&lt;b&gt;補足&lt;/b&gt;&lt;br&gt;※1 &lt;b&gt;S3 PutObject から FlexCache の NFS で読めるまでの実測&lt;/b&gt;&lt;br&gt;p50 14 ms（aws CLI + cat、n=30）。boto3 の持続セッションでは p50 8 ms。差は測定方法による&lt;br&gt;※2 &lt;b&gt;FlexCache の加算分&lt;/b&gt;&lt;br&gt;p50 +5 ms（Origin を直接読む場合との差）&lt;br&gt;※3 &lt;b&gt;SMB と NFS は同等&lt;/b&gt;&lt;br&gt;持続接続でどちらも p50 7 ms（n=30）&lt;br&gt;※4 &lt;b&gt;Cache 側は FSx for ONTAP かオンプレミスの ONTAP 9&lt;/b&gt;&lt;br&gt;AWS が文書化している FlexCache 構成はこの 2 つ。Cloud Volumes ONTAP、ONTAP Select、Azure NetApp Files、Google Cloud NetApp Volumes は未検証で、「ONTAP ベースだから動く」とは書かない" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="50" y="440" width="1250" height="170" as="geometry" />
+        <mxCell id="note" value="&lt;b&gt;補足&lt;/b&gt;&lt;br&gt;※1 &lt;b&gt;S3 PutObject から FlexCache の NFS で読めるまでの実測&lt;/b&gt;&lt;br&gt;p50 14 ms（aws CLI + cat、n=30）。boto3 の持続セッションでは p50 8 ms。差は測定方法による。Cache 側も FSx for ONTAP、同一リージョン、VPC ピアリング、ap-northeast-1、ONTAP 9.18.1P3D1&lt;br&gt;※2 &lt;b&gt;FlexCache の加算分&lt;/b&gt;&lt;br&gt;p50 +5 ms（Origin を直接読む場合との差）&lt;br&gt;※3 &lt;b&gt;SMB と NFS は同等&lt;/b&gt;&lt;br&gt;持続接続でどちらも p50 7 ms（n=30）&lt;br&gt;※4 &lt;b&gt;Cache 側は FSx for ONTAP かオンプレミスの ONTAP 9&lt;/b&gt;&lt;br&gt;AWS が文書化している FlexCache 構成はこの 2 つ。Cloud Volumes ONTAP、ONTAP Select、Azure NetApp Files、Google Cloud NetApp Volumes は未検証で、「ONTAP ベースだから動く」とは書かない&lt;br&gt;※5 &lt;b&gt;この図の主経路（オンプレミスの Cache）は未検証&lt;/b&gt;&lt;br&gt;上の数値はすべて Cache 側も FSx for ONTAP の条件で測ったもの。オンプレミス ONTAP を Cache とする経路は AWS の対応構成にあるが実機で追っていない。遠隔拠点の遅延も未測定" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=#F5F5F5;fontColor=#333333;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="50" y="440" width="1250" height="200" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

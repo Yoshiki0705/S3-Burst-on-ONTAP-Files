@@ -237,7 +237,8 @@ LABELS: dict[str, dict[str, str]] = {
                     "※1",
                     "S3 PutObject から FlexCache の NFS で読めるまでの実測",
                     "p50 14 ms（aws CLI + cat、n=30）。boto3 の持続セッションでは p50 8 ms。"
-                    "差は測定方法による",
+                    "差は測定方法による。Cache 側も FSx for ONTAP、同一リージョン、"
+                    "VPC ピアリング、ap-northeast-1、ONTAP 9.18.1P3D1",
                 ),
                 (
                     "※2",
@@ -252,6 +253,13 @@ LABELS: dict[str, dict[str, str]] = {
                     "ONTAP Select、Azure NetApp Files、Google Cloud NetApp Volumes は未検証で、"
                     "「ONTAP ベースだから動く」とは書かない",
                 ),
+                (
+                    "※5",
+                    "この図の主経路（オンプレミスの Cache）は未検証",
+                    "上の数値はすべて Cache 側も FSx for ONTAP の条件で測ったもの。"
+                    "オンプレミス ONTAP を Cache とする経路は AWS の対応構成にあるが実機で追っていない。"
+                    "遠隔拠点の遅延も未測定",
+                ),
             ),
         ),
         "en": note_body(
@@ -261,7 +269,8 @@ LABELS: dict[str, dict[str, str]] = {
                     "*1",
                     "Measured S3 PutObject to FlexCache NFS read",
                     "p50 14 ms (aws CLI + cat, n=30); p50 8 ms with a persistent boto3 session. "
-                    "The gap is the measurement method",
+                    "The gap is the measurement method. Cache also on FSx for ONTAP, same Region, "
+                    "VPC peering, ap-northeast-1, ONTAP 9.18.1P3D1",
                 ),
                 ("*2", "FlexCache overhead", "p50 +5 ms against a direct origin read"),
                 (
@@ -275,6 +284,13 @@ LABELS: dict[str, dict[str, str]] = {
                     "Those are the two FlexCache configurations AWS documents. Cloud Volumes ONTAP, "
                     "ONTAP Select, Azure NetApp Files and Google Cloud NetApp Volumes are "
                     "unverified, which is not the same as unsupported",
+                ),
+                (
+                    "*5",
+                    "This diagram's main path, an on-premises cache, is unverified",
+                    "Every figure above was measured with FSx for ONTAP on the cache side too. A "
+                    "cache on on-premises ONTAP is in AWS's supported configurations but has not "
+                    "been followed on hardware, and a remote site's latency is unmeasured",
                 ),
             ),
         ),
@@ -549,7 +565,7 @@ def _overview() -> Diagram:
         name="s3burst-architecture-overview",
         diagram_id="s3burst-overview",
         width=1350,
-        height=635,
+        height=665,
         groups=(
             Group("aws_cloud", "aws_cloud", 50, 50, 560, 350),
             Group(
@@ -589,7 +605,7 @@ def _overview() -> Diagram:
             Edge("e3", "origin_vol", "cache_platform", "flexcache_pull"),
             Edge("e4", "cache_platform", "nfs_client", "nfs_smb"),
         ),
-        notes=(Note("note", "overview_note", 50, 440, 1250, 170),),
+        notes=(Note("note", "overview_note", 50, 440, 1250, 200),),
     )
 
 
