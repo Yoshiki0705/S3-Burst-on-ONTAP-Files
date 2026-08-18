@@ -153,16 +153,20 @@ test bench that has the actual ECU built into it, and verified there. An effort 
 AWS and NetApp is published
 ([Accelerating HiL Testing for AV/ADAS with a Hybrid Cloud Approach](https://aws.amazon.com/blogs/industries/accelerating-hil-testing-for-av-adas-with-a-hybrid-cloud-approach-aws-and-netapp/)).
 
-The mapping below is this repository's own arrangement, not a claim made by that article.
+The mapping below is this repository's own arrangement, not a claim made by that article. **That
+article does not propose this architecture — the S3 Access Point combined with FlexCache.**
 
-| The circumstances on the HiL side | How this architecture takes them |
+The left column states **what this worked example assumes**. It is not a claim that every HiL
+environment looks like this; check the left column against your own before reading across.
+
+| What this worked example assumes | How this architecture takes it |
 |---|---|
-| The test bench contains the actual ECU, so it is physically on-premises. It cannot be relocated | Place a Cache volume on the bench side and mount it over NFS / SMB |
+| The test bench contains the actual ECU, is physically on-premises, and cannot be relocated | Place a Cache volume on the bench side and mount it over NFS / SMB |
 | Collection, pre-processing and cataloguing are to run on the cloud side | `PutObject` to the S3 Access Point. **Speaking S3 is not sufficient on its own:** check per application or AWS service whether it accepts an access point ARN or alias, and whether the operations it needs are in the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) |
-| Replay uses the part needed for that test, not the whole data set | FlexCache is a sparse cache that pulls in only what is needed; it does not replicate everything |
-| The same data set is used on several benches and at several sites | Fan out from one Origin to several Cache volumes |
-| Nothing is written back during replay (results are produced elsewhere) | The Cache is read-centric, which matches what FlexCache is suited to |
-| The data volume is large, and transferring all of it to each site is not realistic | Only the range actually read is transferred |
+| Replay uses the part needed for that test, not the whole data set | FlexCache is a sparse cache that pulls in only the range that is read; it does not replicate everything |
+| The same data set is used on several benches and at several sites | Fan out from one Origin to several Cache volumes. **The behaviour as the number of fan-out targets grows is unverified** ([verification status](verification-status.md)) |
+| Nothing is written back during replay, and results go out by another path | This fits the baseline here, which confines the Cache to reads. **Where write-back is needed, FlexCache's write modes come into it** and the case moves outside this worked example |
+| Transferring all of the data to each site is to be avoided | Only the range actually read is transferred |
 
 Workloads with the same structure are not limited to HiL. Collecting measurement data and
 distributing it to on-site analysis equipment, collecting rendering assets and distributing them to
