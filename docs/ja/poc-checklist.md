@@ -88,7 +88,11 @@
 この構成の前提ではない。S3 Access Point をボリュームに接続することとは**別の機構**なので、
 これを検証しても収集層の根拠にはならない。後回しにする。
 
-- [ ] 何ができるかを確認する（この構成に取り込む前提ではなく、区別を保つための確認）
+- [x] 何ができるかを確認する（この構成に取り込む前提ではなく、区別を保つための確認）。
+      通常ボリュームの NAS バケットは動作し、FlexCache ボリュームでは
+      `flexcache config modify -is-s3-enabled true`（advanced 権限）の設定後に
+      `GetObject` / `ListObjectsV2` が成功した（[全方向比較](verification/cross-protocol-directions.md)）。
+      **この結果は S3 Access Point の対応状況の根拠にはならない。別の機構である**
 
 ## 記録の作り方
 
