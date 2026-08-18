@@ -36,16 +36,20 @@ does not render.
 | Collect (write) | FSx for ONTAP S3 Access Point, **attached to the origin volume only** | S3 API |
 | Source of truth | FSx for ONTAP origin volume | — |
 | Distribute | FlexCache | cluster / SVM peering between ONTAP systems |
-| Consume (read) | Cache volume at the consuming site | NFS / SMB only |
+| Consume (read-only in this repository's baseline) | Cache volume at the consuming site | NFS / SMB only |
 
 **"Source of truth" here means the origin volume is the one place writes are directed to.** It is a
 design commitment about the write path. **It does not mean FlexCache resolves conflicts between
 protocols, provides distributed locking, or guarantees application-level consistency.**
 
 Writes always pass through the S3 Access Point on the origin, and no S3 access is exposed on the
-cache side. That keeps the write path single and leaves the cache read-oriented, which is where
-FlexCache fits best. The full picture is in
-[Architecture](architecture.md).
+cache side. That keeps the write path single.
+
+**FlexCache can take writes** — write-around by default, and write-back from ONTAP 9.15.1
+([replicating with FlexCache](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)). **This repository's baseline** confines the cache to reads and
+consolidates writes on the origin, to keep conflicts, locking, disconnection behaviour and write-back
+out of the design surface. AWS describes FlexCache as best suited to read-intensive workflows. The
+full picture is in [Architecture](architecture.md).
 
 ## When the consuming site is the origin
 
