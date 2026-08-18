@@ -38,15 +38,20 @@ flowchart LR
 | 層 | 何を使うか | プロトコル |
 |---|---|---|
 | 収集（書き込み） | Amazon FSx for NetApp ONTAP の S3 Access Point | S3 API |
-| 正典 | FSx for ONTAP の Origin ボリューム | — |
+| 正本 | FSx for ONTAP の Origin ボリューム | — |
 | 配布 | FlexCache | ONTAP 間のクラスタ / SVM ピアリング |
 | 利用（読み取り） | ファンアウト先の Cache ボリューム | NFS / SMB のみ |
+
+**「正本データ」は、書き込み先として管理するボリュームを指す。** この構成では Origin ボリュームである。
+書き込み経路を 1 つに定めるという設計上の約束であり、**複数プロトコル間の競合解決、分散ロック、
+アプリケーションレベルの整合性を FlexCache が保証するという意味ではない。** 同時書き込みの扱いは
+[S3 AP 設計ガイド](reference/limits/s3ap-design-guide.md)にある。
 
 ## S3 Access Point は Origin 側にだけ付ける
 
 この 1 点が設計を大きく単純にする。Cache 側は S3 を提供せず、NFS / SMB で使う。
 
-- **書き込み経路が 1 本になる。** 正典は Origin であり、書き込みは常に AWS 側の S3 Access Point を
+- **書き込み経路が 1 本になる。** 正本は Origin であり、書き込みは常に AWS 側の S3 Access Point を
   通る。Cache 側からの書き戻し（write-back / write-around）の設計判断が主題から外れ、Cache は
   読み取り中心という FlexCache 本来の適性に収まる
   （[FlexCache は読み取り主体のワークフローに適する](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。
