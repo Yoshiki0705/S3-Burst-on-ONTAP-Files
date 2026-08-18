@@ -55,6 +55,10 @@ def test_the_published_list_is_not_empty() -> None:
         "https://github.com/Yoshiki0705/s3-burst-on-ontap-files/security/advisories/new",
         "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook",
         "https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-compatibility-notes.md",
+        # The canonical casing of this repository, which its own links do not use. GitHub resolves
+        # either, so rejecting one of them would be a false positive on a working link.
+        "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files",
+        "https://github.com/Yoshiki0705/fsx-for-ontap-adoption-playbook",
     ],
 )
 def test_a_published_repository_passes(url: str) -> None:

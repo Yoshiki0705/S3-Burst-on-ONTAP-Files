@@ -186,6 +186,11 @@ def check_external(url: str, timeout: float = 10.0) -> str | None:
 # 404 that only an external probe catches. Eighteen links in this repository were wrong that way, in
 # the README, in SECURITY.md and in llms.txt, and none of them failed a commit gate. Checked offline
 # against this list so it fails on the machine that introduced it.
+#
+# Compared case-insensitively, because GitHub resolves a repository name regardless of case and both
+# spellings are in use here: this repository is `S3-Burst-on-ONTAP-Files` while its own links say
+# `s3-burst-on-ontap-files`. A case-sensitive list would reject the canonical spelling of the
+# repository it lives in.
 OWNER = "Yoshiki0705"
 PUBLISHED_REPOS = frozenset(
     {
@@ -194,6 +199,7 @@ PUBLISHED_REPOS = frozenset(
         "FSx-for-ONTAP-Adoption-Playbook",
     }
 )
+PUBLISHED_LOWER = frozenset(name.lower() for name in PUBLISHED_REPOS)
 # The character class excludes quotes and commas as well as the obvious delimiters: in prose and
 # in Python fixtures a URL is routinely followed by one, and capturing it turns a correct name
 # into an unknown one.
@@ -206,7 +212,7 @@ def check_owner_repo(url: str) -> str | None:
     if not match:
         return None
     name = match.group(1)
-    if name in PUBLISHED_REPOS:
+    if name.lower() in PUBLISHED_LOWER:
         return None
     return (
         f"unknown repository {name!r} for {OWNER}; a local directory name is not a repository name. "
