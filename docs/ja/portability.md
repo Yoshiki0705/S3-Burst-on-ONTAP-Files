@@ -32,25 +32,21 @@
 AWS が明記している FSx for ONTAP の FlexCache 対応構成は 3 つだけである
 （[対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。
 
-| Origin | Cache | 段階 |
-|---|---|---|
-| オンプレミス ONTAP | FSx for ONTAP | ドキュメント記載（この構成の対象外。逆方向） |
-| FSx for ONTAP | オンプレミス ONTAP | ドキュメント記載 / 実機未検証（**この構成の主経路**） |
-| FSx for ONTAP | FSx for ONTAP | ドキュメント記載 |
+判定の語は 4 つに正規化してある。`documented`（一次資料に記載）、`locally verified`（このリポジトリで実測）、
+`unverified`（記載はあるが実機で追っていない）、`unconfirmed`（公開ドキュメントに記載を見つけられていない）。
+**`unconfirmed` は「できない」ではない。** 同時に「ONTAP ベースだから動く」とも書かない。どちらも根拠がない。
 
-### 表に含まれていない組み合わせ
+| プラットフォーム | Origin として | Cache として（Origin は FSx for ONTAP） | 最小バージョン | 対応プロトコル | 一次資料 | 制約 | 判定 |
+|---|---|---|---|---|---|---|---|
+| Amazon FSx for NetApp ONTAP | ✅ この構成の Origin | ✅ 対応構成に記載 | 収集層に ONTAP 9.17.1 以降 | NFS / SMB | [対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) | Cache は FlexGroup であること。Cache 側は階層化できない | **locally verified**（同一リージョン・VPC ピアリング、NFSv3 は 2026-08-09、SMB は 2026-08-10。条件と範囲は[検証状況](verification-status.md)） |
+| オンプレミス ONTAP（AFF / FAS） | ✅ 逆方向として記載 | ✅ 対応構成に記載（**この構成の主経路**） | FlexCache は ONTAP 9.5 以降、write-back は 9.15.1 以降 | NFS / SMB | [対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) | クラスタ / SVM ピアリングの経路をこのリポジトリの外で用意する | **unverified**（記載はあるが実機で追っていない） |
+| ONTAP Select | 収集層は ONTAP S3 で可（[サポート状況](support-matrix.md)） | 対応構成表に記載なし | — | NFS / SMB | — | — | **unconfirmed** |
+| Cloud Volumes ONTAP | 収集層は ONTAP S3 で可 | 対応構成表に記載なし | — | NFS / SMB | — | — | **unconfirmed** |
+| Azure NetApp Files | 収集層は object REST API で可 | 対応構成表に記載なし。ANF 側にキャッシュボリュームはあるが Origin に FSx for ONTAP を挙げていない | — | NFS / SMB | [cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes)（Origin は外部 ONTAP / Cloud Volumes ONTAP） | キャッシュボリュームでは object REST API 非対応 | **unconfirmed** |
+| Google Cloud NetApp Volumes | 収集層は S3 multiprotocol で可（ONTAP モードのみ） | 対応構成表に記載なし | — | NFS / SMB | — | — | **unconfirmed** |
 
-FSx for ONTAP を Origin としたときに、次を Cache にできるかは AWS の対応構成表に含まれていない。
-
-| Cache 候補 | 段階 |
-|---|---|
-| Cloud Volumes ONTAP | 未確認 |
-| ONTAP Select | 未確認 |
-| Azure NetApp Files | 未確認 |
-| Google Cloud NetApp Volumes | 未確認 |
-
-**未確認は「できない」ではなく、「公開ドキュメントに記載を見つけられていない」である。**
-同時に「ONTAP ベースだから動く」とも書かない。どちらも根拠がない。
+**`一次資料` 欄が空の行は、こちらが探して見つけられていないという意味である。**
+存在しないという主張ではない。見つけたら埋める。
 
 確かめる手順は [PoC チェックリスト](poc-checklist.md)のフェーズ 4 にある。
 結果が出たらこの表を更新する。
