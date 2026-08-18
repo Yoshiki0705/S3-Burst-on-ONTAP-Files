@@ -101,8 +101,12 @@ Environment needed: ONTAP 9.18.1.
 This is not a premise of the architecture. It and attaching an S3 Access Point to a volume are
 **separate mechanisms**, so confirming it produces no evidence about the collect layer. Leave it last.
 
-- [ ] Confirm what it can do (not as a premise for adopting it here, but to keep the distinction
-      intact)
+- [x] Confirm what it can do (not as a premise for adopting it here, but to keep the distinction
+      intact). A NAS bucket on a regular volume works, and on a FlexCache volume `GetObject` and
+      `ListObjectsV2` succeeded after `flexcache config modify -is-s3-enabled true` at advanced
+      privilege ([all directions](verification/cross-protocol-directions.md)).
+      **This result is not evidence about what the S3 Access Point supports. They are separate
+      mechanisms**
 
 ## How to write the record
 
