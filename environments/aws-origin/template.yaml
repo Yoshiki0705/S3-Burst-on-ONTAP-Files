@@ -171,6 +171,10 @@ Resources:
   # ---------------------------------------------------------------------------------------------
   OntapAdminSecret:
     Type: AWS::SecretsManager::Secret
+    # checkov:skip=CKV_AWS_149: encrypted with the service-managed key. A customer managed key would
+    # add a resource whose deletion has a mandatory 7-to-30-day waiting period to the teardown path
+    # of a verification environment, which is the one place this repository keeps deletable on the
+    # same day. Use a CMK where the key policy is itself part of the control being demonstrated.
     Properties:
       Name: !Sub "${ProjectName}/${FileSystemName}/fsxadmin"
       Description: !Sub "fsxadmin credential for the ${FileSystemName} FSx for ONTAP file system."

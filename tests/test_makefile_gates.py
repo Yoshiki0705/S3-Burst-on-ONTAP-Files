@@ -173,18 +173,50 @@ def scripts_invoked(target: str) -> set[str]:
     return found
 
 
+# Gates whose work is an external binary rather than a script in this repository. Matched by the
+# command name, because `scripts_invoked` finds nothing for them and a gate that matches nothing
+# would be skipped -- which is the blind spot this file exists to close, reproduced inside itself.
+EXTERNAL_COMMANDS = {
+    "cfn": "cfn-lint",
+    "iac-security": "checkov",
+    "markdown": "markdownlint",
+}
+
+
+def commands_invoked(target: str) -> set[str]:
+    """What a gate runs in CI terms: repository scripts, or the external command it wraps."""
+    scripts = scripts_invoked(target)
+    if scripts:
+        return scripts
+    names = {target} | prerequisites(target)
+    return {EXTERNAL_COMMANDS[name] for name in names if name in EXTERNAL_COMMANDS}
+
+
+def executable_lines(text: str) -> str:
+    """The workflow with comments stripped.
+
+    Without this the search matches its own documentation: the comment explaining why the checkov
+    step names its frameworks contains the word `checkov`, so deleting the step left the assertion
+    green. Found by deleting it and watching the test pass.
+    """
+    return "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    )
+
+
 def test_every_make_all_gate_runs_in_ci() -> None:
     assert CI.is_file(), "the CI workflow must exist for this to mean anything"
-    workflow = CI.read_text(encoding="utf-8")
+    workflow = executable_lines(CI.read_text(encoding="utf-8"))
     missing: list[str] = []
     for gate in sorted(prerequisites("all")):
         if gate in COVERED_ELSEWHERE:
             continue
-        invoked = scripts_invoked(gate)
-        if not invoked:
-            # A gate that runs no script of its own (`test` runs one; `cfn` runs cfn-lint) is
-            # matched by name instead, which is why the assertion below is on the union.
-            continue
+        invoked = commands_invoked(gate)
+        assert invoked, (
+            f"gate {gate!r} runs neither a script under tools/ or scripts/ nor a command listed in "
+            "EXTERNAL_COMMANDS, so this test cannot tell whether CI runs it. Add it to "
+            "EXTERNAL_COMMANDS rather than leaving it unchecked."
+        )
         if not any(script in workflow for script in invoked):
             missing.append(f"{gate} ({', '.join(sorted(invoked))})")
     assert not missing, (
@@ -210,3 +242,12 @@ def test_the_workflows_the_exemptions_point_at_exist() -> None:
             assert (ROOT / ".github" / "workflows" / where).is_file(), (
                 f"{gate} is exempted because {where} covers it, but that workflow is missing"
             )
+
+
+def test_every_external_command_gate_is_a_real_target() -> None:
+    """A stale entry would map a gate that no longer exists and check nothing."""
+    unknown = sorted(set(EXTERNAL_COMMANDS) - set(targets()))
+    assert not unknown, (
+        "EXTERNAL_COMMANDS names targets the Makefile does not define: "
+        + ", ".join(unknown)
+    )

@@ -85,6 +85,19 @@ Parameters:
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 180, 365]
     Description: CloudWatch Logs retention for this pattern's function.
 
+  # A cap, not a target. The collect side writes into one FSx for ONTAP file system whose throughput
+  # is a purchased tier, so an unbounded fan-out of this function does not go faster -- it queues
+  # against a fixed ceiling while consuming the account's concurrency. Raise it once the pattern has
+  # been measured against the throughput the file system actually has.
+  ReservedConcurrency:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    MaxValue: 1000
+    Description: >-
+      Maximum concurrent executions for this pattern's function. Bounded by default because the
+      destination file system has a fixed throughput tier.
+
 Resources:
   # The log group is declared explicitly rather than left to implicit creation, so that retention is
   # set from the start. An implicitly created group retains forever, which is a cost that nobody
@@ -99,6 +112,19 @@ Resources:
 
   Function:
     Type: AWS::Serverless::Function
+    # Three decisions this scaffold cannot make for a pattern it does not know yet. Each is left to
+    # the author rather than defaulted, because a wrong default here propagates to every pattern.
+    #
+    # checkov:skip=CKV_AWS_117: VPC placement depends on what the pattern talks to. A function that
+    # only calls the S3 Access Point endpoint does not need to be in the VPC; one that mounts NFS
+    # does. Decide it per pattern and add VpcConfig with the subnets and security group.
+    # checkov:skip=CKV_AWS_116: a dead-letter target depends on the invocation model, and this
+    # scaffold configures no event source. Add DeadLetterQueue once the trigger is known -- an
+    # asynchronous invocation that fails without one is lost silently.
+    # checkov:skip=CKV_AWS_173: the environment variables here are resource identifiers and names,
+    # not secrets, and they are encrypted with the service-managed key. A CMK is a per-deployment
+    # decision, as with the log group above. Read anything secret from Secrets Manager instead of
+    # putting it here.
     Properties:
       FunctionName: !Sub "${AWS::StackName}-${PatternName}"
       Description: !Sub "__PATTERN_TITLE__ — ${PatternName}"
@@ -109,6 +135,7 @@ Resources:
         - arm64
       MemorySize: 256
       Timeout: 30
+      ReservedConcurrentExecutions: !Ref ReservedConcurrency
       LoggingConfig:
         LogGroup: !Ref FunctionLogGroup
       Environment:
