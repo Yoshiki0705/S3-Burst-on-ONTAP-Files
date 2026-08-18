@@ -78,7 +78,7 @@ is treated as something to verify.
 
 | Constraint | Detail |
 |---|---|
-| Supported operations | Limited. Event notifications, lifecycle and versioning are out of scope |
+| Supported operations | A subset of the S3 API. Event notifications, lifecycle, versioning, Object Lock, Requester Pays and conditional writes are out of scope; the storage class is `FSX_ONTAP` and encryption is `SSE-FSX` only; Block Public Access is always on and cannot be changed. The full list is in [limits](reference/limits/s3-access-point.md#features-out-of-scope) ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)) |
 | Authorisation | Both the AWS side (IAM and the access point policy) and the ONTAP side (the file system identity) have to permit it ([two-layer authorisation](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)) |
 | `NetworkOrigin` | Cannot be changed after creation (changing it means deleting and recreating). **Reachability is decided by where the caller is and how it is routed, not by the origin type.** A Gateway endpoint only routes traffic that originates inside the VPC, so a caller arriving over VPN, Direct Connect, a peered VPC or Transit Gateway needs an Interface endpoint ([network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)) |
 | Object names | An S3 name is up to 1024 bytes and a file or directory name up to 255 characters. `part1/part2` and `part1/part2/part3` cannot both exist on NAS ([NAS data requirements](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)) |
