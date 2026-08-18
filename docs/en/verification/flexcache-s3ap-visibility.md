@@ -18,7 +18,7 @@ volume in a different cluster, by way of FlexCache.
 | Date measured | 2026-08-09 (UTC) |
 | Region | ap-northeast-1 |
 | Origin cluster | File system 1 (`fs-0123456789abcdef0`, acting as Origin), SINGLE_AZ_1, 128 MBps, 1 HA pair |
-| Cache cluster | File system 2 (`fs-0123456789abcdef0`, acting as the on-premises-equivalent Cache), SINGLE_AZ_1, 128 MBps, 1 HA pair |
+| Cache cluster | File system 2 (`fs-0abcdef1234567890`, acting as the on-premises-equivalent Cache), SINGLE_AZ_1, 128 MBps, 1 HA pair |
 | **ONTAP version** | **NetApp Release 9.18.1P3D1** (identical on both clusters) |
 | Connection | VPC peering (same Region, same account) |
 | Origin volume | `s3burst_origin_vol2`, SVM `fsxsvm02`, security style UNIX |

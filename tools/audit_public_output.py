@@ -174,11 +174,16 @@ PII_RULES: list[tuple[re.Pattern[str], str]] = [
     # A real file system ID names a resource in a real account. AGENTS.md has listed it as
     # never-commit from the start, but nothing enforced it, and two of them reached a published
     # verification record. Both `FsxId0123...` (as ONTAP and the console render it) and `fs-0123...`
-    # (as the AWS API does) are caught; the documented placeholder is allowed through so that the
-    # replacement this message asks for does not itself fail.
+    # (as the AWS API does) are caught; the documented placeholders are allowed through so that the
+    # replacement this message asks for does not itself fail. There are two of them because this
+    # architecture has two file systems -- an origin and a cache -- and masking both to the same
+    # string makes a two-cluster measurement read as one cluster.
     (
-        re.compile(rf"\b(?:FsxId|fs-)(?!{'0123456789abcdef0'})[0-9a-f]{{17}}\b"),
-        "remove real file system IDs; use fs-0123456789abcdef0",
+        re.compile(
+            r"\b(?:FsxId|fs-)(?!0123456789abcdef0\b|0abcdef1234567890\b)[0-9a-f]{17}\b"
+        ),
+        "remove real file system IDs; use fs-0123456789abcdef0 "
+        "(and fs-0abcdef1234567890 for a second one)",
     ),
 ]
 
