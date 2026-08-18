@@ -83,17 +83,22 @@ file system, they contend for bandwidth. In this architecture the Origin and the
 clusters, so it is not normally a problem — but **if a client mounts NFS directly against the Origin
 cluster**, the throughput split has to be accounted for.
 
-### Recommended concurrency (S3 AP writes only, no other traffic)
+### How to decide concurrency
 
-| FSx for ONTAP Throughput Capacity | Recommended concurrent requests | Intended use |
-|---|---|---|
-| 128 MBps | 2–5 | PoC / small-scale verification |
-| 256 MBps | 5–10 | Development and test |
-| 512 MBps | 10–20 | Small production |
-| 1,024 MBps | 20–50 | Medium production |
-| 2,048+ MBps | 50–100 | Large production |
+**This repository has no measurement of concurrency.** The only starting point is this relation.
 
-Formula: `max concurrency ≈ provisioned throughput ÷ bandwidth consumed per request`
+```text
+max concurrency ≈ provisioned throughput ÷ bandwidth consumed per request
+```
+
+Bandwidth consumed per request comes from the object size and the time one request takes. Both have
+to be measured against your own workload; neither can be derived from the throughput step.
+
+That makes the order of work:
+
+1. Measure the elapsed time and the throughput at concurrency 1, at a representative object size
+2. Raise concurrency while recording the rate of `SlowDown` (503) and p99
+3. Take the ceiling just below where that rate exceeds what you can absorb
 
 **Where an existing NFS / SMB workload is present, subtract its share when designing.**
 
