@@ -117,11 +117,11 @@ Parameters:
     AllowedValues: [UNIX, NTFS]
     Description: >-
       UNIX pairs with NFS on the fan-out side, NTFS pairs with SMB. MIXED is deliberately not
-      offered: it is reported as unsupported for cache volumes, and the choice is treated as
-      inherited at cache creation time rather than settable on the cache. Decide this before the
-      volume exists — changing it later means rebuilding the serve layer. NTFS additionally needs a
-      CIFS server on the SVM, which this template does not create; an Active Directory join is one
-      way to get one, workgroup mode is the documented alternative.
+      offered: AWS describes it as for advanced users only. Whether the cache inherits this from the
+      origin is unconfirmed on this architecture's main path; if it does, changing it later means
+      rebuilding the serve layer, which is why deciding before the volume exists is the safe order.
+      NTFS additionally needs a CIFS server on the SVM, which this template does not create; an
+      Active Directory join is one way to get one, workgroup mode is the documented alternative.
 
   DeployVerificationHost:
     Type: String

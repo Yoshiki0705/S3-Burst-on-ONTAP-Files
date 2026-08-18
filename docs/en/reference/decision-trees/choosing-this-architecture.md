@@ -52,7 +52,11 @@ created. The detail and the sources are in
 | Whether to extend across Regions | The S3 Access Point's identity (UNIX or Windows) |
 | Whether to replace the collect layer with another platform | The S3 Access Point's `NetworkOrigin` |
 
-Everything in the right column means a rebuild if it is changed afterwards.
+Everything in the right column means a rebuild if it is changed afterwards. **The evidence behind
+each differs, though.** For `NetworkOrigin` and the S3 Access Point's identity, the absence of an
+update API is confirmed in AWS documentation. **For the origin's security style, whether the cache
+inherits it is unconfirmed on this architecture's main path, and so is the rebuild that follows from
+it** ([decisions that come first](../../design-first-decisions.md)).
 
 ## Related documents
 

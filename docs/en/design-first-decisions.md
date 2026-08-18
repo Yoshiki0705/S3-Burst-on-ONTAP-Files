@@ -7,16 +7,16 @@
 Japanese is the authoritative version of this repository for technical accuracy; report any
 discrepancy you find here.
 
-The judgement that is most expensive to reverse in this architecture is **whether the fan-out side
-uses NFS or SMB**. The origin volume's security style bears on it and is treated as an item that
-cannot be set on the cache side, so changing it later means rebuilding the serve layer.
+The judgement that could be most expensive to reverse in this architecture is **whether the fan-out
+side uses NFS or SMB**. The origin volume's security style bears on it.
 
-The conclusion first.
+The conclusion first. **Read the confirmed part and the unconfirmed part separately.**
 
-> **Decide whether the consuming site uses NFS or SMB before you create the origin volume.**
-> The security style is described as inherited from the origin at cache creation time and is not a
-> setting on the cache. If it is changed on the origin afterwards, the cache has to be deleted and
-> recreated.
+> **Deciding whether the consuming site uses NFS or SMB before the origin volume exists is the safe
+> order.** The security style (UNIX or NTFS) pairs with the type of identity the S3 Access Point uses,
+> and that part is confirmed. **Whether the security style is inherited from the origin at cache
+> creation time is unconfirmed.** If it is, changing it on the origin afterwards means deleting and
+> recreating the cache. **The reason to decide early is the asymmetry, not a confirmed constraint.**
 
 ## The source, and how far it is confirmed
 
