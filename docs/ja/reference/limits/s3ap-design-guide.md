@@ -240,16 +240,21 @@ done
 
 | シナリオ | 動作 | リスク |
 |---|---|---|
-| **S3 AP PutObject 完了 → NFS/SMB read** | **即座に一貫したデータが読める**（WAFL の原子的コミット） | なし。これが主経路 |
+| **S3 AP PutObject 完了 → NFS/SMB read** | **見えた時点では常に完全なデータ。** ただし反映には時間差がある（同一ボリュームで p50 9 ms、FlexCache 経由で p50 8 ms。[検証記録](../../verification/flexcache-s3ap-visibility.md)） | 低い。これが主経路。**ただしクライアント側のキャッシュが支配的になる**（既定マウントの `acdirmin=30` / `acdirmax=60` では最大 1 分見えないことがある） |
 | NFS 書き込み中に S3 AP GET | 書き込み途中のデータが読まれる可能性（部分読み取り） | データ不整合 |
 | S3 AP 書き込み + FlexCache write-back で同一ファイル | Cache のダーティデータが破棄される（XLD revoke） | データ競合 |
 | NFS rename 直後に S3 AP GET（旧キー） | 旧キーでは NotFound（rename は即座に反映） | アプリ側のキー管理 |
 
 ### この構成での安全な使い方
 
-**主経路（S3 AP → FlexCache NFS/SMB）は安全。** S3 AP の PutObject が完了した時点で、
-FlexCache 経由の NFS/SMB read からも一貫したデータが見える（伝搬待ちはあるが、
-見えた時点では常に完全なデータ）。
+**主経路（S3 AP → FlexCache NFS/SMB）で、中途半端なデータを読むことはない。**
+マルチパートアップロードは `CompleteMultipartUpload` まで NFS 側に現れず、単一 `PutObject` も
+見えた時点では常に完全なデータである（[検証記録](../../verification/flexcache-s3ap-visibility.md)）。
+
+**「完了と同時に見える」ではない。** サーバ側の反映に数ミリ秒かかり、そのうえで
+クライアント側のキャッシュ期限が乗る。既定マウントでは削除の反映に 2,171 ms かかった実測がある
+（[同一ボリュームの検証記録](../../verification/s3ap-nfs-visibility.md)）。
+鮮度が要件なら `actimeo` を明示する。
 
 **避けるべきパターン:**
 
