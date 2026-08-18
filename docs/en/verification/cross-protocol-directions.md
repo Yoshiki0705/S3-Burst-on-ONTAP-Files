@@ -31,6 +31,8 @@ checked whether an ONTAP NAS bucket (FlexCache duality) can be enabled on FSx fo
 | Concurrency | 1 |
 | Method | boto3 persistent session, same host (a single clock) |
 
+> **Note on the identity**: this measurement used the UNIX root user as the access point identity. Every request through the access point is authorized as that one identity, so root removes the file-permission layer entirely ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). It is recorded as the condition it was, not as a recommendation. Use a dedicated user holding only the permissions the write path needs, and split access points by purpose (`FileSystemIdentity` cannot be changed after creation).
+
 ## Results for all four directions
 
 | # | Direction | p50 | p90 | p99 | max | n |

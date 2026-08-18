@@ -30,6 +30,8 @@ volume in a different cluster, by way of FlexCache.
 | Concurrency | 1 |
 | Method | The write (S3 PutObject) and the read (NFS `cat`) run on the **same host against the same clock** |
 
+> **Note on the identity**: this measurement used the UNIX root user as the access point identity. Every request through the access point is authorized as that one identity, so root removes the file-permission layer entirely ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). It is recorded as the condition it was, not as a recommendation. Use a dedicated user holding only the permissions the write path needs, and split access points by purpose (`FileSystemIdentity` cannot be changed after creation).
+
 ## Results
 
 ### S3 PutObject (Origin) until readable over FlexCache Cache NFS

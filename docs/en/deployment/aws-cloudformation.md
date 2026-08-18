@@ -103,7 +103,7 @@ Two decisions:
 
 | Setting | What it means |
 |---|---|
-| `FileSystemIdentity` | **Every request through the access point is authorized as this one identity.** Per-file ownership on the volume does not carry through it. Scope access with the access point policy and IAM. |
+| `FileSystemIdentity` | **Every request through the access point is authorized as this one identity**, so callers are indistinguishable from each other. **Restriction lives in two places:** an explicit Deny in the access point policy on the AWS side (narrowing the `Allow` is not a restriction), and the file permissions — mode bits or ACLs — held by this identity on the file system side. **To make writes impossible, give the access point an identity that has no write permission.** It cannot be changed after creation, so split access points by purpose ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). |
 | `NetworkOrigin` | **Immutable after creation.** `VPC` keeps a single-host measurement off the public path. `Internet` is writable from outside but is not reachable through an S3 Gateway VPC endpoint. |
 
 ## 4. Mount and check
@@ -177,7 +177,7 @@ The Secrets Manager secret is deleted with a recovery window by default. Either 
 | The stack fails creating the file system | Free IPs in the subnet; characters in the `fsxadmin` password that ONTAP rejects |
 | Cannot reach the management endpoint | Are you inside the VPC? The ONTAP management interface is VPC-only |
 | `mount` times out | Security groups. NFSv3 uses 111, 635 and 4045-4046 as well as 2049 |
-| `AccessDenied` through the access point | The AWS side (IAM and the access point policy) **and** the ONTAP side (file system identity) must both allow it |
+| `AccessDenied` through the access point | The AWS side (IAM and the access point policy) **and** the ONTAP side (file system identity) must both allow it. **The two can be told apart.** A denial on the AWS side carries `with an explicit deny in a resource-based policy` in the error body. A denial on the ONTAP side happens even with no access point policy attached, so check the volume root's owner and mode bits ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). |
 | `HeadBucket` passes but data operations fail | On an AD-joined SVM, domain controller reachability. `HeadBucket` is a false positive |
 | Written but not visible over NFS | Mount options. Check on the `actimeo=0` mount point |
 
