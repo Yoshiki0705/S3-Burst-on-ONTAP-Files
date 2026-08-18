@@ -35,26 +35,23 @@ The serve layer's design is unaffected by that difference.
 AWS states exactly three supported FlexCache configurations for FSx for ONTAP
 ([supported configurations](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)).
 
-| Origin | Cache | Stage |
-|---|---|---|
-| On-premises ONTAP | FSx for ONTAP | documented (out of scope here; the reverse direction) |
-| FSx for ONTAP | On-premises ONTAP | documented / not confirmed on hardware (**this architecture's main path**) |
-| FSx for ONTAP | FSx for ONTAP | documented |
+The verdicts are normalised to four words. `documented` (stated in a primary source),
+`locally verified` (measured in this repository), `unverified` (stated somewhere but not followed on
+hardware), `unconfirmed` (no statement found in public documentation).
+**`unconfirmed` does not mean "cannot be done".** Equally, it is never written as "it works because
+it is ONTAP-based". Neither has any basis.
 
-### Combinations the table does not include
+| Platform | As origin | As cache (origin is FSx for ONTAP) | Minimum version | Protocols | Primary source | Constraints | Verdict |
+|---|---|---|---|---|---|---|---|
+| Amazon FSx for NetApp ONTAP | ✅ the origin in this architecture | ✅ in the supported configurations | ONTAP 9.17.1 or later for the collect layer | NFS / SMB | [supported configurations](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) | The cache must be a FlexGroup. The cache side cannot be tiered | **locally verified** (same Region over VPC peering; NFSv3 on 2026-08-09, SMB on 2026-08-10. Conditions and scope in [verification status](verification-status.md)) |
+| On-premises ONTAP (AFF / FAS) | ✅ stated as the reverse direction | ✅ in the supported configurations (**this architecture's main path**) | FlexCache needs ONTAP 9.5 or later; write-back 9.15.1 or later | NFS / SMB | [supported configurations](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) | The cluster / SVM peering path is provided outside this repository | **unverified** (stated, but not followed on hardware) |
+| ONTAP Select | Collect layer possible over ONTAP S3 ([support matrix](support-matrix.md)) | Not in the supported configuration table | — | NFS / SMB | — | — | **unconfirmed** |
+| Cloud Volumes ONTAP | Collect layer possible over ONTAP S3 | Not in the supported configuration table | — | NFS / SMB | — | — | **unconfirmed** |
+| Azure NetApp Files | Collect layer possible over the object REST API | Not in the supported configuration table. ANF has cache volumes, but does not list FSx for ONTAP as an origin | — | NFS / SMB | [cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes) (origin is external ONTAP or Cloud Volumes ONTAP) | The object REST API is not supported on cache volumes | **unconfirmed** |
+| Google Cloud NetApp Volumes | Collect layer possible over S3 multiprotocol (ONTAP mode only) | Not in the supported configuration table | — | NFS / SMB | — | — | **unconfirmed** |
 
-Whether the following can be the cache when FSx for ONTAP is the origin is not covered by AWS's
-supported configuration table.
-
-| Cache candidate | Stage |
-|---|---|
-| Cloud Volumes ONTAP | unconfirmed |
-| ONTAP Select | unconfirmed |
-| Azure NetApp Files | unconfirmed |
-| Google Cloud NetApp Volumes | unconfirmed |
-
-**Unconfirmed means "no statement was found in public documentation", not "cannot be done".** Equally,
-it is never written as "it works because it is ONTAP-based". Neither has any basis.
+**An empty `Primary source` cell means we looked and did not find one.**
+It is not a claim that none exists. It gets filled in once one is found.
 
 The procedure for confirming this is in phase 4 of the
 [PoC checklist](poc-checklist.md). This table gets updated once there is a result.
