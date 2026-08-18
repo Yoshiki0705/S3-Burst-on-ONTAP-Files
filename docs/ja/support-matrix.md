@@ -69,7 +69,7 @@ FSx for ONTAP を Origin として使えるかは
 
 | 制約 | 内容 |
 |---|---|
-| 対応オペレーション | 限定される。イベント通知・ライフサイクル・バージョニングは対象外 |
+| 対応オペレーション | S3 API の一部のみ。イベント通知・ライフサイクル・バージョニング・Object Lock・Requester Pays・条件付き書き込みなどは対象外で、ストレージクラスは `FSX_ONTAP`、暗号化は `SSE-FSX` のみ。Block Public Access は常に有効で変更できない。全項目は[上限値](reference/limits/s3-access-point.md#対象外の機能)（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)） |
 | 認可 | AWS 側（IAM とアクセスポイントポリシー）と ONTAP 側（ファイルシステム識別情報）の両方が許可する必要がある（[二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)） |
 | `NetworkOrigin` | 作成後は変更できない（変更するには削除して作り直す）。**到達性は origin の種別ではなく、呼び出し元の位置とルーティングで決まる。** Gateway エンドポイントは VPC 内で発生したトラフィックだけをルーティングするため、VPN / Direct Connect / ピア VPC / Transit Gateway 経由で VPC に入る呼び出しには Interface エンドポイントが必要になる（[ネットワークアクセス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)） |
 | オブジェクト名 | S3 名は 1024 バイト、ファイル / ディレクトリ名は 255 文字まで。`part1/part2` と `part1/part2/part3` は NAS 上で同時に存在できない（[NAS データ要件](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)） |

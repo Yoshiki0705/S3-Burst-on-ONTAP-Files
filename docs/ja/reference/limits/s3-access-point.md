@@ -42,11 +42,41 @@
 
 ## 対象外の機能
 
+すべて[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)の記載である。
+
 | 機能 | 状態 |
 |---|---|
 | イベント通知 | 対象外。ポーリングまたは FPolicy を検討する |
 | ライフサイクル | 対象外 |
-| バージョニング | 対象外 |
+| バージョニング（Object Versioning、`ListObjectVersions`） | 対象外 |
+| Object Lock | 対象外。WORM が要るなら SnapLock |
+| Object Annotations | 対象外 |
+| Requester Pays | 対象外 |
+| Static Website Hosting | 対象外 |
+| 多要素認証（MFA delete） | 対象外 |
+| 条件付き書き込み | 対象外 |
+| `Presign` | 対応表では非対応（[設計ガイド](s3ap-design-guide.md#presigned-url)に観測と注意） |
+| ACL | `bucket-owner-full-control` 以外は対象外。他の値は `InvalidArgument` |
+| ストレージクラス | `FSX_ONTAP` のみ |
+| サーバー側暗号化 | `SSE-FSX` のみ。`SSE-S3` / `SSE-KMS` は指定できない |
+| Block Public Access | **常に有効で、変更できない**（[アクセス管理](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)） |
+
+### 完全性の検証に効く 2 点
+
+| 項目 | 内容 |
+|---|---|
+| ETag | オブジェクト内容のハッシュだが、**MD5 ダイジェストではない。** メタデータの変更では変わらない |
+| チェックサム | アップロード時に指定すると転送中の検証には使われるが、**値はボリュームに保存されず応答にも返らない。** ダウンロード時の検証には使えない |
+
+収集パイプラインが完全性を ETag やチェックサムで担保している場合、この 2 点は設計に直接効く。
+
+### マルチパートアップロードの副作用
+
+| 項目 | 内容 |
+|---|---|
+| 未完了パートとバックアップ | 進行中（未完了）のマルチパートのパートは、ボリュームのバックアップに含まれない |
+| 未完了パートと容量メトリクス | 宛先ボリュームの `StorageUsed` には現れないが、親ファイルシステムの `StorageUsed` には現れる |
+| 完了後のパート情報 | 完了すると各パートのメタデータは保持されない。`GetObjectAttributes` でのパート情報取得も、パート番号単位のダウンロードもできない |
 
 ## 配布層（FlexCache）
 

@@ -46,11 +46,41 @@ NAS-unfriendly names heavily.
 
 ## Features out of scope
 
+All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html).
+
 | Feature | State |
 |---|---|
 | Event notifications | Out of scope. Consider polling or FPolicy |
 | Lifecycle | Out of scope |
-| Versioning | Out of scope |
+| Versioning (Object Versioning, `ListObjectVersions`) | Out of scope |
+| Object Lock | Out of scope. Use SnapLock where WORM is required |
+| Object Annotations | Out of scope |
+| Requester Pays | Out of scope |
+| Static website hosting | Out of scope |
+| Multi-factor authentication (MFA delete) | Out of scope |
+| Conditional writes | Out of scope |
+| `Presign` | Listed as not supported (the observation and the caveat are in the [design guide](s3ap-design-guide.md#presigned-url)) |
+| ACLs | Only `bucket-owner-full-control`. Any other value returns `InvalidArgument` |
+| Storage class | `FSX_ONTAP` only |
+| Server-side encryption | `SSE-FSX` only. `SSE-S3` and `SSE-KMS` cannot be requested |
+| Block Public Access | **Always on and cannot be changed** ([managing access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)) |
+
+### Two points that bear on integrity checking
+
+| Item | Detail |
+|---|---|
+| ETag | A hash of the object's contents, but **not an MD5 digest.** It does not change when only metadata changes |
+| Checksums | A checksum supplied on upload is used to verify the transfer, but **the value is not stored on the volume and is not returned in the response.** It cannot be used to verify a download |
+
+Where a collection pipeline relies on ETags or checksums for integrity, these two bear directly on the design.
+
+### Side effects of multipart upload
+
+| Item | Detail |
+|---|---|
+| In-progress parts and backups | Parts of an in-progress (incomplete) multipart upload are not included in volume backups |
+| In-progress parts and capacity metrics | They do not appear in the destination volume's `StorageUsed`, but they do appear in the parent file system's |
+| Part metadata after completion | Once the upload completes, per-part metadata is not kept: part information cannot be retrieved through `GetObjectAttributes`, and a single part cannot be downloaded by part number |
 
 ## Serve layer (FlexCache)
 
