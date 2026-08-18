@@ -72,9 +72,12 @@ checked and what has not is in [Verification status](verification-status.md).
 
 ## What to decide before creating the Origin volume
 
-The Origin's security style governs which protocols can be used at the fan-out target. It is an item
-inherited when the Cache is created, and it cannot be set on the Cache side.
-**Whether the site uses NFS or SMB has to be decided before the Origin volume is created.**
+The origin's security style (UNIX or NTFS) pairs with the type of identity the S3 Access Point uses.
+**Whether the cache inherits it from the origin is unconfirmed on this architecture's main path** —
+what that rests on is another platform's requirements. If it does inherit, changing it later means
+rebuilding the serve layer. **Deciding whether the site uses NFS or SMB before the origin volume
+exists is therefore the safe order.** The reason is the asymmetry: the rework if the rule holds is
+large, and there is nothing to lose if it does not.
 
 The detail and the sources are collected in
 [Decisions that come first](design-first-decisions.md). This is the only point worth reading before

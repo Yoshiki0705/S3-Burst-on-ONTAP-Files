@@ -47,7 +47,10 @@ flowchart TD
 | リージョン間に広げるか | S3 Access Point の識別情報（UNIX か Windows か） |
 | 収集層を他プラットフォームに置き換えるか | S3 Access Point の `NetworkOrigin` |
 
-右の列は、いずれも後から変えると作り直しになる項目である。
+右の列は、後から変えると作り直しになる項目である。**ただし根拠の強さが違う。**
+`NetworkOrigin` と S3 Access Point の識別情報は、変更 API がないことが AWS のドキュメントで確認できる。
+**Origin のセキュリティスタイルは、Cache が継承するかどうかがこの構成の主経路では未確認で、
+作り直しになるという帰結もそこに依存する**（[最初に決めること](../../design-first-decisions.md)）。
 
 ## 関連ドキュメント
 

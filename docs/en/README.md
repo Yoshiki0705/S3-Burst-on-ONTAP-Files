@@ -98,15 +98,18 @@ the cost breakdown in
 
 ## Decisions that come first
 
-**Decide whether the consuming site uses NFS or SMB before you create the origin volume.** The
-origin's security style bears on which protocol the fan-out side can use, and it is treated as
-inherited at cache creation time rather than set on the cache. Changing it later means rebuilding
-the serve layer.
+**Deciding whether the consuming site uses NFS or SMB before the origin volume exists is the safe
+order.** The origin's security style (UNIX or NTFS) pairs with the type of identity the S3 Access
+Point uses, and that part is confirmed here.
 
-The supporting text is Azure NetApp Files' cache volume requirements, and whether the same rule
-holds on this architecture's main path (FSx for ONTAP origin to on-premises ONTAP cache) is
-unconfirmed. Deciding early is still worth it: the rework if the rule holds is large, and there is
-nothing to lose if it does not. Detail and sources are in
+**Whether the cache inherits the security style from the origin is unconfirmed on this
+architecture's main path** (FSx for ONTAP origin to on-premises ONTAP cache). What that rests on is
+Azure NetApp Files' cache volume requirements — another platform's requirements. **If it does
+inherit, changing it later means rebuilding the serve layer, but that has not been confirmed.**
+
+The reason to decide early is the asymmetry: the rework if the rule holds is large, and there is
+nothing to lose if it does not. The steps to confirm it are in the
+[PoC checklist](poc-checklist.md), and the detail and sources are in
 [Decisions that come first](design-first-decisions.md).
 
 ## Start here
