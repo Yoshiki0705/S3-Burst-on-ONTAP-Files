@@ -35,6 +35,8 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 
 図 1: 収集層と配布層。図と下の表は同じことを述べています。画像が表示されない環境でも
 判断の根拠が残るように、内容は必ず表か本文の側にも置いています。
+図の中の実測値は Cache 側も FSx for ONTAP という条件のものです。図が主経路として描いている
+オンプレミスの Cache は未検証で、範囲は[検証状況](docs/ja/verification-status.md)にあります。
 
 | 層 | 何を使うか | プロトコル |
 |---|---|---|

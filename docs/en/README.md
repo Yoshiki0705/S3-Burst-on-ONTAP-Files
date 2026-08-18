@@ -31,7 +31,9 @@
 
 Figure 1: the collect and distribute layers. The figure and the table below state the same thing.
 The reasoning is kept in the table or the prose as well, so that it survives anywhere the image
-does not render.
+does not render. The measured figures in it were taken with FSx for ONTAP on the cache side; the
+on-premises cache the figure draws as the main path is unverified, and the scope is in
+[verification status](verification-status.md).
 
 | Layer | Mechanism | Protocol |
 |---|---|---|
