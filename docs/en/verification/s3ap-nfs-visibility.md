@@ -33,6 +33,8 @@ the latter, but the former's figures cannot be quoted as the latter's answer.
 | Method | The write and the read run on the **same host against the same clock** |
 | **ONTAP version** | **could not be determined** (see below) |
 
+> **Note on the identity**: this measurement used the UNIX root user as the access point identity. Every request through the access point is authorized as that one identity, so root removes the file-permission layer entirely ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). It is recorded as the condition it was, not as a recommendation. Use a dedicated user holding only the permissions the write path needs, and split access points by purpose (`FileSystemIdentity` cannot be changed after creation).
+
 ### Why the ONTAP version is not stated
 
 This repository requires the ONTAP version to be stated alongside a measurement. For this measurement

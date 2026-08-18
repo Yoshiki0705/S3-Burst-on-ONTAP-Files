@@ -99,7 +99,7 @@ aws fsx create-and-attach-s3-access-point \
 
 | 設定 | 判断 |
 |---|---|
-| `FileSystemIdentity` | アクセスポイント経由の**全リクエストがこの 1 つの識別情報で認可されます**。ボリューム上のファイルごとの所有権は引き継がれません。範囲の制御はアクセスポイントポリシーと IAM で行います |
+| `FileSystemIdentity` | アクセスポイント経由の**全リクエストがこの 1 つの識別情報で認可されます**。呼び出し元ごとの区別は付きません。**絞り込みは 2 か所にあります。** AWS 側はアクセスポイントポリシーの明示的な拒否（`Allow` を狭くすることは絞り込みになりません）、ファイルシステム側はこの識別情報が持つファイル権限（mode bits / ACL）です。**確実に書けなくしたいなら、書き込み権限を持たない識別情報を指定してください。** 作成後に変更できないので、用途ごとにアクセスポイントを分けます（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)） |
 | `NetworkOrigin` | **作成後は変更できません。** `VPC` にすると単一ホストでの測定が公開経路を通らずに済みます。`Internet` は外部から書けますが、S3 Gateway VPC エンドポイント経由では到達しません |
 
 ## 4. マウントと疎通確認
@@ -173,7 +173,7 @@ Secrets Manager のシークレットは既定で復旧期間を持って削除�
 | スタックがファイルシステムの作成で失敗する | サブネットの空き IP、`fsxadmin` パスワードに ONTAP が拒否する文字が入っていないか |
 | 管理エンドポイントに届かない | VPC 内から実行しているか。ONTAP の管理面は VPC 限定で、手元の端末からは届きません |
 | `mount` がタイムアウトする | セキュリティグループ。NFSv3 は 2049 だけでなく 111 / 635 / 4045-4046 も使います |
-| アクセスポイント経由で `AccessDenied` | AWS 側（IAM とアクセスポイントポリシー）と ONTAP 側（ファイルシステム識別情報）の**両方**が許可している必要があります |
+| アクセスポイント経由で `AccessDenied` | AWS 側（IAM とアクセスポイントポリシー）と ONTAP 側（ファイルシステム識別情報）の**両方**が許可している必要があります。**どちらから返ったかは切り分けられます。** AWS 側の拒否はエラー本文に `with an explicit deny in a resource-based policy` が入ります。ONTAP 側の拒否はアクセスポイントポリシーを付けていない状態でも起きるので、ボリュームルートの所有者と mode bits を確認します（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)） |
 | `HeadBucket` は通るのにデータ操作が失敗する | AD 参加 SVM ならドメインコントローラーへの到達性。`HeadBucket` は偽陽性になります |
 | 書いたのに NFS に見えない | マウントオプション。`actimeo=0` のマウントポイントで確認してください |
 
