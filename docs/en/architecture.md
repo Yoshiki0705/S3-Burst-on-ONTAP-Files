@@ -9,7 +9,12 @@ discrepancy you find here.
 
 This architecture splits into two layers. The **collect layer** takes writes over the S3 API, and the
 **serve layer** distributes to consuming sites with FlexCache. The protocol on the reading side stays
-NFS / SMB, and no copy job is placed between the two.
+NFS / SMB, and no separate copy or scheduled replication job is placed between the two.
+
+**FlexCache is a sparse cache: it pulls the data that gets accessed from the origin and holds it on
+the cache side.** That is not the same as no data transfer. What does not happen is the up-front copy
+of everything, and the synchronisation machinery whose freshness and failures you would otherwise
+own.
 
 ```mermaid
 flowchart LR
@@ -85,8 +90,8 @@ Get Started, so it is kept apart from the other design decisions.
 
 ## What this architecture solves
 
-- Collection is taken over the S3 API while the consuming side stays on NFS / SMB, with no copy job
-  between the two
+- Collection is taken over the S3 API while the consuming side stays on NFS / SMB, with no separate
+  copy or scheduled replication job between the two. Transfer happens for the range that is read
 - The write path can be consolidated onto the S3 Access Point on the origin. **Authorization,
   however, is not a single layer.** A request passes two independent layers in order and has to clear
   both. Layer 1 (the AWS side) evaluates the calling principal and the `s3:` action, and what

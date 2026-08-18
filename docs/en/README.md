@@ -8,13 +8,18 @@
 
 ---
 
-> **Ingest once, consume many times.** Implementation patterns for **collecting** data through an
-> Amazon FSx for NetApp ONTAP S3 Access Point and **serving** it to NFS / SMB consuming sites through
-> FlexCache. "Burst" in the name means fanning collected data out to the file-protocol side. It has
-> nothing to do with FSx for ONTAP throughput burst credits.
+> **Implementation patterns for collecting data over an Amazon FSx for NetApp ONTAP S3 Access Point,
+> keeping the origin volume as the source of truth, and serving it on demand to NFS / SMB consuming
+> sites through FlexCache — with no separate copy or scheduled replication job between the two.**
+> The collect side can stay on the S3 API and the consume side on NFS / SMB.
 >
-> The collect side stays on the S3 API, the consume side stays on NFS / SMB, and there is no copy job
-> between them.
+> **Nothing is copied up front: data that gets read is pulled into the FlexCache cache on demand.**
+> "No copy job" is not "no data transfer". Transfer happens for the range that is read, and the cache
+> holds it. What is absent is the synchronisation machinery whose freshness and failures you would
+> otherwise own.
+>
+> "Burst" in the name means fanning collected data out to the file-protocol side. It has nothing to
+> do with FSx for ONTAP throughput burst credits.
 
 ---
 

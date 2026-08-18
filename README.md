@@ -8,16 +8,21 @@
 
 ---
 
-> **データは 1 回だけ入れて、何度でも使う。** Amazon FSx for NetApp ONTAP の S3 Access Point で
-> データを**集め**、FlexCache で NFS / SMB の利用拠点へ**配る**構成の実装集です。
+> **S3 API で収集したデータを Amazon FSx for NetApp ONTAP 上で正本として管理し、独立した複製・同期
+> ジョブを追加せずに、FlexCache 経由で NFS / SMB の利用拠点へオンデマンドに提供する構成の実装集です。**
+> 収集側は S3 API のまま、利用側は NFS / SMB のままにできます。
+>
+> **全量を事前にコピーするのではなく、アクセスされたデータが FlexCache に取り込まれます。**
+> 「コピージョブを置かない」は「データ転送が起きない」ではありません。転送は読まれた範囲について発生し、
+> Cache 側に保持されます。置かないのは、鮮度と失敗を自分で管理することになる同期の仕組みです。
+>
 > 名前の `burst` は、集めたデータをファイルプロトコル側へ吹き出すことを指します。
 > FSx for ONTAP のスループットのバーストクレジットとは関係ありません。
->
-> 収集側は S3 API のまま、利用側は NFS / SMB のまま。両者の間にコピージョブを置きません。
 
-**English**: collect data over the Amazon FSx for NetApp ONTAP S3 Access Point, then serve it to
-NFS / SMB consuming sites through FlexCache — one source of truth, no copy job between them. The
-worked example is hybrid-cloud AV / ADAS Hardware-in-the-Loop testing.
+**English**: collect over the Amazon FSx for NetApp ONTAP S3 Access Point, keep the origin volume as
+the source of truth, and serve it on demand to NFS / SMB consuming sites through FlexCache — with no
+separate copy or scheduled replication job between the two. Data that is read is pulled into the
+cache on demand. The worked example is hybrid-cloud AV / ADAS Hardware-in-the-Loop testing.
 Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 
 ---
