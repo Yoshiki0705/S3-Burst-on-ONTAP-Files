@@ -1,5 +1,13 @@
 # s3ap-flexcache-verify — Verification Environment Pattern
 
+> **Status: `functionally-tested`** — deployed in ap-northeast-1 and used for the measurements in
+> [the FlexCache verification record](../../../docs/ja/verification/flexcache-s3ap-visibility.md) and
+> [the all-directions comparison](../../../docs/ja/verification/cross-protocol-directions.md)
+> (2026-08-09 and 2026-08-10, ONTAP 9.18.1P3D1, both sides FSx for ONTAP). **The steps this template
+> does not cover — the cluster peer, the SVM peer and the FlexCache itself — were run by hand, and
+> with on-premises ONTAP as the cache nothing here has been exercised.** The vocabulary is defined in
+> [the pattern template](../../_template/README.md#状態).
+
 Deploys the infrastructure needed to measure S3 AP → FlexCache visibility latency
 on existing FSx for ONTAP file systems.
 
