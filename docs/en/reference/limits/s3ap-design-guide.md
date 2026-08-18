@@ -8,8 +8,8 @@ Japanese is the authoritative version of this repository for technical accuracy;
 discrepancy you find here.
 
 <!-- Source: the design considerations, compatibility notes and performance considerations of the
-     sibling repository fsxn-s3ap-serverless-patterns, reorganised for this architecture's point of
-     view. https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns -->
+     sibling repository FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns, reorganised for this architecture's point of
+     view. https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns -->
 
 This covers the detail worth knowing when designing this architecture's collect layer (the S3 Access
 Point). The limits are on [a separate page](s3-access-point.md); the architecture as a whole is in
@@ -66,7 +66,7 @@ of the Authorization header. Since `GetObject` is supported, presigned URL acces
 without breaking `GetObject` itself. A sibling repository has measured a presigned `GetObject`
 succeeding (ONTAP 9.18.1P3D1). The version-dependent scope is stated in NetApp KB articles (v4 from
 9.11.1, v2 and v4 from 9.16.1). The mechanism, the version requirements and a list of alternatives
-are in the [sibling repository's compatibility notes](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/s3ap-compatibility-notes.md).
+are in the [sibling repository's compatibility notes](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-compatibility-notes.md).
 
 **While the public documentation says `Not supported`, do not let a production workload depend on
 it.** The behaviour can change without a deprecation notice. Where time-limited access is needed,
@@ -527,7 +527,7 @@ write-back is used on the serve side.
 | [Architecture](../../architecture.md) | What this architecture solves and does not solve |
 | [Decisions that come first](../../design-first-decisions.md) | The order for deciding security style and volume design |
 | [PoC checklist](../../poc-checklist.md) | What to confirm, and in what order |
-| [Sibling repository: compatibility notes](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | The detail of the Lambda / Step Functions integration |
+| [Sibling repository: compatibility notes](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | The detail of the Lambda / Step Functions integration |
 
 ---
 

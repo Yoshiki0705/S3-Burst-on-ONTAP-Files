@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate and verify the language switcher, and catch links that prefer the wrong language.
 
-Adapted from the sibling repository `fsxn-adoption-playbook` (`tools/sync_lang_switcher.py`).
+Adapted from the sibling repository `FSx-for-ONTAP-Adoption-Playbook` (`tools/sync_lang_switcher.py`).
 Divergence from the original: that repository carries eight languages and a `_template/`
 convention for scaffolding; this one is Japanese-canonical with English as the only translation,
 so `LANGS` is reduced to two and the per-language `HOME_LABEL` table shrinks with it. The path

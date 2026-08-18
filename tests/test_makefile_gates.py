@@ -1,6 +1,6 @@
 """Every Makefile target must be declared `.PHONY`, and `make all` must run every gate.
 
-The first half is carried over from the sibling repository `fsxn-s3ap-serverless-patterns`
+The first half is carried over from the sibling repository `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`
 (`scripts/tests/test_makefile_phony.py`). There, `security` was not declared phony and collided
 with a `security/` directory, so make answered "`security' is up to date" and ran bandit zero
 times — while `make security` sat in the pre-commit list and in the agent instructions, appearing

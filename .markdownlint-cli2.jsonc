@@ -1,5 +1,5 @@
 {
-  // Adapted from the sibling repository fsxn-adoption-playbook. Rules are tuned for a
+  // Adapted from the sibling repository FSx-for-ONTAP-Adoption-Playbook. Rules are tuned for a
   // Japanese-primary documentation repository with heavy table use.
   "config": {
     "default": true,

@@ -4,9 +4,9 @@
 <!-- lang-switcher:end -->
 
 <!-- 出典と分岐の記録
-     姉妹リポジトリ fsxn-s3ap-serverless-patterns の docs/flexcache-poc-checklist.md を
+     姉妹リポジトリ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns の docs/flexcache-poc-checklist.md を
      出発点にしている。
-     https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/flexcache-poc-checklist.md
+     https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/flexcache-poc-checklist.md
 
      分岐:
      1. 順序を「安い順」から「答えが出ないと設計が書けない順」に組み替えた。

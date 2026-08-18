@@ -2,7 +2,7 @@
 """Verify that every count written in prose still matches what is on disk.
 
 Adapted from the count-claim mechanism in the sibling repository
-`fsxn-s3ap-serverless-patterns` (`scripts/check_portal_drift.py`, `_templates_under` /
+`FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns` (`scripts/check_portal_drift.py`, `_templates_under` /
 `_COUNTED_IN_PROSE` / `check_count_claims`). Divergences: the pattern axes are this repository's
 three (`collect` / `serve` / `pipelines`) rather than that repository's six solution families; test
 and Lambda counts are not carried over because there is nothing here yet to count; and the glob

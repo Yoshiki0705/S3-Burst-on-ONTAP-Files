@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pre-publication audit for a public repository.
 
-Adapted from the sibling repository `fsxn-adoption-playbook` (`tools/audit_public_output.py`).
+Adapted from the sibling repository `FSx-for-ONTAP-Adoption-Playbook` (`tools/audit_public_output.py`).
 Divergences, all additive:
 
 * **`vendor-ref` line marker.** The forbidden-product check is now case-insensitive, because a

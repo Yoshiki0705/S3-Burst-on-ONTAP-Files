@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Keep the agent-facing documentation reachable, published, and within budget.
 
-Adapted from the sibling repository `fsxn-s3ap-serverless-patterns`
+Adapted from the sibling repository `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`
 (`scripts/check_agent_context_budget.py`). Divergences: the budget is 20,000 B rather than 28,000 B
 because this repository is starting from nothing and the larger figure is what a grown repository
 settled at, not a target to aim for; the per-topic budget for a dedicated `docs/agent/` tree is

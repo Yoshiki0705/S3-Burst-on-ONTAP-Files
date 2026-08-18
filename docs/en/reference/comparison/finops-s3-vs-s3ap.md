@@ -1234,7 +1234,7 @@ part does not appear on the invoice, and the invoice is not all that FinOps cove
 | Data transfer | Included in the read-side estimates. The rate is the tiered internet rate, or flat for Direct Connect. On-premises circuit costs are not included |
 | The cache refetch rate | Assumed as a share of the working set. Treated as a plausible range for read-heavy reference workloads, but not measured on real equipment. The actual value is set by change frequency and the eviction configuration |
 | The working set share | Assumed at a tenth of the whole dataset. Likewise treated as a plausible range rather than measured. The larger this share, the less a cache is worth and the smaller the gap to a full copy |
-| The latency figures | Measured in the sister repository [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns). They change with the environment |
+| The latency figures | Measured in the sister repository [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns). They change with the environment |
 | Recalculating | `make finops-write` (`python3 tools/finops_model.py --write`) |
 
 Unit prices change. Before using the figures in this document as an estimate, check what is currently

@@ -5,9 +5,9 @@
 <!-- lang-switcher:end -->
 
 <!-- 出典と分岐の記録
-     この表は姉妹リポジトリ fsxn-s3ap-serverless-patterns の
+     この表は姉妹リポジトリ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns の
      docs/support-matrix-fsx-ontap-flexcache-s3ap.md を出発点にしている。
-     https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/support-matrix-fsx-ontap-flexcache-s3ap.md
+     https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/support-matrix-fsx-ontap-flexcache-s3ap.md
 
      コピーではなく、次の点で分岐させた。分岐の理由も残す。
 

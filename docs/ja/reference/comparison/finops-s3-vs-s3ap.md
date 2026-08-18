@@ -1218,7 +1218,7 @@ FinOps の対象は請求書だけではない。
 | データ転送 | 読み取り側の試算には含めている。単価はインターネット向けの段階単価で、Direct Connect の場合は定額。オンプレミス側の回線費用は含まない |
 | キャッシュの再取得率 | 作業セットに対する割合として仮定。読み取り中心の参照系では妥当な範囲として扱っているが、実機で測った値ではない。実際の値は変更頻度と退避の設定で決まる |
 | 作業セットの割合 | データセット全体の 1 割として仮定。同じく妥当な範囲として扱っているが実測ではない。この割合が大きくなるほどキャッシュの利点は薄れ、全量コピーとの差が縮む |
-| 遅延の値 | 姉妹リポジトリ [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) の実測。環境が違えば変わる |
+| 遅延の値 | 姉妹リポジトリ [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) の実測。環境が違えば変わる |
 | 再計算 | `make finops-write`（`python3 tools/finops_model.py --write`） |
 
 単価は変わる。この文書の数値をそのまま見積りに使う前に、

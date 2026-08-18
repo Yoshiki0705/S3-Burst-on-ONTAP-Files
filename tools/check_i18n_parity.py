@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that Tier 1 documents have the same section structure in Japanese and English.
 
-Adapted from the sibling repository `fsxn-adoption-playbook` (`tools/check_i18n_parity.py`).
+Adapted from the sibling repository `FSx-for-ONTAP-Adoption-Playbook` (`tools/check_i18n_parity.py`).
 Divergence: that repository carries eight languages and a second tier of module READMEs
 discovered from `docs/ja/{playbooks,domains}/`. This repository has two languages and no module
 axis, so the language list is reduced and the Tier 2 discovery pass is removed rather than kept

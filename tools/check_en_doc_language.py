@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Catch Japanese text left in English documentation.
 
-Adapted from the sibling repository `fsxn-s3ap-serverless-patterns`
+Adapted from the sibling repository `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`
 (`scripts/check_en_doc_language.py`). Divergences: that repository names translations
 `<name>.en.md` alongside the Japanese file, so it selected them by filename; here a document's
 language is its directory, so the selector is `docs/en/**/*.md`. It also discovered files through

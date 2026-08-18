@@ -270,8 +270,8 @@ FSx for ONTAP という条件で検証済みですが、**主経路であるオ�
 
 | リポジトリ | 概要 |
 |---|---|
-| [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | S3 Access Point のサーバーレス処理パターン集。個別パターンはそちらに残ります |
-| [fsxn-adoption-playbook](https://github.com/Yoshiki0705/fsxn-adoption-playbook) | FSx for ONTAP 導入のライフサイクル / テーマ別知見集 |
+| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | S3 Access Point のサーバーレス処理パターン集。個別パターンはそちらに残ります |
+| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | FSx for ONTAP 導入のライフサイクル / テーマ別知見集 |
 
 このリポジトリは**構成そのもの**を扱います。収集と配布を 1 本の設計として記述し、
 プラットフォーム差と未検証箇所を表で明示することが役割です。

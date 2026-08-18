@@ -1,7 +1,7 @@
 """The count checker, verified against the ways it can fail quietly.
 
 Three of these tests exist because of a specific defect in the sibling repository
-`fsxn-s3ap-serverless-patterns`. Its drift checker was correct, but `solutions/README.md` was not in
+`FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`. Its drift checker was correct, but `solutions/README.md` was not in
 the list of files it scanned, so that file drifted to a pattern count disk did not support and the
 check stayed green. A checker's blind spot is invisible from inside the checker, so the glob list is
 asserted here rather than reviewed.

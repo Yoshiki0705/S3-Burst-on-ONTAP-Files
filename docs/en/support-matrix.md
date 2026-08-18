@@ -8,9 +8,9 @@ Japanese is the authoritative version of this repository for technical accuracy;
 discrepancy you find here.
 
 <!-- Provenance and divergence
-     This table started from the sibling repository fsxn-s3ap-serverless-patterns,
+     This table started from the sibling repository FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns,
      docs/support-matrix-fsx-ontap-flexcache-s3ap.md.
-     https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/support-matrix-fsx-ontap-flexcache-s3ap.md
+     https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/support-matrix-fsx-ontap-flexcache-s3ap.md
 
      It is not a copy. It diverges as follows, and the reasons are kept with it.
 

@@ -41,7 +41,7 @@ is the single source for the stage, and other documents link here.
 
 | Item | Stage | Basis |
 |---|---|---|
-| Supported operations and measured size limits of the FSx for ONTAP S3 Access Point | verified | Measured in the sibling repository [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns). 5 GiB for a single `PutObject`, 50 GiB for a whole object, and the limit is judged at `CompleteMultipartUpload` |
+| Supported operations and measured size limits of the FSx for ONTAP S3 Access Point | verified | Measured in the sibling repository [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns). 5 GiB for a single `PutObject`, 50 GiB for a whole object, and the limit is judged at `CompleteMultipartUpload` |
 | On an Active Directory joined SVM, every data operation through the S3 Access Point needs reachability to an AD domain controller | verified | Same repository. `HeadBucket` succeeds even when AD is unreachable, so it is a false positive |
 | FlexCache with FSx for ONTAP as origin and on-premises ONTAP as cache | documented / not confirmed on hardware | Stated in AWS's [supported configurations](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html) |
 | How an object written through the S3 Access Point appears over NFS on the **same volume** | verified | [Verification record](verification/s3ap-nfs-visibility.md). 2026-08-09, ap-northeast-1, SINGLE_AZ_1 / 128 MBps, UNIX, NFSv3, `actimeo=0`, n=30. S3 to NFS is p50 9 ms; NFS to S3 is p50 873 ms (64 B). **The ONTAP version could not be determined** (the record explains why) |
