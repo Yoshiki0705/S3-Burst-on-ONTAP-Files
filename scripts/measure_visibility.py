@@ -15,7 +15,7 @@ Usage:
     --nfs-lif <DATA_LIF_IP> \
     --fc-path /s3burst_verify_fc \
     --origin-path /s3burst_verify \
-    [--smb-share <SHARE_NAME> --smb-user <DOMAIN\\User> --smb-pass <PASSWORD>] \
+    [--smb-share <SHARE_NAME> --smb-user <DOMAIN\\User>] \
     [--iterations 30] \
     [--region ap-northeast-1] \
     [--output results.json]
@@ -23,6 +23,17 @@ Usage:
 Environment:
   Designed to run on the test host created by the CloudFormation template.
   Requires: nfs-utils, cifs-utils (for SMB), boto3, python3.
+
+SMB credentials:
+  The password is never taken on the command line: an argument is visible in `ps` to every user on
+  the host and lands in shell history and the SSM session log. Supply it as either
+    SMB_PASSWORD=...            environment variable, or
+    --smb-cred-secret <id>      an AWS Secrets Manager secret id or ARN, read with GetSecretValue
+                                (a JSON secret may use the "password" key, or be the raw string)
+  It is written to a mode-600 credentials file for `mount -t cifs` and removed afterwards, so it does
+  not appear in the mount command line either.
+
+  Use an account that can read the share. An administrator is not required.
 
 Notes:
   - Numbers are from a specific test environment and vary by configuration.
@@ -37,6 +48,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from datetime import UTC, datetime
@@ -79,15 +91,52 @@ def mount_nfs(lif: str, path: str, mountpoint: str) -> None:
         print(f"  WARNING: NFS mount failed: {r.stderr.strip()}", file=sys.stderr)
 
 
+def resolve_smb_password(secret_id: str | None) -> str | None:
+    """Read the SMB password from the environment or from Secrets Manager.
+
+    Deliberately not a command-line argument: an argument is visible in `ps` to every user on the
+    host, and it is kept by shell history and by the SSM session log.
+    """
+    from_env = os.environ.get("SMB_PASSWORD")
+    if from_env:
+        return from_env
+    if not secret_id:
+        return None
+    client = boto3.client("secretsmanager")
+    value = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return value
+    if isinstance(parsed, dict):
+        return parsed.get("password") or parsed.get("Password")
+    return value
+
+
 def mount_smb(lif: str, share: str, mountpoint: str, user: str, password: str) -> None:
-    """Mount SMB with cache=none (no client cache)."""
+    """Mount SMB with cache=none (no client cache).
+
+    The credentials go in a mode-600 file rather than in `-o`, because mount options are visible in
+    `ps` for as long as the process runs.
+    """
     os.makedirs(mountpoint, exist_ok=True)
     subprocess.run(["umount", mountpoint], capture_output=True)
-    opts = f"username={user.split(chr(92))[-1]},password={password},domain={user.split(chr(92))[0]},vers=3.0,sec=ntlmssp,cache=none"
-    cmd = ["mount", "-t", "cifs", f"//{lif}/{share}", mountpoint, "-o", opts]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        print(f"  WARNING: SMB mount failed: {r.stderr.strip()}", file=sys.stderr)
+    domain, _, username = user.rpartition(chr(92))
+    cred_fd, cred_path = tempfile.mkstemp(prefix="s3burst-smb-", suffix=".cred")
+    try:
+        os.fchmod(cred_fd, 0o600)
+        with os.fdopen(cred_fd, "w") as handle:
+            handle.write(f"username={username}\n")
+            handle.write(f"password={password}\n")
+            if domain:
+                handle.write(f"domain={domain}\n")
+        opts = f"credentials={cred_path},vers=3.0,sec=ntlmssp,cache=none"
+        cmd = ["mount", "-t", "cifs", f"//{lif}/{share}", mountpoint, "-o", opts]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  WARNING: SMB mount failed: {r.stderr.strip()}", file=sys.stderr)
+    finally:
+        os.unlink(cred_path)
 
 
 def measure_s3_to_file(
@@ -191,7 +240,14 @@ def main():
         "--smb-share", help="SMB share name on the FlexCache (enables SMB measurement)"
     )
     parser.add_argument("--smb-user", help="SMB user (DOMAIN\\User format)")
-    parser.add_argument("--smb-pass", help="SMB password")
+    parser.add_argument(
+        "--smb-cred-secret",
+        help=(
+            "Secrets Manager secret id or ARN holding the SMB password. "
+            "SMB_PASSWORD in the environment takes precedence. "
+            "The password is never accepted as a command-line argument"
+        ),
+    )
     parser.add_argument(
         "--iterations", type=int, default=30, help="Number of iterations per direction"
     )
@@ -278,10 +334,16 @@ def main():
     print(f"    → {percentiles(lat)}\n")
 
     # Direction 5 (optional): S3 AP → FlexCache SMB
-    if args.smb_share and args.smb_user and args.smb_pass:
+    smb_password = resolve_smb_password(args.smb_cred_secret)
+    if args.smb_share and args.smb_user and not smb_password:
+        print(
+            "  SKIP SMB: no password available. Set SMB_PASSWORD or pass --smb-cred-secret",
+            file=sys.stderr,
+        )
+    if args.smb_share and args.smb_user and smb_password:
         smb_mount = "/mnt/s3burst_fc_smb"
         print("Mounting SMB...")
-        mount_smb(args.nfs_lif, args.smb_share, smb_mount, args.smb_user, args.smb_pass)
+        mount_smb(args.nfs_lif, args.smb_share, smb_mount, args.smb_user, smb_password)
         time.sleep(2)
         lat = measure_s3_to_file(
             s3,
