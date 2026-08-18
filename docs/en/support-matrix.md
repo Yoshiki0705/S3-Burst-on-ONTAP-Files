@@ -83,8 +83,9 @@ is treated as something to verify.
 | `NetworkOrigin` | Cannot be changed after creation. An `Internet` origin is not reachable from an S3 Gateway VPC endpoint |
 | Object names | An S3 name is up to 1024 bytes and a file or directory name up to 255 characters. `part1/part2` and `part1/part2/part3` cannot both exist on NAS ([NAS data requirements](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)) |
 | Size limits | 5 GiB per single `PutObject` and per `UploadPart`, 50 GiB for a whole object. Against the documentation's "GB" wording, the measured values were binary prefixes. The whole-object limit is judged at `CompleteMultipartUpload`, so it fails after the entire payload has been transferred ([verification status](verification-status.md)) |
-| Active Directory joined SVM | Every data operation needs reachability to an AD domain controller. `HeadBucket` succeeds even when AD is unreachable, so it cannot be used as a connectivity check |
+| Windows identity | An AD join is not required. Where a domain is not available, use a workgroup-mode CIFS server ([procedure](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html); NTLM only, no Kerberos). **If AD is joined**, every data operation then needs reachability to an AD domain controller, and `HeadBucket` succeeds even when AD is unreachable, so it cannot be used as a connectivity check |
 | Volume names | Alphanumerics and underscores only |
+| Auditing | What ONTAP's file access auditing records is the identity fixed on the access point, not the calling IAM principal. **Splitting access points by purpose is what sets the granularity of the audit.** Identifying the caller requires correlating with AWS CloudTrail ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)) |
 
 ## Constraints on the serve layer
 

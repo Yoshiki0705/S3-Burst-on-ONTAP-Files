@@ -74,8 +74,9 @@ FSx for ONTAP を Origin として使えるかは
 | `NetworkOrigin` | 作成後は変更できない。`Internet` origin は S3 Gateway VPC エンドポイントからは到達しない |
 | オブジェクト名 | S3 名は 1024 バイト、ファイル / ディレクトリ名は 255 文字まで。`part1/part2` と `part1/part2/part3` は NAS 上で同時に存在できない（[NAS データ要件](https://docs.netapp.com/us-en/ontap/s3-multiprotocol/nas-data-requirements-client-access-reference.html)） |
 | サイズ上限 | 単一 `PutObject` と `UploadPart` あたり 5 GiB、オブジェクト全体で 50 GiB。ドキュメントの「GB」表記に対して実測は 2 進接頭辞だった。全体の上限は `CompleteMultipartUpload` の時点で判定されるため、全ペイロードの転送後に失敗する（[検証状況](verification-status.md)） |
-| Active Directory 参加 SVM | すべてのデータ操作に AD ドメインコントローラーへの到達性が必要。`HeadBucket` は AD 到達不能でも成功するため疎通確認に使えない |
+| Windows 識別情報 | AD 参加は必須ではない。ドメインが利用できない場合は workgroup モードの CIFS サーバー（[公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみ、Kerberos 非対応）。**AD 参加を選んだ場合は**、すべてのデータ操作に AD ドメインコントローラーへの到達性が必要になり、`HeadBucket` は AD 到達不能でも成功するため疎通確認に使えない |
 | ボリューム名 | 英数字とアンダースコアのみ |
+| 監査 | ONTAP のファイルアクセス監査に記録されるのはアクセスポイントに固定した識別情報で、呼び出し元の IAM プリンシパルではない。**用途ごとにアクセスポイントを分けることが、監査の粒度を決める。**呼び出し元の特定には AWS CloudTrail 側との突き合わせが必要（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)） |
 
 ## 配布層に対する制約
 
