@@ -8,9 +8,9 @@ Japanese is the authoritative version of this repository for technical accuracy;
 discrepancy you find here.
 
 <!-- Provenance and divergence
-     This started from the sibling repository fsxn-s3ap-serverless-patterns,
+     This started from the sibling repository FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns,
      docs/flexcache-poc-checklist.md.
-     https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/flexcache-poc-checklist.md
+     https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/flexcache-poc-checklist.md
 
      Divergences:
      1. The order was rearranged from "cheapest first" to "whatever blocks the design until it is

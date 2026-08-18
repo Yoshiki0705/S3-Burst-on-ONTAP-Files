@@ -239,9 +239,9 @@ Automated checks catch syntax. These catch design-level problems.
 
 ## Do not
 
-- Move `solutions/flexcache/` out of the sibling repository `fsxn-s3ap-serverless-patterns`. Its
-  README, its stale-claim tests and its `pattern-test-dirs.txt` all count that directory, and a move
-  breaks `make drift` and `make test` there.
+- Move `solutions/flexcache/` out of the sibling repository
+  `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`. Its README, its stale-claim tests and its
+  `pattern-test-dirs.txt` all count that directory; a move breaks `make drift` and `make test`.
 - Copy an asset without recording where it came from and how it diverged.
 - Put the body of any knowledge in `.kiro/`. It is not published. Steering holds the load condition
   and a pointer; the body goes in `docs/`. `make budget` checks that every pointer resolves to a
@@ -340,6 +340,5 @@ edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeCol
 
 ### Reference implementation
 
-The sister project (`fsxn-s3ap-serverless-patterns`) has `scripts/diagram_builder.py` with the full
-compliance system. For this project, a minimal Python script that generates the XML is sufficient —
-see `docs/_assets/diagrams/` for the source file that was used.
+The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,
+a minimal Python script that generates the XML is enough — see `docs/_assets/diagrams/`.

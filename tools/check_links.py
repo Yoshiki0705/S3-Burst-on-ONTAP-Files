@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Resolve internal Markdown links and optionally probe external URLs.
 
-Adapted from the sibling repository `fsxn-adoption-playbook` (`tools/check_links.py`).
+Adapted from the sibling repository `FSx-for-ONTAP-Adoption-Playbook` (`tools/check_links.py`).
 Divergence: the original imported `iter_markdown` from a `frontmatter` module that also parsed the
 YAML note schema. This repository has no note schema, so the one function that was needed is
 inlined here and the module is not carried over — a dependency exists to be read, and a file whose
@@ -180,6 +180,37 @@ def check_external(url: str, timeout: float = 10.0) -> str | None:
     return _probe(url, "GET", timeout)
 
 
+# Repositories of this owner that are actually published, with the names GitHub knows them by. A
+# local working directory is often named differently -- `~/Projects/fsxn-adoption-playbook` is
+# `FSx-for-ONTAP-Adoption-Playbook` on GitHub -- and writing the directory name into a URL produces a
+# 404 that only an external probe catches. Eighteen links in this repository were wrong that way, in
+# the README, in SECURITY.md and in llms.txt, and none of them failed a commit gate. Checked offline
+# against this list so it fails on the machine that introduced it.
+OWNER = "Yoshiki0705"
+PUBLISHED_REPOS = frozenset(
+    {
+        "s3-burst-on-ontap-files",
+        "FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns",
+        "FSx-for-ONTAP-Adoption-Playbook",
+    }
+)
+OWNER_URL = re.compile(rf"https://github\.com/{OWNER}/([^/#?\s)]+)")
+
+
+def check_owner_repo(url: str) -> str | None:
+    """Whether a link to one of this owner's repositories names a published one."""
+    match = OWNER_URL.match(url)
+    if not match:
+        return None
+    name = match.group(1)
+    if name in PUBLISHED_REPOS:
+        return None
+    return (
+        f"unknown repository {name!r} for {OWNER}; a local directory name is not a repository name. "
+        f"Published: {', '.join(sorted(PUBLISHED_REPOS))}"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -202,6 +233,11 @@ def main() -> int:
             if scheme in SKIP_SCHEMES:
                 continue
             if scheme in ("http", "https"):
+                # Runs without a network, so a wrong repository name fails the fast gate rather
+                # than waiting for the weekly external probe.
+                problem = check_owner_repo(target)
+                if problem:
+                    errors.append(f"{rel}:{lineno}: {problem} -> {target}")
                 if not args.external:
                     continue
                 if target not in external_seen:

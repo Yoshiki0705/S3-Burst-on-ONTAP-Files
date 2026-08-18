@@ -120,8 +120,8 @@ does not state one.
   mapping for the four evidence stages, and why the stage words must not be weakened.
 - [Tier 1 manifest](docs/i18n-manifest.txt): Which guides require which languages, and the rule that
   only first-touch material is promoted.
-- [Related repository: FSx for ONTAP S3 Access Point serverless patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns): The
+- [Related repository: FSx for ONTAP S3 Access Point serverless patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns): The
   pattern catalogue this repository draws its verified S3 Access Point findings from. Individual
   FlexCache patterns stay there; this repository describes the single architecture.
-- [Related repository: FSx for ONTAP adoption playbook](https://github.com/Yoshiki0705/fsxn-adoption-playbook): Lifecycle
+- [Related repository: FSx for ONTAP adoption playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook): Lifecycle
   and topic-oriented knowledge base for adopting FSx for ONTAP.

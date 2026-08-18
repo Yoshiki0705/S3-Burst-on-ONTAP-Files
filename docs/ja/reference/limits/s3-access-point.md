@@ -14,7 +14,7 @@
 | オブジェクト全体 | 50 GiB | 検証済み | 同上。判定は `CompleteMultipartUpload` の時点で行われるため、全ペイロードの転送後に失敗する。クライアント側で先に検証する |
 
 出典: 姉妹リポジトリ
-[fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns)
+[FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns)
 の実測記録。
 
 ## 名前

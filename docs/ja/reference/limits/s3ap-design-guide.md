@@ -3,9 +3,9 @@
 🌐 [日本語](s3ap-design-guide.md) | [English](../../../en/reference/limits/s3ap-design-guide.md) | [🏠 リポジトリトップ](../../../../README.md)
 <!-- lang-switcher:end -->
 
-<!-- 出典: 姉妹リポジトリ fsxn-s3ap-serverless-patterns の設計考慮事項・互換性ノート・
+<!-- 出典: 姉妹リポジトリ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns の設計考慮事項・互換性ノート・
      性能考慮事項を、この構成の観点でまとめ直したもの。
-     https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns -->
+     https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns -->
 
 この構成の収集層（S3 Access Point）を設計する際に知っておくべき詳細を記載する。
 上限値は[別ページ](s3-access-point.md)、構成全体は[構成の形](../../architecture.md)を参照。
@@ -62,7 +62,7 @@ presigned URL 経由だけを止めることはできない。姉妹リポジト
 成功することを実測している（ONTAP 9.18.1P3D1）。ONTAP のバージョン別のサポート範囲は
 NetApp KB に記載がある（9.11.1 以降で v4、9.16.1 以降で v2 + v4）。
 機構の説明、バージョン要件、代替手段の一覧は
-[姉妹リポジトリの互換性ノート](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns/blob/main/docs/s3ap-compatibility-notes.md)にある。
+[姉妹リポジトリの互換性ノート](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-compatibility-notes.md)にある。
 
 **公開ドキュメントが `Not supported` としている間は、本番ワークロードを依存させない。**
 非推奨通知なしに挙動が変わる可能性がある。時間制限つきのアクセスが必要なら、
@@ -508,7 +508,7 @@ SMB クライアントの性能前提が oplock に依存している場合、wr
 | [構成の形](../../architecture.md) | この構成が解くことと解かないこと |
 | [最初に決めること](../../design-first-decisions.md) | セキュリティスタイルとボリューム設計の決定順序 |
 | [PoC チェックリスト](../../poc-checklist.md) | 何をどの順に確かめるか |
-| [姉妹リポジトリ: 互換性ノート](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | Lambda / Step Functions 連携の詳細 |
+| [姉妹リポジトリ: 互換性ノート](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | Lambda / Step Functions 連携の詳細 |
 
 ---
 

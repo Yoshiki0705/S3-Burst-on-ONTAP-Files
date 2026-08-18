@@ -111,7 +111,7 @@ make new-pattern AXIS=collect SLUG=s3ap-ingest
 既存の例は [docs/ja/support-matrix.md](docs/ja/support-matrix.md) と
 [docs/ja/poc-checklist.md](docs/ja/poc-checklist.md) の先頭にあります。
 
-姉妹リポジトリ `fsxn-s3ap-serverless-patterns` の `solutions/flexcache/` は**移動しません**。
+姉妹リポジトリ `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns` の `solutions/flexcache/` は**移動しません**。
 あちらの README とテストとテスト対象一覧がそのディレクトリを数えているため、移動すると
 あちらの `make drift` と `make test` が壊れます。
 

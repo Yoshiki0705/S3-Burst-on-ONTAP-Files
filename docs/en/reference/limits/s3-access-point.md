@@ -19,7 +19,7 @@ Figures are stated with their source and stage. The stages are defined in
 | Whole object | 50 GiB | verified | As above. The judgement is made at `CompleteMultipartUpload`, so it fails after the whole payload has been transferred. Validate on the client side first |
 
 Source: measurement records in the sibling repository
-[fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns).
+[FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns).
 
 ## Names
 

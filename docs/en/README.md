@@ -278,8 +278,8 @@ evidence for the other. This architecture uses neither. The distinction is set o
 
 | Repository | Scope |
 |---|---|
-| [fsxn-s3ap-serverless-patterns](https://github.com/Yoshiki0705/fsxn-s3ap-serverless-patterns) | Serverless processing patterns for S3 Access Points. Individual patterns stay there |
-| [fsxn-adoption-playbook](https://github.com/Yoshiki0705/fsxn-adoption-playbook) | Lifecycle and topic-oriented knowledge base for adopting FSx for ONTAP |
+| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | Serverless processing patterns for S3 Access Points. Individual patterns stay there |
+| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | Lifecycle and topic-oriented knowledge base for adopting FSx for ONTAP |
 
 This repository covers **the architecture itself**: collect and serve described as one design, with
 platform differences and unverified areas stated in tables.

@@ -1,6 +1,6 @@
 """The generated switcher block, and the wrong-language link check.
 
-The block format is pinned because it has to match the sibling repository `fsxn-adoption-playbook`
+The block format is pinned because it has to match the sibling repository `FSx-for-ONTAP-Adoption-Playbook`
 byte for byte: a reader moving between these repositories should meet the same control, and the
 generator is the only thing that writes it. A hand-edited switcher is the defect this replaces, so
 "the format changed and nobody noticed" has to be a test failure rather than a review question.

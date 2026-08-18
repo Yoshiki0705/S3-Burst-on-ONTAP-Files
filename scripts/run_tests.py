@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Discover every test directory and run each in its own pytest process.
 
-Two failure modes from the sibling repository `fsxn-s3ap-serverless-patterns` are designed out
+Two failure modes from the sibling repository `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns` are designed out
 here rather than inherited.
 
 **A hand-maintained list of test directories drifts.** That repository kept one list in its
