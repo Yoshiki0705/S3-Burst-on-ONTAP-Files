@@ -113,7 +113,7 @@ accounts for half the value of considering this architecture.
 | A flat namespace can be handled the way an object store handles it | It cannot. Every name without a slash collects in the root directory, and in quantity that becomes a performance problem. The source above states explicitly that an object store is the more suitable choice for applications that make heavy use of names that are not NAS-friendly |
 | Reads over S3 work on the Cache side as well | Not in this architecture. As above, FlexCache duality and attaching an S3 Access Point are separate mechanisms, and the support status of the former is not evidence for the latter |
 | Writing to the Cache side is faster | This architecture treats the Cache as read-oriented. Writes are consolidated on the Origin-side S3 Access Point |
-| Billing follows the S3 pricing model | It does not. Charges follow capacity and throughput on the file storage side |
+| Billing works the same way as an S3 bucket | It does not. On top of SSD capacity, the capacity pool, SSD IOPS, throughput capacity and backups, **requests and data transfer through the S3 Access Point are charged as well** ([FSx for ONTAP pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/)). The dimensions are mapped in [FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md) |
 | The procedure is the same on any platform | It is not. Supported configurations and minimum versions differ ([Portability](portability.md)) |
 
 ## Representative use cases
