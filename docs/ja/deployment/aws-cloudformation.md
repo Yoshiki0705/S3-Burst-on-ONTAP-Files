@@ -103,7 +103,7 @@ aws fsx create-and-attach-s3-access-point \
 | 設定 | 判断 |
 |---|---|
 | `FileSystemIdentity` | アクセスポイント経由の**全リクエストがこの 1 つの識別情報で認可されます**。呼び出し元ごとの区別は付きません。**絞り込みは 2 か所にあります。** AWS 側はアクセスポイントポリシーの明示的な拒否（`Allow` を狭くすることは絞り込みになりません）、ファイルシステム側はこの識別情報が持つファイル権限（mode bits / ACL）です。**確実に書けなくしたいなら、書き込み権限を持たない識別情報を指定してください。** 作成後に変更できないので、用途ごとにアクセスポイントを分けます（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)） |
-| `NetworkOrigin` | **作成後は変更できません。** `VPC` にすると単一ホストでの測定が公開経路を通らずに済みます。`Internet` は外部から書けますが、S3 Gateway VPC エンドポイント経由では到達しません |
+| `NetworkOrigin` | **作成後は変更できません。** `VPC` にすると単一ホストでの測定が公開経路を通らずに済みます。`Internet` は VPC の外からも書けます。**どちらの場合も、VPC 内から呼ぶなら S3 の VPC エンドポイントが要り、そのサブネットのルートテーブルに経路が関連付いている必要があります。** 姉妹リポジトリでは、経路のない VPC 内 Lambda から接続タイムアウトになる例が観測されています |
 
 ## 4. マウントと疎通確認
 

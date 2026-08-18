@@ -41,7 +41,7 @@ NAS-unfriendly names heavily.
 | Minimum ONTAP version | 9.17.1 | documented | [restrictions](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-point-for-fsxn-restrictions-limitations-naming-rules.html) |
 | Region | Access point and volume in the same Region | documented | As above |
 | Account | Access point and volume in the same account | documented | As above |
-| `NetworkOrigin` | Cannot be changed after creation | documented | As above. An `Internet` origin is not reachable from an S3 Gateway VPC endpoint |
+| `NetworkOrigin` | Cannot be changed after creation | documented | As above. **Reachability is decided by where the caller is and how it is routed, not by the origin type.** A Gateway endpoint only routes traffic originating inside the VPC; a caller arriving over VPN, Direct Connect, a peered VPC or Transit Gateway needs an Interface endpoint ([network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)) |
 | Authorisation | Both the AWS side and the ONTAP side have to permit it | documented | [two-layer authorisation](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
 
 ## Features out of scope

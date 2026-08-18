@@ -58,7 +58,11 @@
   "S3AccessPoint": {
     "_NetworkOrigin_comment": [
       "Immutable after creation. VPC restricts the access point to a VPC; Internet makes it reachable",
-      "from outside and is NOT reachable through an S3 Gateway VPC endpoint.",
+      "from outside the VPC as well. Reachability is decided by where the caller is and how it is",
+      "routed, not by the origin type: a caller inside the VPC needs an S3 VPC endpoint whose route",
+      "is associated with its subnet, and a caller arriving over VPN, Direct Connect, a peered VPC or",
+      "Transit Gateway needs an Interface endpoint, because a Gateway endpoint only routes traffic",
+      "that originates inside the VPC.",
       "",
       "For a single-host measurement, VPC with the verification host's VPC keeps the write and the",
       "read on one clock and off the public internet. Replace the whole VpcConfiguration block with",
