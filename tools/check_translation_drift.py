@@ -60,9 +60,22 @@ IDENTIFIER = re.compile(
     re.VERBOSE,
 )
 
+# --- copyable block ---------------------------------------------------------------------------
+# NUMBER, SCALE, NUMBER_FLOOR and numbers_in() depend on nothing else in this file or this
+# repository -- only `re` -- so they can be lifted out as-is. The sibling playbook asked for that,
+# having decided to borrow the myriad scaling rather than write a second implementation of it, and
+# `test_the_numeric_block_is_self_contained` executes this block in an empty namespace to keep the
+# promise true.
+#
 # Numbers are compared by value, not by spelling. Japanese writes 3 億 where English writes
 # "300 million" and 10 万 where English writes "100,000", so a spelling comparison reports the
 # numeral system as drift. Both were false positives on the first run of this checker.
+#
+# Not handled: a locale that groups digits with a full stop, where `24.861` means 24861. The sibling
+# repository handles it because it publishes eight languages including German, Spanish and French.
+# Here the pairs are Japanese and English only, so adding it would be a mechanism with no input --
+# and it cannot be had for free: `1.234` as a decimal and as a grouped integer are indistinguishable,
+# so supporting it means normalising some real decimals away.
 NUMBER = re.compile(
     r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(億|万|million|billion|thousand)?", re.I
 )
@@ -79,10 +92,16 @@ SCALE = {
 NUMBER_FLOOR = 100
 
 
-def numbers_in(text: str) -> set[str]:
-    """Numeric values in a line, normalised so that 3 億, 300 million and 300,000,000 are one value."""
-    found: set[str] = set()
-    for digits, scale in NUMBER.findall(text):
+def numbers_in(text: str) -> dict[str, str]:
+    """Map each numeric value in a line to the spelling it was written with.
+
+    Keyed by value so that 3 億, 300 million and 300,000,000 compare equal; valued by the original
+    spelling because that is what gets reported. A finding that says `24681` cannot be found in a file
+    that says `24,861`, which makes the report useless exactly when it is right.
+    """
+    found: dict[str, str] = {}
+    for match in NUMBER.finditer(text):
+        digits, scale = match.group(1), match.group(2)
         try:
             value = float(digits.replace(",", ""))
         except ValueError:
@@ -90,13 +109,19 @@ def numbers_in(text: str) -> set[str]:
         if scale:
             value *= SCALE[scale.lower()]
         if value >= NUMBER_FLOOR:
-            # Rendered back to a canonical string so that 8.0 and 8 compare equal.
-            found.add(f"{value:.4f}".rstrip("0").rstrip("."))
+            canonical = f"{value:.4f}".rstrip("0").rstrip(".")
+            found.setdefault(canonical, match.group(0).strip())
     return found
 
 
-def literals_in(text: str) -> set[str]:
-    return set(IDENTIFIER.findall(text)) | numbers_in(text)
+# --- end of copyable block --------------------------------------------------------------------
+
+
+def literals_in(text: str) -> dict[str, str]:
+    """Every comparable literal in a line, mapped to the spelling it was written with."""
+    found = {identifier: identifier for identifier in IDENTIFIER.findall(text)}
+    found.update(numbers_in(text))
+    return found
 
 
 def tables(path: Path) -> list[list[str]]:
@@ -133,19 +158,20 @@ def paired_documents() -> list[tuple[Path, Path]]:
 
 def literal_findings(ja_file: Path, en_file: Path) -> list[str]:
     """Literals in the English tables that the Japanese tables do not contain."""
-    ja_literals: set[str] = set()
+    ja_values: set[str] = set()
     for table in tables(ja_file):
         for row in table:
-            ja_literals |= literals_in(row)
+            ja_values |= set(literals_in(row))
     problems = []
     for table in tables(en_file):
         for row in table:
-            for literal in sorted(literals_in(row) - ja_literals):
-                problems.append(
-                    f"{en_file.relative_to(ROOT)}: a table cell has {literal!r}, which no table in "
-                    f"{ja_file.relative_to(ROOT)} contains. Either the English is stale, or the "
-                    "Japanese lost a value."
-                )
+            for value, spelling in sorted(literals_in(row).items()):
+                if value not in ja_values:
+                    problems.append(
+                        f"{en_file.relative_to(ROOT)}: a table cell has {spelling!r}, which no table "
+                        f"in {ja_file.relative_to(ROOT)} contains. Either the English is stale, or "
+                        "the Japanese lost a value."
+                    )
     return problems
 
 
