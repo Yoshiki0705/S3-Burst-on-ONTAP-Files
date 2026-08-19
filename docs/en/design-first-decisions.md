@@ -70,7 +70,7 @@ the protocol choice on the fan-out side.
 
 The identity only has to be a user the SVM can resolve. **Neither type requires an external directory
 service.** A UNIX identity served reads and writes as an SVM-local user with no LDAP or NIS, and a
-Windows identity did the same as a local user on a workgroup-mode CIFS server ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)).
+Windows identity did the same as a local user on a workgroup-mode CIFS server ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-2-prerequisite--the-identity-bound-to-the-access-point-must-exist-on-the-file-system)).
 Workgroup mode is documented as the alternative when an Active Directory domain is not available
 ([SMB server in a workgroup](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)). It supports NTLM authentication only, not Kerberos, and leaves
 out GPO, VSS and SMB3 CA shares among others.

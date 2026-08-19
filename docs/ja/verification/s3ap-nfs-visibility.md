@@ -29,7 +29,7 @@ S3 Access Point 経由で書いたものが **FlexCache の Cache ボリュー�
 | 測定方法 | 書き込みと読み取りを**同一ホスト・同一クロック**で実行 |
 | **ONTAP バージョン** | **特定できず**（下記） |
 
-> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
+> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--ファイルシステム側の権限が絞り込みを担う)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
 
 ### ONTAP バージョンを併記できていない理由
 
