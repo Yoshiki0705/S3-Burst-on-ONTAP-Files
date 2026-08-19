@@ -28,6 +28,9 @@
 - [ ] Switcher regenerated with `make switcher-write`, if a translation was added
 - [ ] `docs/ja/verification-status.md` updated in this PR, if a claim's stage moved either way. It
       is the single source of stage; a document that restates one links to it
+- [ ] Japanese and English touched in the same commit, if what *backs* a claim changed. No gate
+      catches that: `make i18n-check` compares headings and `make drift` compares literals, so a row
+      whose evidence was reclassified in one language passes both
 - [ ] Pattern README status still true, if a template was deployed or measured. `make pattern-status`
       checks the word is defined, not that it is accurate -- only you know that
 
