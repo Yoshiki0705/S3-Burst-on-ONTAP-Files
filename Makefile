@@ -71,20 +71,39 @@ cfn: ## Lint every CloudFormation template (skipped when cfn-lint is not install
 	@if ! command -v cfn-lint >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
-		found=$$(find patterns environments -name template.yaml -print 2>/dev/null); \
-		if [ -z "$$found" ]; then \
-			echo "cfn: no template.yaml found yet"; \
-		else \
-			cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
+		if ! found=$$(find patterns environments -name template.yaml -print); then \
+			echo "cfn: the scan of patterns/ and environments/ failed, so this is not a report"; \
+			echo "     that there are no templates. Its own error is above."; \
+			exit 1; \
 		fi; \
+		if [ -z "$$found" ]; then \
+			echo "cfn: no template.yaml anywhere under patterns/ or environments/. Both are"; \
+			echo "     tracked and contain some, so zero means this scan stopped matching,"; \
+			echo "     not that there is nothing to lint."; \
+			exit 1; \
+		fi; \
+		cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
 	fi
 
 terraform: ## Validate and format-check every Terraform root (skipped when terraform is absent)
 	@if ! command -v terraform >/dev/null 2>&1; then \
 		echo "terraform not installed - skipping (brew install terraform)"; \
 	else \
-		roots=$$(find environments -name '*.tf' -exec dirname {} \; 2>/dev/null | sort -u); \
-		if [ -z "$$roots" ]; then echo "terraform: no .tf files yet"; else \
+		if ! found=$$(find environments -name '*.tf' -print); then \
+			echo "terraform: the scan of environments/ failed, so this is not a report that"; \
+			echo "           there is nothing to validate. Its own error is above."; \
+			exit 1; \
+		fi; \
+		if [ -z "$$found" ]; then \
+			echo "terraform: no .tf file under environments/. The tracked roots contain some,"; \
+			echo "           so zero means this scan stopped matching, not 'none yet'."; \
+			exit 1; \
+		fi; \
+		roots=$$(printf '%s\n' "$$found" | sed 's|/[^/]*$$||' | sort -u); \
+		if [ -z "$$roots" ]; then \
+			echo "terraform: found .tf files but derived no directory from their paths."; \
+			exit 1; \
+		else \
 			for d in $$roots; do \
 				terraform -chdir="$$d" fmt -check -recursive >/dev/null || { echo "terraform: $$d is not formatted; run 'terraform -chdir=$$d fmt'"; exit 1; }; \
 				if [ -d "$$d/.terraform" ]; then \
