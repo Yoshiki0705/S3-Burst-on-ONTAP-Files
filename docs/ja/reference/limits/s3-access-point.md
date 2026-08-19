@@ -39,6 +39,7 @@
 | アカウント | アクセスポイントとボリュームが同一アカウント | ドキュメント記載 | 同上 |
 | `NetworkOrigin` | 作成後は変更できない | ドキュメント記載 | 同上。**到達性は origin の種別ではなく呼び出し元の位置とルーティングで決まる。** Gateway エンドポイントは VPC 内で発生したトラフィックだけをルーティングし、VPN / Direct Connect / ピア VPC / Transit Gateway 経由の呼び出しには Interface エンドポイントが必要（[ネットワークアクセス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)） |
 | 認可 | AWS 側と ONTAP 側の両方が許可する必要がある | ドキュメント記載 | [二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
+| アクセスポイントポリシーのサイズ | ドキュメント上の上限は 20 KB。**判定は正規化後の文書に対して行われる** | ドキュメント記載 / **別環境での実測** | 24,620 B は受理、24,861 B は `MalformedPolicy: Normalized policy document exceeds the maximum allowed size`。境界は書き方で動くので**手元の JSON のバイト数を予算にできない**。FSx API がフィールドとして受け付ける 200,000 文字は実効上限ではない（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#ポリシーサイズの上限は正規化後で判定される)。ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。**このリポジトリでは測っていない**） |
 
 ## ネットワークで絞るときに効く条件キー
 
