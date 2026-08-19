@@ -243,6 +243,9 @@ Automated checks catch syntax. These catch design-level problems.
   `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`. Its README, its stale-claim tests and its
   `pattern-test-dirs.txt` all count that directory; a move breaks `make drift` and `make test`.
 - Copy an asset without recording where it came from and how it diverged.
+- Let this file grow to the budget. It is loaded every turn, and the last 500 B are the expensive
+  ones: at 88 B of headroom the next edit is spent shaving prose instead of writing it. Move a
+  task-conditional section to `docs/` and leave a pointer, as the diagram notes are.
 - Put the body of any knowledge in `.kiro/`. It is not published. Steering holds the load condition
   and a pointer; the body goes in `docs/`. `make budget` checks that every pointer resolves to a
   tracked file.
@@ -281,64 +284,8 @@ Automated checks catch syntax. These catch design-level problems.
 
 ## Architecture diagrams (draw.io)
 
-### The only method that works for export
-
-**Generate `.drawio` XML directly with icons embedded as `shape=image;image=data:image/svg+xml,<base64>`
-in the cell's `style` attribute.** This is what the sister project's `diagram_builder.py` does.
-
-Things that do NOT work:
-
-| Approach | Problem |
-|---|---|
-| draw.io MCP `insert_image_vertex` | Icons disappear on CLI export — the tool uses a different embedding method |
-| `mxgraph.aws4.*` built-in shapes | 2019 generation icons, wrong colors, not the official AWS asset pack |
-| `fillColor=#232F3E` on resource icons | Makes the icon a black filled square |
-| `data:image/svg+xml;base64,` (with `;base64`) | draw.io expects `data:image/svg+xml,<base64>` (comma, no `;base64` prefix) |
-
-### Correct workflow
-
-1. **Locate the AWS Architecture Icons asset package** (quarterly release from [aws.amazon.com/architecture/icons](https://aws.amazon.com/architecture/icons/)).
-   Default path: `~/Downloads/Icon-package_MMDDYYYY.*/`
-2. **Read the SVG, base64-encode, build a data URI**: `data:image/svg+xml,<base64_string>`
-3. **Write `.drawio` XML directly** with a Python script using `xml.etree.ElementTree`
-4. **Export with draw.io CLI**: `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2 --border 12`
-5. **Verify visually** — XML valid does not mean the picture is correct
-
-### Icon style template
-
-```python
-style = (
-    "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;"
-    "verticalAlign=top;labelPosition=center;align=center;"
-    f"imageAspect=1;aspect=fixed;fontSize=11;fontColor=#232F3E;"
-    f"image={data_uri};"
-)
-```
-
-### Icon sizes (native, never rescale)
-
-| Asset | File pattern | Size to use |
-|---|---|---|
-| Service icon | `Arch_<Service>_64.svg` | 80×80 |
-| Resource icon | `Res_<Name>_48.svg` | 48×48 |
-
-### Edge style (single color, no variation)
-
-```text
-edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;
-```
-
-### Export commands (macOS)
-
-```bash
-# PNG at 2x for blog posts
-/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2 --border 12 --output out.2x.png src.drawio
-
-# SVG with embedded images for GitHub docs
-/Applications/draw.io.app/Contents/MacOS/draw.io --export --format svg --embed-svg-images --border 12 --output out.svg src.drawio
-```
-
-### Reference implementation
-
-The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,
-a minimal Python script that generates the XML is enough — see `docs/_assets/diagrams/`.
+Generate the `.drawio` XML directly, with each icon embedded as
+`shape=image;image=data:image/svg+xml,<base64>` in the cell's `style`. Several plausible alternatives
+produce a file that exports without its icons, and that is invisible until the PNG is opened, so read
+[docs/agent/diagrams.md](docs/agent/diagrams.md) before touching a diagram or its builder. Export with
+`make diagrams`, and confirm with `make diagrams-check`.
