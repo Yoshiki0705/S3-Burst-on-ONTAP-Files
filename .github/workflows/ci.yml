@@ -53,6 +53,15 @@ jobs:
       # into a Japanese one is how a reader lands in a language they cannot read.
       - name: Check cross-language links
         run: python3 tools/check_cross_language_links.py
+      # Heading structure is compared by the step above; this compares what is inside the tables.
+      # A claim was changed in Japanese and not in English once, and no gate noticed.
+      - name: Check translated tables for content drift
+        run: python3 tools/check_translation_drift.py
+      # Skips here: verifying a cited anchor needs the sibling repository checked out, which CI does
+      # not have. It runs for whoever has both locally, and the sibling repository gates the rename
+      # from its own side.
+      - name: Check cited sibling-repository anchors
+        run: python3 tools/check_external_anchors.py
 
       - name: Audit public output
         run: python3 tools/audit_public_output.py

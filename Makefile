@@ -7,7 +7,7 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
         audit secrets pinning zizmor links links-external budget en-lang xlang counts \
-        pattern-status iac-security test all new-pattern \
+        pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write \
         commit-gate clean
@@ -150,6 +150,12 @@ en-lang: ## Catch untranslated Japanese in docs/en/
 counts: ## Verify every count stated in prose against the filesystem
 	@$(PY) tools/check_derived_counts.py
 
+drift: ## Compare the contents of translated tables, not just their headings
+	@$(PY) tools/check_translation_drift.py
+
+external-anchors: ## Verify cited sibling-repository anchors (skipped without a local checkout)
+	@$(PY) tools/check_external_anchors.py
+
 pattern-status: ## Verify every pattern README opens with a defined status word
 	@$(PY) tools/check_pattern_status.py
 
@@ -162,7 +168,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang audit secrets pinning zizmor links budget en-lang counts pattern-status iac-security finops test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts pattern-status iac-security finops test ## Commit gate
 	@echo "All checks passed."
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x

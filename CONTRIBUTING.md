@@ -29,6 +29,8 @@ make all     # コミットゲート
 |---|---|
 | `make lint` | Markdown / Python / CloudFormation |
 | `make i18n-check` | 日本語版と英語版の節構成が一致しているか |
+| `make drift` | 表の中身（条件キー・API 名・バージョン・数値）が言語間でずれていないか。節構成の一致では捕まらない差分です |
+| `make external-anchors` | 引用している姉妹リポジトリの節アンカーが生きているか（ローカルチェックアウトが無ければスキップ） |
 | `make switcher-check` | 言語スイッチャーが実在する言語と一致しているか、他言語へ誘導していないか |
 | `make audit` | 命名・出典マーカー・比較の書き方・個人情報・機構の混同・誇張語 |
 | `make secrets` | gitleaks |
