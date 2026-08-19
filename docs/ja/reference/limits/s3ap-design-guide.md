@@ -67,7 +67,18 @@ NetApp KB に記載がある（9.11.1 以降で v4、9.16.1 以降で v2 + v4）
 **公開ドキュメントが `Not supported` としている間は、本番ワークロードを依存させない。**
 非推奨通知なしに挙動が変わる可能性がある。時間制限つきのアクセスが必要なら、
 API Gateway + Lambda、CloudFront signed URL、一時的な STS 認証情報のいずれかを設計する。
-実測されているのは `GetObject` で、**`PutObject` と `HeadObject` は未検証**である。
+**`PutObject` と `HeadObject` も実測した**（[検証記録](../../verification/s3ap-operations.md)、
+2026-08-19）。`GetObject` を含む 3 つとも成功し、SigV4 と SigV2 の両方で動作した。
+NetApp KB のバージョン別記載（9.11.1 以降で v4、9.16.1 以降で v2 + v4）と整合する。
+**対応表が `Not supported` としている間は依存させないという上記の判断は変えない。**
+動作したことは、非推奨通知なしに挙動が変わらないことの保証ではない。
+
+**SigV2 は Content-Type を署名対象に含めるため、クライアントが自動で付けたヘッダーで署名が
+無効になる。** SigV4 の既定の署名対象は `host` だけなのでこの影響を受けない。
+boto3 では署名バージョンを明示する必要がある — 明示しない `generate_presigned_url` は
+SigV2 を生成し、`client.meta.config.signature_version` はどちらの場合も `s3v4` を返すため
+報告値では判別できない（クライアント側の挙動であり、FSx for ONTAP の性質ではない）。
+
 この構成の経路では presigned URL を使わない。
 
 ## 並行度とスループットの設計

@@ -103,7 +103,7 @@ All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx
 | Static website hosting | Out of scope |
 | Multi-factor authentication (MFA delete) | Out of scope |
 | Conditional writes | Out of scope |
-| `Presign` | Listed as not supported (the observation and the caveat are in the [design guide](s3ap-design-guide.md#presigned-url)) |
+| `Presign` | Listed as not supported. **Measured: `PutObject`, `HeadObject` and `GetObject` all succeed** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19, under both SigV4 and SigV2). The measurement runs opposite to the table, and **while the table says not supported, do not depend on it** ([design guide](s3ap-design-guide.md#presigned-url)) |
 | ACLs | Only `bucket-owner-full-control`. Any other value returns `InvalidArgument` |
 | Storage class | `FSX_ONTAP` only |
 | Server-side encryption | `SSE-FSX` only. `SSE-S3` and `SSE-KMS` cannot be requested |
