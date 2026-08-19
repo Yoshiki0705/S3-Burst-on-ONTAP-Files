@@ -60,4 +60,4 @@ jobs:
       # short enough to sit on the line — is suppressed inline, with the reason, at the one place it
       # applies. That way a finding is either fixed or answered, never merely unseen.
       - name: Run zizmor
-        run: zizmor --no-online-audits --persona=pedantic .github/workflows
+        run: zizmor --no-online-audits --no-progress --persona=pedantic .github/workflows

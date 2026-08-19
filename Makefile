@@ -182,7 +182,7 @@ zizmor: ## Audit the workflow files for CI security problems
 			echo "         mean CI passes. Install the pinned version:"; \
 			echo "         pip install -r requirements-dev.txt"; \
 		fi; \
-		$(ZIZMOR) --no-online-audits --persona=pedantic .github/workflows; \
+		$(ZIZMOR) --no-online-audits --no-progress --persona=pedantic .github/workflows; \
 	else \
 		echo "zizmor not installed - skipping"; \
 		echo "  install the pinned version: pip install -r requirements-dev.txt"; \

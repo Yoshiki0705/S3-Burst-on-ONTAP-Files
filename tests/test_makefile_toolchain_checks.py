@@ -234,3 +234,52 @@ def test_finding_no_terraform_file_is_treated_as_a_scan_that_stopped_matching(
 
     assert result.returncode != 0, combined
     assert "none yet" in combined, combined
+
+
+# --- output that does not depend on being watched ---------------------------------------------
+
+WORKFLOWS = ROOT / ".github" / "workflows"
+# Matches an invocation that runs the audit, in a recipe or in a workflow `run:`. Keyed on
+# `--no-online-audits` rather than on the tool's name: the Makefile calls it through `$(ZIZMOR)`, so
+# a case-sensitive `\bzizmor\b` matched the workflow only and found one invocation where there are
+# two. That is the third pattern in this file to miss what it was aimed at, which is why the
+# assertion below also checks the count -- a pattern that quietly matches less than it should still
+# satisfies every "all matches carry the flag" test.
+ZIZMOR_AUDIT = re.compile(r"^[^#\n]*--no-online-audits.*$", re.MULTILINE)
+
+
+def _zizmor_audit_invocations() -> list[tuple[str, str]]:
+    sources = [(MAKEFILE.name, MAKEFILE.read_text())]
+    sources += [
+        (path.name, path.read_text()) for path in sorted(WORKFLOWS.glob("*.yml"))
+    ]
+    return [
+        (name, match.group(0).strip())
+        for name, text in sources
+        for match in ZIZMOR_AUDIT.finditer(text)
+    ]
+
+
+def test_every_zizmor_invocation_suppresses_the_progress_bar() -> None:
+    """Without `--no-progress`, zizmor draws a progress bar when its output is a terminal.
+
+    Measured on this repository's five workflow files: 23,043 bytes and 225 carriage returns on a
+    pty, against 850 bytes with the flag. It is suppressed automatically when the output is
+    redirected, which is the trap -- the gate's output differed depending on whether anyone was
+    watching it, so what a contributor saw and what a log recorded were not the same text. The flag
+    makes the two identical rather than merely shorter.
+
+    Both call sites are asserted because the Makefile and the workflow invoke zizmor separately, and
+    a flag added to one is a difference between what a contributor runs and what CI runs.
+    """
+    invocations = _zizmor_audit_invocations()
+    assert len(invocations) >= 2, (
+        f"expected the Makefile recipe and the workflow step; found {invocations}"
+    )
+    missing = [
+        (where, line) for where, line in invocations if "--no-progress" not in line
+    ]
+    assert not missing, (
+        "these zizmor invocations still draw a progress bar:\n"
+        + "\n".join(f"  {where}: {line}" for where, line in missing)
+    )
