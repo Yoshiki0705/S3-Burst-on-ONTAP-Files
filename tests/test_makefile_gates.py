@@ -48,6 +48,9 @@ NOT_IN_ALL = {
     "links-external",  # needs a network
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate
+    # Takes a pull request number and queries the API. It answers a question about a commit that
+    # has already been pushed, which is after `make all` has run, not before.
+    "pr-verify",
     "clean",
 }
 

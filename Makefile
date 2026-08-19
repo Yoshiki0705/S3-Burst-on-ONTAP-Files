@@ -10,7 +10,7 @@ PY ?= python3
         pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write \
-        commit-gate clean
+        commit-gate pr-verify clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -170,6 +170,10 @@ test: ## Run every discovered test directory, one pytest process each
 
 all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts pattern-status iac-security finops test ## Commit gate
 	@echo "All checks passed."
+
+pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
+	@test -n "$(PR)" || { echo "usage: make pr-verify PR=<number>"; exit 2; }
+	@$(PY) scripts/verify_pr_checks.py $(PR)
 
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x
 	@test -n "$(MSG)$(BRANCH)" || (echo 'give MSG="<subject>" and/or BRANCH=<name>'; exit 1)
