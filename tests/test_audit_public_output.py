@@ -18,6 +18,8 @@ should find out from a red test rather than from a reader.
 
 from __future__ import annotations
 
+import re
+
 import audit_public_output as audit
 from conftest import (
     REAL_LOOKING_ACCOUNT,
@@ -267,3 +269,26 @@ def test_every_allow_token_the_regex_accepts_is_a_real_category() -> None:
             f"{category} is listed in CATEGORIES but the ALLOW regex rejects it"
         )
     assert audit.ALLOW.search("<!-- allow:nonsense -->") is None
+
+
+def test_the_category_list_and_its_regex_agree_in_both_directions() -> None:
+    """The tuple is the authority; the regex restates it. Only one direction was asserted.
+
+    A category in CATEGORIES that the regex rejects was already caught by the test above. The reverse
+    -- an alternative left in the regex after the tuple was renamed -- was not, and it produces a
+    marker that looks like a suppression and is not one: `allow:oldname` parses, lands in the allowed
+    set, matches no category, and the finding the author meant to suppress is reported anyway.
+
+    Kept as two lists rather than derived from one, because a regex is not a list and generating it
+    would make the pattern unreadable at the point where it matters. The sibling playbook reached the
+    same conclusion for its vocabulary constants: where the constant is the authority, keep the
+    duplication and assert that it has not diverged.
+    """
+    alternatives = set(
+        re.fullmatch(r"allow:\(([^)]+)\)", audit.ALLOW.pattern).group(1).split("|")
+    )
+    assert alternatives == set(audit.CATEGORIES) | {"all"}, (
+        "the ALLOW regex and CATEGORIES have diverged. Every category needs an alternative, and "
+        "every alternative except the 'all' sentinel needs a category -- an orphan alternative is a "
+        "marker that suppresses nothing while looking like it does."
+    )
