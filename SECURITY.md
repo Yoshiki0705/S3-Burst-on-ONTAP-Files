@@ -46,7 +46,12 @@ ONTAP 側（ファイルシステム識別情報）の両方が許可する必�
 
 **AWS 側で絞るのは明示的な拒否です。** 同一アカウントでは identity-based ポリシーと
 アクセスポイントポリシーが結合されるため、`Allow` を狭く書くことは絞り込みになりません
-（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。
+（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)）。
+
+**VPC エンドポイントを経由する場合、そのエンドポイントポリシーも許可している必要があります。**
+既定が全許可なので、絞っていない環境ではこの層の存在に気づきません。逆に絞ってある環境では、
+アクセスポイントを追加したときにその ARN を許可対象へ追加しないと `AccessDenied` になります
+（[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)。AWS のドキュメント記載で、このリポジトリでは実測していません）。
 
 ## 不可逆操作
 
