@@ -156,7 +156,8 @@ Resources:
       # not work, and the object-level statement needs the `/object/*` suffix. See
       # https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/referencing-access-points-for-fsxn.html
       # A policy generated automatically by a service role is sometimes written in the bucket form,
-      # which returns AccessDenied. Authorization is dual-layer -- the AWS side and the ONTAP file
+      # which returns AccessDenied -- the symptom and the fix are in
+      # https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/troubleshooting-access-points-for-fsxn.html Authorization is dual-layer -- the AWS side and the ONTAP file
       # system identity must both allow the call.
       Policies:
         - Version: "2012-10-17"
