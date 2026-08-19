@@ -204,7 +204,10 @@ release the cache, then the SVM peer, then the cluster peer.
   needs the marker pair added once, after the H1 and at the end.
 - **Do not write a number that can be derived.** `make counts` recomputes every pattern count from
   `patterns/*/*/template.yaml` and fails on drift. A count of zero is reported as a broken reader,
-  not as "none yet".
+  not as "none yet". **This applies to the Makefile recipes too**, and two of them contradicted it:
+  a scan that finds nothing must fail, and a scan that could not run must say so rather than report
+  an empty result. Never take a decision from the exit status of a pipeline — it is the *last*
+  command's, and `awk`, `sort` and `grep` all succeed on empty input.
 - The conflation check reads one line at a time, so when a sentence names both mechanisms the words
   "separate mechanisms" / `別の機構` have to sit on the **same** line, not wrap onto the next. That is
   a constraint worth keeping: it stops the distinction drifting away from the claim during a later

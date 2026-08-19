@@ -1,7 +1,8 @@
-"""A toolchain gate must tell a broken tool apart from a mismatched one.
+"""A gate must tell a tool that cannot run apart from one at the wrong version, and a scan that
+could not run apart from one that found nothing.
 
-A pipeline's exit status is its *last* command's, so the status of the command that matters is
-discarded:
+Both were the same defect. A pipeline's exit status is its *last* command's, so the status of the
+command that matters is discarded:
 
     installed=$(ruff --version | awk '{print $2}')
 
@@ -22,6 +23,7 @@ recipe's shell. A test that reimplemented the same logic in Python could not rea
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -151,3 +153,84 @@ def test_no_recipe_reads_a_version_through_a_pipe() -> None:
         "cannot run yields an empty version and is reported as a mismatch:\n"
         + "\n".join(f"  Makefile:{number}: {line}" for number, line in offenders)
     )
+
+
+# --- a scan that fails, versus a scan that finds nothing --------------------------------------
+#
+# The same discarded-status shape, with a worse consequence. `make terraform` read:
+#
+#     roots=$(find environments -name '*.tf' -exec dirname {} \; 2>/dev/null | sort -u)
+#
+# `sort` succeeds on empty input, so a missing or unreadable `environments/` produced an empty list,
+# which the recipe reported as "terraform: no .tf files yet" and **passed**. `make cfn` had the same
+# hole by a different route: it did not pipe, but it discarded `find`'s status all the same by
+# testing only whether the output was empty.
+#
+# `AGENTS.md` already required the opposite -- "A count of zero is reported as a broken reader, not
+# as 'none yet'" -- and `tools/check_derived_counts.py` implements it. The rule was written for prose
+# counts, so two shell recipes contradicted a rule this repository had already put in writing.
+
+
+def _isolated(tmp_path: Path) -> Path:
+    """A copy of the Makefile in an empty directory, so its relative paths resolve to nothing.
+
+    Nothing is stubbed here: these cases assert the real scan's failure handling.
+    """
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    shutil.copy(MAKEFILE, workspace / "Makefile")
+    shutil.copy(REQUIREMENTS, workspace / "requirements-dev.txt")
+    return workspace
+
+
+@pytest.mark.parametrize(
+    ("target", "tool"),
+    [("cfn", "cfn-lint"), ("terraform", "terraform")],
+)
+def test_a_scan_that_cannot_run_is_not_reported_as_nothing_to_check(
+    tmp_path: Path, target: str, tool: str
+) -> None:
+    if shutil.which(tool) is None:
+        pytest.skip(f"{tool} is not installed, so the recipe skips before it scans")
+
+    result = subprocess.run(
+        ["make", target],
+        cwd=_isolated(tmp_path),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = result.stdout + result.stderr
+
+    assert result.returncode != 0, (
+        f"a failed scan must not pass; before the fix this printed 'no ... yet' and exited 0:"
+        f"\n{combined}"
+    )
+    assert "scan" in combined and "failed" in combined, combined
+    assert "yet" not in combined, (
+        f"'yet' frames a scan that could not run as an empty one:\n{combined}"
+    )
+
+
+def test_finding_no_terraform_file_is_treated_as_a_scan_that_stopped_matching(
+    tmp_path: Path,
+) -> None:
+    if shutil.which("terraform") is None:
+        pytest.skip("terraform is not installed, so the recipe skips before it scans")
+
+    workspace = _isolated(tmp_path)
+    # The directory exists and is readable, so `find` succeeds and returns nothing. This is the case
+    # the old recipe reported as "terraform: no .tf files yet", and passed.
+    (workspace / "environments").mkdir()
+
+    result = subprocess.run(
+        ["make", "terraform"],
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = result.stdout + result.stderr
+
+    assert result.returncode != 0, combined
+    assert "none yet" in combined, combined
