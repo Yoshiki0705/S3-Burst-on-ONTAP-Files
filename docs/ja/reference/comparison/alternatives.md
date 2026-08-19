@@ -109,7 +109,7 @@ S3 を正本に保ったまま、ファイルシステムのセマンティク�
 
 「収集は S3、利用は NFS / SMB」という要求の分岐が、この構成が対象とする状況そのものである。
 
-ただし**この構成も権限モデルは 2 層で、単一の根拠にはならない。** 何が担保でき、何が担保できないかは[構成の形](../../architecture.md)にある（両層の実測: [S3 Access Point の権限設計](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。
+ただし**この構成も権限モデルは 2 層で、単一の根拠にはならない。** 何が担保でき、何が担保できないかは[構成の形](../../architecture.md)にある（両層の実測: [S3 Access Point の権限設計](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)）。
 
 ## 関連ドキュメント
 

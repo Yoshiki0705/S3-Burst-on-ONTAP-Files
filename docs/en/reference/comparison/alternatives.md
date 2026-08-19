@@ -120,7 +120,7 @@ architecture is for.
 
 **This architecture's permission model is two layers as well, and it is not a single basis.** What it
 can and cannot account for is in [Architecture](../../architecture.md) (both layers measured in
-[Access point authorization layers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)).
+[Access point authorization layers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--what-the-union-implies)).
 
 ## Related documents
 

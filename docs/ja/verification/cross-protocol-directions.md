@@ -27,7 +27,7 @@ FSx for ONTAP 上で有効化できるかを確認しました。
 | 並列度 | 1 |
 | 測定方法 | boto3 persistent session + 同一ホスト（単一クロック） |
 
-> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
+> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--ファイルシステム側の権限が絞り込みを担う)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
 
 ## 全 4 方向の測定結果
 
@@ -214,7 +214,7 @@ flexcache config modify -vserver snapmirror-s3-test -volume duality_fc_s3en -is-
 
 - この構成の「利用（読み取り）」層は NFS でも SMB でも同じパフォーマンスが得られます
 - プロトコル選択は性能ではなく、クライアント OS とセキュリティモデルで決まります
-- SMB を使う場合、SVM に CIFS サーバーが必要です。**Active Directory 参加は必須ではありません**（[workgroup モードの公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみで Kerberos 非対応、GPO・VSS・SMB3 CA 共有も対象外）。workgroup モードのローカル Windows ユーザーで S3 Access Point の Windows 識別情報が機能した実測があります（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)）。**この測定は AWS Managed AD 参加の環境で行っており、workgroup モードは試していません**
+- SMB を使う場合、SVM に CIFS サーバーが必要です。**Active Directory 参加は必須ではありません**（[workgroup モードの公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみで Kerberos 非対応、GPO・VSS・SMB3 CA 共有も対象外）。workgroup モードのローカル Windows ユーザーで S3 Access Point の Windows 識別情報が機能した実測があります（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2-の前提--ap-に固定する-id-はファイルシステム側に実在していなければならない)）。**この測定は AWS Managed AD 参加の環境で行っており、workgroup モードは試していません**
 - UNIX セキュリティスタイルの Origin に SMB でアクセスする場合、NTFS ACL ではなく
   UNIX パーミッションに基づくアクセス制御が適用されます
 
