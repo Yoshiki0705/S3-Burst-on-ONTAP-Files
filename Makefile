@@ -10,7 +10,7 @@ PY ?= python3
         pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write \
-        commit-gate pr-verify clean
+        commit-gate ready pr-verify clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -178,6 +178,19 @@ pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs P
 commit-gate: ## Check a message or branch name. Usage: make commit-gate MSG="docs: ..." BRANCH=docs/x
 	@test -n "$(MSG)$(BRANCH)" || (echo 'give MSG="<subject>" and/or BRANCH=<name>'; exit 1)
 	@$(PY) scripts/commit_gate.py $(if $(MSG),--message "$(MSG)") $(if $(BRANCH),--branch "$(BRANCH)")
+
+# The one target to run before committing. `commit-gate` on its own only checks the subject line, so
+# invoking it satisfies a habit without covering the work; this depends on `all` as well, so a single
+# `&&` links a complete gate to the commit.
+#
+# Two ways the separation used to leak, both structural rather than forgetful:
+#   make all; git commit ...            -- `;` does not carry the failure
+#   make all 2>&1 | tail -2 && git ...  -- the pipeline's status is tail's, which is 0
+# So: `make ready MSG="..." && git commit -F <file>`, no pipe on the left.
+ready: all ## Full gate plus the commit message check. Usage: make ready MSG="docs: ..."
+	@test -n "$(MSG)" || (echo 'give MSG="<subject>"'; exit 1)
+	@$(PY) scripts/commit_gate.py --message "$(MSG)"
+	@echo "ready: gates green and the subject is valid - commit with && from here"
 
 new-pattern: ## Scaffold a pattern. Usage: make new-pattern AXIS=collect SLUG=my-slug
 	@test -n "$(AXIS)" || (echo "AXIS is required (collect | serve | pipelines)"; exit 1)

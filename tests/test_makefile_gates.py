@@ -51,6 +51,9 @@ NOT_IN_ALL = {
     # Takes a pull request number and queries the API. It answers a question about a commit that
     # has already been pushed, which is after `make all` has run, not before.
     "pr-verify",
+    # An aggregate of `all` plus the message check, meant to be the single command before a
+    # commit. Reaching it from `all` would be circular.
+    "ready",
     "clean",
 }
 
@@ -253,4 +256,17 @@ def test_every_external_command_gate_is_a_real_target() -> None:
     assert not unknown, (
         "EXTERNAL_COMMANDS names targets the Makefile does not define: "
         + ", ".join(unknown)
+    )
+
+
+def test_the_pre_commit_target_covers_the_whole_gate() -> None:
+    """`make ready` must depend on `all`, or it repeats the mistake it exists to prevent.
+
+    `commit-gate` validates a subject line and nothing else. Invoking it before a commit satisfies the
+    habit while covering none of the work, which is how a commit that fails `make all` gets made by
+    someone who believes they ran the gate.
+    """
+    assert "all" in prerequisites("ready"), (
+        "make ready must have `all` as a prerequisite; without it the command run before a commit "
+        "checks only the message"
     )
