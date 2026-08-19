@@ -62,8 +62,11 @@ VPC ピアリング・サブミリ秒のネットワーク遅延で測ったも�
       （部分的なファイルが見えるか、`CompleteMultipartUpload` まで見えないか）
 - [ ] Origin 側で削除したときに Cache 側での見え方がどうなるかを確認する
 - [ ] 上書きしたときの反映を確認する
-- [ ] `UploadPartCopy` を**同一アクセスポイント内のソース**で試す。公式は同一 AP 内・同一リージョンで
-      対応としており、このリポジトリの観測（`404 NoSuchKey`）はソースが同一 AP 内にない条件のもの
+- [x] `UploadPartCopy` を**同一アクセスポイント内のソース**で試す →
+      **`NoSuchKey`**（[検証記録](verification/s3ap-operations.md)、2026-08-19）。同一の `CopySource` を
+      与えた `CopyObject` は同一実行内で成功しており対照が取れている。公式は同一 AP 内で対応と記載
+- [ ] 標準 S3 バケットをソースにした `UploadPartCopy` を試す。**このエンドポイントでコピーが成立する
+      別のソース名前空間が無いため、`UploadPartCopy` そのものの対応可否は未判定のまま**
 
 記録先は[検証状況](verification-status.md)の表。数値を書くときは環境を必ず併記する。
 

@@ -38,11 +38,11 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 | Conditional writes (If-None-Match) | 501 NotImplemented | Mutual exclusion in the application |
 | S3 Annotations (PutObjectAnnotation and similar) | 501 NotImplemented | Write to a standard S3 bucket and annotate there |
 
-### Supported with conditions (not measured here)
+### Supported with conditions
 
 | Operation | Condition | State in this repository |
 |---|---|---|
-| UploadPartCopy | Supported when source and destination are within the same AP, same-Region copies only | **The two claims in this row rest on different evidence.** That it is supported within one access point is stated in the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html). The `404 NoSuchKey` with a source outside the access point is **a single observation whose reproduction was never confirmed**, held as a measurement in neither this repository nor the sibling one. **No measurement has been taken with a source inside the access point.** One observation does not generalise to unsupported |
+| UploadPartCopy | The compatibility table states same-AP, same-Region only | **Measured with a source inside the same access point, it returns `NoSuchKey`** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19). **`CopyObject` given the identical `CopySource` succeeds in the same run**, which is the control. The measurement runs opposite to the table. Whether `UploadPartCopy` is unsupported outright **cannot be decided here**: no other source namespace copies successfully on this endpoint, since a source in a different access point is refused for `CopyObject` too. The earlier single observation of `404 NoSuchKey` for a source outside the access point **does not fit, because a different access point yields `InvalidArgument`** |
 
 ### Features that do not exist
 

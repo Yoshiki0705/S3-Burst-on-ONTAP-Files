@@ -33,11 +33,11 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 | 条件付き書き込み（If-None-Match） | 501 NotImplemented | アプリケーション側の排他制御 |
 | S3 Annotations（PutObjectAnnotation 等） | 501 NotImplemented | 標準 S3 バケットに出力して annotation 付与 |
 
-### 条件つきで対応（この構成では未測定）
+### 条件つきで対応
 
 | オペレーション | 条件 | このリポジトリでの状態 |
 |---|---|---|
-| UploadPartCopy | 同一 AP 内・同一リージョンのみ対応 | **この行の 2 つの主張は根拠が別である。**「同一 AP 内なら対応」は[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)の記載。「ソースが同一 AP 内にない条件で `404 NoSuchKey`」は**再現を確認していない 1 回の観測**で、姉妹リポジトリでも本リポジトリでも実測記録として扱っていない。**同一 AP 内をソースにした測定は未実施。** 1 回の観測から非対応と一般化しない |
+| UploadPartCopy | 対応表は同一 AP 内・同一リージョンのみ対応と記載 | **同一 AP 内をソースにして実測したところ `NoSuchKey` を返した**（[検証記録](../../verification/s3ap-operations.md)、2026-08-19）。**同一の `CopySource` を与えた `CopyObject` は同一実行内で成功しており**、対照が取れている。測定は対応表と逆向き。ただし**このエンドポイントでコピーが成立する別のソース名前空間が無いため、`UploadPartCopy` そのものが非対応なのかは判定できない**（別 AP 経由は `CopyObject` でも拒否される）。先の「同一 AP 内に無いソースで `404 NoSuchKey`」という 1 回の観測は、**別 AP では `InvalidArgument` になったため帰属が合わない** |
 
 ### 機能として存在しない
 
