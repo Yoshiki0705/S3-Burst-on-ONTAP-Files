@@ -18,18 +18,39 @@ help: ## Show available targets
 
 lint: markdown python cfn terraform ## Markdown, Python, CloudFormation and Terraform
 
+# `RUFF` and `ZIZMOR` are overridable so that the recipes below can be driven against a stub
+# binary. The defect they guard against lives in the recipe's shell, not in any Python, so a test
+# that reimplements the same logic cannot reach it -- see tests/test_makefile_toolchain_checks.py.
+RUFF ?= ruff
 RUFF_PINNED := $(shell sed -n 's/^ruff==//p' requirements-dev.txt)
 
+# The version is read without a pipe. `$(RUFF) --version | awk '{print $$2}'` reports the status of
+# awk, which succeeds on empty input, so a binary that is installed but cannot run produced an empty
+# version and fell through to the comparison below -- printing "ruff  installed, this repository
+# pins 0.15.20" and pointing at the version pin. That named the wrong remedy: the install is broken,
+# not mismatched. stderr is deliberately not suppressed, because the binary's own message (a missing
+# shared library, typically) is the useful part of the diagnosis.
 python: ## Lint and format-check tools/ and scripts/ (falls back to a syntax check)
-	@if command -v ruff >/dev/null 2>&1; then \
-		installed=$$(ruff --version | awk '{print $$2}'); \
+	@if command -v $(RUFF) >/dev/null 2>&1; then \
+		if ! raw=$$($(RUFF) --version); then \
+			echo "error: $(RUFF) is present but does not run - '--version' exited non-zero."; \
+			echo "       Its own error is above. This is a broken install, not a version"; \
+			echo "       mismatch, so pinning will not fix it:"; \
+			echo "       pip install --force-reinstall -r requirements-dev.txt"; \
+			exit 1; \
+		fi; \
+		if [ -z "$$raw" ]; then \
+			echo "error: $(RUFF) ran but reported no version, so the pin cannot be checked."; \
+			exit 1; \
+		fi; \
+		installed=$${raw##* }; \
 		if [ "$$installed" != "$(RUFF_PINNED)" ]; then \
 			echo "warning: ruff $$installed installed, this repository pins $(RUFF_PINNED)."; \
 			echo "         Rule sets differ between versions, so a local pass does not"; \
 			echo "         mean CI passes. Install the pinned version:"; \
 			echo "         pip install -r requirements-dev.txt"; \
 		fi; \
-		ruff check tools scripts tests && ruff format --check tools scripts tests; \
+		$(RUFF) check tools scripts tests && $(RUFF) format --check tools scripts tests; \
 	else \
 		echo "ruff not installed - falling back to a syntax check"; \
 		echo "  install the pinned version: pip install -r requirements-dev.txt"; \
@@ -119,17 +140,30 @@ iac-security: ## Security posture of the templates and workflows (skipped when c
 pinning: ## Every GitHub Action must be pinned to a commit SHA
 	@$(PY) tools/check_actions_pinning.py
 
+ZIZMOR ?= zizmor
 ZIZMOR_PINNED := $(shell sed -n 's/^zizmor==//p' requirements-dev.txt)
+# Read without a pipe, for the reason given above `python`.
 zizmor: ## Audit the workflow files for CI security problems
-	@if command -v zizmor >/dev/null 2>&1; then \
-		installed=$$(zizmor --version | awk '{print $$2}'); \
+	@if command -v $(ZIZMOR) >/dev/null 2>&1; then \
+		if ! raw=$$($(ZIZMOR) --version); then \
+			echo "error: $(ZIZMOR) is present but does not run - '--version' exited non-zero."; \
+			echo "       Its own error is above. This is a broken install, not a version"; \
+			echo "       mismatch, so pinning will not fix it:"; \
+			echo "       pip install --force-reinstall -r requirements-dev.txt"; \
+			exit 1; \
+		fi; \
+		if [ -z "$$raw" ]; then \
+			echo "error: $(ZIZMOR) ran but reported no version, so the pin cannot be checked."; \
+			exit 1; \
+		fi; \
+		installed=$${raw##* }; \
 		if [ "$$installed" != "$(ZIZMOR_PINNED)" ]; then \
 			echo "warning: zizmor $$installed installed, this repository pins $(ZIZMOR_PINNED)."; \
 			echo "         Rule sets differ between versions, so a local pass does not"; \
 			echo "         mean CI passes. Install the pinned version:"; \
 			echo "         pip install -r requirements-dev.txt"; \
 		fi; \
-		zizmor --no-online-audits --persona=pedantic .github/workflows; \
+		$(ZIZMOR) --no-online-audits --persona=pedantic .github/workflows; \
 	else \
 		echo "zizmor not installed - skipping"; \
 		echo "  install the pinned version: pip install -r requirements-dev.txt"; \
