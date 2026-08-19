@@ -65,6 +65,23 @@ VPC と一致しないリクエストを拒否する明示的な拒否と同等�
 実測されているのは `aws:SourceVpce` が S3 ゲートウェイエンドポイント経由で埋まることだけで、
 [条件キーの実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#条件キーはリクエストに載っているときしか比較できません)にある。
 
+## 監査で追えるものと追えないもの
+
+ONTAP のファイルアクセス監査は S3 Access Point 経由のアクセスも記録するが、**記録される主体は
+アクセスポイントに固定した識別情報**で、呼び出し元の IAM プリンシパルではない。
+下の 4 点は、監査要件がある場合に設計を変える。
+
+| 追えないもの | 記録される値 | 設計への影響 |
+|---|---|---|
+| 呼び出し元の IAM プリンシパル | `SubjectUserSid` に AP の識別情報の SID。`SubjectUserName` と `SubjectDomainName` は **`Not Present`**（名前解決されない） | 特定には AWS CloudTrail との突き合わせが要る。**用途ごとに AP を分けることが監査の粒度を決める** |
+| 呼び出し元のアドレス | `SubjectIP` は AWS のサービス側アドレス。1 クライアントの連続 2 リクエストで**別の値**になった | 送信元 IP で絞り込む監査要件はこの経路では満たせない |
+| ローカルユーザーかどうか | `SubjectUserIsLocal` が、実際にはローカルの Windows ユーザーに対して `false` | このフィールドを判定条件に使えない |
+| UNIX 実効スタイルのボリュームの操作 | SVM で監査を有効化しても**記録が 1 件も出ない**（同一 SVM・同一設定の NTFS ボリュームでは記録あり）。mode bits は監査情報を持たないため、対象を指定する **ACE（SACL）が必要** | UNIX ボリュームで監査が要件なら、有効化だけでは足りない |
+
+いずれも[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログには誰が記録されるか)（`WINDOWS` タイプの AP、ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。
+UNIX ボリュームの件は[この節](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#unix-セキュリティスタイルのボリュームでは監査を有効化しても記録されない)）。**このリポジトリでは測っていない。**
+AD グループで認可を分けても、監査は AP に紐づく 1 つの識別情報として記録される。
+
 ## 対象外の機能
 
 すべて[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)の記載である。
