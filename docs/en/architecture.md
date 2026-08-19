@@ -104,10 +104,11 @@ Get Started, so it is kept apart from the other design decisions.
   restricts it there is an **explicit Deny**: within one account the identity policy and the access
   point policy are combined, so narrowing the `Allow` is not a restriction. Layer 2 (the file system
   side) evaluates the file permissions — mode bits or ACLs — held by the one identity fixed on the
-  access point. **Neither layer subtracts from the other**
-  ([dual-layer authorization](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html),
-  and both layers measured in
-  [Access point authorization layers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md))
+  access point. **Neither layer subtracts from the other.** That the two are combined, and that an
+  `Allow` alone therefore does not restrict, is [stated by AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html);
+  a [measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--what-the-union-implies) confirms it behaves that way, and the
+  [paired measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--file-system-permissions-are-what-narrow-access) for Layer 2 is in
+  the same record
 - Localized reads. Only the range that is needed is brought to the consuming site
 - Replacing the collect layer with another platform does not change the design of the serve layer
   ([Portability](portability.md))

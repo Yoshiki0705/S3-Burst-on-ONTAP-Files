@@ -45,7 +45,8 @@ ONTAP 側（ファイルシステム識別情報）の両方が許可する必�
 片方だけを絞っても、もう片方が広ければ実効権限は広いままです。
 
 **AWS 側で絞るのは明示的な拒否です。** 同一アカウントでは identity-based ポリシーと
-アクセスポイントポリシーが結合されるため、`Allow` を狭く書くことは絞り込みになりません
+アクセスポイントポリシーが結合されるため、`Allow` を狭く書くことは絞り込みになりません。
+これは [AWS のドキュメント記載](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)であり、実測でも確認されています
 （[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)）。
 
 **VPC エンドポイントを経由する場合、そのエンドポイントポリシーも許可している必要があります。**
