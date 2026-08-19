@@ -143,6 +143,73 @@ Expect: 100-continue
 | 並列実行時の挙動 | 未測定（並列度 1） |
 | ONTAP バージョンとの対応 | **バージョンを特定できていないため、この結果をバージョンに紐付けられない** |
 
+## UploadPartCopy
+
+### 結果: 同一 Access Point 内をソースにしても `NoSuchKey` を返す
+
+公式対応表は `UploadPartCopy` を**同一 AP 内・同一リージョンで対応**としています。
+6 MiB のソースオブジェクトを同一 Access Point に置き、同じ Access Point 上の宛先に対して
+`UploadPartCopy` を実行しました。
+
+| 操作 | 結果 |
+|---|---|
+| `UploadPartCopy`、ソースは同一 Access Point | **`NoSuchKey`** |
+
+**同一実行内の対照がすべて成功しているため、手順の誤りではありません。**
+
+| 対照 | 期待 | 結果 |
+|---|---|---|
+| ソースオブジェクトを `HeadObject` で読む | 成功する（キーは存在する） | 成功、6,291,456 バイト |
+| 同じマルチパートアップロードに `UploadPart`（コピーでない） | 成功する（セッションは有効） | 成功 |
+| **同一の `CopySource` を与えた `CopyObject`** | — | **成功** |
+
+最後の行が判定の要です。**同じソース、同じ Access Point、同じ実行の中で、`CopyObject` は成功し
+`UploadPartCopy` は `NoSuchKey` を返します。** ソースの指定が解決できているのに、
+オペレーションの側で失敗しています。
+
+`CopySource` を文字列形式（`<ap-arn>/<key>`）で渡した場合は
+`InvalidArgument: Invalid resource in copy source ARN` になりました。
+辞書形式（`{"Bucket": <ap-arn>, "Key": <key>}`）は `CopyObject` が受理する形式です。
+
+### 別の Access Point をソースにすると、両方とも拒否される
+
+同一ボリュームに接続された別の Access Point 経由で同じオブジェクトを指した場合です。
+
+| 操作 | 結果 |
+|---|---|
+| `UploadPartCopy`、ソースは同一ボリュームの別 Access Point | `InvalidArgument: Invalid copy source header` |
+| `CopyObject`、ソースは同一ボリュームの別 Access Point | `InvalidArgument: Invalid copy source header` |
+
+対照の `HeadObject` はどちらの Access Point 経由でも成功しており、オブジェクトは見えています。
+設計ガイドが Cross-AP Copy を「機能として存在しない」に置いているのと整合します。
+
+### この測定が答えていないこと
+
+**`UploadPartCopy` そのものが非対応なのかどうかは、この測定では判定できません。**
+判定するには、このエンドポイントでコピーが成立する別のソース名前空間が必要ですが、
+**別 Access Point 経由のコピーは `CopyObject` でも拒否されるため、そのような名前空間がありません。**
+言えるのは次の範囲です。
+
+> このエンドポイントでコピーが成立する唯一のソース形式（同一 Access Point）を与えたとき、
+> `UploadPartCopy` は `NoSuchKey` を返し、同じソースで `CopyObject` は成功する。
+
+| 項目 | 状態 |
+|---|---|
+| 標準 S3 バケットをソースにした `UploadPartCopy` | 未測定。この測定の範囲（Access Point 1 つ）を超えるため実施していない |
+| 6 MiB 以外のパートサイズ | 未測定 |
+| 複数パートでの `UploadPartCopy` | 未測定（パート 1 で失敗するため到達しない） |
+| ONTAP バージョンとの対応 | **バージョンを特定できていないため紐付けられない** |
+
+### 先の 1 回の観測との関係
+
+設計ガイドは「ソースが同一 AP 内に**ない**条件で `404 NoSuchKey`」という
+**再現を確認していない 1 回の観測**を記録し、そこから非対応と一般化しないと注意していました。
+
+今回の測定は、**同一 AP 内のソースでも `NoSuchKey` になり**、
+**同一 AP 内に「ない」ソース（別 AP）では `InvalidArgument` になる**ことを示しています。
+先の観測が `NoSuchKey` をソースの位置に帰していたのであれば、**その帰属は今回の結果と合いません。**
+1 回の観測から原因を決めなかった判断は妥当でした。
+
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |
