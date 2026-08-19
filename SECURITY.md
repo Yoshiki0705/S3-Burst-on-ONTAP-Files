@@ -43,6 +43,8 @@ virtual-hosted-style URI での参照](https://docs.aws.amazon.com/fsx/latest/ON
 認可は二層です。AWS 側（IAM とアクセスポイントポリシー）と
 ONTAP 側（ファイルシステム識別情報）の両方が許可する必要があります。
 片方だけを絞っても、もう片方が広ければ実効権限は広いままです。
+**AWS 側の内側はさらに層になっています**（origin のチェック、明示的な拒否、SCP / RCP、
+identity-based と resource-based の結合、経由する場合は VPC エンドポイントポリシー）。
 
 **AWS 側で絞るのは明示的な拒否です。** 同一アカウントでは identity-based ポリシーと
 アクセスポイントポリシーが結合されるため、`Allow` を狭く書くことは絞り込みになりません。
