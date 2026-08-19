@@ -37,7 +37,7 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 
 | オペレーション | 条件 | このリポジトリでの状態 |
 |---|---|---|
-| UploadPartCopy | 同一 AP 内・同一リージョンのみ対応（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)） | ソースが同一 AP 内にない条件で `404 NoSuchKey` を 1 回観測した。**同一 AP 内をソースにした再測定は未実施。** 1 回の観測から非対応と一般化しない |
+| UploadPartCopy | 同一 AP 内・同一リージョンのみ対応 | **この行の 2 つの主張は根拠が別である。**「同一 AP 内なら対応」は[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)の記載。「ソースが同一 AP 内にない条件で `404 NoSuchKey`」は**再現を確認していない 1 回の観測**で、姉妹リポジトリでも本リポジトリでも実測記録として扱っていない。**同一 AP 内をソースにした測定は未実施。** 1 回の観測から非対応と一般化しない |
 
 ### 機能として存在しない
 
