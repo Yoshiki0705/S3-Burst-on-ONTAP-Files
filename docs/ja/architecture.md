@@ -86,7 +86,8 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 ## この構成が解くこと
 
 - 収集を S3 API で受けつつ、利用側は NFS / SMB のまま。両者の間に独立した複製・同期ジョブを置かない。転送は読まれた範囲について発生する
-- 書き込み経路を Origin 側の S3 Access Point に集約できる。**ただし認可は単一層ではない。**
+- 書き込み経路を Origin 側の S3 Access Point に集約できる（本リポジトリの設計上の主張であり、
+  引用先の実測がこの集約を検証したものではない）。**ただし認可は単一層ではない。**
   独立した 2 層を順に通り、両方を通らなければデータに届かない。Layer 1（AWS 側）は呼び出し元の
   プリンシパルと `s3:` アクションを評価し、絞り込みを担うのは**明示的な拒否**である。
   同一アカウントでは identity-based ポリシーとアクセスポイントポリシーが結合されるため、
@@ -96,6 +97,13 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
   [AWS のドキュメント記載](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)であり、
   そのとおりになることを確かめた[実測記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)がある。
   Layer 2 が絞り込みを担うことの[対測定](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--ファイルシステム側の権限が絞り込みを担う)も同じ記録にある
+- **集約すると監査でも主体が 1 つに潰れる。** ONTAP のファイルアクセス監査に残るのはアクセスポイントに
+  固定した識別情報の SID だけで、`SubjectUserName` と `SubjectDomainName` は `Not Present`、
+  `SubjectIP` は AWS のサービス側アドレスである（1 クライアントの連続 2 リクエストで別の値になった）。
+  呼び出し元の特定には AWS CloudTrail との突き合わせが要る。**ファイル単位の操作を主体別に追跡する
+  要件があるなら、アクセスポイントの分割が監査の粒度を決める。** 分割は実測ではなく、
+  この実測から導かれる設計上の帰結である（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログには誰が記録されるか)。追えないものの一覧は
+  [上限値](reference/limits/s3-access-point.md#監査で追えるものと追えないもの)）
 - 読み取りの局所化。必要な範囲だけを利用拠点に持ち込む
 - 収集層を別のプラットフォームに置き換えても、配布層の設計が変わらない
   （[移植性](portability.md)）

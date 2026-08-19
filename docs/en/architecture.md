@@ -98,7 +98,8 @@ Get Started, so it is kept apart from the other design decisions.
 
 - Collection is taken over the S3 API while the consuming side stays on NFS / SMB, with no separate
   copy or scheduled replication job between the two. Transfer happens for the range that is read
-- The write path can be consolidated onto the S3 Access Point on the origin. **Authorization,
+- The write path can be consolidated onto the S3 Access Point on the origin (a design statement of
+  this repository; the measurements cited below did not verify that consolidation). **Authorization,
   however, is not a single layer.** A request passes two independent layers in order and has to clear
   both. Layer 1 (the AWS side) evaluates the calling principal and the `s3:` action, and what
   restricts it there is an **explicit Deny**: within one account the identity policy and the access
@@ -109,6 +110,14 @@ Get Started, so it is kept apart from the other design decisions.
   a [measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--what-the-union-implies) confirms it behaves that way, and the
   [paired measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--file-system-permissions-are-what-narrow-access) for Layer 2 is in
   the same record
+- **Consolidating it collapses the audit subject too.** What ONTAP's file access auditing retains is
+  the SID of the identity fixed on the access point: `SubjectUserName` and `SubjectDomainName` are
+  `Not Present`, and `SubjectIP` is an AWS service-side address that differed between two consecutive
+  requests from one client. Identifying the caller needs correlation with AWS CloudTrail. **Where
+  file-level operations have to be attributed per subject, splitting access points is what sets the
+  granularity of the audit.** The splitting is a consequence drawn from that measurement, not a
+  measurement itself ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#who-appears-in-the-audit-log); what cannot be attributed is listed in
+  [limits](reference/limits/s3-access-point.md#what-the-audit-trail-can-and-cannot-attribute))
 - Localized reads. Only the range that is needed is brought to the consuming site
 - Replacing the collect layer with another platform does not change the design of the serve layer
   ([Portability](portability.md))
