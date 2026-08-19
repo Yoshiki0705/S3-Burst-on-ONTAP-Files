@@ -152,9 +152,12 @@ Resources:
         PatternAxis: __PATTERN_AXIS__
         Environment: !Ref Environment
       # Replace with the least privilege this pattern actually needs. An access point ARN is
-      # required for S3 calls against FSx for ONTAP: a bucket-style ARN does not work, and the
-      # object-level statement needs the `/object/*` suffix. Authorization is dual-layer — the AWS
-      # side and the ONTAP file system identity must both allow the call.
+      # required for S3 calls against FSx for ONTAP: a bucket-style ARN (arn:aws:s3:::<alias>) does
+      # not work, and the object-level statement needs the `/object/*` suffix. See
+      # https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/referencing-access-points-for-fsxn.html
+      # A policy generated automatically by a service role is sometimes written in the bucket form,
+      # which returns AccessDenied. Authorization is dual-layer -- the AWS side and the ONTAP file
+      # system identity must both allow the call.
       Policies:
         - Version: "2012-10-17"
           Statement:

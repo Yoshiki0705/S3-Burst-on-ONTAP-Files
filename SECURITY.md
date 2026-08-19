@@ -35,8 +35,10 @@ AWS のサービス自体、または ONTAP 製品自体の脆弱性は、それ
 デプロイする前に、そのパターンが実際に必要とする最小権限に置き換えてください。
 FSx for ONTAP に対する S3 呼び出しでは、アクセスポイント形式の ARN
 （`arn:aws:s3:<region>:<account>:accesspoint/<name>`、オブジェクト操作には `/object/*` を付ける）を
-使います。バケット形式の ARN では動かないと報告されていますが、このリポジトリでは確認していません
-（[姉妹リポジトリの認可モデル](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-authorization-model.md)）。
+使います。**バケット形式の ARN（`arn:aws:s3:::<alias>`）では動きません**（[ARN・エイリアス・
+virtual-hosted-style URI での参照](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/referencing-access-points-for-fsxn.html)）。サービスロールが自動生成したポリシーが
+バケット形式で書かれていることがあり、その場合は `AccessDenied` になります。
+機構の説明は[姉妹リポジトリの認可モデル](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-authorization-model.md)にあります。
 
 認可は二層です。AWS 側（IAM とアクセスポイントポリシー）と
 ONTAP 側（ファイルシステム識別情報）の両方が許可する必要があります。
