@@ -378,6 +378,9 @@ Outputs:
          # then, from an NFS client: chown 7101:7100 <mount>/  (the identity below needs write
          # permission on the volume root -- with no access point policy at all, the mode bits and
          # owner alone decide whether PutObject succeeds)
+         # This access point is a writer, which is why ownership is granted here. Reusing it as a
+         # read-only one needs the opposite: an identity the volume root withholds write from. Being
+         # non-root is not sufficient -- at 775 or 777, or as owner, a non-root identity writes.
       1. Create S3 Access Point (this one identity authorizes every request; not root on purpose):
          aws fsx create-and-attach-s3-access-point --name s3burst-verify-ap --type ONTAP \
            --ontap-configuration '{"VolumeId":"${OriginVolume}","FileSystemIdentity":{"Type":"UNIX","UnixUser":{"Name":"s3ap-writer"}}}'
