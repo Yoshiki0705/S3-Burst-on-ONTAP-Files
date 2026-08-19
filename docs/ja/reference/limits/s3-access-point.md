@@ -40,6 +40,30 @@
 | `NetworkOrigin` | 作成後は変更できない | ドキュメント記載 | 同上。**到達性は origin の種別ではなく呼び出し元の位置とルーティングで決まる。** Gateway エンドポイントは VPC 内で発生したトラフィックだけをルーティングし、VPN / Direct Connect / ピア VPC / Transit Gateway 経由の呼び出しには Interface エンドポイントが必要（[ネットワークアクセス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)） |
 | 認可 | AWS 側と ONTAP 側の両方が許可する必要がある | ドキュメント記載 | [二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
 
+## ネットワークで絞るときに効く条件キー
+
+この構成は収集の書き込み経路を 1 本にするので、送信元での絞り込みを設計に入れることがある。
+**条件キーはリクエストに載っているときしか比較できない。** 載らない条件キーで `Allow` を書くと
+その文は成立せず、`Deny` を書くと当たらない。**`Allow` 側と `Deny` 側で結果が反転する。**
+
+| 条件キー | リクエストに載る条件 |
+|---|---|
+| `aws:SourceVpc` / `aws:SourceVpce` / `aws:VpcSourceIp` | **VPC エンドポイントを経由するときだけ** |
+| `aws:SourceIp` | **VPC エンドポイントを経由しないときだけ** |
+
+出典は[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)。
+両者は相互排他で、**エンドポイント経由のリクエストを `aws:SourceIp` では絞れない**。
+`aws:VpcSourceIp` は大文字小文字を**区別する**。
+
+**`Allow` の `Condition` に書いても絞り込みにならない。** 同一アカウントでは identity-based
+ポリシーと結合されるため、絞るには逆条件の**明示的な拒否**が要る。AWS も両方の文が必要だと
+記載している。**ただし `VPC` origin のアクセスポイントでは不要で**、`aws:SourceVpc` が束縛先の
+VPC と一致しないリクエストを拒否する明示的な拒否と同等に振る舞う（同出典）。
+
+この節は AWS のドキュメント記載である。このリポジトリでは実測していない。
+実測されているのは `aws:SourceVpce` が S3 ゲートウェイエンドポイント経由で埋まることだけで、
+[条件キーの実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#条件キーはリクエストに載っているときしか比較できません)にある。
+
 ## 対象外の機能
 
 すべて[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)の記載である。

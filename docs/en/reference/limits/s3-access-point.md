@@ -44,6 +44,31 @@ NAS-unfriendly names heavily.
 | `NetworkOrigin` | Cannot be changed after creation | documented | As above. **Reachability is decided by where the caller is and how it is routed, not by the origin type.** A Gateway endpoint only routes traffic originating inside the VPC; a caller arriving over VPN, Direct Connect, a peered VPC or Transit Gateway needs an Interface endpoint ([network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)) |
 | Authorisation | Both the AWS side and the ONTAP side have to permit it | documented | [two-layer authorisation](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
 
+## Condition keys, where the restriction is a network one
+
+This architecture consolidates the collect-side write path, so restricting by where a request comes
+from is a design people reach for. **A condition key can only be compared when it is present on the
+request.** Write an `Allow` on a key that is absent and the statement does not match; write a `Deny`
+and it never fires. **The two sides fail in opposite directions.**
+
+| Condition key | Present only when |
+|---|---|
+| `aws:SourceVpc` / `aws:SourceVpce` / `aws:VpcSourceIp` | **the request travels through a VPC endpoint** |
+| `aws:SourceIp` | **the request does not travel through a VPC endpoint** |
+
+The source is [configuring network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html).
+They are mutually exclusive, so **a request arriving through an endpoint cannot be restricted with
+`aws:SourceIp`**. `aws:VpcSourceIp` **is** case sensitive.
+
+**A `Condition` on the `Allow` side is not a restriction.** Within one account it is combined with the
+identity policy, so restricting needs an **explicit Deny** on the inverse condition; AWS states that
+both statements are required. **An access point with a `VPC` origin needs neither**: it behaves as an
+explicit Deny on requests whose `aws:SourceVpc` does not match the VPC it is bound to (same source).
+
+This section is AWS-documented and not measured here. What was measured is only that
+`aws:SourceVpce` is populated over an S3 gateway endpoint, in
+[condition keys as measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#a-condition-key-can-only-be-compared-when-it-is-present-on-the-request).
+
 ## Features out of scope
 
 All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html).
