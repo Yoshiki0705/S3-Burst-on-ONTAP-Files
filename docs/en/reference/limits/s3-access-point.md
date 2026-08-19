@@ -70,6 +70,24 @@ This section is AWS-documented and not measured here. What was measured is only 
 `aws:SourceVpce` is populated over an S3 gateway endpoint, in
 [condition keys as measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#a-condition-key-can-only-be-compared-when-it-is-present-on-the-request).
 
+## What the audit trail can and cannot attribute
+
+ONTAP's file access auditing does record access that arrives through an S3 Access Point, but **the
+subject it records is the identity fixed on the access point**, not the calling IAM principal. The
+four below change a design where auditing is a requirement.
+
+| Not attributable | What is recorded | Consequence for the design |
+|---|---|---|
+| The calling IAM principal | `SubjectUserSid` holds the SID of the access point's identity; `SubjectUserName` and `SubjectDomainName` are **`Not Present`** (not resolved to a name) | Identifying the caller needs correlation with AWS CloudTrail. **Splitting access points by purpose is what sets the granularity** |
+| The caller's address | `SubjectIP` is an AWS service-side address, and two consecutive requests from one client produced **different values** | An audit requirement that filters by source IP cannot be met over this path |
+| Whether the user is local | `SubjectUserIsLocal` was `false` for what was in fact a local Windows user | The field cannot be used as a test |
+| Operations on a UNIX-effective-style volume | Enabling auditing on the SVM produced **no events at all**, while an NTFS volume on the same SVM with the same settings produced them. Mode bits carry no audit information, so an **ACE (SACL)** naming what to record is required | Where auditing is required on a UNIX volume, enabling it is not sufficient |
+
+All of these are [measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#who-appears-in-the-audit-log) (a `WINDOWS`-type access point, ONTAP 9.18.1P3D1, 2026-08-17 to 18,
+`ap-northeast-1`; the UNIX volume finding is in [this section](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#on-a-unix-security-style-volume-enabling-auditing-records-nothing)). **Not measured in this
+repository.** Separating authorisation by AD group does not separate the audit trail either: it is
+recorded as the one identity bound to the access point.
+
 ## Features out of scope
 
 All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html).
