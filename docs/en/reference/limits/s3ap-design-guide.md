@@ -42,7 +42,7 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 
 | Operation | Condition | State in this repository |
 |---|---|---|
-| UploadPartCopy | Supported when source and destination are within the same AP, same-Region copies only ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)) | `404 NoSuchKey` was observed once, with a source that was not within the same AP. **A re-measurement with a same-AP source has not been done.** One observation does not generalise to unsupported |
+| UploadPartCopy | Supported when source and destination are within the same AP, same-Region copies only | **The two claims in this row rest on different evidence.** That it is supported within one access point is stated in the [compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html). The `404 NoSuchKey` with a source outside the access point is **a single observation whose reproduction was never confirmed**, held as a measurement in neither this repository nor the sibling one. **No measurement has been taken with a source inside the access point.** One observation does not generalise to unsupported |
 
 ### Features that do not exist
 
