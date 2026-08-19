@@ -80,7 +80,9 @@ is an absent link and never a placeholder page.
 - [Support matrix](docs/ja/support-matrix.md): Collect-layer and serve-layer support with minimum
   versions, plus the constraints that shape a design — limited S3 operations, no event notification
   or lifecycle or versioning, dual-layer authorization, immutable `NetworkOrigin`, object-name
-  limits, and the measured size ceilings.
+  limits, and the measured size ceilings. On authorization, note that the AWS side is itself layered:
+  a request through a VPC endpoint is also evaluated against that endpoint's policy, whose default is
+  allow-all, and an `Allow` does not restrict because it is combined with the identity policy.
 - [Verification status](docs/ja/verification-status.md): The four stages, and the current stage of
   every claim. Also states what a number must carry before it can be published.
 - [Limits](docs/ja/reference/limits/s3-access-point.md): Limit values with source and stage. Single
