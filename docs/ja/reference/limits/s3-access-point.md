@@ -97,7 +97,7 @@ AD グループで認可を分けても、監査は AP に紐づく 1 つの識�
 | Static Website Hosting | 対象外 |
 | 多要素認証（MFA delete） | 対象外 |
 | 条件付き書き込み | 対象外 |
-| `Presign` | 対応表では非対応（[設計ガイド](s3ap-design-guide.md#presigned-url)に観測と注意） |
+| `Presign` | 対応表では非対応。**実測では `PutObject` / `HeadObject` / `GetObject` の 3 つとも成功**（[検証記録](../../verification/s3ap-operations.md)、2026-08-19。SigV4 / SigV2 の両方）。測定は対応表と逆向きであり、**対応表が非対応としている間は依存させない**（[設計ガイド](s3ap-design-guide.md#presigned-url)） |
 | ACL | `bucket-owner-full-control` 以外は対象外。他の値は `InvalidArgument` |
 | ストレージクラス | `FSX_ONTAP` のみ |
 | サーバー側暗号化 | `SSE-FSX` のみ。`SSE-S3` / `SSE-KMS` は指定できない |

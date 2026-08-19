@@ -39,6 +39,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 |---|---|---|
 | FSx for ONTAP の S3 Access Point の対応オペレーションと実測サイズ上限 | 検証済み | 姉妹リポジトリ [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) での実測。単一 `PutObject` 5 GiB、オブジェクト全体 50 GiB、上限は `CompleteMultipartUpload` の時点で判定される |
 | Active Directory 参加 SVM では S3 Access Point の全データ操作に AD ドメインコントローラー到達性が必要 | 検証済み | 同リポジトリ。`HeadBucket` は AD 到達不能でも成功するため偽陽性になる |
+| S3 Access Point 経由の presigned URL（`PutObject` / `HeadObject` / `GetObject`） | 検証済み | [検証記録](verification/s3ap-operations.md)。2026-08-19、ap-northeast-1、SINGLE_AZ_1 / 128 MBps、UNIX、AWS 外のクライアントから、n=30 × 4 回。3 つとも成功し、SigV4 と SigV2 の両方で動作。**公式対応表は `Presign — Not supported` と記載しており、測定はそれと逆向き。** 本番ワークロードを依存させない判断は変えない。ONTAP バージョンは特定できず |
 | FSx for ONTAP を Origin、オンプレミス ONTAP を Cache とする FlexCache | ドキュメント記載 / 実機未検証 | AWS の[対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)に記載 |
 | S3 Access Point 経由で書いたオブジェクトが **同一ボリューム**の NFS でどう見えるか | 検証済み | [検証記録](verification/s3ap-nfs-visibility.md)。2026-08-09、ap-northeast-1、SINGLE_AZ_1 / 128 MBps、UNIX、NFSv3、`actimeo=0`、n=30。S3 → NFS は p50 9 ms、NFS → S3 は p50 873 ms（64 B）。**ONTAP バージョンは特定できず**（同記録に理由） |
 | マルチパートアップロード中の部分オブジェクトがファイル側に見えるか | 検証済み | 同記録。`CompleteMultipartUpload` まで NFS 側に現れない |

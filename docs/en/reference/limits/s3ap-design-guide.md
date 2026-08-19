@@ -71,8 +71,19 @@ are in the [sibling repository's compatibility notes](https://github.com/Yoshiki
 **While the public documentation says `Not supported`, do not let a production workload depend on
 it.** The behaviour can change without a deprecation notice. Where time-limited access is needed,
 design for API Gateway plus Lambda, CloudFront signed URLs, or temporary STS credentials. What has
-been measured is `GetObject`; **`PutObject` and `HeadObject` are unverified**. This architecture's
-path does not use presigned URLs.
+**`PutObject` and `HeadObject` have now been measured too** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese),
+2026-08-19). All three succeed, under SigV4 and under SigV2, which agrees with the
+NetApp KB version scope above. **The guidance not to depend on it while the table says
+`Not supported` is unchanged**: that it works is not a guarantee that it will keep working without a
+deprecation notice.
+
+**SigV2 includes Content-Type in the string to sign**, so a header the client adds on its own
+invalidates the signature; SigV4 signs only `host` by default and is unaffected. With boto3 the
+signature version has to be set explicitly — `generate_presigned_url` emits SigV2 otherwise, and
+`client.meta.config.signature_version` reports `s3v4` either way, so the reported value does not
+tell you which was generated. That is client-side behaviour, not a property of FSx for ONTAP.
+
+This architecture's path does not use presigned URLs.
 Depending on it in a production workload is not recommended.
 
 ## Designing concurrency and throughput
