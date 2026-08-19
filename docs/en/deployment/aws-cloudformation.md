@@ -180,6 +180,7 @@ The Secrets Manager secret is deleted with a recovery window by default. Either 
 | Cannot reach the management endpoint | Are you inside the VPC? The ONTAP management interface is VPC-only |
 | `mount` times out | Security groups. NFSv3 uses 111, 635 and 4045-4046 as well as 2049 |
 | `AccessDenied` through the access point | The AWS side (IAM and the access point policy) **and** the ONTAP side (file system identity) must both allow it. **The two can be told apart.** A denial on the AWS side carries `with an explicit deny in a resource-based policy` in the error body. A denial on the ONTAP side happens even with no access point policy attached, so check the volume root's owner and mode bits ([measured](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md)). |
+| One newly added access point returns `AccessDenied` while the others work | **Where the VPC endpoint policy is restricted, the new access point's ARN is not among the resources it allows.** The default is allow-all, so an environment that has not restricted it never notices the layer ([configuring network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html); AWS-documented, not measured here) |
 | `HeadBucket` passes but data operations fail | On an AD-joined SVM, domain controller reachability. `HeadBucket` is a false positive |
 | Written but not visible over NFS | Mount options. Check on the `actimeo=0` mount point |
 

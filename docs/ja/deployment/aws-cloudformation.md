@@ -177,6 +177,7 @@ Secrets Manager のシークレットは既定で復旧期間を持って削除�
 | 管理エンドポイントに届かない | VPC 内から実行しているか。ONTAP の管理面は VPC 限定で、手元の端末からは届きません |
 | `mount` がタイムアウトする | セキュリティグループ。NFSv3 は 2049 だけでなく 111 / 635 / 4045-4046 も使います |
 | アクセスポイント経由で `AccessDenied` | AWS 側（IAM とアクセスポイントポリシー）と ONTAP 側（ファイルシステム識別情報）の**両方**が許可している必要があります。**どちらから返ったかは切り分けられます。** AWS 側の拒否はエラー本文に `with an explicit deny in a resource-based policy` が入ります。ONTAP 側の拒否はアクセスポイントポリシーを付けていない状態でも起きるので、ボリュームルートの所有者と mode bits を確認します（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md)） |
+| アクセスポイントを追加したら、それだけ `AccessDenied` になる | **VPC エンドポイントポリシーを絞っている環境では、新しいアクセスポイントの ARN が許可対象に入っていません。** 既定は全許可なので、絞っていない環境ではこの層の存在に気づきません（[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)。AWS のドキュメント記載で、このリポジトリでは実測していません） |
 | `HeadBucket` は通るのにデータ操作が失敗する | AD 参加 SVM ならドメインコントローラーへの到達性。`HeadBucket` は偽陽性になります |
 | 書いたのに NFS に見えない | マウントオプション。`actimeo=0` のマウントポイントで確認してください |
 
