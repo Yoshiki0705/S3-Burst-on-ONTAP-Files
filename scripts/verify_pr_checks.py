@@ -23,7 +23,10 @@ import json
 import subprocess
 import sys
 
-REPO = "Yoshiki0705/S3-Burst-on-ONTAP-Files"
+# The repository is not named here. `gh` resolves it from the working directory and templates
+# `{owner}/{repo}` in an API path, so a constant would restate what git already knows -- and would be
+# wrong in a fork, silently reporting the upstream's runs as this branch's.
+#
 # Workflows that run for every pull request. `zizmor` is path-filtered to `.github/` and the pinned
 # manifest, so its absence is normal and is reported rather than treated as missing.
 ALWAYS = {"ci", "gitleaks", "pr-title-check"}
@@ -41,12 +44,10 @@ def main() -> int:
         raise SystemExit("usage: verify_pr_checks.py <pr-number>")
     number = sys.argv[1]
 
-    view = json.loads(
-        gh("pr", "view", number, "--repo", REPO, "--json", "headRefOid,state,title")
-    )
+    view = json.loads(gh("pr", "view", number, "--json", "headRefOid,state,title"))
     head = view["headRefOid"]
     runs = json.loads(
-        gh("api", f"repos/{REPO}/actions/runs?head_sha={head}&per_page=100")
+        gh("api", f"repos/{{owner}}/{{repo}}/actions/runs?head_sha={head}&per_page=100")
     )["workflow_runs"]
 
     # Latest run per workflow, in case one was re-run.
