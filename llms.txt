@@ -55,9 +55,11 @@ against.
 
 A document's language is its directory: `docs/ja/` and `docs/en/`. The one exception is the Japanese
 hub, which is the repository-root `README.md`, so `docs/ja/README.md` does not exist. Japanese is the
-reference language and the only complete tree; English currently covers the hub only. Content that
-exists in one language is linked in that language rather than stubbed out, so a missing translation
-is an absent link and never a placeholder page.
+reference language and the authoritative one for technical accuracy; English mirrors it for the
+documents listed in `docs/i18n-manifest.txt`, with the section structure held identical by a check.
+Where the two disagree, Japanese is correct. Content that exists in one language is linked in that
+language rather than stubbed out, so a missing translation is an absent link and never a placeholder
+page.
 
 ## The architecture
 

@@ -1,5 +1,9 @@
 # 他クラウドとの接続経路
 
+<!-- lang-switcher:start -->
+🌐 [日本語](multi-cloud-connectivity.md) | [English](../en/multi-cloud-connectivity.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->
+
 この文書が扱うのは**ネットワーク層だけ**である。AWS と Google Cloud / Microsoft Azure /
 Oracle Cloud Infrastructure (OCI) の間を private につなぐ選択肢と、それぞれがどのリージョンで
 使えるかを整理する。
@@ -449,3 +453,7 @@ MTU の不一致で起きるのは接続失敗ではなく、小さな読み取�
 | [PoC チェックリスト](poc-checklist.md) | 未確認を埋める順序。MTU の確認を含む |
 | [配布側のデプロイ](deployment/onprem-terraform.md) | ピアリングをこのリポジトリが作らない理由と、削除順序 |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 「ファイルを S3 で見せる」機構の呼び名と実装元 |
+
+<!-- lang-switcher:start -->
+🌐 [日本語](multi-cloud-connectivity.md) | [English](../en/multi-cloud-connectivity.md) | [🏠 リポジトリトップ](../../README.md)
+<!-- lang-switcher:end -->

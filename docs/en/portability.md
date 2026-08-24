@@ -74,7 +74,7 @@ have its stage raised by a primary source or by a measurement; the second rests 
 premise. Network reachability does not change the second one.
 
 The connectivity itself is covered in
-[cross-cloud connectivity](../ja/multi-cloud-connectivity.md) (Japanese).
+[cross-cloud connectivity](multi-cloud-connectivity.md).
 
 ### Reference — Azure NetApp Files cache volumes
 

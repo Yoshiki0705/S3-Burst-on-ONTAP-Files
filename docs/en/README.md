@@ -133,6 +133,7 @@ nothing to lose if it does not. The steps to confirm it are in the
 | Check what must be decided up front | [Decisions that come first](design-first-decisions.md) | 5 min |
 | See how far each claim is confirmed | [Verification status](verification-status.md) | 5 min |
 | Look up versions and constraints | [Support matrix](support-matrix.md) | 10 min |
+| Look up cross-cloud connectivity | [Cross-cloud connectivity](multi-cloud-connectivity.md) | 10 min |
 | Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](reference/glossary/object-access-on-ontap.md) | 5 min |
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
