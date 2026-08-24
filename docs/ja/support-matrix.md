@@ -59,6 +59,10 @@ FSx for ONTAP を Origin としたときに、Cloud Volumes ONTAP / ONTAP Select
 Azure NetApp Files / Google Cloud NetApp Volumes を Cache にできるかは、この表に含まれていない。
 **現時点では未確認として扱う。** 「ONTAP ベースだから動く」とまとめない。
 
+逆方向、つまり他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成も
+この表の外にある。判定の分かれ方は[移植性](portability.md)、接続経路そのものは
+[他クラウドとの接続経路](multi-cloud-connectivity.md)にある。
+
 参考として、Azure NetApp Files には外部 ONTAP / Cloud Volumes ONTAP の Origin を対象とする
 キャッシュボリュームがある（[cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes)）。
 FSx for ONTAP を Origin として使えるかは
@@ -95,6 +99,7 @@ FSx for ONTAP を Origin として使えるかは
 | [検証状況](verification-status.md) | 検証済みと未検証の区別 |
 | [最初に決めること](design-first-decisions.md) | セキュリティスタイルとプロトコルの関係 |
 | [移植性](portability.md) | 層ごとの置き換えを検討する場合 |
+| [他クラウドとの接続経路](multi-cloud-connectivity.md) | 他クラウドとの接続の選択肢と対応リージョン |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 機構の呼び名と実装元 |
 
 ---

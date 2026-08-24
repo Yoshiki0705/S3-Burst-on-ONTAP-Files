@@ -129,6 +129,7 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | 作る前に決めることを確認する | [最初に決めること](docs/ja/design-first-decisions.md) | 5 分 |
 | 何がどこまで確かめられているか知る | [検証状況](docs/ja/verification-status.md) | 5 分 |
 | 対応バージョンと制約を調べる | [サポート状況](docs/ja/support-matrix.md) | 10 分 |
+| 他クラウドとの接続経路を調べる | [他クラウドとの接続経路](docs/ja/multi-cloud-connectivity.md) | 10 分 |
 | 用語の違いを確認する | [用語の整理](docs/ja/reference/glossary/object-access-on-ontap.md) | 5 分 |
 | 検証環境をデプロイする（AWS 側） | [収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md) | 40 分 |
 | 検証環境をデプロイする（AWS 以外） | [配布側のデプロイ](docs/ja/deployment/onprem-terraform.md) | 40 分 |

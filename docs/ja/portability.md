@@ -51,6 +51,23 @@ AWS が明記している FSx for ONTAP の FlexCache 対応構成は 3 つだ�
 確かめる手順は [PoC チェックリスト](poc-checklist.md)のフェーズ 4 にある。
 結果が出たらこの表を更新する。
 
+### 逆方向 — 他クラウドのファイルストレージを Origin にする
+
+上の表はいずれも **Origin が FSx for ONTAP** の場合である。他クラウドのファイルストレージを
+Origin として FSx for ONTAP を Cache にする方向は、AWS の対応構成表に含まれていない。
+**この方向は表の外にある。** 段階の付け方が 2 通りに分かれるため、区別して扱う。
+
+| Origin 側 | 判定 | 理由 |
+|---|---|---|
+| Google Cloud NetApp Volumes | **unconfirmed** | ONTAP モードがあるが、対応構成表に記載がない |
+| Azure NetApp Files | **unconfirmed** | ONTAP ベースだが、対応構成表に記載がない |
+| Google Cloud Filestore、Azure Managed Lustre、Azure Blob NFS、OCI File Storage | **機構として対象外** | ONTAP ではない。FlexCache は ONTAP 間のクラスタ / SVM ピアリングを要求する |
+
+**`unconfirmed` と「機構として対象外」を同じ語で書かない。** 前者は一次資料か実機で段階が
+上がりうるもので、後者は前提が違う。ネットワークが到達しても後者は変わらない。
+
+各クラウドとの接続経路そのものは[他クラウドとの接続経路](multi-cloud-connectivity.md)にまとめてある。
+
 ### 参考 — Azure NetApp Files のキャッシュボリューム
 
 Azure NetApp Files には外部 ONTAP / Cloud Volumes ONTAP の Origin を対象とする
@@ -80,6 +97,7 @@ FSx for ONTAP を Origin として使えるかは
 | [サポート状況](support-matrix.md) | 制約の一覧 |
 | [検証状況](verification-status.md) | 段階の定義 |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 収集層の機構の呼び名 |
+| [他クラウドとの接続経路](multi-cloud-connectivity.md) | AWS と他クラウドを private につなぐ選択肢と対応リージョン |
 | [PoC チェックリスト](poc-checklist.md) | 未確認を埋める手順 |
 
 ---
