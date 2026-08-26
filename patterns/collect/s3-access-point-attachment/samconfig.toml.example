@@ -1,0 +1,23 @@
+# Copy to samconfig.toml and edit. samconfig.toml is gitignored: it accumulates a real stack name and
+# a real Region, neither of which belongs in a public repository.
+#
+# No `[default.build.parameters]` here, unlike the pattern skeleton. This template declares no
+# function and carries no `Transform`, so there is nothing to build and nothing to upload -- plain
+# `aws cloudformation deploy` works, and the README uses it. This file exists so that `sam deploy`
+# also works for anyone whose habit it is.
+
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "s3burst-collect-ap"
+region = "ap-northeast-1"
+confirm_changeset = true
+# No `capabilities`: this stack creates no IAM resource. The permissions the resource type needs --
+# fsx:CreateAndAttachS3AccessPoint, s3:CreateAccessPoint, s3:PutAccessPointPolicy and the delete-side
+# pair -- belong to whoever runs the deployment, not to a role this template makes.
+#
+# No `resolve_s3`: nothing is packaged, so no artefact bucket is needed.
+#
+# Fill from params.json. Keeping both files means writing the same values twice; params.example.json
+# is the one the README tells a reader to copy, so treat it as the source and paste here.
+# parameter_overrides = "VolumeId=fsvol-... AccessPointName=... VpcId=vpc-... AllowedPrincipalArns=..."

@@ -1,0 +1,17 @@
+[
+  { "ParameterKey": "PatternName", "ParameterValue": "s3-access-point-attachment" },
+  { "ParameterKey": "Environment", "ParameterValue": "dev" },
+  { "ParameterKey": "VolumeId", "ParameterValue": "fsvol-0123456789abcdef0" },
+  { "ParameterKey": "AccessPointName", "ParameterValue": "s3burst-collect-ap" },
+  { "ParameterKey": "NetworkOrigin", "ParameterValue": "VPC" },
+  { "ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0" },
+  { "ParameterKey": "FileSystemIdentityType", "ParameterValue": "UNIX" },
+  { "ParameterKey": "UnixUserName", "ParameterValue": "root" },
+  { "ParameterKey": "WindowsUserName", "ParameterValue": "" },
+  {
+    "ParameterKey": "AllowedPrincipalArns",
+    "ParameterValue": "arn:aws:iam::123456789012:role/collect-writer,arn:aws:iam::123456789012:role/analytics-reader"
+  },
+  { "ParameterKey": "AllowedPrefix", "ParameterValue": "" },
+  { "ParameterKey": "AttachPolicy", "ParameterValue": "true" }
+]

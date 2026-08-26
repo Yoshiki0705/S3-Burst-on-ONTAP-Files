@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# Smallest thing that attaches an S3 access point to an FSx for ONTAP volume with a UNIX identity.
+#
+# Read this one first. `../template.yaml` is the same resource with the conditions, the rules and the
+# policy that a deployment needs; everything here is the part that cannot be removed.
+#
+# `Name` is the primary identifier and is create-only, so changing it replaces the access point.
+Description: >-
+  Example — one S3 access point on an FSx for ONTAP volume, UNIX identity, VPC origin.
+  Minimal reference; see ../template.yaml for the deployable version.
+
+Parameters:
+  VolumeId:
+    Type: String
+    Description: Existing, mounted FSx for ONTAP volume.
+    AllowedPattern: "^fsvol-[0-9a-f]{17}$"
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC the access point accepts requests from.
+
+Resources:
+  AccessPoint:
+    Type: AWS::FSx::S3AccessPointAttachment
+    Properties:
+      Name: example-unix-ap
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: UNIX
+          # A NAME, not a UID. Numeric Uid / Gid / SecondaryGids belong to the FSx for OpenZFS shape
+          # of this resource and have no field here. The name has to resolve on the SVM that owns the
+          # volume: `fsxadmin` is a cluster administrator and fails with "Failed to lookup the
+          # provided user in ONTAP".
+          UnixUser:
+            Name: root
+      S3AccessPoint:
+        # Present means VPC origin; omit the whole block for internet origin. There is no
+        # `NetworkOrigin` property, and origin cannot be changed after creation.
+        VpcConfiguration:
+          VpcId: !Ref VpcId
+
+Outputs:
+  Alias:
+    Description: Use as the bucket name in an S3 client.
+    Value: !GetAtt AccessPoint.S3AccessPoint.Alias
+
+  Arn:
+    Description: Use as the bucket ARN. A bucket-style arn:aws:s3:::<alias> does not work here.
+    Value: !GetAtt AccessPoint.S3AccessPoint.ResourceARN
+
+  Lifecycle:
+    Description: AVAILABLE when usable.
+    Value: !GetAtt AccessPoint.Lifecycle

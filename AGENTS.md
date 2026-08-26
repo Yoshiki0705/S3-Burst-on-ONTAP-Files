@@ -281,9 +281,12 @@ Automated checks catch syntax. These catch design-level problems.
   `zizmor` are exact-pinned in `requirements-dev.txt`; CI installs from that file so the verdict does
   not depend on the day it runs.
 - No application runtime. Patterns are CloudFormation / SAM templates deployed by the reader.
-- The S3 Access Point itself is created out of band: CloudFormation has no native resource for it,
-  so `aws fsx create-and-attach-s3-access-point --cli-input-json file://…` is used. Positional
-  `--ontap-configuration` parsing is fragile; always pass a JSON file.
+- The S3 Access Point has a native resource, `AWS::FSx::S3AccessPointAttachment` (registry, checked
+  2026-08-26: LIVE). `patterns/collect/s3-access-point-attachment/` manages one with it. It has no
+  update handler and `S3AccessPoint` is create-only, so **editing the policy deletes and recreates
+  the access point**, and it is not taggable. The ONTAP identity takes a user *name*; numeric
+  Uid/Gid belong to the OpenZFS configuration. Where the CLI is still used, pass a JSON file —
+  positional `--ontap-configuration` parsing is fragile.
 
 ## Architecture diagrams (draw.io)
 

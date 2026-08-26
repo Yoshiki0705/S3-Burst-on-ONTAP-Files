@@ -82,8 +82,21 @@ ONTAP のバージョンとSVM の NFS エンドポイントは CloudFormation �
 
 ## 3. S3 Access Point の作成
 
-CloudFormation には FSx for ONTAP のボリュームへ S3 Access Point を接続するリソースが
-ありません。CLI で作成します。
+`AWS::FSx::S3AccessPointAttachment` があるので、推奨は 2 つ目のスタックで作ることです。
+[`patterns/collect/s3-access-point-attachment/`](../../../patterns/collect/s3-access-point-attachment/README.md)
+を使います。上のスタックに含めない理由は、アクセスポイントの設定が全て create-only で、
+ポリシーを変えるだけで置き換えになること、そしてアクセスポイントの改名でボリュームを持つ
+スタックを動かしたくないことの 2 点です。
+
+```bash
+aws cloudformation deploy \
+  --template-file patterns/collect/s3-access-point-attachment/template.yaml \
+  --stack-name s3burst-collect-ap \
+  --parameter-overrides file://params.json \
+  --region ap-northeast-1
+```
+
+以下の CLI も有効で、スタックに持たせる必要のない 1 回限りの作成では短い経路です。
 
 ```bash
 cp access-point.example.json access-point.json

@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# The WINDOWS identity, on an NTFS-security-style volume, with internet origin.
+#
+# Two differences from `unix-user.yaml` beyond the identity block, both deliberate:
+#   - no `VpcConfiguration`, which is how internet origin is expressed
+#   - an explicit note on what the identity is evaluated against
+#
+# Measured 2026-08-26 on ONTAP 9.18.1P3D1: an SVM-local SMB user works, and a domain account is not
+# required -- the data plane worked with no reachable domain controller at attach time. A domain
+# account is written DOMAIN\username.
+Description: >-
+  Example — one S3 access point on an FSx for ONTAP volume, WINDOWS identity, internet origin.
+  Minimal reference; see ../template.yaml for the deployable version.
+
+Parameters:
+  VolumeId:
+    Type: String
+    Description: >-
+      Existing, mounted FSx for ONTAP volume. NTFS security style for the ACLs to be the ones
+      evaluated; on a UNIX-security-style volume a Windows identity is mapped and the effective
+      permissions are the UNIX ones.
+    AllowedPattern: "^fsvol-[0-9a-f]{17}$"
+
+  WindowsUserName:
+    Type: String
+    Default: Administrator
+    Description: SVM-local SMB user, or DOMAIN\\username.
+
+Resources:
+  AccessPoint:
+    Type: AWS::FSx::S3AccessPointAttachment
+    Properties:
+      Name: example-windows-ap
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: WINDOWS
+          # Exactly one of UnixUser / WindowsUser. The schema declares them as a oneOf, so sending
+          # both is rejected rather than one winning.
+          WindowsUser:
+            Name: !Ref WindowsUserName
+      # No VpcConfiguration: internet origin. Any network that can authenticate reaches this access
+      # point, subject to the access point policy and IAM. Block Public Access is enforced and cannot
+      # be turned off, so this is not "public" -- but it is not confined to a VPC either.
+      #
+      # Deliberately left with no Policy here to keep the example minimal. Do not deploy an
+      # internet-origin access point without one; ../template.yaml has a starting policy.
+      S3AccessPoint: {}
+
+Outputs:
+  Alias:
+    Description: Use as the bucket name in an S3 client.
+    Value: !GetAtt AccessPoint.S3AccessPoint.Alias
+
+  Lifecycle:
+    Description: >-
+      AVAILABLE when usable. MISCONFIGURED means the Windows user does not resolve on the SVM; the
+      attachment still has to be detached to remove it.
+    Value: !GetAtt AccessPoint.Lifecycle
