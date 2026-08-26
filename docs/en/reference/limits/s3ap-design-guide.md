@@ -48,7 +48,7 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 
 | Feature | Alternative |
 |---|---|
-| S3 Event Notification | FPolicy + EventBridge, or polling |
+| S3 Event Notification | Polling, or the ONTAP native audit log. **FPolicy + EventBridge is not a substitute** (see below) |
 | Lifecycle rules | FabricPool / ONTAP tiering policy |
 | Versioning | ONTAP Snapshot |
 | Object Lock / WORM | SnapLock Compliance / Enterprise |
@@ -256,9 +256,20 @@ network filesystem, **events are not reported if the change was made on a remote
 ([inotify(7)](https://man7.org/linux/man-pages/man7/inotify.7.html)). Writes in this architecture arrive at the origin over the S3 Access Point
 and the cache pulls them in afterwards, so `inotify` on a client mounting the cache does not fire.
 
-Detecting server-side means [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html). **That is unverified here.** Whether FPolicy treats
-a write arriving over the S3 Access Point as an event, and whether it fires on the cache side, has
-not been checked. Do not design on a mechanism that has not been verified.
+The server-side candidate is [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html), and **on the origin side it is now settled that it does
+not work.** A write arriving over the S3 Access Point raises no FPolicy notification, and is not
+blocked even by a `mandatory` synchronous policy (measured 2026-08-26, ONTAP 9.18.1P3D1, with both
+UNIX and WINDOWS identity — see [the measured FPolicy / S3 Access Point coverage](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-monitoring-coverage-implications.md)). An FPolicy event accepts only `cifs`, `nfsv3` or
+`nfsv4` as its protocol; there is no value for the S3 path.
+
+**Whether it fires on the cache side is still unverified.** Writes in this architecture arrive at
+the origin, so even if a FlexCache fill were to raise an FPolicy event on the cache, that is a
+separate question. Do not design on a mechanism that has not been verified.
+
+Two substitutes are confirmed to work. The ONTAP native audit log records S3 Access Point
+operations as `Source=HTTP` (object operations) and `Source=S3` (LIST), though without the
+requester. ARP detects high-entropy files written through the access point. Both were observed on
+the origin side; the cache side is equally unverified.
 
 Polling with a periodic `ls` costs in proportion to the number of directory entries. It is workable
 where the tree is split as described under [directory design](#directory-design).

@@ -43,7 +43,7 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 
 | 機能 | 代替手段 |
 |---|---|
-| S3 Event Notification | FPolicy + EventBridge、またはポーリング |
+| S3 Event Notification | ポーリング、または ONTAP ネイティブ監査ログ。**FPolicy + EventBridge は代替にならない**（下記参照） |
 | ライフサイクルルール | FabricPool / ONTAP Tiering Policy |
 | バージョニング | ONTAP Snapshot |
 | Object Lock / WORM | SnapLock Compliance / Enterprise |
@@ -248,9 +248,19 @@ done
 （[inotify(7)](https://man7.org/linux/man-pages/man7/inotify.7.html)）。この構成の書き込みは S3 Access Point 経由で Origin に届き、
 Cache は後からそれを取り込むため、Cache をマウントしているクライアントの `inotify` は発火しない。
 
-サーバー側で検出する場合は [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html)になる。**この構成では未検証である。**
-FPolicy が S3 Access Point 経由の書き込みをイベントとして扱うか、Cache 側で発火するかは
-確かめていない。検証していない機構を前提に設計しないこと。
+サーバー側で検出する候補は [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html) だが、**Origin 側については使えないことが確定した。**
+S3 Access Point 経由で届いた書き込みは FPolicy 通知を発火せず、`mandatory` 指定の同期ポリシーでも
+遮断されない（実測 2026-08-26、ONTAP 9.18.1P3D1、UNIX / WINDOWS identity 両方。[FPolicy と S3 Access Point のカバレッジ実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-monitoring-coverage-implications.md)）。
+FPolicy の event が受け付けるプロトコルは `cifs` / `nfsv3` / `nfsv4` のみで、S3 に相当する値は存在しない。
+
+**Cache 側で発火するかは未検証のまま残っている。** この構成の書き込みは Origin に届くため、
+仮に Cache 側で FlexCache の取り込みが FPolicy イベントになるとしても、それは別の問いである。
+確かめていない機構を前提に設計しないこと。
+
+代替として動くことが確認できているのは 2 つある。ONTAP ネイティブ監査ログは S3 Access Point 経由の
+操作を `Source=HTTP`（オブジェクト操作）と `Source=S3`（LIST）で記録する（ただし要求者は記録されない）。
+ARP は AP 経由で書かれた高エントロピーファイルを検知する。いずれも Origin 側での観測であり、
+Cache 側については同じく未検証である。
 
 ポーリング（定期的な `ls`）はコストがディレクトリのエントリ数に比例して増える。
 [ディレクトリあたりのファイル数](#ディレクトリ設計)で分割してあれば実用になる。

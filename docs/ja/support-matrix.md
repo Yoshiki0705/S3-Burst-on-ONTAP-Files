@@ -81,6 +81,7 @@ FSx for ONTAP を Origin として使えるかは
 | Windows 識別情報 | AD 参加は必須ではない。ドメインが利用できない場合は workgroup モードの CIFS サーバー（[公式手順](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)。NTLM のみ、Kerberos 非対応）。**AD 参加を選んだ場合は**、すべてのデータ操作に AD ドメインコントローラーへの到達性が必要になり、`HeadBucket` は AD 到達不能でも成功するため疎通確認に使えない |
 | ボリューム名 | 英数字とアンダースコアのみ |
 | 監査 | ONTAP のファイルアクセス監査に記録されるのはアクセスポイントに固定した識別情報で、呼び出し元の IAM プリンシパルではない。**用途ごとにアクセスポイントを分けることが、監査の粒度を決める。**呼び出し元の特定には AWS CloudTrail 側との突き合わせが必要。追えないものの一覧は[上限値](reference/limits/s3-access-point.md#監査で追えるものと追えないもの)（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログには誰が記録されるか)） |
+| 監視 | **FPolicy は収集層の経路を見ない。** S3 Access Point 経由の操作は通知されず、`mandatory` 指定の同期ポリシーでも遮断されない。ONTAP ネイティブ監査ログは記録する（`Source=HTTP` / `Source=S3`）。ARP は AP 経由の書き込みを検知する。FPolicy の通知を起点にする検知・DLP・遮断は、この経路には効かない（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-monitoring-coverage-implications.md)） |
 
 ## 配布層に対する制約
 

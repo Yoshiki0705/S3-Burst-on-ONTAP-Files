@@ -197,6 +197,9 @@ PUBLISHED_REPOS = frozenset(
         "s3-burst-on-ontap-files",
         "FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns",
         "FSx-for-ONTAP-Adoption-Playbook",
+        # Local directory `fsxn-observability-integrations`. Six links in this repository named the
+        # directory instead, and every one of them would have been a 404.
+        "FSx-for-ONTAP-Observability-integrations",
     }
 )
 PUBLISHED_LOWER = frozenset(name.lower() for name in PUBLISHED_REPOS)
