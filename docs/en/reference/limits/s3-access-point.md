@@ -94,7 +94,7 @@ All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx
 
 | Feature | State |
 |---|---|
-| Event notifications | Out of scope. Consider polling or FPolicy |
+| Event notifications | Out of scope. Use polling, or the ONTAP native audit log. **FPolicy is not a substitute** — writes through the access point raise no notification (measured 2026-08-26, ONTAP 9.18.1P3D1) |
 | Lifecycle | Out of scope |
 | Versioning (Object Versioning, `ListObjectVersions`) | Out of scope |
 | Object Lock | Out of scope. Use SnapLock where WORM is required |

@@ -918,7 +918,7 @@ same granularity.
 
 | Given up | What it is |
 |---|---|
-| S3-specific features | Event notifications, lifecycle and versioning are out of scope. Design a substitute with polling or FPolicy |
+| S3-specific features | Event notifications, lifecycle and versioning are out of scope. Design a substitute with polling or the ONTAP native audit log. **FPolicy is not a substitute** — writes through the access point raise no notification (measured 2026-08-26) |
 | Freedom in a flat namespace | Object names are constrained. Not suited to a workload that leans on names which are not NAS-friendly |
 | Elastic bandwidth | Throughput capacity is chosen in advance. It does not stretch with demand the way S3 does |
 | A choice of storage classes | There is no model that cuts the storage rate steeply in exchange for a retrieval charge. The one tier available is the capacity pool |
