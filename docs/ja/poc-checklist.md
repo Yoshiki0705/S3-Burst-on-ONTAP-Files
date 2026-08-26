@@ -88,6 +88,9 @@ VPC ピアリング・サブミリ秒のネットワーク遅延で測ったも�
       AWS 側のセキュリティグループと、拠点側のファイアウォールの両方）
 - [ ] 経路の MTU を確認する。Direct Connect / VPN の経路で MTU が揃っていないと
       大きい読み取りで詰まる
+- [ ] 経路が別クラウドを経由する場合、その区間が private につながることを先に確認する。
+      **可否の決まり方が 2 通りある**（管理サービスなら対応リージョンのペア、パートナー経由なら
+      ロケーションの重なり。[他クラウドとの接続経路](multi-cloud-connectivity.md)）
 - [ ] 経路の往復遅延を先に測る（`ping` などで 1 度。**フェーズ 1 の数値と比べる基準になる**。
       サブミリ秒で測った値との差はここで説明できる）
 - [ ] Cache 側のボリュームを FlexGroup として作れることを確認する（Cache は FlexGroup である）
@@ -123,6 +126,18 @@ VPC ピアリング・サブミリ秒のネットワーク遅延で測ったも�
 - [ ] ONTAP Select を Cache にできるか
 - [ ] Azure NetApp Files のキャッシュボリュームが FSx for ONTAP を Origin にできるか
 - [ ] Google Cloud NetApp Volumes を Cache にできるか
+
+**逆方向は別の項目である。** 上の 4 つはいずれも Origin が FSx for ONTAP の場合で、他クラウドの
+ファイルストレージを Origin にする方向は対応構成表の外にある（[移植性](portability.md)）。
+
+- [ ] 相手側がクラスタピアリングを外部に提供しているかを先に確認する。**提供していなければ
+      FlexCache の可否を測る前に止まる**ので、ここが最初の分岐になる
+- [ ] Google Cloud NetApp Volumes を Origin として FSx for ONTAP を Cache にできるか
+- [ ] Azure NetApp Files を Origin として FSx for ONTAP を Cache にできるか
+
+**ONTAP でないファイルストレージはこのフェーズの対象外である。** Google Cloud Filestore、
+Azure Managed Lustre、Azure Blob NFS、OCI File Storage は機構として成り立たないため、測っても
+埋まる「未確認」がない（[他クラウドとの接続経路](multi-cloud-connectivity.md)）。
 
 結果はいずれも[移植性](portability.md)の表に反映する。できなかった場合も記録する。
 
@@ -164,6 +179,7 @@ PoC は不可逆操作を置く場所として最悪である。削除できな�
 | [最初に決めること](design-first-decisions.md) | フェーズ 2 で確かめる未確認事項 |
 | [サポート状況](support-matrix.md) | 各項目の前提となる対応状況 |
 | [移植性](portability.md) | フェーズ 4 の結果の反映先 |
+| [他クラウドとの接続経路](multi-cloud-connectivity.md) | 別クラウドを経由する経路の前提 |
 
 ---
 

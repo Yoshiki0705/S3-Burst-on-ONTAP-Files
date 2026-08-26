@@ -55,9 +55,11 @@ against.
 
 A document's language is its directory: `docs/ja/` and `docs/en/`. The one exception is the Japanese
 hub, which is the repository-root `README.md`, so `docs/ja/README.md` does not exist. Japanese is the
-reference language and the only complete tree; English currently covers the hub only. Content that
-exists in one language is linked in that language rather than stubbed out, so a missing translation
-is an absent link and never a placeholder page.
+reference language and the authoritative one for technical accuracy; English mirrors it for the
+documents listed in `docs/i18n-manifest.txt`, with the section structure held identical by a check.
+Where the two disagree, Japanese is correct. Content that exists in one language is linked in that
+language rather than stubbed out, so a missing translation is an absent link and never a placeholder
+page.
 
 ## The architecture
 
@@ -73,7 +75,24 @@ is an absent link and never a placeholder page.
 - [Portability](docs/ja/portability.md): Each layer can be replaced independently. AWS documents
   exactly three FlexCache configurations; with FSx for ONTAP as origin the cache is on-premises ONTAP
   or FSx for ONTAP. Cloud Volumes ONTAP, ONTAP Select, Azure NetApp Files and Google Cloud NetApp
-  Volumes as cache are absent from that table and are recorded as unconfirmed.
+  Volumes as cache are absent from that table and are recorded as unconfirmed. The reverse direction
+  — another cloud's file storage as the FlexCache origin with FSx for ONTAP as the cache — is absent
+  too, and splits two ways: unconfirmed for the ONTAP-based platforms, and out of scope as a
+  mechanism for the ones that are not ONTAP, because FlexCache requires ONTAP cluster and SVM
+  peering. Those two are not written with the same word.
+- [Cross-cloud connectivity](docs/ja/multi-cloud-connectivity.md): The network layer only —
+  private connectivity options between AWS and Google Cloud, Microsoft Azure and OCI, and which
+  Regions each one covers. Three ways of building it, kept apart because what decides availability
+  differs: a managed cloud-to-cloud service is decided by the published Region pairs, while a
+  partner or self-built route is decided by whether Direct Connect locations, the other cloud's
+  connection locations and the provider's footprint overlap. **Choosing a partner route does not
+  widen a managed service's Region coverage**; it is a different construction. AWS Interconnect –
+  multicloud is GA and its published pairs include no Japanese Region — neither Tokyo nor Osaka. The
+  pairs are listed in the document rather than here, because AWS extends them over time. Azure
+  support is stated
+  as planned ("coming later in 2026") and is neither GA nor Preview. Also separates the layers of
+  encryption: MACsec on the physical link is not a substitute for ONTAP cluster peering encryption,
+  which is what protects FlexCache traffic.
 
 ## Support status and evidence
 

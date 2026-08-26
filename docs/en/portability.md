@@ -56,6 +56,26 @@ It is not a claim that none exists. It gets filled in once one is found.
 The procedure for confirming this is in phase 4 of the
 [PoC checklist](poc-checklist.md). This table gets updated once there is a result.
 
+### The reverse direction — another cloud's file storage as the origin
+
+Every row above has **FSx for ONTAP as the origin**. The reverse direction, another cloud's file
+storage as the origin with FSx for ONTAP as the cache, is absent from AWS's supported configuration
+table. **That direction sits outside the table.** It is kept separate because the verdict splits two
+ways.
+
+| Origin side | Verdict | Why |
+|---|---|---|
+| Google Cloud NetApp Volumes | **unconfirmed** | It has an ONTAP mode, but the supported configuration table does not mention it |
+| Azure NetApp Files | **unconfirmed** | ONTAP-based, but the supported configuration table does not mention it |
+| Google Cloud Filestore, Azure Managed Lustre, Azure Blob NFS, OCI File Storage | **out of scope as a mechanism** | Not ONTAP. FlexCache requires ONTAP cluster and SVM peering |
+
+**Do not write `unconfirmed` and "out of scope as a mechanism" with the same word.** The first can
+have its stage raised by a primary source or by a measurement; the second rests on a different
+premise. Network reachability does not change the second one.
+
+The connectivity itself is covered in
+[cross-cloud connectivity](multi-cloud-connectivity.md).
+
 ### Reference — Azure NetApp Files cache volumes
 
 Azure NetApp Files has cache volumes that target an external ONTAP or Cloud Volumes ONTAP origin

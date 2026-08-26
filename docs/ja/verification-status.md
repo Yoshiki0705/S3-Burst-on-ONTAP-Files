@@ -51,6 +51,10 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 | S3 Access Point 経由で書いたオブジェクトが **FlexCache の Cache ボリューム**でどう見えるか | **検証済み** | [FlexCache 検証記録](verification/flexcache-s3ap-visibility.md)。2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、VPC ピアリング経由、UNIX、NFSv3、`actimeo=0`、n=30。**S3 → FlexCache NFS は p50 8 ms**（boto3 の持続セッション。3 回の測定で 7〜14 ms に散り、差は S3 クライアント側の測定方法）。同一セッション内で FlexCache が加えるのは +5 ms。部分マルチパートは `CompleteMultipartUpload` まで見えない。削除の反映は 9 ms |
 | セキュリティスタイルとファンアウト先プロトコルの対応、および Cache 作成時の継承 | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路で同じ規則が成り立つかは確かめていない（[最初に決めること](design-first-decisions.md)） |
 | FSx for ONTAP を Origin としたときの Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes の Cache 可否 | 未確認 | AWS の対応構成表に記載がない |
+| **逆方向** — Google Cloud NetApp Volumes / Azure NetApp Files を Origin として FSx for ONTAP を Cache にできるか | 未確認 | AWS の対応構成表に記載がない。ONTAP ベースであることを根拠にしない（[移植性](portability.md)、[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
+| Google Cloud Filestore / Azure Managed Lustre / Azure Blob NFS / OCI File Storage を FlexCache の Origin または Cache にできるか | 機構として対象外 | ONTAP ではない。FlexCache は ONTAP 間のクラスタ / SVM ピアリングを要求する。**未確認とは区別する** |
+| パートナー経由（Direct Connect と相手クラウドの専用線を相互接続プロバイダのファブリックで結ぶ）でのクラスタピアリング成立と、その経路での FlexCache 読み取り | 未確認 | 各サービスのドキュメント記載はあるが、この組み合わせを実機で追っていない（[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
+| ONTAP が intercluster LIF に MACsec を提供するか | 未確認 | 記載を見つけられていない。FlexCache のトラフィックの暗号化は cluster peering encryption（ONTAP 9.6 以降、TLS 1.2 AES-256 GCM）としてドキュメント記載がある |
 | Origin あたりの Cache 数を増やしたときの挙動 | 未検証 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨しており、ファンアウト数の設計に影響する可能性がある |
 | ONTAP 9.18.1 の FlexCache duality と、S3 Access Point をボリュームに接続することの関係 | 別の機構として扱う | 実装元も有効化方法も異なる。一方の対応状況を他方の根拠にしない。この構成はどちらも使わないため設計上の影響はない |
 | 各プラットフォームでの性能特性 | 未計測 | 計測する場合は環境・オブジェクトサイズ・並列度・スループット設定を併記する |
@@ -103,6 +107,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 |---|---|
 | [PoC チェックリスト](poc-checklist.md) | 未検証項目を確かめる順序 |
 | [サポート状況](support-matrix.md) | 公開ドキュメントに何が書かれているか |
+| [他クラウドとの接続経路](multi-cloud-connectivity.md) | 他クラウドとの接続の選択肢、対応リージョン、暗号化の層 |
 | [最初に決めること](design-first-decisions.md) | 未確認だが後戻りが高い判断 |
 
 ---

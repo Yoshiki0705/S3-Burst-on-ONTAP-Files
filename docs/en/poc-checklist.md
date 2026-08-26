@@ -100,6 +100,10 @@ Preconditions, before peering
 - [ ] Confirm the ports ONTAP cluster peering uses are open along the path -- both the AWS security
       group and the firewall at the site
 - [ ] Check the MTU along the path. An uneven MTU over Direct Connect or VPN stalls large reads
+- [ ] Where the path crosses another cloud, confirm first that the segment connects privately.
+      **There are two ways that is decided** — the published Region pairs for a managed service,
+      overlapping locations for a partner route
+      ([cross-cloud connectivity](multi-cloud-connectivity.md))
 - [ ] Measure the round-trip latency of the path first. **It is the baseline for comparing against
       phase 1**, whose figures were taken under sub-millisecond latency, and it is what explains the
       difference
@@ -139,6 +143,20 @@ portability table.
 - [ ] Whether ONTAP Select can be the cache
 - [ ] Whether an Azure NetApp Files cache volume can take FSx for ONTAP as its origin
 - [ ] Whether Google Cloud NetApp Volumes can be the cache
+
+**The reverse direction is a separate item.** All four above have FSx for ONTAP as the origin;
+another cloud's file storage as the origin sits outside the supported configuration table
+([portability](portability.md)).
+
+- [ ] Confirm first whether the far side exposes cluster peering externally. **If it does not, this
+      stops before FlexCache can be measured at all**, so it is the first branch
+- [ ] Whether Google Cloud NetApp Volumes can be the origin with FSx for ONTAP as the cache
+- [ ] Whether Azure NetApp Files can be the origin with FSx for ONTAP as the cache
+
+**File storage that is not ONTAP is out of scope for this phase.** Google Cloud Filestore, Azure
+Managed Lustre, Azure Blob NFS and OCI File Storage do not hold as a mechanism, so there is no
+"unconfirmed" for a measurement to close
+([cross-cloud connectivity](multi-cloud-connectivity.md)).
 
 Every result goes into the table in [portability](portability.md). Record the negative results too.
 
@@ -182,6 +200,7 @@ in the irreversible operations section of [AGENTS.md](../../AGENTS.md).
 | [Decisions that come first](design-first-decisions.md) | The unconfirmed items checked in phase 2 |
 | [Support matrix](support-matrix.md) | The support status each item presupposes |
 | [Portability](portability.md) | Where phase 4 results land |
+| [Cross-cloud connectivity](multi-cloud-connectivity.md) | What a path crossing another cloud presupposes |
 
 ---
 
