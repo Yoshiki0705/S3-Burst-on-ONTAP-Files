@@ -180,7 +180,8 @@ cooling period が短い構成や `All` ポリシーでは 0% に寄る。
 
 | 制約 | 内容 |
 |---|---|
-| 乖離した分は物理を消費する | クローンを書き換えた分だけ共有が解ける。書き換えが進めば全量コピーに近づく |
+| クローンに書き込んだ変更の分は共有されない | NetApp は「変更がコピーに書き込まれるまで、メタデータに必要な分を除いてストレージを消費しない」と記載している（[FlexClone volumes, files, and LUNs](https://docs.netapp.com/us-en/ontap/concepts/flexclone-volumes-files-luns-concept.html)）。書き込んだ変更の分だけ新しいブロックを消費する。新規作成時のメタデータは公称サイズの約 0.5%（[使用スペースの確認](https://docs.netapp.com/ja-jp/ontap/volumes/determine-space-used-flexclone-task.html)） |
+| スプリットすると共有が終わる | クローンを通常の FlexVol にする明示の操作（`volume clone split start`）。**ONTAP 9.4 以降、ボリュームギャランティが `none` の AFF システムでは物理ブロックを共有したままデータをコピーせず、ストレージ効率も維持される。** ただしスプリット後は親とクローンの両方が、それぞれのボリュームギャランティに基づく完全なスペース割り当てを必要とする。所要スペースは `volume clone show -estimate` で事前に確認する（[スプリットの手順](https://docs.netapp.com/ja-jp/ontap/volumes/split-flexclone-from-parent-task.html)）。**この構成では未測定**（ドキュメント記載） |
 | 参照されているブロックは解放されない | 親のデータを削除しても、クローンやスナップショットが参照している間は容量が戻らない |
 | プロビジョニングを下げなければ請求は変わらない | 節約が金額に出るのは、積まずに済んだ容量の分だけ。すでに余裕を持って確保している構成では請求は動かない |
 | 削除の順序が増える | クローンを消してから親を消す。ONTAP の volume recovery queue に残っている間は親側の `clone.has_flexclone` が `true` のままで、AWS 側の `delete-volume` が無言で戻る（[相互運用性](../limits/s3ap-interoperability.md)） |
