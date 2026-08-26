@@ -22,8 +22,13 @@
 | リージョン / アカウント | S3 Access Point とボリュームは同一リージョン・同一アカウント |
 | このパターンが依存する主張の段階 | 未検証 / ドキュメント記載 / 検証済み のいずれかを書く（[検証状況](../../../docs/ja/verification-status.md)）。テンプレート自身の状態は冒頭の行に書く |
 
-S3 Access Point 自体は CloudFormation では作れないため、CLI で作成します。
-位置引数の `--ontap-configuration` は解析が壊れやすいので、必ず JSON ファイルを渡してください。
+S3 Access Point は別のスタックで作ります。`AWS::FSx::S3AccessPointAttachment` を宣言する
+[s3-access-point-attachment パターン](../../collect/s3-access-point-attachment/README.md)を使い、
+その出力の alias をこのパターンのパラメータに渡してください。alias は再作成で変わるので、
+固定値として埋め込まないこと。
+
+CLI で作る場合は、位置引数の `--ontap-configuration` は解析が壊れやすいので、必ず JSON ファイルを
+渡してください。
 
 ```bash
 aws fsx create-and-attach-s3-access-point \

@@ -15,10 +15,12 @@ AWSTemplateFormatVersion: "2010-09-09"
 #     read to share a clock. Two hosts means comparing two clocks, and at the millisecond scale that
 #     is not a measurement.
 #
-# The S3 Access Point is deliberately *not* here. CloudFormation has no native resource for
-# attaching one to an FSx for ONTAP volume, so it is created with the CLI after this stack settles.
-# See docs/ja/deployment/aws-cloudformation.md. Inventing a custom resource to hide that would put a
-# Lambda in the trust path of every deployment for one API call.
+# The S3 Access Point is deliberately *not* here, and the reason changed on 2026-08-26 without the
+# decision changing. `AWS::FSx::S3AccessPointAttachment` exists, so it is no longer impossible to
+# declare here; it is still separated, because the access point is the part that gets renamed,
+# re-scoped and rebuilt while the volume stays put, and its whole configuration is create-only. A
+# policy edit in this stack would replace the access point. `patterns/collect/s3-access-point-attachment/`
+# owns it in a stack whose deletion cannot take a volume with it.
 Description: >-
   S3 Burst on ONTAP Files — collect-side (origin) verification environment.
   FSx for NetApp ONTAP file system, SVM, origin volume, and an in-VPC verification host.
@@ -532,13 +534,17 @@ Outputs:
 
   CreateAccessPointCommand:
     Description: >-
-      CloudFormation has no resource for attaching an S3 Access Point to an FSx for ONTAP volume, so
-      it is created out of band. Pass a JSON file rather than positional arguments — the positional
-      form of --ontap-configuration parses unreliably.
+      How to attach an S3 Access Point to the origin volume. Preferred:
+      patterns/collect/s3-access-point-attachment/, which declares
+      AWS::FSx::S3AccessPointAttachment and gives the access point its own stack. The CLI form below
+      is the alternative for a one-off — pass a JSON file rather than positional arguments, because
+      the positional form of --ontap-configuration parses unreliably.
     Value: !Sub >-
-      aws fsx create-and-attach-s3-access-point --region ${AWS::Region}
-      --cli-input-json file://access-point.json
-      # set Name, OpenZFSConfiguration=null, and OntapConfiguration.VolumeId=${OriginVolume}
+      aws cloudformation deploy --template-file patterns/collect/s3-access-point-attachment/template.yaml
+      --stack-name <name> --region ${AWS::Region}
+      --parameter-overrides VolumeId=${OriginVolume} AccessPointName=<name> ...
+      # or: aws fsx create-and-attach-s3-access-point --region ${AWS::Region}
+      # --cli-input-json file://access-point.json
 
   NextStep:
     Description: What to do once this stack is CREATE_COMPLETE.

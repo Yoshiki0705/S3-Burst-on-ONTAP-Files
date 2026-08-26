@@ -1,0 +1,435 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# One S3 access point attached to one existing FSx for ONTAP volume, managed on its own.
+#
+# No `Transform: AWS::Serverless-2016-10-31` here, unlike the pattern skeleton. This stack declares
+# no function; a SAM transform on a template with nothing to transform adds a change-set step and an
+# implicit S3 dependency for no benefit.
+#
+# Nothing in this stack creates or touches the file system, the SVM or the volume. That separation is
+# the point: the access point is the part that gets renamed, re-scoped and rebuilt while the data
+# stays put, so it belongs in a stack whose deletion cannot take a volume with it.
+#
+# `AWS::FSx::S3AccessPointAttachment` has create, read, delete and list handlers and NO update
+# handler, `replacementStrategy: delete_then_create`, and `Name`, `Type`, `OntapConfiguration` and
+# `S3AccessPoint` are all create-only. Every consequence of that is in README.md under
+# 「変更は置き換えになる」; the one that matters while reading this file is that editing the policy
+# below deletes the access point and creates it again under the same name. There is no in-place
+# policy update, and the alias changes when it is recreated.
+Description: >-
+  s3-access-point-attachment (collect) — S3 Burst on ONTAP Files pattern.
+  One S3 access point on an existing Amazon FSx for NetApp ONTAP volume, managed independently of
+  the file system. Collect over the S3 Access Point, serve over NFS / SMB via FlexCache.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Pattern
+        Parameters:
+          - PatternName
+          - Environment
+      - Label:
+          default: Target volume
+        Parameters:
+          - VolumeId
+      - Label:
+          default: Access point
+        Parameters:
+          - AccessPointName
+          - NetworkOrigin
+          - VpcId
+      - Label:
+          default: ONTAP file system identity
+        Parameters:
+          - FileSystemIdentityType
+          - UnixUserName
+          - WindowsUserName
+      - Label:
+          default: Access point policy
+        Parameters:
+          - AllowedPrincipalArns
+          - AllowedPrefix
+          - AttachPolicy
+    ParameterLabels:
+      VolumeId:
+        default: FSx for ONTAP volume ID (fsvol-...)
+      NetworkOrigin:
+        default: Network origin (template parameter, not a resource property)
+      UnixUserName:
+        default: ONTAP UNIX user NAME (not a UID)
+      WindowsUserName:
+        default: ONTAP Windows user name
+
+Parameters:
+  PatternName:
+    Type: String
+    Description: Identifier used in resource names and outputs.
+    AllowedPattern: "^[a-z][a-z0-9-]{1,38}[a-z0-9]$"
+    ConstraintDescription: lowercase letters, digits and hyphens; 3-40 characters.
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, stg, prod]
+    Description: Deployment environment. Used in outputs only -- the attachment is not taggable.
+
+  # The resource schema gives minLength 23, maxLength 23 and `^(fsvol-[0-9a-f]{17,})$`, so the ID is
+  # exactly `fsvol-` plus 17 hex digits. Pinned to 17 here rather than left open-ended: a longer
+  # value would satisfy the resource's own pattern and fail its length bound, which surfaces as a
+  # rollback rather than as a parameter error.
+  VolumeId:
+    Type: String
+    Description: >-
+      Existing FSx for ONTAP volume to attach the access point to. The volume must be mounted (have
+      a junction path) -- an unmounted volume fails attachment.
+    AllowedPattern: "^fsvol-[0-9a-f]{17}$"
+    ConstraintDescription: must be fsvol- followed by 17 hexadecimal digits.
+
+  # The resource's own pattern is `^(?=[a-z0-9])[a-z0-9-]{1,48}[a-z0-9]$`. Expressed here without the
+  # lookahead, which is equivalent for this shape and avoids depending on lookahead support in the
+  # parameter validator: first character alphanumeric, last character alphanumeric, hyphens between.
+  AccessPointName:
+    Type: String
+    Description: >-
+      Name of the attachment, which is also the name of the S3 access point. This is the resource's
+      primary identifier and is create-only, so changing it replaces the access point.
+    MinLength: 3
+    MaxLength: 50
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$"
+    ConstraintDescription: >-
+      lowercase letters, digits and hyphens; 3-50 characters; must start and end with a letter or
+      digit.
+
+  # There is no `NetworkOrigin` property on the resource. Origin is decided by whether
+  # `S3AccessPoint.VpcConfiguration` is present. This parameter exists so the choice is explicit at
+  # deploy time instead of implied by whether someone remembered to pass a VPC ID.
+  NetworkOrigin:
+    Type: String
+    Default: VPC
+    AllowedValues: [VPC, INTERNET]
+    Description: >-
+      VPC restricts the access point to requests originating in VpcId. INTERNET accepts requests from
+      any network that can authenticate. Origin cannot be changed after creation -- switching this
+      value replaces the access point.
+
+  VpcId:
+    Type: String
+    Default: ""
+    Description: >-
+      VPC the access point accepts requests from. Required when NetworkOrigin is VPC, ignored when it
+      is INTERNET.
+    AllowedPattern: "^$|^vpc-[0-9a-f]{8,}$"
+    ConstraintDescription: empty, or a VPC ID.
+
+  FileSystemIdentityType:
+    Type: String
+    Default: UNIX
+    AllowedValues: [UNIX, WINDOWS]
+    Description: >-
+      Which ONTAP identity every request through this access point is authorized as. UNIX evaluates
+      against UNIX permissions, WINDOWS against NTFS ACLs.
+
+  # ONTAP takes a user NAME. Numeric UID / GID / secondary GIDs belong to the FSx for OpenZFS shape
+  # of this resource (`OpenZFSConfiguration` with `Type: POSIX` and `PosixUser.Uid` / `.Gid` /
+  # `.SecondaryGids`) and have no equivalent here -- there is no field to put them in.
+  #
+  # The name must resolve on the SVM. Measured on 2026-08-26: `fsxadmin` is a cluster administrator,
+  # not an SVM UNIX user, and attaching with it fails with "Failed to lookup the provided user in
+  # ONTAP". An SVM-local UNIX user such as `root` resolves.
+  UnixUserName:
+    Type: String
+    Default: root
+    Description: >-
+      ONTAP UNIX user name to authorize as. A name, not a UID. Must resolve on the SVM that owns the
+      volume. Used when FileSystemIdentityType is UNIX.
+    MinLength: 1
+    MaxLength: 256
+
+  # Measured on 2026-08-26: an SVM-local SMB user works and a domain account is not required, even
+  # with no reachable domain controller at attach time. A domain account is written
+  # `DOMAIN\username`.
+  WindowsUserName:
+    Type: String
+    Default: ""
+    Description: >-
+      ONTAP Windows user name to authorize as, either an SVM-local SMB user or DOMAIN\\username.
+      Used when FileSystemIdentityType is WINDOWS.
+    MaxLength: 256
+
+  # A list rather than a single ARN because the useful default -- "this account's data pipeline roles"
+  # -- is plural, and because a single-ARN parameter invites `*` the first time a second consumer
+  # appears.
+  AllowedPrincipalArns:
+    Type: CommaDelimitedList
+    Description: >-
+      IAM principal ARNs allowed to use this access point. Roles or users, not accounts and not "*".
+      Every entry must be in the same account as the file system.
+
+  AllowedPrefix:
+    Type: String
+    Default: ""
+    Description: >-
+      Object key prefix the principals are confined to, without a leading slash. Empty means the
+      whole volume. A prefix here is a boundary in the S3 layer only -- it does not restrict NFS or
+      SMB access to the same files.
+
+  # An escape hatch with a reason. Because the whole `S3AccessPoint` object is create-only, a team
+  # that manages the policy outside CloudFormation cannot do it while this stack owns the policy:
+  # every edit here is a delete-and-recreate. Setting this to false hands the policy to
+  # `s3control put-access-point-policy` and leaves this stack owning only the attachment.
+  AttachPolicy:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Whether this stack owns the access point policy. false leaves the access point with no policy
+      attached, for teams that manage it out of band; see README.md.
+
+Conditions:
+  IsVpcOrigin: !Equals [!Ref NetworkOrigin, VPC]
+  IsUnixIdentity: !Equals [!Ref FileSystemIdentityType, UNIX]
+  IsWindowsIdentity: !Equals [!Ref FileSystemIdentityType, WINDOWS]
+  HasPolicy: !Equals [!Ref AttachPolicy, "true"]
+  HasPrefix: !Not [!Equals [!Ref AllowedPrefix, ""]]
+
+Rules:
+  # cfn-lint sees a missing VpcId as a valid empty string, and the failure would otherwise arrive
+  # from the FSx for ONTAP API after the stack has started. A Rule rejects it before any resource
+  # is touched.
+  VpcOriginNeedsVpcId:
+    RuleCondition: !Equals [!Ref NetworkOrigin, VPC]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref VpcId, ""]]
+        AssertDescription: NetworkOrigin=VPC requires VpcId.
+
+  WindowsIdentityNeedsUserName:
+    RuleCondition: !Equals [!Ref FileSystemIdentityType, WINDOWS]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref WindowsUserName, ""]]
+        AssertDescription: FileSystemIdentityType=WINDOWS requires WindowsUserName.
+
+Resources:
+  AccessPointUnix:
+    Type: AWS::FSx::S3AccessPointAttachment
+    Condition: IsUnixIdentity
+    # The UNIX and WINDOWS identities are two resources under mutually exclusive conditions rather
+    # than one resource with `Fn::If` inside `FileSystemIdentity`. The schema declares UnixUser and
+    # WindowsUser as a `oneOf`, and a validator that evaluates both branches of an `Fn::If` sees a
+    # value that satisfies neither -- cfn-lint reports E3003 and E3018 on exactly that shape. Two
+    # resources are statically valid, and only one of them is ever in the stack.
+    # Retain is deliberately NOT set. The attachment holds no data -- the data is in the volume this
+    # stack does not own -- so retaining it on delete would leave an access point nobody manages,
+    # still granting the access its policy grants. Deleting it is the reversible choice here.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Ref AccessPointName
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: UNIX
+          UnixUser:
+            Name: !Ref UnixUserName
+      S3AccessPoint:
+        VpcConfiguration: !If
+          - IsVpcOrigin
+          - VpcId: !Ref VpcId
+          - !Ref AWS::NoValue
+        # Account-scoped, principal-listed, action-listed. No wildcard principal, and no `s3:*`.
+        #
+        # Two things about the resource ARN shape are load-bearing, and getting either wrong returns
+        # AccessDenied on a stack that deployed successfully:
+        #   - bucket-level actions (ListBucket) take the access point ARN itself
+        #   - object-level actions take the access point ARN plus `/object/<key pattern>`
+        # A bucket-style ARN (arn:aws:s3:::<alias>) does not work against FSx for ONTAP.
+        # https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/referencing-access-points-for-fsxn.html
+        #
+        # `aws:PrincipalAccount` is asserted in addition to naming the principals. The principal list
+        # is the control; the condition is what stops a later hand-edit that widens the list from
+        # also widening it across account boundaries.
+        Policy: !If
+          - HasPolicy
+          - Version: "2012-10-17"
+            Statement:
+              - Sid: ListWithinAccessPoint
+                Effect: Allow
+                Principal:
+                  AWS: !Ref AllowedPrincipalArns
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}"
+                Condition:
+                  StringEquals:
+                    aws:PrincipalAccount: !Ref AWS::AccountId
+                  # Without this, ListBucket enumerates every key in the volume even when the object
+                  # statement below is confined to a prefix -- the listing is the leak.
+                  StringLike: !If
+                    - HasPrefix
+                    - s3:prefix: !Sub "${AllowedPrefix}/*"
+                    - !Ref AWS::NoValue
+              - Sid: ReadWriteObjects
+                Effect: Allow
+                Principal:
+                  AWS: !Ref AllowedPrincipalArns
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !If
+                  - HasPrefix
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/${AllowedPrefix}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/*"
+                Condition:
+                  StringEquals:
+                    aws:PrincipalAccount: !Ref AWS::AccountId
+              # Deny in plaintext rather than relying on the absence of an Allow. The absence is
+              # correct today and stops being correct the moment someone adds a broader statement
+              # above; an explicit Deny cannot be overridden by a later Allow.
+              - Sid: DenyUnencryptedTransport
+                Effect: Deny
+                Principal: "*"
+                Action: "s3:*"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}"
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/*"
+                Condition:
+                  Bool:
+                    aws:SecureTransport: false
+          - !Ref AWS::NoValue
+
+  AccessPointWindows:
+    Type: AWS::FSx::S3AccessPointAttachment
+    Condition: IsWindowsIdentity
+    # The WINDOWS half of the pair above. Same name, same volume, same policy; only the identity
+    # differs, and the conditions guarantee exactly one exists.
+    # Retain is deliberately NOT set. The attachment holds no data -- the data is in the volume this
+    # stack does not own -- so retaining it on delete would leave an access point nobody manages,
+    # still granting the access its policy grants. Deleting it is the reversible choice here.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Ref AccessPointName
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: WINDOWS
+          WindowsUser:
+            Name: !Ref WindowsUserName
+      S3AccessPoint:
+        VpcConfiguration: !If
+          - IsVpcOrigin
+          - VpcId: !Ref VpcId
+          - !Ref AWS::NoValue
+        # Account-scoped, principal-listed, action-listed. No wildcard principal, and no `s3:*`.
+        #
+        # Two things about the resource ARN shape are load-bearing, and getting either wrong returns
+        # AccessDenied on a stack that deployed successfully:
+        #   - bucket-level actions (ListBucket) take the access point ARN itself
+        #   - object-level actions take the access point ARN plus `/object/<key pattern>`
+        # A bucket-style ARN (arn:aws:s3:::<alias>) does not work against FSx for ONTAP.
+        # https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/referencing-access-points-for-fsxn.html
+        #
+        # `aws:PrincipalAccount` is asserted in addition to naming the principals. The principal list
+        # is the control; the condition is what stops a later hand-edit that widens the list from
+        # also widening it across account boundaries.
+        Policy: !If
+          - HasPolicy
+          - Version: "2012-10-17"
+            Statement:
+              - Sid: ListWithinAccessPoint
+                Effect: Allow
+                Principal:
+                  AWS: !Ref AllowedPrincipalArns
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}"
+                Condition:
+                  StringEquals:
+                    aws:PrincipalAccount: !Ref AWS::AccountId
+                  # Without this, ListBucket enumerates every key in the volume even when the object
+                  # statement below is confined to a prefix -- the listing is the leak.
+                  StringLike: !If
+                    - HasPrefix
+                    - s3:prefix: !Sub "${AllowedPrefix}/*"
+                    - !Ref AWS::NoValue
+              - Sid: ReadWriteObjects
+                Effect: Allow
+                Principal:
+                  AWS: !Ref AllowedPrincipalArns
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !If
+                  - HasPrefix
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/${AllowedPrefix}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/*"
+                Condition:
+                  StringEquals:
+                    aws:PrincipalAccount: !Ref AWS::AccountId
+              # Deny in plaintext rather than relying on the absence of an Allow. The absence is
+              # correct today and stops being correct the moment someone adds a broader statement
+              # above; an explicit Deny cannot be overridden by a later Allow.
+              - Sid: DenyUnencryptedTransport
+                Effect: Deny
+                Principal: "*"
+                Action: "s3:*"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}"
+                  - !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/*"
+                Condition:
+                  Bool:
+                    aws:SecureTransport: false
+          - !Ref AWS::NoValue
+
+Outputs:
+  AccessPointName:
+    Description: Name of the attachment and of the S3 access point.
+    Value: !If [IsUnixIdentity, !Ref AccessPointUnix, !Ref AccessPointWindows]
+
+  AccessPointArn:
+    Description: >-
+      ARN of the S3 access point. Use this, or the alias, as the bucket argument in an S3 client. A
+      bucket-style ARN does not work against FSx for ONTAP.
+    Value: !If
+      - IsUnixIdentity
+      - !GetAtt AccessPointUnix.S3AccessPoint.ResourceARN
+      - !GetAtt AccessPointWindows.S3AccessPoint.ResourceARN
+
+  AccessPointAlias:
+    Description: >-
+      Alias of the S3 access point, usable wherever a bucket name is expected. It is assigned at
+      creation and changes when the access point is recreated, so do not hardcode it downstream.
+    Value: !If
+      - IsUnixIdentity
+      - !GetAtt AccessPointUnix.S3AccessPoint.Alias
+      - !GetAtt AccessPointWindows.S3AccessPoint.Alias
+
+  Lifecycle:
+    Description: >-
+      Attachment lifecycle. AVAILABLE means usable. MISCONFIGURED means the attachment exists but the
+      file system identity does not resolve on the SVM -- it still needs detaching to remove.
+    Value: !If
+      - IsUnixIdentity
+      - !GetAtt AccessPointUnix.Lifecycle
+      - !GetAtt AccessPointWindows.Lifecycle
+
+  FileSystemIdentityInEffect:
+    Description: The ONTAP identity every request through this access point is authorized as.
+    Value: !If
+      - IsUnixIdentity
+      - !Sub "UNIX / ${UnixUserName}"
+      - !Sub "WINDOWS / ${WindowsUserName}"
+
+  NetworkOriginInEffect:
+    Description: Origin this attachment was created with. It cannot be changed in place.
+    Value: !If [IsVpcOrigin, !Sub "VPC (${VpcId})", "INTERNET"]
+
+  PolicyOwner:
+    Description: Whether this stack owns the access point policy, or it is managed out of band.
+    Value: !If [HasPolicy, "this stack", "out of band (s3control put-access-point-policy)"]
+
+  Environment:
+    Description: Environment this attachment was deployed for. The resource itself is not taggable.
+    Value: !Sub "${Environment} / ${PatternName}"

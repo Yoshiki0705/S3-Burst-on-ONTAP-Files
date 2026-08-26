@@ -85,8 +85,21 @@ carry the commands that read them instead.
 
 ## 3. Create the S3 Access Point
 
-CloudFormation has no resource for attaching an S3 Access Point to an FSx for ONTAP volume, so this
-step uses the CLI.
+`AWS::FSx::S3AccessPointAttachment` declares this, so the preferred route is a second stack:
+[`patterns/collect/s3-access-point-attachment/`](../../../patterns/collect/s3-access-point-attachment/README.md).
+It is a separate stack rather than part of the one above because the whole access point
+configuration is create-only — a policy edit replaces the access point — and because the volume must
+not be in a stack that a rename of the access point can disturb.
+
+```bash
+aws cloudformation deploy \
+  --template-file patterns/collect/s3-access-point-attachment/template.yaml \
+  --stack-name s3burst-collect-ap \
+  --parameter-overrides file://params.json \
+  --region ap-northeast-1
+```
+
+The CLI form below remains valid, and is the shorter route for a one-off that no stack has to own.
 
 ```bash
 cp access-point.example.json access-point.json

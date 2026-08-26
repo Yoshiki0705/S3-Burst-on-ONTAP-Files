@@ -67,11 +67,18 @@ markdown: ## Run markdownlint if available (skipped when not installed)
 		echo "markdownlint-cli2 not installed - skipping (npm install -g markdownlint-cli2)"; \
 	fi
 
-cfn: ## Lint every CloudFormation template (skipped when cfn-lint is not installed)
+# `template.yaml` is the deployable template of a pattern, and `examples/*.yaml` are the reference
+# templates beside it. Both are linted; only the first is counted as a pattern by `make counts`,
+# which is what keeps "one pattern, one template" true while a pattern can still carry examples.
+#
+# The examples were added to this scan at the same time as the first pattern that has any. A file
+# that reads like a template and is linted by nothing is the shape that rots: it is copied, and the
+# copy is the first thing anybody validates.
+cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is not installed)
 	@if ! command -v cfn-lint >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
-		if ! found=$$(find patterns environments -name template.yaml -print); then \
+		if ! found=$$(find patterns environments \( -name template.yaml -o -path '*/examples/*.yaml' \) -print); then \
 			echo "cfn: the scan of patterns/ and environments/ failed, so this is not a report"; \
 			echo "     that there are no templates. Its own error is above."; \
 			exit 1; \

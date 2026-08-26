@@ -1,0 +1,233 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# Three access points on the SAME volume, one per department, each with its own policy and prefix.
+#
+# What this isolates, and what it does not, is the whole point of the example:
+#
+#   isolated      the S3 principals that may call each access point, and the key prefix each is
+#                 confined to. A finance role holding only `finance-ap` cannot list or read
+#                 `engineering/` through it.
+#   NOT isolated  the files. All three access points authorize as the SAME ONTAP identity here, so
+#                 the file-system permissions each request is evaluated against are identical. The
+#                 prefix boundary lives in the access point policy, not in the file system.
+#   NOT isolated  the other protocols. An NFS or SMB client on this volume sees every prefix,
+#                 subject only to file-system permissions. An S3-layer boundary is invisible to it.
+#
+# So this is a tenancy boundary for S3 consumers, not a multi-tenancy boundary for the data. If the
+# departments must not be able to reach each other's files at all, give them separate volumes, or
+# separate ONTAP identities whose file-system permissions actually differ -- and then the prefix
+# policy is defence in depth rather than the only control.
+#
+# Per-department ONTAP identities are the stronger form and are shown for `analytics-ap` below: a
+# read-only consumer gets an identity with no write permission on the volume, so a policy mistake
+# that grants PutObject still cannot write.
+Description: >-
+  Example — three S3 access points on one FSx for ONTAP volume with per-department policies.
+  Shows what an access point does and does not isolate.
+
+Parameters:
+  VolumeId:
+    Type: String
+    Description: Existing, mounted FSx for ONTAP volume shared by all three access points.
+    AllowedPattern: "^fsvol-[0-9a-f]{17}$"
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: >-
+      VPC all three access points accept requests from. VPC origin for every one of them: a
+      department boundary that only holds on some of the access points is not a boundary.
+
+  NamePrefix:
+    Type: String
+    Default: dept
+    Description: >-
+      Prefix for the three access point names, so one stack can be deployed more than once in an
+      account. Names are create-only, so changing this replaces all three access points.
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,20}$"
+
+  FinanceRoleArn:
+    Type: String
+    Description: IAM role ARN allowed to use finance-ap.
+    AllowedPattern: "^arn:aws[a-z-]*:iam::[0-9]{12}:(role|user)/.+$"
+
+  EngineeringRoleArn:
+    Type: String
+    Description: IAM role ARN allowed to use engineering-ap.
+    AllowedPattern: "^arn:aws[a-z-]*:iam::[0-9]{12}:(role|user)/.+$"
+
+  AnalyticsRoleArn:
+    Type: String
+    Description: IAM role ARN allowed to use analytics-ap, read-only.
+    AllowedPattern: "^arn:aws[a-z-]*:iam::[0-9]{12}:(role|user)/.+$"
+
+  WriteIdentityUserName:
+    Type: String
+    Default: root
+    Description: >-
+      ONTAP UNIX user name the two read-write access points authorize as. A name, not a UID.
+
+  ReadOnlyIdentityUserName:
+    Type: String
+    Default: nobody
+    Description: >-
+      ONTAP UNIX user name the analytics access point authorizes as. Give this user read-only
+      permissions on the volume; the read-only guarantee comes from the file system, and the policy
+      below is the second layer rather than the only one.
+
+Resources:
+  FinanceAccessPoint:
+    Type: AWS::FSx::S3AccessPointAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}-finance-ap"
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: UNIX
+          UnixUser:
+            Name: !Ref WriteIdentityUserName
+      S3AccessPoint:
+        VpcConfiguration:
+          VpcId: !Ref VpcId
+        Policy:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: FinanceList
+              Effect: Allow
+              Principal:
+                AWS: !Ref FinanceRoleArn
+              Action: s3:ListBucket
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-finance-ap"
+              # The prefix condition on ListBucket is what stops the listing itself from being the
+              # leak. Without it, the object statement's prefix is enforced but every key in the
+              # volume is enumerable.
+              Condition:
+                StringLike:
+                  s3:prefix: "finance/*"
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+            - Sid: FinanceObjects
+              Effect: Allow
+              Principal:
+                AWS: !Ref FinanceRoleArn
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-finance-ap/object/finance/*"
+              Condition:
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+
+  EngineeringAccessPoint:
+    Type: AWS::FSx::S3AccessPointAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}-engineering-ap"
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: UNIX
+          UnixUser:
+            Name: !Ref WriteIdentityUserName
+      S3AccessPoint:
+        VpcConfiguration:
+          VpcId: !Ref VpcId
+        Policy:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: EngineeringList
+              Effect: Allow
+              Principal:
+                AWS: !Ref EngineeringRoleArn
+              Action: s3:ListBucket
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-engineering-ap"
+              Condition:
+                StringLike:
+                  s3:prefix: "engineering/*"
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+            - Sid: EngineeringObjects
+              Effect: Allow
+              Principal:
+                AWS: !Ref EngineeringRoleArn
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-engineering-ap/object/engineering/*"
+              Condition:
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+
+  # The read-only consumer. Two differences from the two above, and the first is the one that
+  # actually holds: a different ONTAP identity, so write is refused by the file system regardless of
+  # what the policy says. The absent PutObject is the second layer.
+  AnalyticsAccessPoint:
+    Type: AWS::FSx::S3AccessPointAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}-analytics-ap"
+      Type: ONTAP
+      OntapConfiguration:
+        VolumeId: !Ref VolumeId
+        FileSystemIdentity:
+          Type: UNIX
+          UnixUser:
+            Name: !Ref ReadOnlyIdentityUserName
+      S3AccessPoint:
+        VpcConfiguration:
+          VpcId: !Ref VpcId
+        Policy:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: AnalyticsListAll
+              Effect: Allow
+              Principal:
+                AWS: !Ref AnalyticsRoleArn
+              Action: s3:ListBucket
+              # No prefix condition: analytics reads across departments by design. That is a
+              # decision, not an oversight, and it is why this access point gets the read-only
+              # identity.
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-analytics-ap"
+              Condition:
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+            - Sid: AnalyticsReadOnly
+              Effect: Allow
+              Principal:
+                AWS: !Ref AnalyticsRoleArn
+              Action: s3:GetObject
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-analytics-ap/object/*"
+              Condition:
+                StringEquals:
+                  aws:PrincipalAccount: !Ref AWS::AccountId
+            - Sid: DenyWriteExplicitly
+              Effect: Deny
+              Principal: "*"
+              Action:
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub "arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${NamePrefix}-analytics-ap/object/*"
+
+Outputs:
+  FinanceAlias:
+    Description: Bucket name for the finance consumer.
+    Value: !GetAtt FinanceAccessPoint.S3AccessPoint.Alias
+
+  EngineeringAlias:
+    Description: Bucket name for the engineering consumer.
+    Value: !GetAtt EngineeringAccessPoint.S3AccessPoint.Alias
+
+  AnalyticsAlias:
+    Description: Bucket name for the read-only analytics consumer.
+    Value: !GetAtt AnalyticsAccessPoint.S3AccessPoint.Alias
+
+  IsolationScope:
+    Description: What these three access points isolate.
+    Value: >-
+      S3 principals and key prefixes. Not the files, and not NFS / SMB access to them. See the
+      comment at the top of this template before treating this as multi-tenancy.

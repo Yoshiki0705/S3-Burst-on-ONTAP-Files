@@ -50,5 +50,6 @@ verification/flexcache-s3ap-visibility.md
 verification/s3ap-nfs-visibility.md
 verification/cross-protocol-directions.md
 reference/limits/s3ap-design-guide.md
+reference/limits/s3ap-interoperability.md
 reference/comparison/finops-s3-vs-s3ap.md
 multi-cloud-connectivity.md

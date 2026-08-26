@@ -75,9 +75,11 @@ Parameters:
     Default: ""
     Description: >-
       Alias of the S3 Access Point attached to the origin volume, or a plain bucket name when
-      running against Amazon S3 for a local dry run. The access point itself is created out of band
-      with `aws fsx create-and-attach-s3-access-point`, because CloudFormation has no native
-      resource for it.
+      running against Amazon S3 for a local dry run. The access point is created by its own stack --
+      patterns/collect/s3-access-point-attachment/, which declares
+      AWS::FSx::S3AccessPointAttachment -- rather than here, because its configuration is create-only
+      and a change to it replaces the access point. Take the alias from that stack's output; it
+      changes when the access point is recreated, so read it rather than hardcoding it.
 
   LogRetentionInDays:
     Type: Number
