@@ -160,6 +160,15 @@ COVERED_ELSEWHERE = {
     "lint": "its members are asserted individually",
 }
 
+# Gates whose input is deliberately not committed, so CI has nothing to check and adding a step there
+# would report a skip forever while looking like coverage. These are honestly local-only, which is a
+# different claim from COVERED_ELSEWHERE: nobody verifies them for a contributor who does not hold the
+# files. The path is asserted to be gitignored below, so this exemption cannot be borrowed by a gate
+# that ought to run in CI.
+LOCAL_ONLY = {
+    "blog-sync": ".private/",
+}
+
 
 def recipe(target: str) -> str:
     """The recipe body of a target: every indented line following its rule."""
@@ -215,7 +224,7 @@ def test_every_make_all_gate_runs_in_ci() -> None:
     workflow = executable_lines(CI.read_text(encoding="utf-8"))
     missing: list[str] = []
     for gate in sorted(prerequisites("all")):
-        if gate in COVERED_ELSEWHERE:
+        if gate in COVERED_ELSEWHERE or gate in LOCAL_ONLY:
             continue
         invoked = commands_invoked(gate)
         assert invoked, (
@@ -270,3 +279,24 @@ def test_the_pre_commit_target_covers_the_whole_gate() -> None:
         "make ready must have `all` as a prerequisite; without it the command run before a commit "
         "checks only the message"
     )
+
+
+def test_local_only_gates_really_have_uncommittable_input():
+    """Keep the CI exemption honest.
+
+    A gate is exempt from the CI-parity assertion only because its input is not in the repository. If
+    that path ever became tracked, the gate would be verifiable in CI and the exemption would be
+    hiding a missing step rather than describing a real constraint.
+    """
+    ignore = Path(__file__).resolve().parent.parent / ".gitignore"
+    patterns = {
+        line.strip().lstrip("/").rstrip("/")
+        for line in ignore.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    for gate, path in LOCAL_ONLY.items():
+        assert path.rstrip("/") in patterns, (
+            f"gate {gate!r} claims its input {path!r} is not committed, but {path!r} is not in "
+            ".gitignore. Either the path is tracked and the gate belongs in ci.yml, or .gitignore "
+            "changed and this exemption is now false."
+        )

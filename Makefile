@@ -5,7 +5,7 @@ PY ?= python3
 # name exists, and make then reports "up to date" without running the recipe — a gate that never
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
-.PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write \
+.PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync \
         audit secrets pinning zizmor links links-external budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
@@ -210,6 +210,9 @@ en-lang: ## Catch untranslated Japanese in docs/en/
 counts: ## Verify every count stated in prose against the filesystem
 	@$(PY) tools/check_derived_counts.py
 
+blog-sync: ## Verify no blog draft has moved ahead of its published post
+	@$(PY) tools/check_blog_draft_sync.py
+
 drift: ## Compare the contents of translated tables, not just their headings
 	@$(PY) tools/check_translation_drift.py
 
@@ -228,7 +231,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts pattern-status iac-security finops test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops test ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
