@@ -99,6 +99,11 @@ Then a reader can choose. Do not announce that the comparison is even-handed: `m
 the words for it, since declaring even-handedness reads as a defence and invites the framing it
 avoids.
 
+**A shared column has to mean the same thing in every row.** A managed cross-cloud service publishes
+Region pairs; a partner circuit has none, so a single `Region pairs` column across both reads as the
+second extending the first's coverage. It does not. Split the table by route, and state separately
+what chooses between routes.
+
 Forbidden: `beats X`, `X is inferior`, `competing tools`, `競合ツール`, `より優れて`, `優位性`,
 `game-changer`, `best-in-class`, and any vendor-versus positioning. Every comparison carries a
 "how to choose" path — see `docs/ja/reference/decision-trees/choosing-this-architecture.md`.
