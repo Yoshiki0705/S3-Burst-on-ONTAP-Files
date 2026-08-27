@@ -67,6 +67,35 @@ flowchart LR
 **分類を変えても 1 の対応ペアは変わらない。** パートナー経由にしたからといって、管理サービスの
 対応リージョンが増えるわけではない。別の作り方に切り替えているだけである。
 
+### 実際のサービスで見た全体像
+
+上の分類に実際のサービス名を入れると次の形になる。**図の矢印は AWS の VPC で止めてある。**
+そこから先（他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成）は
+この文書が主張しない範囲である。
+
+![他クラウドとの接続経路](../_assets/images/s3burst-cross-cloud-connectivity.svg)
+
+図と同じことを表にしておく。
+
+| クラウド | ストレージ | 自クラウド側 | 現在取れる分類 | 接続サービス |
+|---|---|---|---|---|
+| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 管理サービス | AWS Interconnect – multicloud（GA、8 ペア）または Partner Cross-Cloud Interconnect for AWS |
+| OCI | OCI File Storage | OCI VCN | 1 管理サービス | AWS Interconnect – multicloud（GA、1 ペア）または Oracle Interconnect for AWS |
+| Azure | Azure NetApp Files | Azure VNet | 2 パートナー経由のみ | ExpressRoute と Direct Connect を相互接続プロバイダのファブリックで結ぶ |
+
+**表の「現在取れる分類」は、そのクラウドで分類 1 が使えるかどうかを示すものである。**
+Google Cloud と OCI も分類 2 で作ることはできる。逆に Azure は分類 1 の対象外なので、
+リージョンによらず分類 2 か 3 になる。
+
+図中のアイコンについて。Azure NetApp Files は Microsoft の
+[Azure architecture icons](https://learn.microsoft.com/ja-jp/azure/architecture/icons/)を使い、
+製品名をアイコンの近くに置くという同ページの指示に従っている。**Google Cloud NetApp Volumes には
+固有アイコンが存在しない。** Google の製品アイコン体系は core product にだけ固有アイコンを与え、
+それ以外はカテゴリアイコンと製品名で示す方式で、同社のガイドは NetApp Volumes を Storage
+カテゴリに分類している（[Google Cloud icons](https://cloud.google.com/icons?hl=ja)）。
+そのため Storage カテゴリアイコンと製品名で示している。OCI はこのリポジトリがアイコンを用意できて
+いないため名前だけである。
+
 ## AWS Interconnect – multicloud
 
 AWS が Amazon VPC と他 CSP の環境の間に private な L3 接続を提供する管理サービスで、

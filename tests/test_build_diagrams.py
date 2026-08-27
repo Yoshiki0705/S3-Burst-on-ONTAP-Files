@@ -26,8 +26,11 @@ def boxes(diagram) -> list:
 
 def endpoints(diagram) -> set[str]:
     """What an edge may attach to. Frames count on purpose: an edge that has to arrive at a choice
-    between two products must land on the container, not on whichever option is drawn first."""
-    return {c.cid for c in (*diagram.nodes, *diagram.frames)}
+    between two products must land on the container, not on whichever option is drawn first. Text
+    boxes count because a named waypoint a path passes through -- another cloud's VPC, VNet or VCN --
+    is a real step in the route without being a container that holds anything. What the check is for
+    is an edge naming a cell that does not exist, and that still fails here."""
+    return {c.cid for c in (*diagram.nodes, *diagram.frames, *diagram.texts)}
 
 
 def test_every_label_a_spec_refers_to_exists_in_every_language() -> None:
@@ -108,7 +111,13 @@ def test_every_vertex_stays_inside_the_page() -> None:
 
 
 def test_icons_inside_a_frame_stay_inside_it() -> None:
-    """A frame states "one of these"; an icon spilling out of it says something else."""
+    """A frame states "one of these"; an icon spilling out of it says something else.
+
+    A frame must hold something. It may hold a text box rather than an icon: where a vendor publishes
+    no icon this repository can use, the service is named in a box instead, and substituting another
+    vendor's mark would attribute the service to whoever's mark was borrowed. What stays forbidden is
+    an empty frame, which draws a boundary around nothing.
+    """
     for diagram in bd.DIAGRAMS:
         for frame in diagram.frames:
             inside = [
@@ -117,7 +126,13 @@ def test_icons_inside_a_frame_stay_inside_it() -> None:
                 if frame.x <= node.x <= frame.x + frame.width
                 and frame.y <= node.y <= frame.y + frame.height
             ]
-            assert inside, f"{diagram.name}: frame {frame.cid} contains no icon"
+            texts_inside = [
+                text
+                for text in diagram.texts
+                if frame.x <= text.x <= frame.x + frame.width
+                and frame.y <= text.y <= frame.y + frame.height
+            ]
+            assert inside or texts_inside, f"{diagram.name}: frame {frame.cid} is empty"
             for node in inside:
                 size = bd.ICON_SIZE[node.icon]
                 assert node.x + size <= frame.x + frame.width, (

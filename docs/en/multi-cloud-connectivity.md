@@ -74,6 +74,35 @@ table, so this document keeps the comparisons apart** (way 1 in
 **Changing which way you build does not change way 1's Region pairs.** Taking a partner route does
 not add Regions to a managed service. It switches to a different construction.
 
+### The same picture with the actual services
+
+Putting real service names into the classification above gives the following. **The arrows in the
+figure stop at the AWS VPC.** What lies beyond it — another cloud's file storage as the origin with
+FSx for ONTAP as the cache — is the part this document does not claim.
+
+![Cross-cloud connectivity](../_assets/images/s3burst-cross-cloud-connectivity-en.svg)
+
+The same content as a table.
+
+| Cloud | Storage | Own-cloud side | Way available today | Connectivity service |
+|---|---|---|---|---|
+| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 Managed service | AWS Interconnect – multicloud (GA, eight pairs) or Partner Cross-Cloud Interconnect for AWS |
+| OCI | OCI File Storage | OCI VCN | 1 Managed service | AWS Interconnect – multicloud (GA, one pair) or Oracle Interconnect for AWS |
+| Azure | Azure NetApp Files | Azure VNet | 2 Partner route only | ExpressRoute and Direct Connect joined inside an interconnection provider's fabric |
+
+**"Way available today" says whether way 1 can be used for that cloud.** Google Cloud and OCI can
+also be built with way 2. Azure, conversely, is outside way 1, so it is way 2 or 3 regardless of
+Region.
+
+On the icons in the figure. Azure NetApp Files uses Microsoft's
+[Azure architecture icons](https://learn.microsoft.com/azure/architecture/icons/), following that
+page's instruction to keep the product name close to the icon. **Google Cloud NetApp Volumes has no
+icon of its own.** Google's product icon system gives unique icons to core products and represents
+everything else with a category icon plus the product name, and Google's guide places NetApp Volumes
+under Storage ([Google Cloud icons](https://cloud.google.com/icons)). It is therefore shown with the
+Storage category icon and the product name. OCI is named without an icon, because this repository has
+no icon for it.
+
 ## AWS Interconnect – multicloud
 
 A managed service that provides private Layer 3 connectivity between an Amazon VPC and another CSP's

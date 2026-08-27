@@ -47,6 +47,44 @@ style = (
 | Service icon | `Arch_<Service>_64.svg` | 80×80 |
 | Resource icon | `Res_<Name>_48.svg` | 48×48 |
 
+The package directory name carries its release date (`Icon-package_07312026.<hash>`), and that date
+appears in every directory inside it. `build_diagrams.py` reads it off the package rather than
+holding a copy, so a new quarterly release needs no edit. Before switching releases, check whether
+the icons already in use changed: if they are byte-identical, the generated `.drawio` files stay
+byte-identical too and `--check` still passes, which is what makes the switch safe to do on its own.
+
+A service that shipped recently may be absent from an older package. AWS Interconnect is in
+`07312026` and not in `01302026`, which predates its GA.
+
+## Icons that are not AWS assets
+
+They go in `docs/_assets/icons/`, which is gitignored. What gets committed is the diagram with the
+icon embedded, never the icon as a file of its own. `build_diagrams.py` names the file it wants and
+where to obtain it, so run `--write` and read the error rather than guessing a filename.
+
+The data URI's media type has to match the bytes — `image/png` for PNG, `image/svg+xml` for SVG. Get
+it wrong and the export succeeds with a broken-image placeholder.
+
+Each vendor's rules differ, and following them is not optional:
+
+| Vendor | Where | Rules that bear on the diagram |
+|---|---|---|
+| Microsoft | [Azure architecture icons](https://learn.microsoft.com/azure/architecture/icons/) | Permitted in architecture diagrams, training material and documentation. Keep the product name close to the icon. Do not crop, flip, rotate or reshape. Uniform scaling is not reshaping, so an 18 px source held at 80×80 is fine |
+| Google | [Google Cloud icons](https://cloud.google.com/icons) | Core products have unique icons; **everything else uses its category icon plus the product name**, and the name is what distinguishes two products sharing an icon. Check the product icon guide before assuming an icon is missing — Google Cloud NetApp Volumes has no unique icon by design and belongs to Storage |
+| NetApp | Obtain from NetApp | The ONTAP 9 badge is a 96 px square and is the one asset held at a size that is not its own, so that it reads as a peer of the 80 px service icons beside it |
+
+**Do not substitute another vendor's mark for a missing icon.** A stand-in attributes the service to
+whoever's mark was borrowed. Name the service in a box instead, as the OCI nodes do.
+
+## SVG export is byte-stable, and that is deliberate
+
+draw.io stamps a fresh random element id into every SVG export and uses it twice. Left alone, every
+re-export rewrites every SVG, and the files that did not change bury the one that did — the same
+failure the fixed `MODIFIED` timestamp prevents in the `.drawio` files. `stabilize_svg()` rewrites
+that id to one derived from the file name after each export. Two consecutive `--write --export` runs
+now produce identical bytes; if that stops being true, something else in the toolchain became
+non-deterministic and the fix belongs in the same place.
+
 ## Edge style (single color, no variation)
 
 ```text

@@ -63,27 +63,69 @@ DRAWIO_CLI = Path("/Applications/draw.io.app/Contents/MacOS/draw.io")
 # never the icon as a file of its own. Obtain the ONTAP 9 product badge from NetApp and place it at
 # the path below before running --write.
 LOCAL_ICON_DIR = ROOT / "docs" / "_assets" / "icons"
-LOCAL_ICONS = {"ontap_9": "ontap-9.png"}
+LOCAL_ICONS = {
+    "ontap_9": "ontap-9.png",
+    "azure_netapp_files": "azure-netapp-files.svg",
+    # Google publishes no product icon for Google Cloud NetApp Volumes. Its own product icon guide
+    # lists the service under Storage without the marker it uses for products that carry a unique
+    # icon, so the category icon plus the product name as a label is what Google's system prescribes
+    # -- the same treatment Filestore gets. The label is what distinguishes them.
+    "gcnv_storage_category": "google-cloud-storage-category.svg",
+}
 
-# Relative to the icon package root. The `_Light` suffix on the general-purpose resource icons is
-# easy to miss: `Res_Client_48.svg` does not exist, `Res_Client_48_Light.svg` does.
+# Printed when a badge is missing, so the message says where to get it rather than only that it is
+# absent. Each vendor permits use in architecture diagrams and documentation; none of them is
+# committed here, which is the same stance the AWS package gets.
+LOCAL_ICON_SOURCES = {
+    "ontap_9": "the ONTAP 9 product badge from NetApp",
+    "azure_netapp_files": (
+        "Azure_Public_Service_Icons/Icons/storage/10096-icon-service-Azure-NetApp-Files.svg "
+        "in the Azure architecture icons package, https://learn.microsoft.com/azure/architecture/icons/"
+    ),
+    "gcnv_storage_category": (
+        "'Category Icons/Storage/SVG/Storage-512-color.svg' in the Google Cloud product category "
+        "icons package, https://cloud.google.com/icons"
+    ),
+}
+
+# A data URI needs the type that matches the bytes. The badge set is no longer PNG-only, and getting
+# this wrong exports a broken-image placeholder while still reporting success.
+MIME_BY_SUFFIX = {".png": "image/png", ".svg": "image/svg+xml"}
+
+# Relative to the icon package root, with `{d}` standing for the package's release date. That date
+# appears in every top-level directory name inside the package (`Resource-Icons_07312026/`), and it
+# changes every quarter -- so it is read off the package directory rather than written here. Writing
+# it out would pin the tool to one release and give the same fact two homes, and the failure it
+# produces on the next package is a path that does not resolve, which reads as a missing icon.
+#
+# The `_Light` suffix on the general-purpose resource icons is easy to miss: `Res_Client_48.svg`
+# does not exist, `Res_Client_48_Light.svg` does.
 ICONS = {
-    "users": "Resource-Icons_01302026/Res_General-Icons/Res_48_Light/Res_Users_48_Light.svg",
-    "client": "Resource-Icons_01302026/Res_General-Icons/Res_48_Light/Res_Client_48_Light.svg",
+    "users": "Resource-Icons_{d}/Res_General-Icons/Res_48_Light/Res_Users_48_Light.svg",
+    "client": "Resource-Icons_{d}/Res_General-Icons/Res_48_Light/Res_Client_48_Light.svg",
     "s3_access_point": (
-        "Resource-Icons_01302026/Res_Storage/"
+        "Resource-Icons_{d}/Res_Storage/"
         "Res_Amazon-Simple-Storage-Service_General-Access-Points_48.svg"
     ),
     "s3_bucket": (
-        "Resource-Icons_01302026/Res_Storage/Res_Amazon-Simple-Storage-Service_Bucket_48.svg"
+        "Resource-Icons_{d}/Res_Storage/Res_Amazon-Simple-Storage-Service_Bucket_48.svg"
     ),
     "s3": (
-        "Architecture-Service-Icons_01302026/Arch_Storage/64/"
+        "Architecture-Service-Icons_{d}/Arch_Storage/64/"
         "Arch_Amazon-Simple-Storage-Service_64.svg"
     ),
     "fsx_ontap": (
-        "Architecture-Service-Icons_01302026/Arch_Storage/64/"
+        "Architecture-Service-Icons_{d}/Arch_Storage/64/"
         "Arch_Amazon-FSx-for-NetApp-ONTAP_64.svg"
+    ),
+    # Added in the 07312026 package; absent from 01302026, which predates the service's GA.
+    "aws_interconnect": (
+        "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
+        "Arch_AWS-Interconnect_64.svg"
+    ),
+    "direct_connect": (
+        "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
+        "Arch_AWS-Direct-Connect_64.svg"
     ),
 }
 
@@ -96,6 +138,21 @@ ICON_SIZE = {
     "s3_bucket": 48,
     "s3": 80,
     "fsx_ontap": 80,
+    "aws_interconnect": 80,
+    "direct_connect": 80,
+    # Non-AWS service icons, held at 80 so they read as peers of the AWS service icons beside them
+    # rather than as something less important. Each vendor's own rules are met at this size:
+    #
+    # Microsoft asks that the icon appear as it does within Azure, that the product name sit close to
+    # it, and that it is not cropped, flipped, rotated or reshaped. The source is an 18 px square SVG
+    # and is scaled uniformly, so nothing is distorted; the product name is the cell label directly
+    # underneath. https://learn.microsoft.com/azure/architecture/icons/
+    "azure_netapp_files": 80,
+    # Google's product icon system gives unique icons to core products only and a shared category
+    # icon to everything else, with the product name distinguishing them. Google Cloud NetApp Volumes
+    # is listed under Storage without the core-product marker, so the Storage category icon is what
+    # the system prescribes -- the same icon Filestore uses. https://cloud.google.com/icons
+    "gcnv_storage_category": 80,
     # Placed at 80 to match the AWS service icons it sits beside. The source badge is 96 px square,
     # so this is the one icon that is scaled; an AWS asset would not be, but holding a third-party
     # badge at its own size next to an 80 px service icon reads as a difference in importance.
@@ -425,6 +482,168 @@ LABELS: dict[str, dict[str, str]] = {
             ),
         ),
     },
+    # --- cross-cloud connectivity diagram --------------------------------------------------------
+    # This figure stops at the network. The FlexCache direction it does not draw as available is the
+    # whole reason the figure exists: a reader who sees three clouds converging on FSx for ONTAP will
+    # assume the storage integration follows, and it does not.
+    "gcp_cloud": {"ja": "Google Cloud", "en": "Google Cloud"},
+    "azure_cloud": {"ja": "Microsoft Azure", "en": "Microsoft Azure"},
+    "oci_cloud": {
+        "ja": "Oracle Cloud Infrastructure",
+        "en": "Oracle Cloud Infrastructure",
+    },
+    "gcnv": {
+        "ja": "Google Cloud NetApp Volumes",
+        "en": "Google Cloud NetApp Volumes",
+    },
+    "anf": {"ja": "Azure NetApp Files", "en": "Azure NetApp Files"},
+    # Oracle publishes no icon set this repository can draw from, so the service is named in a box.
+    # A stand-in from another vendor's set would be worse than a label: it would attribute Oracle's
+    # service to whoever's mark was borrowed.
+    "oci_file_storage": {"ja": "OCI File Storage", "en": "OCI File Storage"},
+    "gcp_vpc": {"ja": "Google Cloud VPC", "en": "Google Cloud VPC"},
+    "azure_vnet": {"ja": "Azure VNet", "en": "Azure VNet"},
+    "oci_vcn": {"ja": "OCI VCN", "en": "OCI VCN"},
+    "managed_way": {
+        "ja": "1 管理サービス — 対応リージョンのペアで決まる",
+        "en": "1 Managed service - decided by the Region pairs",
+    },
+    "partner_way": {
+        "ja": "2 パートナー経由 — ロケーションの重なりで決まる",
+        "en": "2 Partner route - decided by overlapping locations",
+    },
+    "aws_interconnect_mc": {
+        "ja": "AWS Interconnect – multicloud",
+        "en": "AWS Interconnect – multicloud",
+    },
+    "direct_connect": {"ja": "AWS Direct Connect", "en": "AWS Direct Connect"},
+    "provider_fabric": {
+        "ja": "相互接続プロバイダのファブリック",
+        "en": "Interconnection provider's fabric",
+    },
+    "aws_cloud_consuming": {
+        "ja": "AWS Cloud",
+        "en": "AWS Cloud",
+    },
+    "aws_vpc": {"ja": "Amazon VPC", "en": "Amazon VPC"},
+    "fsx_here": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "s3ap_here": {"ja": "Amazon S3 Access Point", "en": "Amazon S3 Access Point"},
+    "private_path": {"ja": "private 接続", "en": "private connectivity"},
+    # Drawn as a barrier on the boundary rather than as a dashed arrow. A dashed arrow from each of
+    # the three origins would cross the connectivity frames, and one arrow standing for all three
+    # would attach a single verdict to platforms that have two different ones. A barrier says where
+    # the evidence stops without implying a route that has been tried.
+    "unconfirmed_boundary": {
+        "ja": "この図が示すのはネットワーク層だけ — "
+        "他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成"
+        "（FlexCache）は未確認、または機構として対象外",
+        "en": "This figure covers the network layer only - another cloud's file storage as the "
+        "origin with FSx for ONTAP as the cache (FlexCache) is unconfirmed, or out of scope as a "
+        "mechanism",
+    },
+    "cross_cloud_note": {
+        "ja": note_body(
+            "補足",
+            (
+                (
+                    "※1",
+                    "この図が示すのはネットワーク層だけである",
+                    "他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする"
+                    "構成は、AWS の FlexCache 対応構成表に含まれていない。図の最上部の帯が"
+                    "その境界を示す。矢印は AWS の VPC までで止めてある",
+                ),
+                (
+                    "※2",
+                    "帯が指す判定は 2 種類あり、同じ語で書かない",
+                    "Google Cloud NetApp Volumes と Azure NetApp Files は未確認。"
+                    "OCI File Storage は ONTAP ではないため機構として対象外で、"
+                    "FlexCache が要求するクラスタ / SVM ピアリングが成立しない",
+                ),
+                (
+                    "※3",
+                    "分類 1 と分類 2 は可否の決まり方が違う",
+                    "分類 1 はサービス提供側が公開している対応リージョンのペア、"
+                    "分類 2 は Direct Connect ロケーション・相手クラウドの接続ロケーション・"
+                    "プロバイダ拠点の重なりで決まる。分類 2 を選んでも分類 1 の対応ペアは増えない。"
+                    "図の矢印は各クラウドで現在取れる分類を示すもので、"
+                    "Google Cloud と OCI も分類 2 で作ることはできる",
+                ),
+                (
+                    "※4",
+                    "対応状況（2026-08-27 時点）",
+                    "AWS Interconnect – multicloud は GA。Google Cloud は 8 ペア、"
+                    "OCI は us-east-1 ↔ us-ashburn-1 の 1 ペアで、東京・大阪はいずれも対象外。"
+                    "Azure は「予定」であり GA でも Preview でもない",
+                ),
+                (
+                    "※5",
+                    "暗号化は層が違う",
+                    "物理リンクの MACsec と、FlexCache のトラフィックを覆う "
+                    "cluster peering encryption（ONTAP 9.6 以降、TLS 1.2 AES-256 GCM）は別物で、"
+                    "前者があっても後者は要る",
+                ),
+                (
+                    "※6",
+                    "アイコンの出所",
+                    "Azure NetApp Files は Microsoft の Azure architecture icons。"
+                    "Google Cloud NetApp Volumes は固有アイコンがないため Google の規則どおり"
+                    "Storage カテゴリアイコンと製品名で示す。OCI はアイコンを用意できず名前のみ",
+                ),
+            ),
+        ),
+        "en": note_body(
+            "Notes",
+            (
+                (
+                    "*1",
+                    "This figure covers the network layer only",
+                    "Another cloud's file storage as the origin with FSx for ONTAP as the cache is "
+                    "not in AWS's supported FlexCache configuration table. The banner along the top "
+                    "marks that boundary, and the arrows stop at the AWS VPC",
+                ),
+                (
+                    "*2",
+                    "The banner covers two different verdicts, not one",
+                    "Google Cloud NetApp Volumes and Azure NetApp Files are unconfirmed. OCI File "
+                    "Storage is out of scope as a mechanism because it is not ONTAP, so the cluster "
+                    "and SVM peering FlexCache requires cannot exist",
+                ),
+                (
+                    "*3",
+                    "Ways 1 and 2 are decided by different things",
+                    "Way 1 by the Region pairs the provider publishes; way 2 by whether Direct "
+                    "Connect locations, the other cloud's connection locations and the provider's "
+                    "footprint overlap. Taking way 2 does not add Regions to way 1. The arrows show "
+                    "which way each cloud can use today; Google Cloud and OCI can also be built "
+                    "with way 2",
+                ),
+                (
+                    "*4",
+                    "Status as at 2026-08-27",
+                    "AWS Interconnect - multicloud is GA: eight pairs for Google Cloud, one pair "
+                    "for OCI (us-east-1 to us-ashburn-1), and no Japanese Region in either. Azure "
+                    "is stated as planned, which is neither GA nor Preview",
+                ),
+                (
+                    "*5",
+                    "Encryption sits at two layers",
+                    "MACsec on the physical link and cluster peering encryption over FlexCache "
+                    "traffic (ONTAP 9.6 or later, TLS 1.2 AES-256 GCM) are different things; the "
+                    "first does not remove the need for the second",
+                ),
+                (
+                    "*6",
+                    "Where the icons come from",
+                    "Azure NetApp Files from Microsoft's Azure architecture icons. Google Cloud "
+                    "NetApp Volumes has no unique icon, so Google's own rule applies: the Storage "
+                    "category icon with the product name. OCI is named in a box, with no icon",
+                ),
+            ),
+        ),
+    },
 }
 
 
@@ -664,7 +883,105 @@ def _single_site() -> Diagram:
     )
 
 
-DIAGRAMS = (_overview(), _single_site())
+def _cross_cloud() -> Diagram:
+    """Private connectivity from three other clouds to AWS, stopping where the evidence stops.
+
+    The layout carries the argument. Left to right is the network path, and it ends at Amazon VPC.
+    FSx for ONTAP sits inside the AWS boundary but the edge reaching it is dashed and labelled,
+    because the FlexCache direction from another cloud's file storage is not in AWS's supported
+    configurations. Drawing it solid would turn a network diagram into an architecture proposal.
+
+    The two ways of building the connection are stacked as separate frames rather than as
+    alternatives on one line, because what decides whether each is available is a different thing --
+    Region pairs for the managed service, overlapping locations for the partner route -- and putting
+    them on one line invites reading the second as an extension of the first's coverage.
+    """
+    return Diagram(
+        name="s3burst-cross-cloud-connectivity",
+        diagram_id="s3burst-cross-cloud",
+        width=1400,
+        height=900,
+        groups=(Group("aws_cloud_r", "aws_cloud_consuming", 1060, 50, 290, 520),),
+        frames=(
+            # Ordered so that the two clouds with a managed service at GA sit next to each other and
+            # their edges reach the upper frame without crossing Azure's edge to the lower one. The
+            # order is a consequence of the connectivity status, not alphabetical.
+            Frame("gcp", "gcp_cloud", 50, 50, 250, 150),
+            Frame("oci", "oci_cloud", 50, 235, 250, 150),
+            Frame("azure", "azure_cloud", 50, 420, 250, 150),
+            Frame("managed", "managed_way", 620, 50, 330, 230),
+            Frame("partner", "partner_way", 620, 320, 330, 250),
+            Frame("aws_vpc_f", "aws_vpc", 1085, 100, 240, 440),
+        ),
+        nodes=(
+            Node(
+                "gcnv_n",
+                "gcnv_storage_category",
+                "gcnv",
+                *centred("gcnv_storage_category", 175, 110),
+            ),
+            Node(
+                "anf_n",
+                "azure_netapp_files",
+                "anf",
+                *centred("azure_netapp_files", 175, 480),
+            ),
+            Node(
+                "ic_n",
+                "aws_interconnect",
+                "aws_interconnect_mc",
+                *centred("aws_interconnect", 785, 145),
+            ),
+            Node(
+                "dx_n",
+                "direct_connect",
+                "direct_connect",
+                *centred("direct_connect", 785, 400),
+            ),
+            Node(
+                "fsx_n",
+                "fsx_ontap",
+                "fsx_here",
+                *centred("fsx_ontap", 1205, 200),
+            ),
+            Node(
+                "s3ap_n",
+                "s3_access_point",
+                "s3ap_here",
+                *centred("s3_access_point", 1205, 420),
+            ),
+        ),
+        texts=(
+            TextBox("oci_fs", "oci_file_storage", 90, 295, 170, 30),
+            TextBox("gcp_net", "gcp_vpc", 340, 110, 200, 20),
+            TextBox("oci_net", "oci_vcn", 340, 295, 200, 20),
+            TextBox("azure_net", "azure_vnet", 340, 480, 200, 20),
+            TextBox("fabric", "provider_fabric", 645, 480, 280, 40),
+            # A banner across the top rather than a label wedged between the connectivity column and
+            # the AWS boundary. Placed there it overlapped the two edges entering the VPC: a TextBox
+            # does not clip, so its text overflowed the 95 px box and crossed the arrowheads. It is
+            # also the first thing read, which is where a limit belongs.
+            TextBox("boundary", "unconfirmed_boundary", 50, 8, 1300, 30),
+        ),
+        edges=(
+            Edge("x1", "gcnv_n", "gcp_net"),
+            Edge("x2", "anf_n", "azure_net"),
+            Edge("x3", "oci_fs", "oci_net"),
+            # Which way each cloud can use today. Google Cloud and OCI have a managed service at GA;
+            # Azure has only the partner route, because it is not yet a supported CSP. Sending OCI to
+            # the partner frame would have said the opposite of what its GA status says.
+            Edge("x4", "gcp_net", "managed", "private_path"),
+            Edge("x5", "oci_net", "managed", "private_path"),
+            Edge("x6", "azure_net", "partner", "private_path"),
+            Edge("x7", "managed", "aws_vpc_f"),
+            Edge("x8", "partner", "aws_vpc_f"),
+            Edge("x9", "s3ap_n", "fsx_n"),
+        ),
+        notes=(Note("note", "cross_cloud_note", 50, 620, 1300, 260),),
+    )
+
+
+DIAGRAMS = (_overview(), _single_site(), _cross_cloud())
 
 
 # --- rendering -----------------------------------------------------------------------------------
@@ -693,6 +1010,23 @@ def icon_package(explicit: str | None) -> Path:
     )
 
 
+def package_date(package: Path) -> str:
+    """The release date embedded in the package directory name, e.g. Icon-package_07312026.<hash>.
+
+    Read rather than configured, so a new quarterly package needs no edit here. If the name does not
+    carry a date the package is not the one this tool expects, and saying so beats reporting eight
+    missing icons.
+    """
+    match = re.search(r"Icon-package_(\d{8})", package.name)
+    if not match:
+        raise SystemExit(
+            f"build_diagrams: cannot read a release date from {package.name!r}.\n"
+            "  Expected a directory named like Icon-package_07312026.<hash> from "
+            "https://aws.amazon.com/architecture/icons/"
+        )
+    return match.group(1)
+
+
 def data_uris(package: Path) -> dict[str, str]:
     """Read each icon and build its draw.io data URI.
 
@@ -702,10 +1036,12 @@ def data_uris(package: Path) -> dict[str, str]:
     it. Established by exporting the same icon twice, once in each form.
     """
     uris = {}
+    date = package_date(package)
     for key, relative in ICONS.items():
-        path = package / relative
+        resolved = relative.format(d=date)
+        path = package / resolved
         if not path.is_file():
-            raise SystemExit(f"build_diagrams: {relative} missing from {package}")
+            raise SystemExit(f"build_diagrams: {resolved} missing from {package}")
         encoded = base64.b64encode(path.read_bytes()).decode("ascii")
         uris[key] = f"data:image/svg+xml,{encoded}"
 
@@ -716,10 +1052,11 @@ def data_uris(package: Path) -> dict[str, str]:
                 f"build_diagrams: {name} not found at {path.relative_to(ROOT)}.\n"
                 "  This is a third-party product badge and is deliberately not committed, so it has\n"
                 "  to be placed there once before the diagrams can be regenerated. It is embedded\n"
-                "  into the generated .drawio, which is what gets committed."
+                "  into the generated .drawio, which is what gets committed.\n"
+                f"  Where to obtain it: {LOCAL_ICON_SOURCES.get(key, 'see docs/agent/diagrams.md')}"
             )
         encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-        uris[key] = f"data:image/png,{encoded}"
+        uris[key] = f"data:{MIME_BY_SUFFIX[path.suffix.lower()]},{encoded}"
     return uris
 
 
@@ -881,6 +1218,22 @@ def check(uris: dict[str, str]) -> int:
 # --- exporting -----------------------------------------------------------------------------------
 
 
+# draw.io stamps a fresh random element id into every SVG export, and uses it twice: once as the root
+# `id` and once as the CSS selector for the adaptive-background rule. Left alone, re-exporting an
+# unchanged diagram still produces a one-line diff in every SVG, which is the same failure the fixed
+# MODIFIED timestamp exists to prevent -- the files that did not change bury the one that did. Since
+# the id only has to be unique within the document, deriving it from the file name is enough.
+SVG_RANDOM_ID = re.compile(r"ge-svg-[A-Za-z0-9_-]+")
+
+
+def stabilize_svg(target: Path) -> None:
+    """Replace the per-run random SVG id with one derived from the file name."""
+    text = target.read_text(encoding="utf-8")
+    stabilized = SVG_RANDOM_ID.sub(f"ge-svg-{target.stem}", text)
+    if stabilized != text:
+        target.write_text(stabilized, encoding="utf-8")
+
+
 def export(diagram: Diagram, lang: str) -> None:
     source = DIAGRAM_DIR / diagram.filename(lang)
     stem = source.stem
@@ -889,10 +1242,6 @@ def export(diagram: Diagram, lang: str) -> None:
             f"  draw.io CLI not found at {DRAWIO_CLI}; skipping export", file=sys.stderr
         )
         return
-    # The SVG export is not byte-reproducible: draw.io stamps a fresh random element id into every
-    # run, so an unchanged diagram still comes out as a one-line diff. Check the diff before
-    # committing an SVG whose `.drawio` did not move — if the id is all that changed, drop it, or the
-    # real edit ends up buried among files that did not change.
     runs = (
         # SVG for the repository: crawlers and screen readers can reach the text.
         (IMAGE_DIR / f"{stem}.svg", ["--format", "svg", "--embed-svg-images"]),
@@ -914,6 +1263,8 @@ def export(diagram: Diagram, lang: str) -> None:
             check=True,
             capture_output=True,
         )
+        if target.suffix == ".svg":
+            stabilize_svg(target)
         print(f"  exported  {target.relative_to(ROOT)}")
 
 
