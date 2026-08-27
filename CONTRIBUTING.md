@@ -63,7 +63,7 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 
 ## ドキュメントを書く
 
-- 日本語が正典です。英語は Tier 1（ハブと `docs/i18n-manifest.txt` に列挙したもの）だけ。
+- 日本語が原文です。英語は Tier 1（ハブと `docs/i18n-manifest.txt` に列挙したもの）だけ訳します。
 - 文書の言語はディレクトリで表します（`docs/ja/` / `docs/en/`）。ファイル名に `.en` は付けません。
   例外はルート `README.md` で、これが日本語のハブです。したがって `docs/ja/README.md` は
   存在しません。
