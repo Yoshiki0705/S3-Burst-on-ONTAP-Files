@@ -253,6 +253,41 @@ AWS 側の API だけを見るテアダウンでは詰まる。recovery queue �
 API にも出ない。**成功レスポンスは成功の証拠ではない。** `DELETING` が返っても、数十秒後の状態で
 判定する。
 
+### テアダウン: アクセスポイントを外してもボリュームが消えない
+
+これは別の測定（2026-08-28）で当たった。**アクセスポイントを取り付けたボリュームは、
+アクセスポイントを全部外した後も ONTAP 側の削除を拒否する。**
+
+```text
+Cannot delete volume "..." in SVM "..." because it is associated with the following
+object store NAS buckets: "amazon-fsx-fsvol-0123456789abcdef0"
+```
+
+| 確認したこと | 結果 |
+|---|---|
+| バケット名の由来 | **ボリューム ID と完全一致**（`amazon-fsx-<volume-id>`）。アクセスポイント単位ではなくボリューム単位に作られる |
+| アクセスポイントを全部削除した後 | 拒否は続く。数時間後も同じ |
+| ボリュームを online・マウント済みに戻す | 拒否は続く |
+| アクセスポイントを再取り付けして正しい順序で外す | 拒否は続く。**アクセスポイントのライフサイクルとは独立している** |
+| ONTAP `/protocols/s3/buckets` と `vserver object-store-server bucket show` | **どちらもこのバケットを列挙しない** |
+| ボリュームの `is_object_store` | `false` |
+| **`aws fsx delete-volume`** | **成功。ボリュームとバケットの両方が消えた** |
+
+**ONTAP 側からは削除できず、AWS 側の `delete-volume` でしか消えない。** NetApp が文書化している
+[NAS バケット構成の削除手順](https://docs.netapp.com/us-en/ontap/revert/remove-nas-bucket-task.html)
+は `vserver object-store-server bucket delete` を使うが、**この経路では対象を列挙できないので
+適用できない。**
+
+リーダーの盲点も測れた。`/svm/svms` はこの SVM の S3 サーバ（`amazon-fsx-svm-...`）を `enabled` と
+返すのに、`/protocols/s3/services` はこの SVM を列挙しない。**AWS が管理するオブジェクトは標準の
+ONTAP S3 ビューから隠れている。** 「バケットが無い」と 2 つのリーダーで確認しても、両方が同じ
+盲点を持っていた。
+
+設計への含意は 1 つ。**S3 アクセスポイントを取り付けたボリュームのテアダウンは、AWS 側の API で
+行う。** ONTAP 側の `volume delete` を前提にした手順書は、この経路では詰まる。`aws fsx
+delete-volume` はボリュームに FSx for ONTAP のバックアップが有効であることを求める旨がドキュメントに
+あるが、バックアップ無効のボリュームでも `SkipFinalBackup=true` で通った（実測）。
+
 ## まだ測っていないもの
 
 | 項目 | 状態 |
