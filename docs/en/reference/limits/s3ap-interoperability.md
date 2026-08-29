@@ -263,6 +263,42 @@ A teardown that watches only the AWS-side API gets stuck. The recovery queue app
 console nor the FSx for ONTAP API. **A success response is not evidence of success:** `DELETING` came
 back both times, so judge by the state a few tens of seconds later.
 
+### Teardown: detaching the access point does not free the volume
+
+This came out of a separate measurement (2026-08-28). **A volume that has carried an access point
+refuses deletion from the ONTAP side even after every access point is detached.**
+
+```text
+Cannot delete volume "..." in SVM "..." because it is associated with the following
+object store NAS buckets: "amazon-fsx-fsvol-0123456789abcdef0"
+```
+
+| What was checked | Result |
+|---|---|
+| Where the bucket name comes from | **An exact match for the volume ID** (`amazon-fsx-<volume-id>`). It is created per volume, not per access point |
+| After deleting every access point | Still refused, and still refused hours later |
+| Bringing the volume back online and mounted | Still refused |
+| Re-attaching an access point and detaching it in the correct order | Still refused. **It is independent of the access point lifecycle** |
+| ONTAP `/protocols/s3/buckets` and `vserver object-store-server bucket show` | **Neither lists this bucket** |
+| The volume's `is_object_store` | `false` |
+| **`aws fsx delete-volume`** | **Succeeded. Both the volume and the bucket went** |
+
+**It cannot be deleted from the ONTAP side; only the AWS-side `delete-volume` removes it.** NetApp's
+documented [procedure for removing a NAS bucket
+configuration](https://docs.netapp.com/us-en/ontap/revert/remove-nas-bucket-task.html) uses `vserver
+object-store-server bucket delete`, which **cannot be applied on this path because the target cannot
+be listed.**
+
+The reader blind spot was measurable too. `/svm/svms` reports this SVM's S3 server
+(`amazon-fsx-svm-...`) as `enabled`, while `/protocols/s3/services` does not list the SVM at all.
+**Objects that AWS manages are hidden from the standard ONTAP S3 views.** "There is no bucket" held
+across two readers, and both shared the same blind spot.
+
+One design implication. **Tear down a volume that has carried an S3 access point through the AWS-side
+API.** A runbook built on ONTAP's `volume delete` gets stuck on this path. The documentation states
+that `aws fsx delete-volume` requires FSx for ONTAP backups to be enabled on the volume, but it succeeded with
+`SkipFinalBackup=true` on volumes that had backups disabled (measured).
+
 ## Not yet measured
 
 | Item | State |
