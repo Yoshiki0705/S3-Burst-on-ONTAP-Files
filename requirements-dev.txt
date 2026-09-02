@@ -27,7 +27,7 @@ zizmor==1.29.0
 #
 # Findings are triaged in the templates with `# checkov:skip=<id>: <reason>`. A skip without a reason
 # is rejected by tests/test_iac_security.py, because an unexplained skip is how a scanner goes quiet.
-checkov==3.3.11
+checkov==3.3.16
 
 # Not installable via pip — install separately, see CONTRIBUTING.md:
 #   markdownlint-cli2   npm install -g markdownlint-cli2@0.22.1
