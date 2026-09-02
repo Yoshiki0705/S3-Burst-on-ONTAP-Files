@@ -55,6 +55,17 @@ from what was known.
   100 Gbps, a path extending to Azure Private Link — describe GA, not the Preview, and are marked as
   blog-only.
 
+- **The overview figure now draws the connectivity layer the FlexCache link runs over.** The edge
+  crossed from the AWS boundary to the cache site with nothing on it, and a reader asked where AWS
+  Interconnect was. It is drawn as a frame naming the three cases — same Region: VPC peering;
+  cross-Region: VPC peering / Transit Gateway / Cloud WAN; on-premises: Direct Connect /
+  Site-to-Site VPN — rather than as one product icon, which would read as a requirement, and a
+  Direct Connect icon in particular would imply a circuit the same-Region case does not need.
+  A note states that **AWS Interconnect – multicloud is not this link**: it joins AWS to another CSP,
+  and no other cloud appears in that figure. `AWS Interconnect – last mile` is named there as one way
+  to obtain the on-premises circuit. Both published posts embed the figure from `main`, so the picture
+  changed with the merge.
+
 ### Fixed
 
 - **The physical-link encryption of AWS Interconnect – multicloud was stated more definitely than the
