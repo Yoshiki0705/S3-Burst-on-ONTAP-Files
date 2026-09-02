@@ -11,6 +11,13 @@
 データ転送が起きないわけではない。起きないのは全量の事前コピーと、鮮度と失敗を自分で管理する
 同期の仕組みである。
 
+**Cache は Origin の性能を分けてもらう仕組みではなく、読み取り側に別の容量を足す仕組みである。**
+Cache は独立したファイルシステムなので、自分の throughput capacity・自分のメモリ・自分のバースト
+許容量を持つ。実測では、非圧縮データで **Cache 常駐の読み取りが Origin 直読みの 2.31 倍**だった
+（[実測記録](verification/throughput-iops-concurrency.md#c--flexcache-は-origin-より速い前回の53は逆でした)、
+両側 128 MBps 段）。**代価は初回にかかる。** 一度も読まれていないデータの初回読み取りは常駐時の
+2.88 分の 1 で、この差は設計時に見込む必要がある。
+
 ```mermaid
 flowchart LR
     subgraph AWS["AWS"]
@@ -47,7 +54,7 @@ flowchart LR
 アプリケーションレベルの整合性を FlexCache が保証するという意味ではない。** 同時書き込みの扱いは
 [S3 AP 設計ガイド](reference/limits/s3ap-design-guide.md)にある。
 
-## S3 Access Point は Origin 側にだけ付ける
+## S3 Access Point の取り付け — Origin 側のみ
 
 この 1 点が設計を大きく単純にする。Cache 側は S3 を提供せず、NFS / SMB で使う。
 

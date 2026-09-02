@@ -118,13 +118,16 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 失うものはありません。確認手順は[PoC チェックリスト](docs/ja/poc-checklist.md)、
 詳細と出典は[最初に決めること](docs/ja/design-first-decisions.md)にあります。
 
-## はじめる
+## はじめ方
 
 | やりたいこと | ガイド | 所要時間 |
 |---|---|---|
 | 構成の全体像をつかむ | [構成の形](docs/ja/architecture.md) | 5 分 |
 | 採るべき構成か判断する | [選び方](docs/ja/reference/decision-trees/choosing-this-architecture.md) | 5 分 |
 | 他の方式と比べる | [代替案との比較](docs/ja/reference/comparison/alternatives.md) | 10 分 |
+| Amazon S3 Files と比べる | [S3 Files と本構成の比較検証](docs/ja/verification/s3files-vs-flexcache.md) | 10 分 |
+| S3 Files の実測値と落とし穴を見る | [S3 Files 実測記録](docs/ja/verification/s3files-measured.md) | 10 分 |
+| スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |
 | 費用を見積もる | [FinOps の費用構造](docs/ja/reference/comparison/finops-s3-vs-s3ap.md) | 15 分 |
 | 作る前に決めることを確認する | [最初に決めること](docs/ja/design-first-decisions.md) | 5 分 |
 | 何がどこまで確かめられているか知る | [検証状況](docs/ja/verification-status.md) | 5 分 |
