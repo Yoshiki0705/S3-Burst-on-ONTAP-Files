@@ -808,7 +808,7 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         key="hil",
-        title="HiL テストベンチ — 走行ログを装置へ配る",
+        title="HiL テストベンチ — 走行ログの装置への配布",
         industry="自動車 (AV / ADAS)",
         objects_per_month=20_000_000,
         object_mib=1.0,
@@ -1686,7 +1686,7 @@ def render_read_cost_matrix(rh: ReadHeavy) -> list[str]:
             )
 
     return [
-        t("### 転送とリクエストを同時に見る"),
+        t("### 転送とリクエストの同時確認"),
         "",
         t(
             "読み取り側の課金は転送とリクエストの 2 つで、効く手が違う。"
@@ -2006,7 +2006,7 @@ def render_read_heavy(rh: ReadHeavy = READ_HEAVY) -> list[str]:
             ]
         )
     out += [
-        t("#### 読み取り回数を振る"),
+        t("#### 読み取り回数に対する感度"),
         "",
         t("同じ作業セットを何回読むかだけを変えて、他の前提は固定する。"),
         "",
@@ -2254,7 +2254,7 @@ def render_whole_system() -> list[str]:
             ]
         )
     out += [
-        t("#### ストレージ効率の仮定を振ってみる"),
+        t("#### ストレージ効率の仮定に対する感度"),
         "",
         t(
             "効率の仮定は、この文書で最も金額を動かす仮定である。"

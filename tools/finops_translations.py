@@ -211,7 +211,7 @@ TRANSLATIONS: dict[str, str] = {
     "利用側が S3 API を話せる場合を想定し、S3 単独も参考として並べる。"
     "NFS / SMB が要るなら S3 単独は選択肢から外れる": "S3 alone is shown for reference, on the assumption that the consumers can speak the S3 API. "
     "If NFS or SMB is required, it is not an option",
-    "HiL テストベンチ — 走行ログを装置へ配る": "HiL test benches — distributing drive logs to the equipment",
+    "HiL テストベンチ — 走行ログの装置への配布": "HiL test benches — distributing drive logs to the equipment",
     "自動車 (AV / ADAS)": "Automotive (AV / ADAS)",
     "センサー由来のバイナリが主体。AWS 公表値で最も近い地震探査データの 40% を当てる": "Mostly sensor-derived binary. AWS's closest published figure, 40% for seismic data, is applied",
     "テストベンチは構成を変えられない物理機器で、AWS 外にある。マウントヘルパーを入れられない": "The test benches are physical equipment outside AWS whose configuration cannot be changed, so the mount helper cannot be installed",
@@ -356,7 +356,7 @@ TRANSLATIONS.update(
         "転送 (リクエストも無視できない)": "Transfer (requests not negligible)",
         "転送": "Transfer",
         "リクエスト": "Requests",
-        "### 転送とリクエストを同時に見る": "### Looking at transfer and requests together",
+        "### 転送とリクエストの同時確認": "### Looking at transfer and requests together",
         "読み取り側の課金は転送とリクエストの 2 つで、効く手が違う。"
         "転送はバイト数を減らすことで下がり、リクエストは呼び出し回数を減らすことで下がる。"
         "**どちらが支配項かで打つ手が変わる**ので、自分のワークロードがどこにいるかを先に確かめる。": "There are two charges on the read side, transfer and requests, and they respond to different remedies. "
@@ -448,7 +448,7 @@ TRANSLATIONS.update(
         "This architecture is for the cases where they cannot: the equipment is on site, proximity to what is being measured is required, or investment in existing facilities has not been written off.",
         # --- sweeping the read count -------------------------------------------------------------
         "{count} 回": "{count}",
-        "#### 読み取り回数を振る": "#### Sweeping the read count",
+        "#### 読み取り回数に対する感度": "#### Sweeping the read count",
         "同じ作業セットを何回読むかだけを変えて、他の前提は固定する。": "Only the number of times the same working set is read changes; every other assumption is held.",
         "直接読む構成": "Reading directly",
         "直接読む構成が何倍か": "Ratio, direct to this architecture",
@@ -620,7 +620,7 @@ TRANSLATIONS.update(
         "AWS 公表値の地震探査データ": "AWS's published figure for seismic data",
         "AWS 公表値の汎用ファイル共有": "AWS's published figure for general-purpose file sharing",
         "AWS 公表値のエンジニアリングデータ": "AWS's published figure for engineering data",
-        "#### ストレージ効率の仮定を振ってみる": "#### Sweeping the storage efficiency assumption",
+        "#### ストレージ効率の仮定に対する感度": "#### Sweeping the storage efficiency assumption",
         "効率の仮定は、この文書で最も金額を動かす仮定である。"
         "「{workload}」で SSD 層の効率を振ると次のようになる"
         "（キャパシティプール層は常にその半分と仮定）。": "Efficiency is the assumption that moves the figures in this document most. "

@@ -203,6 +203,9 @@ release the cache, then the SVM peer, then the cluster peer.
   is not reliably reachable by a screen reader, and is not extractable by a crawler. A decision that
   exists only inside a diagram is a decision some readers cannot access.
 - Code blocks always carry a language tag. Internal links are relative.
+- **Japanese section headings (`##` and below) are noun phrases, and H1 and `title` are not.** The
+  rule, the suffixes that keep an assertion from decaying into a label, and the anchor-rename
+  procedure are in [CONTRIBUTING.md](CONTRIBUTING.md#見出しを書くとき).
 - Japanese is the authoring language for documents; code, identifiers and commit messages are
   English.
 - **Never hand-write a language switcher.** `make switcher-write` generates it. A new localized file
