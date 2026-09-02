@@ -15,6 +15,7 @@ the prose instead produces a confident answer that the tool then contradicts.
 | Anything about the two languages or the switcher | `docs/i18n-terms.md`, `tools/check_i18n_parity.py` |
 | A number stated in prose | `tools/check_derived_counts.py` — `COUNT_GLOBS` |
 | A published article and its draft | `tools/check_blog_draft_sync.py` |
+| The Interconnect Region pairs or a CSP's lifecycle | `tools/check_interconnect_regions.py` — `DOCUMENTS` and `CSP_HEADINGS` |
 
 ## A grep hit count is not a list of things to change
 
@@ -42,3 +43,19 @@ already had the answer.
 When an external observation and this repository disagree, the repository is describing its own
 choices and the observation is not. Read the local record first, then decide whether the observation
 changes it. The reverse order produces work that has to be withdrawn.
+
+## An empty result and an unreadable source are different answers
+
+A check that reads someone else's page has two ways of coming back with nothing, and they call for
+opposite responses. No difference found means the documents are correct. Nothing parsed means the page
+changed shape and the check has stopped looking, which is worse than a difference because it is
+silent and stays silent.
+
+`tools/check_interconnect_regions.py` is the one check here that reads an external page, and it exits
+non-zero on every empty path: the request failing, the page parsing to zero pairs, and a document
+whose table cannot be found. `make counts` applies the same rule to the filesystem — a count of zero
+is reported as a broken reader, not as "none yet".
+
+The rule for any check added later: **decide what the absence of findings means before writing the
+success message.** If a scan that could not run and a scan that found nothing print the same line,
+the check will eventually report success forever.

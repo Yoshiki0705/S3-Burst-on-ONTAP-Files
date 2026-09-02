@@ -104,6 +104,10 @@ Preconditions, before peering
       **There are two ways that is decided** — the published Region pairs for a managed service,
       overlapping locations for a partner route
       ([cross-cloud connectivity](multi-cloud-connectivity.md))
+- [ ] Where a managed service is used (AWS Interconnect – multicloud, for one), **check that pair's
+      lifecycle.** A pair being in the table and that pair being GA are different things, and a
+      Preview pair's Regions and features can change. Using a Preview in a PoC is fine, but **do not
+      carry it forward as a basis for the production design**
 - [ ] Measure the round-trip latency of the path first. **It is the baseline for comparing against
       phase 1**, whose figures were taken under sub-millisecond latency, and it is what explains the
       difference

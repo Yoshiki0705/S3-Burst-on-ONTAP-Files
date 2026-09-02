@@ -62,6 +62,8 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 | **逆方向** — Google Cloud NetApp Volumes / Azure NetApp Files を Origin として FSx for ONTAP を Cache にできるか | 未確認 | AWS の対応構成表に記載がない。ONTAP ベースであることを根拠にしない（[移植性](portability.md)、[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
 | Google Cloud Filestore / Azure Managed Lustre / Azure Blob NFS / OCI File Storage を FlexCache の Origin または Cache にできるか | 機構として対象外 | ONTAP ではない。FlexCache は ONTAP 間のクラスタ / SVM ピアリングを要求する。**未確認とは区別する** |
 | パートナー経由（Direct Connect と相手クラウドの専用線を相互接続プロバイダのファブリックで結ぶ）でのクラスタピアリング成立と、その経路での FlexCache 読み取り | 未確認 | 各サービスのドキュメント記載はあるが、この組み合わせを実機で追っていない（[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
+| 管理サービス（AWS Interconnect – multicloud）経由でのクラスタピアリング成立と、その経路での FlexCache 読み取り | 未確認 | サービスはドキュメント記載で、Google Cloud と OCI は GA、Azure は 2026-08 に Preview。**対応ペアに日本が無いため、実機で追うには対応ペアのリージョンに環境を作る必要がある**（[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
+| AWS Interconnect – multicloud の物理リンク暗号化が MACsec かどうか | 未確認 | 製品ページの本文は規格名を挙げていない。MACsec を名指しした記述は Microsoft のブログに載った AWS 側の役員の発言だけで、**サービスのドキュメントで裏を取れていない**（[他クラウドとの接続経路](multi-cloud-connectivity.md)） |
 | ONTAP が intercluster LIF に MACsec を提供するか | 未確認 | 記載を見つけられていない。FlexCache のトラフィックの暗号化は cluster peering encryption（ONTAP 9.6 以降、TLS 1.2 AES-256 GCM）としてドキュメント記載がある |
 | Origin あたりの Cache 数を増やしたときの挙動 | 未検証 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨しており、ファンアウト数の設計に影響する可能性がある |
 | ONTAP 9.18.1 の FlexCache duality と、S3 Access Point をボリュームに接続することの関係 | 別の機構として扱う | 実装元も有効化方法も異なる。一方の対応状況を他方の根拠にしない。この構成はどちらも使わないため設計上の影響はない |

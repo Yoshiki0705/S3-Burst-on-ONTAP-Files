@@ -86,13 +86,14 @@ The same content as a table.
 
 | Cloud | Storage | Own-cloud side | Way available today | Connectivity service |
 |---|---|---|---|---|
-| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 Managed service | AWS Interconnect – multicloud (GA, eight pairs) or Partner Cross-Cloud Interconnect for AWS |
-| OCI | OCI File Storage | OCI VCN | 1 Managed service | AWS Interconnect – multicloud (GA, one pair) or Oracle Interconnect for AWS |
-| Azure | Azure NetApp Files | Azure VNet | 2 Partner route only | ExpressRoute and Direct Connect joined inside an interconnection provider's fabric |
+| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 Managed service (GA) | AWS Interconnect – multicloud (GA, eight pairs) or Partner Cross-Cloud Interconnect for AWS |
+| OCI | OCI File Storage | OCI VCN | 1 Managed service (GA) | AWS Interconnect – multicloud (GA, one pair) or Oracle Interconnect for AWS |
+| Azure | Azure NetApp Files | Azure VNet | 1 Managed service (**Preview**) or 2 Partner route | AWS Interconnect – multicloud (Preview, four pairs) with Azure Multicloud Interconnect, or ExpressRoute and Direct Connect joined inside an interconnection provider's fabric |
 
-**"Way available today" says whether way 1 can be used for that cloud.** Google Cloud and OCI can
-also be built with way 2. Azure, conversely, is outside way 1, so it is way 2 or 3 regardless of
-Region.
+**"Way available today" says whether way 1 can be used for that cloud.** All three can also be built
+with way 2. **Azure alone is at Preview, and is not treated as equivalent to the two at GA.** A
+Preview's Region pairs and features can change, so depending on Preview behaviour in a production
+design takes that as its premise.
 
 On the icons in the figure. Azure NetApp Files uses Microsoft's
 [Azure architecture icons](https://learn.microsoft.com/azure/architecture/icons/), following that
@@ -115,7 +116,7 @@ environment. It **became generally available in 2026-04**
 | How it is created | Specify three things: the target CSP, its Region, and the bandwidth required. On completion, one attachment representing the capacity is issued | [Product page](https://aws.amazon.com/interconnect/multicloud/) |
 | Changing bandwidth | Increased or decreased by modifying the attribute, without recreating the connection | Same |
 | Resiliency | Four-way resiliency is built in | Same |
-| Encryption | **The physical connections** between the AWS router and the other CSP's router are encrypted. This is AWS's wording; no standard is named | Same |
+| Encryption | **The physical connections** between the AWS router and the other CSP's router are encrypted. That is the product page's wording, and it names no standard. MACsec is named only in a blog quotation ([the two encryption layers](#encryption--separating-the-layers)) | Same |
 | Which AWS network services it reaches | Amazon VPC, AWS Transit Gateway, AWS Cloud WAN | Same |
 | Transit Gateway / virtual private gateway constraint | Both are Regional services, and **can be used only with a multicloud Interconnect provisioned at the interconnection point serving that Region** | [Getting started](https://docs.aws.amazon.com/interconnect/latest/userguide/getting-started.html) |
 | How Cloud WAN differs | A global service, and can reach an Interconnect in any Region | Same |
@@ -127,23 +128,43 @@ far apart, Transit Gateway does not reach and Cloud WAN is required.
 ### Supported Region pairs
 
 The pairs AWS publishes are as follows
+([Regional Availability](https://docs.aws.amazon.com/interconnect/latest/userguide/region-availability.html),
+retrieved 2026-09-02). **A pair that is not here cannot be built with this managed service.** The
+right-hand column is the lifecycle per CSP, and **a Preview row is not treated as a GA row.**
+
+| AWS Region | Target CSP and Region | Lifecycle |
+|---|---|---|
+| us-east-1 (N. Virginia) | Google Cloud us-east4 (N. Virginia) | GA |
+| us-west-1 (N. California) | Google Cloud us-west2 (Los Angeles) | GA |
+| us-west-2 (Oregon) | Google Cloud us-west1 (Oregon) | GA |
+| eu-west-2 (London) | Google Cloud europe-west2 (London) | GA |
+| eu-central-1 (Frankfurt) | Google Cloud europe-west3 (Frankfurt) | GA |
+| eu-north-1 (Stockholm) | Google Cloud europe-north2 (Stockholm) | GA |
+| ap-southeast-1 (Singapore) | Google Cloud asia-southeast1 (Singapore) | GA |
+| ap-southeast-2 (Sydney) | Google Cloud australia-southeast1 (Sydney) | GA |
+| us-east-1 (N. Virginia) | Azure eastus (US East) | Preview |
+| us-west-1 (N. California) | Azure westus (West US) | Preview |
+| eu-central-1 (Frankfurt) | Azure germanywestcentral (Germany West Central) | Preview |
+| ap-southeast-2 (Sydney) | Azure australiaeast (Australia East) | Preview |
+| us-east-1 (N. Virginia) | OCI us-ashburn-1 (Ashburn) | GA |
+
+**This table is not maintained by hand.** `make interconnect-regions` retrieves the page above and
+compares it against both the Japanese and the English table, failing on any divergence. Where the
+page could not be retrieved it **fails as not retrieved**, rather than reporting no divergence
+([policy that lives in the checkers](../agent/policy-in-code.md)).
+
+**Neither Tokyo nor Osaka appears in any CSP's pairs.** The situation for starting from Japan is set
+out in [the state of the Japanese Regions](#the-state-of-the-japanese-regions).
+
+### A different service under the same name — AWS Interconnect – last mile
+
+The same user guide carries `AWS Interconnect – last mile`. **It does not join two CSPs; it brings a
+carrier circuit to AWS.** It is offered with Lumen, from the New Jersey sites in us-east-1 to any AWS
+Region, or from anywhere in the continental United States over Lumen's fabric
 ([Regional Availability](https://docs.aws.amazon.com/interconnect/latest/userguide/region-availability.html)).
-**A pair that is not here cannot be built with this managed service.**
-
-| AWS Region | Target CSP and Region |
-|---|---|
-| us-east-1 (N. Virginia) | Google Cloud us-east4 (N. Virginia) |
-| us-west-1 (N. California) | Google Cloud us-west2 (Los Angeles) |
-| us-west-2 (Oregon) | Google Cloud us-west1 (Oregon) |
-| eu-west-2 (London) | Google Cloud europe-west2 (London) |
-| eu-central-1 (Frankfurt) | Google Cloud europe-west3 (Frankfurt) |
-| eu-north-1 (Stockholm) | Google Cloud europe-north2 (Stockholm) |
-| ap-southeast-1 (Singapore) | Google Cloud asia-southeast1 (Singapore) |
-| ap-southeast-2 (Sydney) | Google Cloud australia-southeast1 (Sydney) |
-| us-east-1 (N. Virginia) | OCI us-ashburn-1 (Ashburn) |
-
-**Neither Tokyo nor Osaka is included.** The situation for starting from Japan is set out in
-[the state of the Japanese Regions](#the-state-of-the-japanese-regions).
+Where the serve side sits at a site, it can form part of the path — but **the three ways above
+classify cloud-to-cloud constructions, which is a different axis, so it is not in those tables.** The
+stage is documented, and this repository has not measured the path.
 
 ## Google Cloud
 
@@ -220,41 +241,70 @@ supported FlexCache configurations are different claims.
 
 ### Connectivity options
 
-**Azure is not among the CSPs supported by AWS Interconnect – multicloud.** AWS's wording is
-"Microsoft Azure coming later in 2026", which is **neither GA nor Preview**
-([product page](https://aws.amazon.com/interconnect/multicloud/)).
+**Azure joined the CSPs supported by AWS Interconnect – multicloud in 2026-08, at Preview**
+([preview announcement](https://aws.amazon.com/about-aws/whats-new/2026/08/aws-announces-AWS-interconnect-multicloud-microsoft-azure-preview/);
+the [product page](https://aws.amazon.com/interconnect/multicloud/) now reads "Microsoft Azure
+(Preview)"). As with Google Cloud and OCI, **there is a counterpart managed service on the Azure
+side.**
 
 | Way | Option | Status |
 |---|---|---|
-| 1 Managed service | AWS Interconnect – multicloud | **Planned** (AWS's wording is "coming later in 2026"). Timing, Region pairs, pricing and feature differences are all unpublished |
+| 1 Managed service | AWS Interconnect – multicloud | **Preview**. The AWS Regions covered are us-east-1, us-west-1, eu-central-1 and ap-southeast-2, listed under [supported Region pairs](#supported-region-pairs). It can be created from the console, the CLI or the API |
+| 1 Managed service | Azure Multicloud Interconnect | The facing service, created from the Azure side. **The only sources found are Microsoft blogs; it is not in the Microsoft Learn reference** (below) |
 | 2 Partner route | ExpressRoute and Direct Connect joined inside an interconnection provider's fabric | Each service is documented. **This repository has not measured the combination.** Availability is decided by [overlapping locations](#partner-route-and-self-built-router) |
 
 **Way 2 is not a substitute for way 1.** The division of operational responsibility changes and the
 list of things to confirm grows. Which to take is in [how to choose](#how-to-choose).
 
-**Do not rewrite "planned" as "Preview".** Preview announcements exist for Google Cloud (2025-11) and
-OCI (2026-05); none was found for Azure.
+**Do not use a Preview as GA-strength evidence.** Region pairs, features and pricing can all change.
+AWS's preview announcement names four Regions but says nothing at this stage about bandwidth
+increments or an SLA.
+
+#### How weak the Azure Multicloud Interconnect sources are
+
+What was found on the Azure-side service is Microsoft's
+[Azure blog](https://azure.microsoft.com/en-us/blog/introducing-azure-multicloud-interconnect-for-aws/)
+and a [Tech Community post](https://techcommunity.microsoft.com/blog/azurenetworkingblog/simpler-private-connectivity-between-azure-and-aws-with-azure-multicloud-interco/4550556),
+and **no mention was found on Microsoft Learn's
+[Azure Networking Design Guide cross-cloud page](https://learn.microsoft.com/en-us/azure/networking/design-guide/cross-cloud).**
+The blogs state the following two things, neither corroborated by a reference.
+
+| What the blog states | How it is treated |
+|---|---|
+| Up to 100 Gbps at GA, with capacity expanding dynamically as demand grows | Blog only. It describes GA, not the Preview figure |
+| The private path extends as far as Azure Private Link | Blog only. This architecture does not make Azure-side storage the origin, so it does not bear on it directly |
+
+**A blog is not a substitute for a reference.** Where one is needed as a basis for design, confirm
+whether Microsoft Learn carries the material by the time of GA.
 
 ### The shape of the path
+
+**There are two paths.** The upper one is way 1 (Preview), the lower one way 2.
 
 ```mermaid
 flowchart LR
     ANF["Azure NetApp Files"] -. "unconfirmed<br/>not in the FlexCache table" .-> FSXN
     ANF --- VNET["Azure VNet"]
+    VNET --- IC["Managed service (Preview)<br/>AWS Interconnect – multicloud<br/>with Azure Multicloud Interconnect"]
+    IC --- AWSVPC["AWS VPC"]
     VNET --- ER["ExpressRoute"]
     ER --- FAB["Interconnection provider's<br/>fabric"]
     FAB --- DX["AWS Direct Connect"]
-    DX --- AWSVPC["AWS VPC"]
+    DX --- AWSVPC
     AWSVPC --- FSXN["FSx for ONTAP"]
 ```
 
 | Segment | Mechanism | Who configures it | Stage |
 |---|---|---|---|
 | Azure NetApp Files to Azure VNet | ANF's mount path | Customer | Documented by Microsoft |
-| Azure VNet to ExpressRoute | An ExpressRoute circuit and its connection | Customer | Documented |
-| ExpressRoute to Direct Connect | The cross-connect inside the interconnection provider's fabric | Customer and provider | Differs by provider. **unconfirmed in this repository** |
-| Direct Connect to AWS VPC | A virtual interface and a virtual private gateway / Transit Gateway | Customer | Documented |
+| Azure VNet to AWS VPC (way 1) | AWS Interconnect – multicloud with Azure Multicloud Interconnect | Both CSPs own the physical layer and the redundancy; the customer picks the CSP, the Region and the bandwidth | **Preview**. Four pairs |
+| Azure VNet to ExpressRoute (way 2) | An ExpressRoute circuit and its connection | Customer | Documented |
+| ExpressRoute to Direct Connect (way 2) | The cross-connect inside the interconnection provider's fabric | Customer and provider | Differs by provider. **unconfirmed in this repository** |
+| Direct Connect to AWS VPC (way 2) | A virtual interface and a virtual private gateway / Transit Gateway | Customer | Documented |
 | Azure NetApp Files to a FlexCache with FSx for ONTAP as cache | — | — | **unconfirmed**. The dashed edge above |
+
+**Way 1 reaching Preview does not change the dashed edge.** Network reachability and presence in the
+supported FlexCache configurations are different claims.
 
 ## Oracle Cloud Infrastructure (OCI)
 
@@ -325,14 +375,18 @@ repository uses for confidence in a claim ([verification status](verification-st
 
 ### Preview
 
-No AWS-to-other-CSP connectivity service was found to be at Preview at present. Google Cloud
-(preview announced 2025-11) and OCI (preview announced 2026-05) have both moved to GA.
+| Cloud | Connectivity service | Region pairs | Where it suits |
+|---|---|---|---|
+| Azure | AWS Interconnect – multicloud | Four pairs (us-east-1, us-west-1, eu-central-1, ap-southeast-2). None in Japan | Verification work that can absorb Preview changes. **Not a basis for a production design** |
+| Azure | Azure Multicloud Interconnect | The Azure side of the same path | The same, and additionally takes as its premise that it is **absent from the reference** |
+
+Google Cloud (preview announced 2025-11) and OCI (preview announced 2026-05) have both moved to GA;
+Azure is at the stage of a preview announcement made in 2026-08.
 
 ### Planned
 
-| Cloud | Connectivity service | Published wording | What is not published |
-|---|---|---|---|
-| Azure | AWS Interconnect – multicloud | "Microsoft Azure coming later in 2026" ([product page](https://aws.amazon.com/interconnect/multicloud/)) | Timing, Region pairs, pricing, feature differences |
+**None at present.** All three CSPs have reached Preview or beyond. This is where the next CSP goes
+when one is added.
 
 ## Partner route and self-built router
 
@@ -383,8 +437,8 @@ Oracle Interconnect for AWS is likewise us-ashburn-1 to us-east-1 only
 
 Connecting AWS privately to another cloud from the Japanese Regions means way 2 or way 3, and
 whether that is possible is decided by
-[the overlap of three locations](#what-decides-whether-it-can-be-used). Azure is outside way 1
-regardless of Region ([Microsoft Azure](#microsoft-azure)).
+[the overlap of three locations](#what-decides-whether-it-can-be-used). **Azure reaching Preview did
+not add a Japanese pair** (it covers us-east-1, us-west-1, eu-central-1 and ap-southeast-2).
 
 ## How to choose
 
@@ -399,9 +453,11 @@ regardless of Region ([Microsoft Azure](#microsoft-azure)).
    routing.
 3. **Where way 1 is available, compare within it.** Google Cloud has two managed services, differing
    in bandwidth increments and in which side can order. OCI has two, differing in how explicit the
-   encryption statement is.
-4. **Azure is outside way 1 at present.** It is way 2 or 3 regardless of Region. Designing around
-   waiting for the managed service takes as its premise that the timing is unpublished.
+   encryption statement is. Azure has two as well, both at Preview.
+4. **Do not conflate lifecycle with availability.** A pair being in the table and that pair being GA
+   are different things. Azure's four pairs are at Preview, so **presence in the table is not
+   GA-strength evidence.** Taking way 1 as a premise in production means either waiting for GA,
+   confining the impact to what a Preview change can be absorbed by, or building way 2 instead.
 
 **This architecture's own exclusion conditions belong here at the same granularity.** Even with
 connectivity in place, another cloud's file storage as the origin with FSx for ONTAP as the cache is
@@ -416,7 +472,8 @@ does not remove the need for the second.
 |---|---|---|---|
 | Physical link | MACsec (IEEE 802.1AE) | Between OCI FastConnect devices and AWS network devices on Oracle Interconnect for AWS ([Oracle](https://docs.oracle.com/iaas/Content/multicloud/interconnect-aws.htm)) | Documented |
 | Physical link | MACsec | Direct Connect 10 / 100 Gbps dedicated connections, at supported points of presence only ([AWS](https://docs.aws.amazon.com/directconnect/latest/UserGuide/MACsec.html)) | Documented |
-| Physical link | "Encryption of the physical connection" | AWS Interconnect – multicloud. **AWS's wording names no standard** ([product page](https://aws.amazon.com/interconnect/multicloud/)) | Documented |
+| Physical link | "Encryption of the physical connection" | AWS Interconnect – multicloud. **The product page names no standard** ([product page](https://aws.amazon.com/interconnect/multicloud/)) | Documented |
+| Physical link | MACsec | For the same service, **an AWS executive quoted on a Microsoft blog names MACsec** ([Azure blog](https://azure.microsoft.com/en-us/blog/introducing-azure-multicloud-interconnect-for-aws/)) | **The only source is a blog quotation.** Not corroborated in the service documentation |
 | ONTAP traffic | Cluster peering encryption. ONTAP 9.6 or later, TLS 1.2 AES-256 GCM, pre-shared key (PSK) | **SnapMirror, SnapVault, FlexCache** ([NetApp](https://docs.netapp.com/us-en/ontap-technical-reports/ontap-security-hardening/data-replication-encryption.html)) | Documented |
 | ONTAP traffic | IPsec. ONTAP 9.8 or later | IP traffic generally, between a client and an SVM. **NetApp recommends TLS over IPsec for SnapMirror and cluster peering** ([NetApp](https://docs.netapp.com/us-en/ontap/networking/ipsec-prepare.html)) | Documented |
 
@@ -488,6 +545,8 @@ environment and the procedure stated alongside.
 | A FlexCache with Azure NetApp Files as origin and FSx for ONTAP as cache | unconfirmed | The same, including whether ANF exposes cluster peering externally |
 | A FlexCache with FSx for ONTAP as origin and Google Cloud NetApp Volumes / Azure NetApp Files as cache | unconfirmed (already in [verification status](verification-status.md)) | The same |
 | Cluster peering over a partner route (Direct Connect, the provider's fabric, the other cloud's circuit) | unconfirmed | Reachability on real equipment, and a FlexCache read with the MTU aligned |
+| Cluster peering over AWS Interconnect – multicloud, and a FlexCache read over that path | unconfirmed | Reachability on real equipment. **No Japanese pair exists, so measuring it means building an environment in a Region that is paired** |
+| Azure Multicloud Interconnect's bandwidth, SLA and pricing | unconfirmed | The material appearing in the Microsoft Learn reference. The blog figures describe GA, not Preview |
 | Time to visibility over a remote or high-latency path | unverified (already in [verification status](verification-status.md)) | A measurement with the environment stated |
 | Cost per unit of bandwidth on each path | not measured | An account that separates a sample run from a production estimate |
 

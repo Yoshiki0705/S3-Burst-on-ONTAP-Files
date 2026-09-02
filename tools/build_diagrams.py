@@ -508,6 +508,13 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "1 管理サービス — 対応リージョンのペアで決まる",
         "en": "1 Managed service - decided by the Region pairs",
     },
+    # Azure reaches the managed frame too, but at Preview. The lifecycle rides on the edge label
+    # rather than on the frame, because the frame holds three CSPs at two different lifecycles and a
+    # frame-level label would flatten them into one.
+    "private_path_preview": {
+        "ja": "private 接続（Preview）",
+        "en": "private connectivity (Preview)",
+    },
     "partner_way": {
         "ja": "2 パートナー経由 — ロケーションの重なりで決まる",
         "en": "2 Partner route - decided by overlapping locations",
@@ -573,10 +580,12 @@ LABELS: dict[str, dict[str, str]] = {
                 ),
                 (
                     "※4",
-                    "対応状況（2026-08-27 時点）",
-                    "AWS Interconnect – multicloud は GA。Google Cloud は 8 ペア、"
-                    "OCI は us-east-1 ↔ us-ashburn-1 の 1 ペアで、東京・大阪はいずれも対象外。"
-                    "Azure は「予定」であり GA でも Preview でもない",
+                    "対応状況（2026-09-02 時点）",
+                    "AWS Interconnect – multicloud は Google Cloud（8 ペア）と "
+                    "OCI（us-east-1 ↔ us-ashburn-1 の 1 ペア）で GA、"
+                    "Azure は 2026-08 から Preview で 4 ペア。"
+                    "東京・大阪はどの CSP のペアにも含まれない。"
+                    "Preview のペアと機能は変更されうるので GA と同じ根拠にしない",
                 ),
                 (
                     "※5",
@@ -622,10 +631,11 @@ LABELS: dict[str, dict[str, str]] = {
                 ),
                 (
                     "*4",
-                    "Status as at 2026-08-27",
-                    "AWS Interconnect - multicloud is GA: eight pairs for Google Cloud, one pair "
-                    "for OCI (us-east-1 to us-ashburn-1), and no Japanese Region in either. Azure "
-                    "is stated as planned, which is neither GA nor Preview",
+                    "Status as at 2026-09-02",
+                    "AWS Interconnect - multicloud is GA for Google Cloud (eight pairs) and OCI "
+                    "(one pair, us-east-1 to us-ashburn-1), and at Preview for Azure since 2026-08 "
+                    "with four pairs. No Japanese Region appears in any CSP's pairs. A Preview's "
+                    "pairs and features can change, so it is not GA-strength evidence",
                 ),
                 (
                     "*5",
@@ -967,12 +977,26 @@ def _cross_cloud() -> Diagram:
             Edge("x1", "gcnv_n", "gcp_net"),
             Edge("x2", "anf_n", "azure_net"),
             Edge("x3", "oci_fs", "oci_net"),
-            # Which way each cloud can use today. Google Cloud and OCI have a managed service at GA;
-            # Azure has only the partner route, because it is not yet a supported CSP. Sending OCI to
-            # the partner frame would have said the opposite of what its GA status says.
+            # Which way each cloud can use today. Google Cloud and OCI have a managed service at GA.
+            # Azure has both: a managed service at Preview since 2026-08, and the partner route it
+            # had before that. Two edges rather than one, because dropping the partner route once
+            # Preview arrived would have said a Preview is a substitute for a GA path, and dropping
+            # the Preview edge would have kept saying Azure is outside way 1, which it no longer is.
             Edge("x4", "gcp_net", "managed", "private_path"),
             Edge("x5", "oci_net", "managed", "private_path"),
             Edge("x6", "azure_net", "partner", "private_path"),
+            # Enters the managed frame on its left edge, not its bottom. Left to itself, draw.io
+            # routes this one straight up the middle of the column: through the partner frame, over
+            # the Direct Connect icon, and with its label landing on top of the fabric caption. The
+            # picture then says Azure's managed path runs through the partner route, which is the one
+            # thing this figure is careful not to say.
+            Edge(
+                "x6b",
+                "azure_net",
+                "managed",
+                "private_path_preview",
+                entry_at=(0.0, 0.85),
+            ),
             Edge("x7", "managed", "aws_vpc_f"),
             Edge("x8", "partner", "aws_vpc_f"),
             Edge("x9", "s3ap_n", "fsx_n"),

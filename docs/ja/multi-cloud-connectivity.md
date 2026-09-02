@@ -79,13 +79,14 @@ flowchart LR
 
 | クラウド | ストレージ | 自クラウド側 | 現在取れる分類 | 接続サービス |
 |---|---|---|---|---|
-| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 管理サービス | AWS Interconnect – multicloud（GA、8 ペア）または Partner Cross-Cloud Interconnect for AWS |
-| OCI | OCI File Storage | OCI VCN | 1 管理サービス | AWS Interconnect – multicloud（GA、1 ペア）または Oracle Interconnect for AWS |
-| Azure | Azure NetApp Files | Azure VNet | 2 パートナー経由のみ | ExpressRoute と Direct Connect を相互接続プロバイダのファブリックで結ぶ |
+| Google Cloud | Google Cloud NetApp Volumes | Google Cloud VPC | 1 管理サービス（GA） | AWS Interconnect – multicloud（GA、8 ペア）または Partner Cross-Cloud Interconnect for AWS |
+| OCI | OCI File Storage | OCI VCN | 1 管理サービス（GA） | AWS Interconnect – multicloud（GA、1 ペア）または Oracle Interconnect for AWS |
+| Azure | Azure NetApp Files | Azure VNet | 1 管理サービス（**Preview**）または 2 パートナー経由 | AWS Interconnect – multicloud（Preview、4 ペア）と Azure Multicloud Interconnect、または ExpressRoute と Direct Connect を相互接続プロバイダのファブリックで結ぶ |
 
 **表の「現在取れる分類」は、そのクラウドで分類 1 が使えるかどうかを示すものである。**
-Google Cloud と OCI も分類 2 で作ることはできる。逆に Azure は分類 1 の対象外なので、
-リージョンによらず分類 2 か 3 になる。
+3 クラウドとも分類 2 で作ることはできる。**Azure だけライフサイクルが Preview であり、
+GA の 2 つと同じ扱いにしない。** Preview の対応ペアと機能は変更されうるため、
+本番の設計を Preview の挙動に依存させる場合はそれが前提になる。
 
 図中のアイコンについて。Azure NetApp Files は Microsoft の
 [Azure architecture icons](https://learn.microsoft.com/ja-jp/azure/architecture/icons/)を使い、
@@ -107,7 +108,7 @@ AWS が Amazon VPC と他 CSP の環境の間に private な L3 接続を提供�
 | 作成手順 | 相手 CSP、相手側リージョン、必要帯域の 3 つを指定する。完了すると容量を表す attachment が 1 つ払い出される | [製品ページ](https://aws.amazon.com/interconnect/multicloud/) |
 | 帯域変更 | 接続を作り直さずに属性の変更で増減できる | 同上 |
 | 冗長性 | 4 経路の冗長性が組み込まれている | 同上 |
-| 暗号化 | AWS ルータと相手 CSP ルータの間の**物理接続を暗号化する**。AWS の記述はこの文言で、規格名を挙げていない | 同上 |
+| 暗号化 | AWS ルータと相手 CSP ルータの間の**物理接続を暗号化する**。製品ページの記述はこの文言で、規格名を挙げていない。MACsec を名指しした発言はブログの引用にしかない（[暗号化の層の差](#暗号化--物理リンクと-flexcache-トラフィックの層の差)） | 同上 |
 | 接続先の AWS ネットワークサービス | Amazon VPC、AWS Transit Gateway、AWS Cloud WAN | 同上 |
 | Transit Gateway / virtual private gateway の制約 | どちらもリージョン単位のサービスで、**そのリージョンを担当する interconnection point の multicloud Interconnect とだけ使える** | [Getting started](https://docs.aws.amazon.com/interconnect/latest/userguide/getting-started.html) |
 | Cloud WAN の扱い | global なサービスで、どのリージョンの Interconnect にも到達できる | 同上 |
@@ -119,23 +120,42 @@ Transit Gateway では届かず Cloud WAN が必要になる。
 ### 対応リージョンのペア
 
 AWS が公開している対応ペアは次のとおりである
+（[Regional Availability](https://docs.aws.amazon.com/interconnect/latest/userguide/region-availability.html)、
+2026-09-02 取得）。**ここに無いペアは、この管理サービスでは作れない。**
+右列は CSP ごとのライフサイクルで、**Preview の行を GA の行と同じ扱いにしない。**
+
+| AWS リージョン | 相手側 CSP とリージョン | ライフサイクル |
+|---|---|---|
+| us-east-1（バージニア北部） | Google Cloud us-east4（バージニア北部） | GA |
+| us-west-1（北カリフォルニア） | Google Cloud us-west2（ロサンゼルス） | GA |
+| us-west-2（オレゴン） | Google Cloud us-west1（オレゴン） | GA |
+| eu-west-2（ロンドン） | Google Cloud europe-west2（ロンドン） | GA |
+| eu-central-1（フランクフルト） | Google Cloud europe-west3（フランクフルト） | GA |
+| eu-north-1（ストックホルム） | Google Cloud europe-north2（ストックホルム） | GA |
+| ap-southeast-1（シンガポール） | Google Cloud asia-southeast1（シンガポール） | GA |
+| ap-southeast-2（シドニー） | Google Cloud australia-southeast1（シドニー） | GA |
+| us-east-1（バージニア北部） | Azure eastus（米国東部） | Preview |
+| us-west-1（北カリフォルニア） | Azure westus（米国西部） | Preview |
+| eu-central-1（フランクフルト） | Azure germanywestcentral（ドイツ中西部） | Preview |
+| ap-southeast-2（シドニー） | Azure australiaeast（オーストラリア東部） | Preview |
+| us-east-1（バージニア北部） | OCI us-ashburn-1（アッシュバーン） | GA |
+
+**この表は人手で維持しない。** `make interconnect-regions` が上記ページを取得して日本語版・英語版の
+両方の表と突き合わせ、食い違いがあれば失敗する。取得できなかった場合は「差分なし」ではなく
+**取得できなかったこととして失敗する**（[検査ツール側の規約](../agent/policy-in-code.md)）。
+
+**`ap-northeast-1`（東京）と `ap-northeast-3`（大阪）は、どの CSP のペアにも含まれていない。**
+日本を起点にする場合の現状は[日本リージョンの現状](#日本リージョンの現状)にまとめた。
+
+### 同名の別サービス — AWS Interconnect – last mile
+
+同じユーザーガイドに `AWS Interconnect – last mile` がある。**これは CSP 間を結ぶものではなく、
+事業者回線を AWS に引くサービスである。** Lumen との提供で、us-east-1 のニュージャージー拠点から
+任意の AWS リージョンへ、または米国本土内から Lumen のファブリック経由で接続する
 （[Regional Availability](https://docs.aws.amazon.com/interconnect/latest/userguide/region-availability.html)）。
-**ここに無いペアは、この管理サービスでは作れない。**
-
-| AWS リージョン | 相手側 CSP とリージョン |
-|---|---|
-| us-east-1（バージニア北部） | Google Cloud us-east4（バージニア北部） |
-| us-west-1（北カリフォルニア） | Google Cloud us-west2（ロサンゼルス） |
-| us-west-2（オレゴン） | Google Cloud us-west1（オレゴン） |
-| eu-west-2（ロンドン） | Google Cloud europe-west2（ロンドン） |
-| eu-central-1（フランクフルト） | Google Cloud europe-west3（フランクフルト） |
-| eu-north-1（ストックホルム） | Google Cloud europe-north2（ストックホルム） |
-| ap-southeast-1（シンガポール） | Google Cloud asia-southeast1（シンガポール） |
-| ap-southeast-2（シドニー） | Google Cloud australia-southeast1（シドニー） |
-| us-east-1（バージニア北部） | OCI us-ashburn-1（アッシュバーン） |
-
-**`ap-northeast-1`（東京）と `ap-northeast-3`（大阪）は含まれていない。** 日本を起点にする場合の
-現状は[日本リージョンの現状](#日本リージョンの現状)にまとめた。
+配布側が拠点にあるこの構成では経路の一部になりうるが、**上の 3 分類は cloud-to-cloud の作り方の
+分類であり、軸が違うので分類の表には入れない。** 段階はドキュメント記載で、当リポジトリは
+この経路を実測していない。
 
 ## Google Cloud
 
@@ -209,41 +229,68 @@ FlexCache の対応構成に載っていることは別である。
 
 ### 接続の選択肢
 
-**Azure は AWS Interconnect – multicloud の対応 CSP に含まれていない。** AWS の記述は
-"Microsoft Azure coming later in 2026" であり、**GA でも Preview でもない**
-（[製品ページ](https://aws.amazon.com/interconnect/multicloud/)）。
+**Azure は 2026-08 に AWS Interconnect – multicloud の対応 CSP に加わり、Preview になった**
+（[preview 告知](https://aws.amazon.com/about-aws/whats-new/2026/08/aws-announces-AWS-interconnect-multicloud-microsoft-azure-preview/)、
+[製品ページ](https://aws.amazon.com/interconnect/multicloud/)の表記は "Microsoft Azure (Preview)"）。
+Google Cloud と OCI と同じく、**Azure 側にも対になる管理サービスがある。**
 
 | 分類 | 選択肢 | 状況 |
 |---|---|---|
-| 1 管理サービス | AWS Interconnect – multicloud | **予定**（AWS の文言は "coming later in 2026"）。提供時期・対応リージョンのペア・料金・機能差はいずれも公開されていない |
+| 1 管理サービス | AWS Interconnect – multicloud | **Preview**。対応する AWS リージョンは us-east-1、us-west-1、eu-central-1、ap-southeast-2 の 4 つで、[対応リージョンのペア](#対応リージョンのペア)にある。コンソール・CLI・API のいずれからも作成できる |
+| 1 管理サービス | Azure Multicloud Interconnect | Azure 側から作る対向のサービス。**出典が Microsoft のブログのみで、Microsoft Learn のリファレンスには未記載**（下記） |
 | 2 パートナー経由 | ExpressRoute と Direct Connect を相互接続プロバイダのファブリックで結ぶ | 各サービスはドキュメント記載。**この組み合わせを当リポジトリは実測していない**。可否は[ロケーションの重なり](#パートナー経由と自前ルータ)で決まる |
 
 **分類 2 は分類 1 の代わりに使えるという意味ではない。** 運用の責任分担が変わり、確認する項目も
 増える。どちらを採るかは[選び方](#選び方)にある。
 
-**「予定」を「Preview」と書き換えない。** Preview の告知は Google Cloud（2025-11）と OCI（2026-05）に
-ついては存在するが、Azure については見つけられていない。
+**Preview を GA と同じ根拠にしない。** 対応ペア・機能・料金はいずれも変更されうる。AWS の
+preview 告知は対応リージョンを 4 つ挙げているが、帯域の刻みと SLA についてはこの段階では
+述べていない。
+
+#### Azure Multicloud Interconnect の出典の弱さ
+
+Azure 側のサービスについて見つけられた記述は Microsoft の
+[Azure blog](https://azure.microsoft.com/en-us/blog/introducing-azure-multicloud-interconnect-for-aws/) と
+[Tech Community の記事](https://techcommunity.microsoft.com/blog/azurenetworkingblog/simpler-private-connectivity-between-azure-and-aws-with-azure-multicloud-interco/4550556)で、
+**Microsoft Learn の [Azure Networking Design Guide の cross-cloud ページ](https://learn.microsoft.com/en-us/azure/networking/design-guide/cross-cloud)には
+記載を見つけられていない。** ブログにある記述は次の 2 点だが、リファレンスで裏を取れていない。
+
+| ブログの記述 | 扱い |
+|---|---|
+| GA 時点で最大 100 Gbps、需要に応じて容量を動的に拡張できる | ブログのみ。GA 時点の話であり、Preview の値ではない |
+| Azure Private Link まで private な経路が延びる | ブログのみ。この構成は Azure 側のストレージを Origin にしないため、直接は効かない |
+
+**ブログはリファレンスの代わりにならない。** 設計の根拠にする場合は、GA 時点で Microsoft Learn
+側に記載が現れるかを確認すること。
 
 ### 経路の形
+
+**経路が 2 通りある。** 上が分類 1（Preview）、下が分類 2 である。
 
 ```mermaid
 flowchart LR
     ANF["Azure NetApp Files"] -. "未確認<br/>FlexCache 対応構成表に記載なし" .-> FSXN
     ANF --- VNET["Azure VNet"]
+    VNET --- IC["管理サービス（Preview）<br/>AWS Interconnect – multicloud<br/>と Azure Multicloud Interconnect"]
+    IC --- AWSVPC["AWS VPC"]
     VNET --- ER["ExpressRoute"]
     ER --- FAB["相互接続プロバイダの<br/>ファブリック"]
     FAB --- DX["AWS Direct Connect"]
-    DX --- AWSVPC["AWS VPC"]
+    DX --- AWSVPC
     AWSVPC --- FSXN["FSx for ONTAP"]
 ```
 
 | 区間 | 機構 | 誰が設定するか | 段階 |
 |---|---|---|---|
 | Azure NetApp Files ↔ Azure VNet | ANF のマウント経路 | 利用者 | Microsoft のドキュメント記載 |
-| Azure VNet ↔ ExpressRoute | ExpressRoute 回線と接続 | 利用者 | ドキュメント記載 |
-| ExpressRoute ↔ Direct Connect | 相互接続プロバイダのファブリック内での相互接続 | 利用者とプロバイダ | プロバイダごとに異なる。**当リポジトリでは未確認** |
-| Direct Connect ↔ AWS VPC | virtual interface と virtual private gateway / Transit Gateway | 利用者 | ドキュメント記載 |
+| Azure VNet ↔ AWS VPC（分類 1） | AWS Interconnect – multicloud と Azure Multicloud Interconnect | 両 CSP が物理と冗長性を持ち、利用者は相手 CSP・リージョン・帯域を選ぶ | **Preview**。4 ペア |
+| Azure VNet ↔ ExpressRoute（分類 2） | ExpressRoute 回線と接続 | 利用者 | ドキュメント記載 |
+| ExpressRoute ↔ Direct Connect（分類 2） | 相互接続プロバイダのファブリック内での相互接続 | 利用者とプロバイダ | プロバイダごとに異なる。**当リポジトリでは未確認** |
+| Direct Connect ↔ AWS VPC（分類 2） | virtual interface と virtual private gateway / Transit Gateway | 利用者 | ドキュメント記載 |
 | Azure NetApp Files → FSx for ONTAP を Cache とする FlexCache | — | — | **未確認**。上の破線 |
+
+**分類 1 が Preview になっても破線は変わらない。** ネットワークが到達することと、FlexCache の
+対応構成に載っていることは別である。
 
 ## Oracle Cloud Infrastructure (OCI)
 
@@ -313,14 +360,18 @@ Direct Connect と ExpressRoute / Cloud Interconnect / FastConnect は分類 2 �
 
 ### Preview
 
-現時点で Preview 段階にある AWS ↔ 他 CSP の接続サービスは見つけられていない。Google Cloud
-（2025-11 に preview 告知）と OCI（2026-05 に preview 告知）はいずれも GA へ移行している。
+| クラウド | 接続サービス | 対応リージョンのペア | 適する場面 |
+|---|---|---|---|
+| Azure | AWS Interconnect – multicloud | 4 組（us-east-1、us-west-1、eu-central-1、ap-southeast-2）。日本を含まない | Preview の変更を受け入れられる検証目的。**本番の設計根拠にはしない** |
+| Azure | Azure Multicloud Interconnect | 上と同じ経路の Azure 側 | 同上。加えて**リファレンスに未記載**であることが前提になる |
+
+Google Cloud（2025-11 に preview 告知）と OCI（2026-05 に preview 告知）はいずれも GA へ移行済みで、
+Azure は 2026-08 に preview 告知が出た段階である。
 
 ### 予定
 
-| クラウド | 接続サービス | 公開されている文言 | 公開されていないこと |
-|---|---|---|---|
-| Azure | AWS Interconnect – multicloud | "Microsoft Azure coming later in 2026"（[製品ページ](https://aws.amazon.com/interconnect/multicloud/)） | 提供時期、対応リージョンのペア、料金、機能差 |
+**現時点で該当なし。** 3 つの CSP はいずれも Preview 以上に達している。次の CSP が加わったときに
+ここへ戻す。
 
 ## パートナー経由と自前ルータ
 
@@ -369,8 +420,8 @@ Oracle Interconnect for AWS も us-ashburn-1 ↔ us-east-1 のみである
 **これは分類 1 についての事実である。**
 
 日本の東西で AWS と他クラウドを private につなぐ場合は分類 2 または 3 になり、その可否は
-[3 つのロケーションの重なり](#使えるかを決めるもの)で決まる。Azure はリージョンによらず
-分類 1 の対象外である（[Microsoft Azure](#microsoft-azure)）。
+[3 つのロケーションの重なり](#使えるかを決めるもの)で決まる。**Azure が Preview に上がっても
+日本のペアは増えていない**（対応は us-east-1、us-west-1、eu-central-1、ap-southeast-2）。
 
 ## 選び方
 
@@ -384,8 +435,11 @@ Oracle Interconnect for AWS も us-ashburn-1 ↔ us-east-1 のみである
    ロケーション・プロバイダの拠点で決まる。経路とルーティングの責任は利用者が持つ。
 3. **分類 1 が使える場合に、その中で比べる。** Google Cloud は AWS 側と Google 側の 2 つの
    管理サービスがあり、帯域の刻みと発注の向きが違う。OCI は 2 つあり、暗号化の記述の明示度が違う。
-4. **Azure は現時点で分類 1 の対象外である。** リージョンによらず分類 2 または 3 になる。
-   管理サービスを待つ設計にする場合、提供時期が公開されていないことが前提になる。
+   Azure も 2 つあるが、どちらも Preview である。
+4. **ライフサイクルを可否と混ぜない。** ペアが表にあることと、そのペアが GA であることは別で
+   ある。Azure の 4 ペアは Preview なので、**表にあることを GA と同じ根拠として扱わない。**
+   本番で分類 1 を前提にするなら、GA まで待つか、Preview の変更を受け入れられる範囲に
+   影響を閉じるか、分類 2 で作るかのいずれかになる。
 
 **この構成側の除外条件も同じ粒度で挙げる。** 接続がつながっても、他クラウドのファイルストレージを
 Origin として FSx for ONTAP を Cache にする構成は未確認である。ネットワークの選択は、その未確認を
@@ -400,7 +454,8 @@ Origin として FSx for ONTAP を Cache にする構成は未確認である。
 |---|---|---|---|
 | 物理リンク | MACsec (IEEE 802.1AE) | Oracle Interconnect for AWS の OCI FastConnect デバイスと AWS ネットワークデバイスの間（[Oracle](https://docs.oracle.com/iaas/Content/multicloud/interconnect-aws.htm)） | ドキュメント記載 |
 | 物理リンク | MACsec | Direct Connect の 10 / 100 Gbps 専用接続、対応 PoP のみ（[AWS](https://docs.aws.amazon.com/directconnect/latest/UserGuide/MACsec.html)） | ドキュメント記載 |
-| 物理リンク | 「物理接続の暗号化」 | AWS Interconnect – multicloud。**AWS の記述は規格名を挙げていない**（[製品ページ](https://aws.amazon.com/interconnect/multicloud/)） | ドキュメント記載 |
+| 物理リンク | 「物理接続の暗号化」 | AWS Interconnect – multicloud。**製品ページの本文は規格名を挙げていない**（[製品ページ](https://aws.amazon.com/interconnect/multicloud/)） | ドキュメント記載 |
+| 物理リンク | MACsec | 同じサービスについて、**Microsoft のブログに載った AWS 側の役員の発言が MACsec を名指ししている**（[Azure blog](https://azure.microsoft.com/en-us/blog/introducing-azure-multicloud-interconnect-for-aws/)） | **出典はブログの引用のみ**。サービスのドキュメントで裏を取れていない |
 | ONTAP のトラフィック | cluster peering encryption。ONTAP 9.6 以降、TLS 1.2 AES-256 GCM、事前共有鍵 (PSK) | **SnapMirror、SnapVault、FlexCache**（[NetApp](https://docs.netapp.com/us-en/ontap-technical-reports/ontap-security-hardening/data-replication-encryption.html)） | ドキュメント記載 |
 | ONTAP のトラフィック | IPsec。ONTAP 9.8 以降 | クライアントと SVM の間の IP トラフィック全般。**NetApp は SnapMirror と cluster peering には TLS を推奨している**（[NetApp](https://docs.netapp.com/us-en/ontap/networking/ipsec-prepare.html)） | ドキュメント記載 |
 
@@ -468,6 +523,8 @@ MTU の不一致で起きるのは接続失敗ではなく、小さな読み取�
 | Azure NetApp Files を Origin、FSx for ONTAP を Cache とする FlexCache | 未確認 | 同上。ANF 側がクラスタピアリングを外部に提供するかを含む |
 | FSx for ONTAP を Origin、Google Cloud NetApp Volumes / Azure NetApp Files を Cache とする FlexCache | 未確認（[検証状況](verification-status.md)に既出） | 同上 |
 | パートナー経由（Direct Connect + プロバイダのファブリック + 相手クラウドの専用線）でのクラスタピアリング成立 | 未確認 | 実機での疎通と、MTU をそろえた状態での FlexCache 読み取り |
+| AWS Interconnect – multicloud 経由でのクラスタピアリング成立と、その経路での FlexCache 読み取り | 未確認 | 実機での疎通。**対応ペアに日本が無いため、測定するなら対応ペアのリージョンに環境を作る必要がある** |
+| Azure Multicloud Interconnect の帯域・SLA・料金 | 未確認 | Microsoft Learn 側のリファレンスに記載が現れること。ブログの数値は GA 時点の話で Preview の値ではない |
 | 遠隔・高レイテンシ経路での可視化までの所要時間 | 未検証（[検証状況](verification-status.md)に既出） | 環境を併記した測定 |
 | 各経路の帯域あたり料金 | 未計測 | サンプル実行と本番見積りを分けた記載 |
 

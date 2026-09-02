@@ -6,7 +6,7 @@ PY ?= python3
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync \
-        audit secrets pinning zizmor links links-external budget en-lang xlang counts \
+        audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
         terraform finops finops-write sg-descriptions \
@@ -208,6 +208,11 @@ links: ## Check internal link resolution
 
 links-external: ## Check internal + external links (network required)
 	@$(PY) tools/check_links.py --external
+# Deliberately outside `all`. It reads someone else's page, so it would make the commit gate depend
+# on the network and turn red on a pull request that changed nothing. Scheduled weekly instead,
+# alongside link-rot, for the same reason.
+interconnect-regions: ## Compare the Interconnect Region pairs against AWS's page (network required)
+	@$(PY) tools/check_interconnect_regions.py
 
 budget: ## AGENTS.md size budget and steering loader reachability
 	@$(PY) tools/check_agent_context_budget.py

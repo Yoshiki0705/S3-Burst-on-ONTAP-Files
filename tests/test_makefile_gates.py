@@ -46,6 +46,11 @@ NOT_IN_ALL = {
     # fail for a missing download. It is a local check, run alongside `diagrams`.
     "diagrams-check",
     "links-external",  # needs a network
+    # Needs a network, and compares against a page AWS owns. In the aggregate it would turn the
+    # commit gate red on a pull request that changed nothing, which is the failure that teaches
+    # contributors to ignore red. Scheduled weekly in `interconnect-regions.yml` instead, and the CI
+    # parity assertions below expect it to appear in a workflow rather than in `all`.
+    "interconnect-regions",
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate
     # Takes a pull request number and queries the API. It answers a question about a commit that
