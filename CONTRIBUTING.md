@@ -61,6 +61,13 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 **プルリクエストでは落としません。** 外部サイトの都合で赤くなる検査は、無関係な変更のときに
 赤を無視する習慣を作るためです。手元で確かめるなら `make links-external`（ネットワークが必要）。
 
+`make interconnect-regions` も同じ扱いです。[他クラウドとの接続経路](docs/ja/multi-cloud-connectivity.md)の
+対応リージョンのペアと CSP ごとのライフサイクルを AWS のページと突き合わせ、毎週
+`.github/workflows/interconnect-regions.yml` が回して差分を Issue に報告します。**ペアの表を
+手で書き換えないでください。**AWS 側が正で、日本語版と英語版を同じコミットで直します。
+**取得できなかった場合は「差分なし」ではなく取得失敗として落ちます**（理由は
+[検査ツール側にある規約](docs/agent/policy-in-code.md)）。
+
 ## ドキュメントの書き方
 
 - 日本語が原文です。英語は Tier 1（ハブと `docs/i18n-manifest.txt` に列挙したもの）だけ訳します。
@@ -91,6 +98,10 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 [検証状況](docs/ja/verification-status.md)の 4 段階（検証済み / ドキュメント記載 / 未検証 /
 未確認）を使います。「ドキュメントに記載がある」を「動く」として引用しないでください。
 未確認は「できない」ではありません。段階を下げるのは自由で、上げるときだけ根拠が必要です。
+
+**段階が動いたら [CHANGELOG.md](CHANGELOG.md) に書きます。下げたときも書きます。** 前の版を読んで
+設計した人には、どの主張が動いたかが要るためです。下げたほうがより重要で、「もう依拠しないで
+ください」という通知になります。
 
 ### 比較を書くとき
 
@@ -251,7 +262,8 @@ chore:    その他
    同じ規則を、CI の結果にも適用します
 2. 未解決のレビューコメントがない
 3. 挙動が変わったならドキュメントを更新している
-4. [AGENTS.md](AGENTS.md) の 4 軸セルフレビューを済ませている
+4. 主張の段階が動いたなら [CHANGELOG.md](CHANGELOG.md) に記録している
+5. [AGENTS.md](AGENTS.md) の 4 軸セルフレビューを済ませている
 
 ## ライセンス
 

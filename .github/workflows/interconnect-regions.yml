@@ -1,0 +1,71 @@
+name: interconnect-regions
+# The AWS Interconnect - multicloud Region pairs and their per-CSP lifecycle are facts this
+# repository restates and does not own. They moved once already without anyone touching a file: Azure
+# went from "coming later in 2026" to Preview with four pairs while four separate statements here kept
+# saying it was neither GA nor Preview. Nothing in the commit gate reads another party's page, so
+# nothing could have caught it.
+#
+# Scheduled rather than run on a pull request, and reported rather than blocking, for the same reason
+# as link-rot.yml: the change that trips it is someone else's. A gate that can turn red on an
+# unrelated pull request teaches contributors to ignore red.
+on:
+  schedule:
+    # Mondays, 21:20 UTC. Twenty minutes after link-rot so the two do not contend for the same
+    # scheduled-job slot, and away from midnight UTC where GitHub's queue is busiest and a run can be
+    # delayed or dropped.
+    - cron: '20 21 * * 1'
+  workflow_dispatch:
+# Read-only at the workflow level; the one job that files the report widens it for itself.
+permissions:
+  contents: read
+concurrency:
+  group: interconnect-regions
+  cancel-in-progress: false
+jobs:
+  region-pairs:
+    name: Region pairs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed to file the report. Nothing here consumes untrusted input: the run is scheduled, so
+      # there is no pull-request body or branch name to interpolate, and the issue body is the
+      # checker's own output passed through an environment variable.
+      #
+      # zizmor wants that as a trailing comment on the line, where it does not fit. Same reasoning as
+      # link-rot.yml.
+      issues: write # zizmor: ignore[undocumented-permissions]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+      - name: Compare Region pairs against AWS
+        id: compare
+        run: |
+          set -o pipefail
+          python3 tools/check_interconnect_regions.py 2>&1 | tee /tmp/interconnect-report.txt
+      - name: Report divergence
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Interconnect Region pairs diverge from AWS'
+          # One open issue at a time, matched by title rather than by label: a label has to exist
+          # before it can be used, and `gh issue create` fails outright on an unknown one. Without
+          # the dedupe, a CSP added to the page opens a fresh issue every Monday until someone acts.
+          existing=$(gh issue list --repo "$REPO" --state open --search "$title in:title" \
+            --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          body=$(printf 'The scheduled Region-pair check disagrees with AWS, or could not read the page.\n\n%s\n\n```\n%s\n```\n\nThe two failures are not the same. A divergence means the tables need correcting in both languages, along with the pair counts and lifecycle stated in the prose around them. A retrieval or parse failure means the page moved or its markup changed, and nothing has been asserted about the documents until the parser is fixed.\n' \
+            "$RUN_URL" "$(tail -c 40000 /tmp/interconnect-report.txt)")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
