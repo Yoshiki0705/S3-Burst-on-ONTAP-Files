@@ -103,13 +103,13 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
   結合されることと、`Allow` だけでは絞れないことは
   [AWS のドキュメント記載](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)であり、
   そのとおりになることを確かめた[実測記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)がある。
-  Layer 2 が絞り込みを担うことの[対測定](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--ファイルシステム側の権限が絞り込みを担う)も同じ記録にある
+  Layer 2 が絞り込みを担うことの[対測定](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--絞り込みを担うファイルシステム側の権限)も同じ記録にある
 - **集約すると監査でも主体が 1 つに潰れる。** ONTAP のファイルアクセス監査に残るのはアクセスポイントに
   固定した識別情報の SID だけで、`SubjectUserName` と `SubjectDomainName` は `Not Present`、
   `SubjectIP` は AWS のサービス側アドレスである（1 クライアントの連続 2 リクエストで別の値になった）。
   呼び出し元の特定には AWS CloudTrail との突き合わせが要る。**ファイル単位の操作を主体別に追跡する
   要件があるなら、アクセスポイントの分割が監査の粒度を決める。** 分割は実測ではなく、
-  この実測から導かれる設計上の帰結である（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログには誰が記録されるか)。追えないものの一覧は
+  この実測から導かれる設計上の帰結である（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログに記録される主体)。追えないものの一覧は
   [上限値](reference/limits/s3-access-point.md#監査で追えるものと追えないもの)）
 - 読み取りの局所化。必要な範囲だけを利用拠点に持ち込む
 - 収集層を別のプラットフォームに置き換えても、配布層の設計が変わらない
