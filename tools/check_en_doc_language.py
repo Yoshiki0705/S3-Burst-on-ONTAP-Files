@@ -60,7 +60,31 @@ BY_DESIGN_FILES: dict[str, re.Pattern[str]] = {}
 
 # Links into Japanese documents that have no English counterpart. Each entry is a reader who
 # leaves English by following a link whose own text is in English.
-ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {}
+ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
+    # The throughput / IOPS / concurrency record is Japanese-only by the Tier 2 policy: it is a
+    # measurement record, not a page a reader follows while creating billable resources. English
+    # documents that cite a specific finding in it therefore have no English target to point at, and
+    # the alternative would be restating measured figures in a second place, where the two copies
+    # would drift.
+    #
+    # Closing these entries means translating docs/ja/verification/throughput-iops-concurrency.md,
+    # not deleting the links.
+    "docs/en/deployment/onprem-terraform.md": (
+        "#flexcache-経由の読み取り",  # the FlexCache read measurement
+        "#リージョンを跨いだ-flexcache読み手が遠い場合",  # the inter-Region FlexCache measurement
+    ),
+    "docs/en/reference/comparison/finops-s3-vs-s3ap.md": (
+        "#小さいオブジェクトの-iops",  # why extra SSD IOPS does not raise the S3 request rate
+    ),
+    "docs/en/reference/limits/s3ap-design-guide.md": (
+        "#複数クライアントでの集約",  # shared versus per-client ceilings, at two clients
+        "#クライアント台数を-1-から-4-まで上げたとき",  # the same, extended to four
+    ),
+    "docs/en/verification-status.md": (
+        # The round that measured the nine outstanding items and corrected five published figures.
+        "#残していた-9-件を測ったこの記録の数値を-5-つ訂正します",
+    ),
+}
 
 
 def english_docs() -> list[Path]:

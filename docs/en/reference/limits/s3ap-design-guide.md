@@ -94,9 +94,107 @@ file system, they contend for bandwidth. In this architecture the Origin and the
 clusters, so it is not normally a problem — but **if a client mounts NFS directly against the Origin
 cluster**, the throughput split has to be accounted for.
 
+### Three limits apply to throughput, not one
+
+**Treating "provisioned throughput" as a single ceiling gets it wrong.** Three limits apply and the
+real one is the lowest
+(see the [performance specifications](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html)).
+
+| Limit | Set by | Value for ap-northeast-1, first-generation Single-AZ |
+|---|---|---|
+| Network I/O | throughput capacity | per step; at the 128 MBps step, 150 MBps baseline |
+| Disk I/O (file server side) | throughput capacity | same as the step (128 at the 128 step, 2048 at the 2048 step) |
+| **Disk I/O (SSD side)** | **provisioned SSD IOPS** | **768 MBps per TiB** and 3,072 IOPS per TiB *while SSD IOPS are on `AUTOMATIC`* |
+
+**Reads and writes also have different ceilings.** Per HA pair:
+
+| | Read | Write |
+|---|---|---|
+| First-generation Single-AZ (ap-northeast-1 and others) | 2,048 MBps | **750 MBps** |
+| First-generation Multi-AZ (same) | 2,048 MBps | 1,300 MBps |
+
+**Writes are lower because they are replicated to the secondary file server.** One write operation
+is documented as consuming twice the network throughput.
+
+Two things to establish when designing:
+
+1. **Whether SSD IOPS match the step.** With 1 TiB of SSD on `AUTOMATIC`, disk throughput stops at
+   768 MBps however high the step goes. Two ways past it: 2.67 TiB or more of SSD, or SSD IOPS set to
+   `USER_PROVISIONED`. Raising SSD IOPS from 3,072 to 40,000 and changing nothing else took a
+   280 GiB read from 286.1 to 2,042.1 MB/s, a 7.14-fold difference. So the 768 MBps figure is not a
+   ceiling that capacity sets; it is what the default IOPS level happens to come to.
+
+   > **That 7.14x is an observation with no established mechanism.** CloudWatch later showed that on
+   > the fast side **98.5 to 99.9% of the bytes never reached the disks.** 280 GiB exceeds this step's
+   > 238 GiB cache by only 18%, so "a read that could not be cached" was too generous a label. A
+   > repeat also moved 2,042.1 to 2,667.2, so **the "99.7% of the step" coincidence did not hold.**
+   > **Check item 3 below before provisioning IOPS.**
+2. **Whether the workload is read- or write-dominated.** For write-dominated work the ceiling comes
+   from the 750 MBps side, and stepping above the equivalent of 750 MBps does nothing.
+
+Two steps were measured (the record is
+[in Japanese](../../../ja/verification/throughput-iops-concurrency.md) (Japanese)): **at the
+128 MBps step the step was the binding limit (129.5 MB/s, 101%), and at the 2048 MBps step it was
+not** (497.1 MB/s, 66% of the 750 MBps write ceiling). A 16-fold step increase gave 3.8 times the
+write throughput.
+
+**A third lever sits on the client, it costs nothing, and it is the one that held up best.** A
+default Linux NFS mount opens one TCP connection per server, and a single flow inside a VPC is capped
+near 5 Gbps. The same sweep was run on two file systems on different days.
+
+| File system | 1 stream | 4 streams | 8 streams |
+|---|---|---|---|
+| First (default mount) | 588.1 | 589.9 | 589.7 |
+| Second (default mount) | 613.1 | 618.7 | 618.7 |
+| Second (`nconnect=16`) | 1,140.6 | 2,904.6 | **3,062.8** |
+
+**A default mount moves less than 1% when stream count goes up eightfold**, because the client is
+what answers. `nconnect=16` gives **4.95 times** the rate at 8 streams. **This is the only finding
+here that reproduced independently twice, so check the mount before buying a larger step.**
+
+### Five defaults to clear before measuring your own environment
+
+Every figure above was measured wrongly at least once because of a default. **All five produce a
+plausible-looking number, so the result alone does not reveal them.** Clear them first.
+
+| Default | What happens | How it shows | What to do |
+|---|---|---|---|
+| A Linux NFS mount opens one TCP connection | Stops near 590 MB/s and **does not respond to stream count** | 1, 4 and 8 streams give the same rate | `nconnect=16` |
+| `dd if=/dev/zero` | Zero blocks never reach the disks and **come back at four times the ceiling** | The figure exceeds a published limit | Incompressible data (generate it with `openssl enc -aes-256-ctr`) |
+| Inline storage efficiency is on for the volume | A compressible or identical payload is collapsed. **A factor of four on reads, under 5% on writes** | `space_savings.dedupe_percent` is high | Turn it off for the measurement, **before writing any data** -- straight after a write the background scan is running and the change is refused |
+| `DiskIopsConfiguration: AUTOMATIC` | 3 IOPS/GiB makes the read IOPS-bound, well below the throughput ceiling | MB/s divided by IOPS is implausibly small for an IO size | `USER_PROVISIONED` |
+| **A read that exceeds the cache only slightly** | The cached share dominates, so **the disk path is not what is being measured** | CloudWatch `DiskReadBytes` over `DataReadBytes` is a few percent or less | Read **at least twice** the cache in one pass |
+
+**Write every figure as a share of a published limit.** When the share is far from 100%, doubt the
+measurement rather than the number. **A figure that is too low deserves the same suspicion as one
+that is too high** -- above, 37% and 400% were both measurement errors.
+
+**And the more neatly a figure lands on a limit, the more it needs measuring again on another day.**
+The same environment and conditions repeat to **within 0.2%** (four replicate pairs). **A repeat that
+moves 30% is not variance; it means the conditions were not what they were thought to be.** The
+"99.7% of the step's disk throughput" coincidence lasted one day.
+
+### How to see whether ONTAP is saturated
+
+The `fsxadmin` credential cannot reach ONTAP's node-level statistics
+(`/api/cluster/nodes?fields=statistics` returns nothing, and the `private/cli` equivalents return
+`API not found`). **CloudWatch publishes 33 metrics for the file system, and the answer is there.**
+<!-- allow:naming the CloudWatch namespace name -->
+
+| What you want | Metric |
+|---|---|
+| Whether ONTAP is saturated | `CPUUtilization` |
+| Whether reads come from disk | `DiskReadBytes` over `DataReadBytes` |
+| Whether the network binds | `NetworkThroughputUtilization` |
+| Whether disk throughput binds | `FileServerDiskThroughputUtilization` |
+| Whether SSD IOPS bind | `DiskIopsUtilization` |
+
+Measured: **21-24% CPU at 417 MB/s through the S3 Access Point, and 18-23% at 800 MB/s over NFS.**
+**Twice the throughput at the same CPU, so the cost of the protocol difference is not inside ONTAP.**
+
 ### How to decide concurrency
 
-**This repository has no measurement of concurrency.** The only starting point is this relation.
+The starting point is this relation.
 
 ```text
 max concurrency ≈ provisioned throughput ÷ bandwidth consumed per request
@@ -113,11 +211,116 @@ That makes the order of work:
 
 **Where an existing NFS / SMB workload is present, subtract its share when designing.**
 
+#### Request rate plateaus well before SSD IOPS does
+
+**For a design that handles many small objects, calculating from SSD IOPS gets it wrong.** Measured
+request rates through the S3 Access Point (4 KiB and 64 KiB objects, 128 MBps, 3,072 SSD IOPS, 20
+seconds per point, zero 503s at every point):
+
+| Concurrency | 4 KiB write | 4 KiB read | 64 KiB write |
+|---|---|---|---|
+| 16 | 153.9 | 330.3 | 171.2 |
+| 64 | **415.3** | **630.3** | **415.9** |
+| 256 | 420.8 | 594.0 | 404.4 |
+
+In req/s. **Writes plateau near 420 req/s and reads near 600, which is 14 to 20 percent of the 3,072
+SSD IOPS.** Object size barely matters (415.3 against 415.9 for 4 KiB versus 64 KiB), and raising
+concurrency from 64 to 256 adds nothing.
+
+The limit is the S3 API request path, not storage IOPS. **Provisioning additional SSD IOPS
+($0.0204/IOPS-Mo) therefore does not raise the request rate available through S3.** Establish which
+one you are hitting before buying more.
+
+#### Aggregate throughput does not grow with more clients
+
+**The purchased capacity is shared.** Summed totals with identical hosts, from one up to four
+(8 MiB objects, concurrency 16, c5n.2xlarge):
+
+| Phase | 1 host | 2 hosts | 3 hosts | 4 hosts | 4/1 |
+|---|---|---|---|---|---|
+| Write | 129.4 | 130.9 | 131.5 | 131.0 | **1.01x** |
+| Read | 480.9 | 600.7 | 598.6 | 612.3 | 1.27x |
+
+In MB/s, summed. **Writes stay flat all the way to four hosts**, and per host the figure is the total
+divided by the count: 129.4, 65.3, 43.5, 33.0. **Size capacity per file system, not per client.**
+
+The 1.27x on reads is not the ceiling moving. **One host (480.9) does not reach it**; two hosts get
+to 600.7 and it is flat from there. The ceiling is about 600 MB/s, and on an 8 vCPU host the TLS work
+at concurrency 16 saturates first, so **more than one client was needed to see the ceiling at all.**
+
+(As a control, the same measurement against Amazon S3 gives 4.22x on writes and 4.10x on reads, with
+per-host throughput unchanged. The ceilings differ in kind; the record is
+[in Japanese](../../../ja/verification/throughput-iops-concurrency.md#クライアント台数を-1-から-4-まで上げたとき) (Japanese).)
+
+#### The collect and serve layers compete for the same capacity
+
+**The claim at the top of this section has a measurement behind it.** Two ten-minute write runs, one
+of which was joined partway through by a FlexCache in another Region reading the same origin.
+
+| Window | With other load | Without |
+|---|---|---|
+| 0 to 510 s | 127.8 to 130.3 MB/s | 127.8 to 130.6 MB/s |
+| 510 to 600 s | **112.7, then 66.8, then 66.0** | 129.2, 130.0, 130.0 |
+
+**Writes through the S3 Access Point roughly halved.** The only difference between the two runs was
+the concurrent FlexCache fill. This is why throughput sharing has to be considered when clients read
+or write the origin cluster directly.
+
+#### Burst mechanisms play no part in writes here
+
+Cut into 30-second intervals, ten minutes of continuous writing stayed within **127.8 to 130.6 MB/s
+across all 20 intervals**, averaging 129.6. No decline, no exhaustion. **The purchased step is the
+ceiling from the first second to the last.**
+
+So a short measurement will not accidentally capture burst capacity on this configuration. **The
+converse also holds: waiting does not make it faster.**
+
+#### What happened when that procedure was run
+
+The procedure above was executed and recorded in the throughput measurement
+(2026-09-01, ap-northeast-1, 128 MBps, 8 MiB objects — the record is
+[in Japanese](../../../ja/verification/throughput-iops-concurrency.md) (Japanese)). How well the
+relation predicted the outcome:
+
+| Step | Result |
+|---|---|
+| Time at concurrency 1 | p50 331.5 ms, 21.8 MB/s |
+| Concurrency the relation gives | 128 ÷ 25.3 ≈ **5** |
+| Where saturation begins, measured | between concurrency 4 (97.5 MB/s) and 16 (129.5 MB/s) |
+| Where it plateaus, measured | concurrency 16 (129.5 MB/s) |
+
+**The relation lands close to the knee and understates the concurrency needed to reach the
+plateau.** It works as a starting point, but stopping at the figure it gives leaves the purchased
+step unused.
+
+**The roughly 330 ms fixed cost per request barely depends on size** (363.7 ms at 1 MiB, 331.5 ms
+at 8 MiB). Smaller objects therefore consume less bandwidth per request and need more concurrency:
+at 1 MiB, throughput was still climbing at concurrency 64.
+
 ### Behaviour when throughput saturates
 
-When FSx for ONTAP throughput saturates, the S3 API returns `SlowDown` (503).
-Handle it with exponential backoff (base 1 second, max 30 seconds).
-boto3's `adaptive` retry mode is recommended.
+**Saturation did not produce `SlowDown` (503).** Across both steps (128 MBps and 2048 MBps), at
+1 MiB and 8 MiB by concurrency 1/4/16/64, **all 32 points recorded zero 503s** (measured with
+retries disabled so they would be counted; the record is
+[in Japanese](../../../ja/verification/throughput-iops-concurrency.md) (Japanese)). Writes did
+plateau at the purchased figure, so saturation was certainly reached.
+
+**Saturation showed up as queueing instead.** At 8 MiB, raising concurrency from 16 to 64 left
+throughput unchanged (129.5 to 127.5 MB/s) while p50 grew from 985.7 ms to 3885.8 ms. **Bandwidth
+does not increase; only latency does, in proportion to concurrency.**
+
+Two consequences for design:
+
+- **The 503 rate cannot be used to detect saturation.** Step 2 above is still the right thing to
+  record, but in this environment saturation arrived without a single 503. **Detect it from p99.**
+- **A timeout arrives first.** Latency keeps growing, so the client read timeout becomes the
+  effective ceiling before anything else does.
+
+This is not a claim that `SlowDown` cannot be returned. It means it was not observed across these
+32 points. Code for the case where it is returned is still needed: exponential backoff (base 1
+second, max 30 seconds), and boto3's `adaptive` retry mode. **Disable retries when measuring,
+though.** `adaptive` absorbs 503s internally, so leaving it on makes a throttled endpoint look
+merely slow.
 
 ## Directory design
 

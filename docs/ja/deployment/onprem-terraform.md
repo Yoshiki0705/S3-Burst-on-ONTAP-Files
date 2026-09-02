@@ -37,7 +37,7 @@ FlexCache は Origin が存在しないと作れません。
   ネットワークのタイムアウトになり、設定の誤りには見えません
 - `terraform` 1.9 以降
 
-## 2. ピアリングを確立する
+## 2. ピアリングの確立
 
 **この設定はピアリングを作りません。** クラスタピアと SVM ピアが先に必要です。
 
@@ -54,6 +54,56 @@ apply が失敗したら、まずピアリングを確認してください。
 cluster peer show
 vserver peer show
 ```
+
+### ピアリングと FlexCache 作成で実際に踏んだ 5 点
+
+FSx for ONTAP を 2 つ用意し、REST API で一連の手順を通した記録です
+（[実測記録](../verification/throughput-iops-concurrency.md#flexcache-経由の読み取り)、2026-09-01、
+ONTAP 9.18.1P5）。**エラーメッセージが原因を名指ししない箇所が続きます。**
+
+| 症状 | 実際の原因 |
+|---|---|
+| `Aggregates not matching FabricPool requirements: aggr1` | **`use_tiered_aggregate` が既定の false。** FSx for ONTAP の aggregate は FabricPool 付きなので、既定では「非 FabricPool の aggregate を探して見つからない」動作になる。**true を明示すると通る**。メッセージは aggregate を名指しし、フラグには触れない |
+| `Volume ... results in a volume that is too small - 20GB` | **FlexCache ボリュームの最小サイズは 50 GB。** 20 GiB を指定して失敗した |
+| `The value "180" is invalid for field "return_timeout" (<0..120>)` | `return_timeout` の上限は 120 |
+| SVM ピアが `pending` のまま進まない | **Origin 側で明示的に受諾が必要。** `PATCH /api/svm/peers/{uuid}` に `{"state":"peered"}` を送る。作成側は `initiated`、相手側は `pending` になる |
+| ONTAP REST が HTTP 401 と `User is not authorized.` を返す | **認証の不一致で、権限の問題ではない。** 生成した fsxadmin パスワードが実効パスワードになっていなかった。詳細は[検証状況](../verification-status.md)の該当行 |
+
+削除にも順序があり、**各段が次を名指ししないメッセージで止めます。**
+
+1. **ONTAP 側でジャンクションを外す**（`PATCH /api/storage/volumes/{uuid}` に `{"nas":{"path":""}}`）。
+   クライアントの `umount` とは別物で、これを飛ばすと
+   `Volume ... must be unmounted before being taken offline` で止まります
+2. FlexCache を削除する
+3. **SVM ピアを削除し、消えるまで待つ。** 削除は非同期なので、待たずに次へ進むと失敗します
+4. クラスタピアを削除する。SVM ピアが残っていると
+   `SVM peering relationships exist with the cluster` で拒否されます
+
+**確認は削除の戻り値ではなく件数で行ってください。** 認証が失敗しているだけの状態でも
+「対象が見つからない」と読める出力になります。実際にこの罠を踏み、シークレットを読めない
+ホストで実行して「FlexCache は存在しない」と誤って報告しました。
+
+### cache が別リージョンにあるときに追加で踏む 3 点
+
+同じ手順をリージョンを跨いで通した記録です（origin は ap-northeast-1、cache は ap-northeast-3、
+リージョン間 VPC ピアリング。[実測記録](../verification/throughput-iops-concurrency.md#リージョンを跨いだ-flexcache読み手が遠い場合)）。
+**同一リージョン内では起きない 3 点が出ます。**
+
+| 症状 | 実際の原因と対処 |
+|---|---|
+| ONTAP REST が空応答を返し、`curl` は成功する | **FSx for ONTAP の管理エンドポイントの DNS は、そのファイルシステムの VPC の内側でしか引けません。** リージョン間 VPC ピアリングはプライベートホストゾーンを運びません。対処は名前ではなく IP を使うことです（下記） |
+| セキュリティグループのルールを相手側 SG の ID で書けない | **リージョンを跨いだピアリングでは SG 参照が使えません。** CIDR で書きます。必要なのは intercluster の **11104-11105**、ONTAP REST の **443**、NFS の **2049** です |
+| ホストが相手リージョンの Secrets Manager を読めない | ホストロールは自分のスタックのシークレットしか許可していません。**インラインポリシーで明示的に許可**します。**スタック削除の前に外さないと、ロールの削除が失敗します** |
+
+管理 IP と intercluster IP は API から取れます。**ONTAP 側の LIF を引く必要もなくなります。**
+
+```bash
+aws fsx describe-file-systems --file-system-ids <fs-id> --region <cache region> \
+  --query 'FileSystems[0].OntapConfiguration.Endpoints.{Management:Management.IpAddresses,Intercluster:Intercluster.IpAddresses}'
+```
+
+**この 3 点はすべて「作成が失敗する」ではなく「何も起きない」形で出ます。** 空応答を認証の
+失敗や対象の不在と読み違えやすいので、まず**名前ではなく IP で 1 回叩いて**切り分けてください。
 
 ## 3. `terraform apply`
 
@@ -78,7 +128,7 @@ terraform apply
 `allowed_clients` には利用拠点のネットワークを指定します。既定値はありません。
 エクスポートルールはアクセス制御の判断であり、`0.0.0.0/0` は変数の検証で拒否されます。
 
-### 何が作られるか
+### 作られるリソース
 
 | リソース | 内容 |
 |---|---|

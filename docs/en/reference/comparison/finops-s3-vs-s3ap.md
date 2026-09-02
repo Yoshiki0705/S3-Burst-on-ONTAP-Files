@@ -130,6 +130,121 @@ frequent-access tier.
 Sources are [availability and deployment options](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html)
 and [FSx for ONTAP pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/).
 
+### The gap between the step you buy and the figure you get
+
+**Throughput capacity is a billing unit, not a guaranteed achieved figure.** Sizing from the step
+alone can leave you short of what you paid for.
+
+Two steps were measured (2026-09-01, ap-northeast-1, SINGLE_AZ_1, 8 MiB objects, writes over the
+S3 API, concurrency 64 — the record is
+[in Japanese](../../../ja/verification/throughput-iops-concurrency.md) (Japanese)).
+
+| Step purchased | Step per month ($0.906/MBps-Mo) | Write measured | The limit that actually bound |
+|---|---|---|---|
+| 128 MBps | about $116 | 129.5 MB/s | the purchased step (128 MBps) |
+| 2048 MBps | about $1,855 | 497.1 MB/s | **the 750 MBps write ceiling**, not the step |
+
+**16 times the cost for 3.8 times the write throughput.** The reason is not that the step went
+unconsumed; it is that **at 2048 MBps the purchased step is not the write ceiling at all.**
+
+### Three limits apply, and the real one is the lowest
+
+The [performance specifications](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html)
+name three. For a first-generation Single-AZ file system in ap-northeast-1:
+
+| Limit | Value |
+|---|---|
+| Purchased throughput capacity (disk throughput) | the step (128 / 256 / … / 2,048 MBps) |
+| **Disk throughput from the SSD side** | **768 MBps per TiB** (while SSD IOPS are on `AUTOMATIC`) |
+| **Write ceiling per HA pair** | **750 MBps** (reads: 2,048 MBps) |
+
+**The second is the one cost design misses.** On a file system with 1 TiB of SSD and SSD IOPS left
+on `AUTOMATIC`, disk throughput stops at 768 MBps however high the throughput capacity goes.
+
+**There are two ways past it, and they differ by an order of magnitude in unit price.**
+
+| Way past it | Billed as | Monthly, for 1 TiB at the equivalent of 40,000 IOPS |
+|---|---|---|
+| Raise SSD capacity to 2.67 TiB or more | SSD storage, $0.15/GB-Mo | **about $257** for the extra 1.67 TiB |
+| **Set SSD IOPS to `USER_PROVISIONED`** | provisioned SSD IOPS, $0.0204/IOPS-Mo | **about $753** for the extra 36,928 IOPS |
+
+> **Cost note.** The capacity side looks cheaper, and the capacity is usable afterwards, so the real
+> question is whether the capacity is wanted. When it is not, and only the ceiling is in the way, the
+> IOPS side is the one that applies.
+
+**The IOPS side was measured.** Raising SSD IOPS from 3,072 to 40,000 and changing nothing else took
+a 280 GiB read from **286.1 to 2,042.1 MB/s, 7.14 times**. **So 768 MBps is not a ceiling set by
+capacity; it is the default IOPS level restated in MB/s.**
+
+> **Before using this for a spending decision: the 7.14x is an observation with no established
+> mechanism.** CloudWatch later showed that on the fast side **98.5 to 99.9% of the bytes never
+> reached the disks** -- 280 GiB exceeds this step's 238 GiB cache by only 18%. A repeat also moved
+> 2,042.1 to 2,667.2, so the "99.7% of the step" figure does not reproduce. **Before paying $753 a
+> month for provisioned IOPS, check `DiskReadBytes` over `DataReadBytes` in your own environment and
+> establish that the reads really come from disk.** If they come from cache, buying IOPS will not
+> move them.
+
+So **stepping up alone does not buy performance.** In the measurement above, adding $1,739 a month
+to the step ($116 to $1,855) moved writes from 129.5 to 497.1 MB/s. The write ceiling with the step
+alone is 750 MBps, so going beyond it means raising something else at the same time.
+
+**And the first thing to check costs nothing.** A default Linux NFS mount opens one TCP connection
+per server, which stopped at about 590 MB/s here. `nconnect=16` alone moved the same measurement into
+the 2,000 MB/s range. **Look there before adding a billed dimension.**
+
+### Consequences for cost design
+
+- **Before stepping up, establish which limit you are hitting.** If it is the step, stepping up
+  helps. If it is SSD IOPS or the write ceiling, stepping up is just spending. **If it is the client
+  mount, nothing you buy will move it.**
+- **The step barely affects reads.** On the 128 MBps file system reads reached 579.3 MB/s, and
+  raising the step 16-fold gave 654.8 MB/s, a factor of 1.13 — because the read ceiling is
+  2,048 MBps and is set independently of the step. **For a read-dominated workload, stepping up
+  buys little for the money.**
+- **Without enough concurrency the step cannot be consumed.** There is a fixed cost of roughly
+  330 ms per request (see [the design guide](../limits/s3ap-design-guide.md#how-to-decide-concurrency)).
+- **Changing the step is online but not immediate.** The 128 to 2048 update took 24 minutes. For a
+  temporary increase during verification, budget close to an hour of the higher step across the
+  round trip.
+
+**The measured figures are one environment measured once.** The limit values are quoted from the
+published specifications; the measurement confirms that the step bound the 128 MBps case and did
+not bind the 2048 MBps one.
+
+### Provisioning more SSD IOPS does not raise the rate available through S3
+
+Additional SSD IOPS is a billed dimension at $0.0204/IOPS-Mo. **For a workload going through the S3
+Access Point, buying more of it does not help.**
+
+Measured with 4 KiB and 64 KiB objects, the request rate plateaued at **about 420 req/s for writes
+and 600 for reads**, which is 14 to 20 percent of the 3,072 SSD IOPS the file system had (the record
+is [in Japanese](../../../ja/verification/throughput-iops-concurrency.md#小さいオブジェクトの-iops) (Japanese)).
+The limit is the S3 API request path.
+
+**Before adding IOPS charges to an estimate for many small objects, establish which path is the
+constraint.** SSD IOPS does work for the file protocols; it does nothing for the S3 portion.
+
+### The unit of capacity planning is opposite on the two sides
+
+**The same MB/s figure behaves in opposite directions when clients are added.** Measured from one
+host, then two simultaneously (8 MiB objects, concurrency 16):
+
+| Target | 1 host | 2 hosts, summed | What it means |
+|---|---|---|---|
+| FSx for ONTAP S3 AP read | 585.3 | **592.5** | the purchased capacity is shared |
+| Amazon S3 read | 649.3 | **1308.9** | the client was the limit |
+
+In MB/s. For cost design:
+
+- **FSx for ONTAP side**: more readers do not raise the total. **Cost is set per file system, and
+  adding clients is not the same as buying capacity.** Raising the total means raising the step or
+  the SSD capacity (see the three limits above).
+- **Amazon S3 side**: the total grows close to linearly with client count and adds nothing on the
+  storage side. **Cost is set by request count and data volume; there is no bandwidth line item.**
+
+So **the same change, more readers in parallel, leads to a capacity decision on one side and only to
+higher request charges on the other.** It is an easy pair to confuse when estimating.
+
 ## How storage efficiency is handled
 
 The figures in the estimates move a great deal with the storage efficiency assumption. Where the

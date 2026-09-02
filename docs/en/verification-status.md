@@ -78,7 +78,10 @@ following:
 - the ONTAP version
 - the file system generation, configuration and throughput setting
 - the object size and concurrency
-- what was measured (client side, or a service metric)
+- **the kind of payload** (incompressible, or compressible) and the volume's inline efficiency setting
+- **the SSD IOPS setting** (`AUTOMATIC` or `USER_PROVISIONED`, and the value)
+- **the client-side mount options** (for NFS, whether `nconnect` is set)
+- what was measured (client side, a service metric, or an ONTAP counter)
 
 A figure missing any of these cannot be reproduced, so it is useless for comparison and for
 estimation alike. Where the sibling repository holds a figure, it is not copied across unless the
@@ -95,6 +98,60 @@ environment is stated with it.
 > accessed both through the S3 Access Point and over NFS. FlexCache is not in the path. The former is
 > a precondition for the latter, but the former's figure cannot be quoted as the latter's answer.
 > Keeping those two apart is half the reason this table exists.
+
+### Why stating the payload is required
+
+**The kind of payload** was added to that list afterwards, and the reason is an actual result.
+
+**A figure measured with a compressible payload cannot be compared against a storage-side limit.**
+With inline compression, dedup and compaction enabled on the volume, `/dev/zero` and a repeated
+single byte never reach the disks, and a read of them is reconstructed rather than served. In the
+measurements, **a 280 GiB read came back at 1.5 times the step's disk throughput and 4 times the
+default level.**
+
+So every figure in this table is one of two kinds.
+
+| Kind | What it may be compared against |
+|---|---|
+| Incompressible (`--body random`, an AES-CTR block) | A storage-side limit |
+| Compressible (`--body fill`, `/dev/zero`) | **Only other figures collapsed the same way.** Never read as a share of a limit |
+
+**As things stand, only part of the 2048 MBps step has been re-measured incompressibly.** The
+128 MBps step and the FlexCache side still rest on compressible payloads, and the rows concerned say
+so.
+
+## Measurements still outstanding, in priority order
+
+**This list was replaced on 2026-09-02, after A to I were all carried out.** The record is
+[in Japanese](../ja/verification/throughput-iops-concurrency.md#残していた-9-件を測ったこの記録の数値を-5-つ訂正します) (Japanese).
+**Five of the nine corrected a figure that had been published above.**
+
+| # | Item | Result |
+|---|---|---|
+| A | A control with the payload as the only variable | **Done.** On writes it changes **0.5% (S3) and 4.7% (NFS)**. **The earlier "at least 17%" was wrong and is withdrawn.** Reads change by a factor of four; the asymmetry follows from writes actually sending the bytes while reads can be reconstructed before they are returned |
+| B | Re-measure the 128 MBps step incompressibly | **Done.** warm 297.8 against cold 297.2, **a ratio of 1.00.** "warm 1164.1 against cold 751.0, ratio 1.55" is withdrawn |
+| C | Re-measure the FlexCache side incompressibly | **Done.** Resident 882.7 to 907.1 against a direct origin read of 383.3, so **FlexCache is 2.31 times faster.** "53% of the origin" had it backwards |
+| D | Re-measure small-object IOPS at 40,000 SSD IOPS | **Done.** With the step 16 times higher and SSD IOPS 13 times higher, **not one of the six points rose and writes fell 25%.** The earlier judgement stands |
+| E | How to restore inline compression | **Done. It can be restored.** `{"efficiency":{"compression":"inline"}}` then `{"efficiency":{"dedupe":"both"}}` on the documented endpoint. **The condition is that `efficiency.op_state` is `idle`.** The private CLI cannot express it |
+| F | Whether S3 Files hits the single-flow limit | **Done. It does not.** Reads reach **451.3 MB/s** at 8 streams and do not rise at 16. 450 MB/s is 3.6 Gbps, below the single-flow limit. The local `efs-proxy` is what stops it (67.3% CPU at 16 streams). The mount's peer is **127.0.0.1**, so `nconnect` structurally cannot reach the service link, and requesting it **hangs the mount** |
+| G | Extend the client ladder past four | **Done. No bend through eight.** Writes 8.23x, reads 8.04x, per-host unchanged, 4,783.2 MB/s in total at eight hosts -- 38.3 Gbps. **Each host used its own prefix, so the per-prefix request limit was not tested** |
+| H | The part of the 41% inside ONTAP | **Done. It was observable after all.** Not through the ONTAP REST API, but **CloudWatch publishes `CPUUtilization`.** At 417 MB/s through the S3 Access Point the CPU is 21-24%; at 800 MB/s over NFS it is 18-23%. **Twice the throughput at the same CPU, so the cost is outside ONTAP** |
+| I | Time-of-day and day-to-day repeatability | **Done, and the result is a caution.** The same environment and conditions repeat to **within 0.2%** (four replicate pairs). The single-flow ceiling also reproduced on a different day and a different file system. But **the 280 GiB read went 2,042.1 to 2,667.2, up 30.6%, and the "99.7% of the step" coincidence did not reproduce** |
+
+**Newly opened**
+
+| Item | Why it is needed | Scale |
+|---|---|---|
+| Read at least twice the cache in one pass | 280 GiB exceeds this step's 238 GiB cache by only 18%, and in the measurement **98.5 to 99.9% of the bytes never reached the disks.** Measuring the disk path needs a volume of 700 GiB or more and a read of 480 GiB or more. **So the 7.14x from SSD IOPS stands as an observation with no established mechanism** | One file system, a volume of 700 GiB or more |
+| Vary only the run duration | Where the 16% between 497.1 (30 s) and 415 (60-90 s) comes from. The payload has been ruled out | One file system, about 15 minutes |
+| FlexCache incompressibly at the 2048 MBps step | C was measured with both sides at 128 MBps. Raising the origin puts a direct origin read in the 2,000 MB/s range, so **"FlexCache is 2.31 times faster" may invert with the step** | Two file systems |
+| Burst balance at the 128 MBps step | Incompressible warm and cold both land at 297-317, consistent with that step's disk-throughput burst range of 128-600 MBps. **The burst balance was not read directly** | Existing environment |
+
+**J. The irreversible family is deliberately not measured.** SnapLock, snapshot locking, S3 Object
+Lock. **Not enabled without an instruction naming the retention value.** In the sibling repository a
+128 MiB SnapLock audit log volume made an entire file system undeletable for six months and produced
+no usable finding. **A verification environment is not the place for an irreversible operation; it is
+the worst place for one.**
 
 ### Why the ONTAP version could not be stated
 
