@@ -462,7 +462,7 @@ and the cache pulls them in afterwards, so `inotify` on a client mounting the ca
 The server-side candidate is [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html), and **on the origin side it is now settled that it does
 not work.** A write arriving over the S3 Access Point raises no FPolicy notification, and is not
 blocked even by a `mandatory` synchronous policy (measured 2026-08-26, ONTAP 9.18.1P3D1, with both
-UNIX and WINDOWS identity — see [the measured FPolicy / S3 Access Point coverage](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-monitoring-coverage-implications.md)). An FPolicy event accepts only `cifs`, `nfsv3` or
+UNIX and WINDOWS identity — see [the measured FPolicy / S3 Access Point coverage](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/errata-fpolicy-s3ap-coverage.en.md)). An FPolicy event accepts only `cifs`, `nfsv3` or
 `nfsv4` as its protocol; there is no value for the S3 path.
 
 **Whether it fires on the cache side is still unverified.** Writes in this architecture arrive at
