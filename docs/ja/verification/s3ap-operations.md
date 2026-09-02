@@ -145,7 +145,7 @@ Expect: 100-continue
 
 ## UploadPartCopy
 
-### 結果: 同一 Access Point 内をソースにしても `NoSuchKey` を返す
+### 結果: 同一 Access Point 内をソースにしても返る `NoSuchKey`
 
 公式対応表は `UploadPartCopy` を**同一 AP 内・同一リージョンで対応**としています。
 6 MiB のソースオブジェクトを同一 Access Point に置き、同じ Access Point 上の宛先に対して
@@ -171,7 +171,7 @@ Expect: 100-continue
 `InvalidArgument: Invalid resource in copy source ARN` になりました。
 辞書形式（`{"Bucket": <ap-arn>, "Key": <key>}`）は `CopyObject` が受理する形式です。
 
-### 別の Access Point をソースにすると、両方とも拒否される
+### 別の Access Point をソースにしたときの両操作の拒否
 
 同一ボリュームに接続された別の Access Point 経由で同じオブジェクトを指した場合です。
 

@@ -19,7 +19,7 @@
 | object REST API | Microsoft | Azure NetApp Files のディレクトリを、S3 API で読み書きできるバケットとして写像する | [object REST API](https://learn.microsoft.com/en-us/azure/azure-netapp-files/object-rest-api-introduction)。キャッシュボリュームでは非対応 | 参考 |
 | S3 multiprotocol | Google | Google Cloud NetApp Volumes で S3 アクセスを提供する | ONTAP モードのみ（[概要](https://docs.cloud.google.com/netapp/volumes/docs/discover/overview)） | 参考 |
 
-## 混同すると何を間違えるか
+## 混同したときに成り立たない推論
 
 表の 1 行目と 4 行目は、名前が近く、どちらも「ONTAP のボリュームに S3 でアクセスする」と
 要約できてしまう。しかし実装元が AWS と NetApp で異なり、有効化の方法も最小バージョンも別で、

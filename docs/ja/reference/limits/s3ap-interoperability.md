@@ -21,7 +21,7 @@
 いずれも 2026-08-26、ap-northeast-1、ONTAP 9.18.1P3D1、SINGLE_AZ_1 / 128 MBps で測った。
 手順と対照は下記。
 
-## この問いはどこから来たか
+## この問いの出どころ
 
 NetApp が公開している
 [ONTAP S3 interoperability](https://docs.netapp.com/us-en/ontap/s3-config/ontap-s3-interoperability-concept.html)
@@ -177,7 +177,7 @@ NetApp が「ONTAP S3 バケットを含む FlexGroup ボリュームのクロ�
 制約は NetApp の表の側にはなく、別のところにあった。**測った範囲では、この 3 つが実際の落とし穴で
 ある。**
 
-### セキュリティスタイルと identity の不一致は、取り付けが成功してから失敗する
+### セキュリティスタイルと identity の不一致による、取り付け成功後の失敗
 
 | 手順 | 結果 |
 |---|---|
@@ -198,7 +198,7 @@ WINDOWS identity を同じ SVM で試した場合は、取り付け自体が完�
 | CIFS サーバの無い SVM で WINDOWS identity を指定して取り付け | **失敗。`did not stabilize`（`NotStabilized`）でスタックがロールバック** |
 | ロールバック後に取り付けが残るか | **残らない**。孤児にはならなかった |
 
-### ONTAP 側で作ったものが AWS 側に現れるまで待つ
+### ONTAP 側で作ったものが AWS 側に現れるまでの待ち時間
 
 ONTAP API で作ったボリュームは、AWS 側の `describe-volumes` にすぐには現れない。`fsvol-` ID が
 無いと `AWS::FSx::S3AccessPointAttachment` も `create-and-attach-s3-access-point` も参照できない。
@@ -224,7 +224,7 @@ ONTAP API で作ったボリュームは、AWS 側の `describe-volumes` にす�
 取り付けられない」と書いた。両方とも誤りで、待てば現れ、取り付けられる。2.5 分は AWS が記載する
 「数分」の内側であり、**「まだ現れていない」と「現れない」を区別していなかった。**
 
-### junction path の反映は逆向きにも遅れる
+### 逆向きにも遅れる junction path の反映
 
 | 手順 | 結果 |
 |---|---|
@@ -239,7 +239,7 @@ ONTAP API で作ったボリュームは、AWS 側の `describe-volumes` にす�
 **書き込みは可能な限り AWS 管理面から行う。** 同じ設定が ONTAP 経由では 2 分待っても反映されず、
 FSx for ONTAP の API 経由では約 40 秒だった。
 
-### テアダウン: 削除が無言で戻る
+### テアダウン: 無言で戻る削除
 
 | 手順 | 結果 |
 |---|---|

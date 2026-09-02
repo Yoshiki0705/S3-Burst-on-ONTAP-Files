@@ -51,7 +51,7 @@ AWS が明記している FSx for ONTAP の FlexCache 対応構成は 3 つだ�
 確かめる手順は [PoC チェックリスト](poc-checklist.md)のフェーズ 4 にある。
 結果が出たらこの表を更新する。
 
-### 逆方向 — 他クラウドのファイルストレージを Origin にする
+### 逆方向 — 他クラウドのファイルストレージを Origin とする構成
 
 上の表はいずれも **Origin が FSx for ONTAP** の場合である。他クラウドのファイルストレージを
 Origin として FSx for ONTAP を Cache にする方向は、AWS の対応構成表に含まれていない。

@@ -20,7 +20,7 @@
 アクセスポイント側の変更で、そのたびにデータを持つスタックを更新したくない。このスタックを削除
 してもボリュームは残る。
 
-## `AWS::FSx::S3AccessPointAttachment` を使う
+## `AWS::FSx::S3AccessPointAttachment` の使用
 
 **CloudFormation にはネイティブリソースがある。** アカウントのレジストリで確認した結果は
 `DeprecatedStatus: LIVE`、`ProvisioningType: IMMUTABLE`（2026-08-26 時点）。以前このリポジトリは
@@ -59,7 +59,7 @@ Properties:
 WINDOWS 側は SVM ローカルの SMB ユーザーで動き、ドメインアカウントは必須ではなかった。取り付け
 時点でドメインコントローラーに到達できない状態でもデータプレーンは動いた。
 
-### 変更は置き換えになる
+### in-place 更新の経路の不在
 
 レジストリのスキーマが示している事実。
 
@@ -135,7 +135,7 @@ INTERNET origin でも Block Public Access は強制されており「公開」�
 サービス、ローカルの開発端末）はそのままでは使えない。**origin は作成後に変更できない**ので、
 後から必要になったら別のアクセスポイントを作る。このスタックが単独で存在する理由の 1 つがこれ。
 
-## consumer から使う
+## consumer からの使い方
 
 alias はバケット名の位置に、ARN はバケット ARN の位置に、そのまま入る。
 

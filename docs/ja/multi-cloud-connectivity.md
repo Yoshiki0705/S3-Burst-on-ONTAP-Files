@@ -391,7 +391,7 @@ Oracle Interconnect for AWS も us-ashburn-1 ↔ us-east-1 のみである
 Origin として FSx for ONTAP を Cache にする構成は未確認である。ネットワークの選択は、その未確認を
 解消しない。
 
-## 暗号化 — どの層の話かを分ける
+## 暗号化 — 物理リンクと FlexCache トラフィックの層の差
 
 **物理リンクの暗号化と、FlexCache のトラフィックの暗号化は別の層である。** 前者があるから後者が
 不要になることはない。

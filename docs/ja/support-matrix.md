@@ -31,7 +31,7 @@
 何が検証済みで何が未検証かは[検証状況](verification-status.md)に分けてある。
 この表は「公開ドキュメントに何が書かれているか」を示すもので、実機確認の記録ではない。
 
-## 収集層 — S3 API で書き込みを受ける
+## 収集層 — S3 API での書き込みの受け付け
 
 | プラットフォーム | 機構 | 最小要件 |
 |---|---|---|
@@ -44,7 +44,7 @@
 呼び名と実装元の違いは[用語の整理](reference/glossary/object-access-on-ontap.md)にまとめてある。
 この構成が使うのは 1 行目だけである。
 
-## 配布層 — FlexCache でファンアウトする
+## 配布層 — FlexCache でのファンアウト
 
 AWS が明記している FSx for ONTAP の FlexCache 対応構成は次の 3 つである
 （[対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)）。

@@ -15,7 +15,7 @@ Origin ボリュームのセキュリティスタイルがこれに関わる。
 > 継承されるなら、Origin 側で後から変更した場合に Cache は削除して作り直すことになる。
 > **先に決める理由は非対称性であって、確認済みの制約があるからではない。**
 
-## 出典と、どこまで確認できているか
+## 出典と確認できている範囲
 
 この節の根拠は **Azure NetApp Files のキャッシュボリューム要件**である
 （[cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes) /
