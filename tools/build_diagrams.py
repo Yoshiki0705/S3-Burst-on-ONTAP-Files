@@ -286,6 +286,28 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "FlexCache (pull on read)",
     },
     "nfs_smb": {"ja": "NFS / SMB", "en": "NFS / SMB"},
+    # The FlexCache edge used to cross the gap with nothing on it, and a reader asked where AWS
+    # Interconnect was. The honest answer is that it depends on what the cache side is, and that the
+    # cloud-to-cloud service is not this link at all. So the link carries a frame naming the three
+    # cases rather than a single product icon: one icon here would read as a requirement, and a
+    # Direct Connect icon in particular would imply a circuit for the same-Region case that needs
+    # none.
+    "connect_layer": {
+        "ja": "接続層（いずれか）",
+        "en": "Connectivity layer (one of)",
+    },
+    "link_same_region": {
+        "ja": "同一リージョン: VPC ピアリング",
+        "en": "Same Region: VPC peering",
+    },
+    "link_cross_region": {
+        "ja": "別リージョン: VPC ピアリング /<br>Transit Gateway / Cloud WAN",
+        "en": "Cross-Region: VPC peering /<br>Transit Gateway / Cloud WAN",
+    },
+    "link_onprem": {
+        "ja": "オンプレミス: Direct Connect /<br>Site-to-Site VPN",
+        "en": "On-premises: Direct Connect /<br>Site-to-Site VPN",
+    },
     "overview_note": {
         "ja": note_body(
             "補足",
@@ -316,6 +338,15 @@ LABELS: dict[str, dict[str, str]] = {
                     "上の数値はすべて Cache 側も FSx for ONTAP の条件で測ったもの。"
                     "オンプレミス ONTAP を Cache とする経路は AWS の対応構成にあるが実機で追っていない。"
                     "遠隔拠点の遅延も未測定",
+                ),
+                (
+                    "※6",
+                    "接続層は Cache 側のケースで変わる",
+                    "FlexCache はクラスタ / SVM ピアリングを要求し、その下を通る経路が図中央の 3 つ。"
+                    "AWS Interconnect – multicloud はこの線ではない。AWS と他 CSP を結ぶもので、"
+                    "この図に他クラウドは出てこない（他クラウドとの接続は別の図にまとめてある）。"
+                    "オンプレミスの回線を調達する手段としては "
+                    "AWS Interconnect – last mile もあり、こちらは同じユーザーガイドの別サービス",
                 ),
             ),
         ),
@@ -348,6 +379,16 @@ LABELS: dict[str, dict[str, str]] = {
                     "Every figure above was measured with FSx for ONTAP on the cache side too. A "
                     "cache on on-premises ONTAP is in AWS's supported configurations but has not "
                     "been followed on hardware, and a remote site's latency is unmeasured",
+                ),
+                (
+                    "*6",
+                    "The connectivity layer depends on what the cache side is",
+                    "FlexCache requires cluster and SVM peering, and the path underneath it is one "
+                    "of the three in the middle of the figure. AWS Interconnect - multicloud is not this "
+                    "link: it joins AWS to another CSP, and no other cloud appears in "
+                    "this figure (cross-cloud connectivity has a figure of its own). For obtaining "
+                    "the on-premises circuit there is also AWS Interconnect - last mile, a separate "
+                    "service in the same user guide",
                 ),
             ),
         ),
@@ -793,14 +834,18 @@ def _overview() -> Diagram:
     return Diagram(
         name="s3burst-architecture-overview",
         diagram_id="s3burst-overview",
-        width=1350,
+        width=1550,
         height=665,
         groups=(
             Group("aws_cloud", "aws_cloud", 50, 50, 560, 350),
+            # Moved right by 120 to open the gap the connectivity frame sits in. At the previous
+            # position the two boundaries were 110 px apart, which fits an icon but not a frame
+            # naming three cases -- and naming them is the point, since a single icon on this link
+            # reads as a requirement.
             Group(
                 "edge_group",
                 "cache_site",
-                720,
+                920,
                 50,
                 560,
                 350,
@@ -808,7 +853,11 @@ def _overview() -> Diagram:
                 stroke="#147EBA",
             ),
         ),
-        frames=(Frame("cache_platform", "cache_platform", 760, 85, 220, 270),),
+        frames=(
+            Frame("cache_platform", "cache_platform", 960, 85, 220, 270),
+            # Sits between the two boundaries, on the FlexCache edge rather than beside it.
+            Frame("link_layer", "connect_layer", 700, 128, 206, 150),
+        ),
         nodes=(
             Node("s3client", "users", "s3_client", 100, 180),
             Node("s3ap", "s3_access_point", "s3_access_point", 270, 180),
@@ -817,24 +866,33 @@ def _overview() -> Diagram:
                 "cache_fsx",
                 "fsx_ontap",
                 "cache_volume_fsx",
-                *centred("fsx_ontap", 870, 155),
+                *centred("fsx_ontap", 1070, 155),
             ),
             Node(
                 "cache_ontap",
                 "ontap_9",
                 "cache_volume_ontap",
-                *centred("ontap_9", 870, 285),
+                *centred("ontap_9", 1070, 285),
             ),
-            Node("nfs_client", "client", "file_client", *centred("client", 1160, 205)),
+            Node("nfs_client", "client", "file_client", *centred("client", 1360, 205)),
         ),
-        texts=(TextBox("cache_or", "either_of", 820, 215, 100, 20),),
+        texts=(
+            TextBox("cache_or", "either_of", 1020, 215, 100, 20),
+            TextBox("link_1", "link_same_region", 708, 158, 190, 20),
+            TextBox("link_2", "link_cross_region", 708, 190, 190, 32),
+            TextBox("link_3", "link_onprem", 708, 234, 190, 32),
+        ),
         edges=(
             Edge("e1", "s3client", "s3ap", "put_object"),
             Edge("e2", "s3ap", "origin_vol"),
-            Edge("e3", "origin_vol", "cache_platform", "flexcache_pull"),
+            # Split in two so the connectivity frame sits on the path instead of alongside it. The
+            # FlexCache label stays on the first leg, because FlexCache is what crosses the link --
+            # the frame says what the link is made of, not what runs over it.
+            Edge("e3", "origin_vol", "link_layer", "flexcache_pull"),
+            Edge("e3b", "link_layer", "cache_platform"),
             Edge("e4", "cache_platform", "nfs_client", "nfs_smb"),
         ),
-        notes=(Note("note", "overview_note", 50, 440, 1250, 200),),
+        notes=(Note("note", "overview_note", 50, 440, 1450, 215),),
     )
 
 
