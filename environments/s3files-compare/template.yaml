@@ -1,0 +1,495 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# =================================================================================================
+# Deployed and verified on 2026-09-01: CREATE_COMPLETE in 375 s, all six resources. The measurements
+# this environment produced are in docs/ja/verification/s3files-measured.md. The CLI equivalent, which
+# is what produced those numbers, is runbook.sh in this directory.
+#
+# It builds the comparison side of a measurement: an Amazon S3 Files file system over a general
+# purpose bucket, mounted from the SAME verification host that environments/aws-origin/ creates, so
+# that the two paths are measured on one host against one clock.
+#
+# What it deliberately does NOT do:
+#   - It does not create a VPC, a subnet, or a host. All three are passed in, because reusing the
+#     existing ones is the whole point: a second host would compare two clocks, and a second subnet
+#     would add an Availability Zone hop to one side of the comparison only.
+#   - It does not modify the verification host's IAM role. That role lives in the other stack, and a
+#     cross-stack mutation of an IAM role is not something to hide inside a template. The policy the
+#     host needs is emitted as the HostPolicyToAttach output instead.
+#   - It enables no immutability feature. No S3 Object Lock, no retention, no versioned-object lock.
+#     S3 Versioning is enabled because S3 Files requires it, and versioning is not immutability:
+#     versions remain deletable.
+# =================================================================================================
+
+Description: >-
+  UNEXECUTED DRAFT. Amazon S3 Files file system, mount target and synchronisation role over a
+  versioned general purpose bucket, for measuring against the S3 Access Point plus FlexCache path on
+  the same host.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Network (reused from the existing measurement environment)
+        Parameters:
+          - VpcId
+          - SubnetId
+          - MeasurementHostSecurityGroupId
+      - Label:
+          default: S3 Files
+        Parameters:
+          - FileSystemName
+          - BucketName
+          - SmallFileImportThresholdBytes
+          - HighPerformanceStorageExpirationDays
+      - Label:
+          default: Access point (required; see the AccessPoint resource for why)
+        Parameters:
+          - PosixUid
+          - PosixGid
+          - AccessPointRootPath
+      - Label:
+          default: Tagging
+        Parameters:
+          - ProjectName
+          - Environment
+    ParameterLabels:
+      SubnetId:
+        default: Subnet (must be the one the measurement host already runs in)
+      MeasurementHostSecurityGroupId:
+        default: Security group of the existing measurement host
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: >-
+      The same VPC as environments/aws-origin/. A file system can have exactly one VPC, so this is
+      also the only VPC that will ever reach this file system.
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      Subnet for the mount target. It has to be the subnet the measurement host is in, not merely
+      one in the same VPC: a client mounts through the mount target in its own Availability Zone,
+      and only one mount target per Availability Zone is allowed. Crossing a zone would add a hop to
+      the S3 Files side that the S3 Access Point side does not pay, which is the comparison this
+      stack exists to avoid distorting.
+
+  MeasurementHostSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >-
+      The security group already attached to the verification host (HostSecurityGroup in the
+      aws-origin stack). It is used as the source of the mount target's inbound rule, so the same
+      host reaches both paths without any address being written down anywhere.
+
+  FileSystemName:
+    Type: String
+    Default: s3burst-s3files-compare
+    AllowedPattern: "^[a-z][a-z0-9-]{1,46}[a-z0-9]$"
+    Description: Name tag for the file system.
+
+  BucketName:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    Description: >-
+      Leave empty to let CloudFormation name the bucket. A bucket created here is owned by this
+      stack, which keeps the teardown on one path. Pointing S3 Files at a pre-existing bucket is
+      supported by the service but not by this template, because CloudFormation cannot turn on
+      versioning for a bucket it does not own, and versioning is a hard prerequisite — see the
+      deployment guide for that route.
+
+  SmallFileImportThresholdBytes:
+    Type: Number
+    Default: 131072
+    MinValue: 1
+    MaxValue: 52673613135872
+    Description: >-
+      Objects strictly smaller than this many BYTES have their data imported to the high-performance
+      storage for low-latency reads. The unit is bytes, not KiB: 131072 is the 128 KiB service
+      default, and writing 128 here would import almost nothing while looking correct. Left as a
+      parameter because it is one of the two variables the fourth measurement direction is about —
+      reads at or above 1 MiB stream from the bucket regardless of what is set here.
+
+  HighPerformanceStorageExpirationDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 365
+    Description: >-
+      How long unread data stays on the high-performance storage before it expires. It is billed
+      while it is resident, so this is a cost parameter as much as a performance one. Service
+      default is 30 days.
+
+  PosixUid:
+    Type: Number
+    Default: 1000
+    MinValue: 0
+    MaxValue: 4294967295
+    Description: >-
+      POSIX uid every client through the access point is mapped to. 1000 is ec2-user on Amazon Linux.
+      0 would map clients to root, which is the thing the access point exists to avoid needing.
+
+  PosixGid:
+    Type: Number
+    Default: 1000
+    MinValue: 0
+    MaxValue: 4294967295
+    Description: POSIX gid every client through the access point is mapped to.
+
+  AccessPointRootPath:
+    Type: String
+    Default: /measure
+    AllowedPattern: "^/[a-zA-Z0-9_/-]*$"
+    Description: >-
+      Directory the mount is rooted at. It shifts the key namespace: with /measure, bucket key
+      measure/a/b appears on the mount as <mount>/a/b, and any tool that maps a mount path to a key
+      needs to be told (scripts/measure_s3files_visibility.py takes --key-prefix for exactly this).
+      Set it to / to keep the two identical, at the cost of writes landing beside every other prefix
+      in the bucket.
+
+  ProjectName:
+    Type: String
+    Default: s3-burst-on-ontap-files
+    Description: Applied as a tag to every resource.
+
+  Environment:
+    Type: String
+    Default: verify
+    AllowedValues: [verify, dev, stg]
+    Description: >-
+      Applied as a tag. There is no prod value on purpose — this stack builds a measurement
+      environment.
+
+Conditions:
+  GenerateBucketName: !Equals [!Ref BucketName, ""]
+
+Resources:
+  # -----------------------------------------------------------------------------------------------
+  # Source bucket
+  #
+  # Versioning is not a choice here: S3 Files uses version-specific API operations to synchronise,
+  # and refuses a bucket without it. The consequence to hold in mind is that every file-side write
+  # becomes a new version rather than an overwrite, so a measurement loop that writes 30 objects
+  # leaves 30 version chains behind. That is why the teardown script deletes versions and delete
+  # markers rather than calling `aws s3 rm`.
+  # -----------------------------------------------------------------------------------------------
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    # checkov:skip=CKV_AWS_18:access logging would need a second bucket, and a second bucket in the
+    # teardown path of a measurement environment is a second thing that can block a delete-stack.
+    # checkov:skip=CKV_AWS_144:cross-Region replication is not wanted for a bucket that exists to be
+    # deleted at the end of a measurement.
+    Properties:
+      BucketName: !If [GenerateBucketName, !Ref "AWS::NoValue", !Ref BucketName]
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          # SSE-S3. S3 Files accepts SSE-S3 or SSE-KMS and nothing else. SSE-S3 is chosen so the
+          # teardown does not involve a customer managed key, whose deletion has a mandatory waiting
+          # period of 7 to 30 days.
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        # ACLs disabled. S3 Files does not preserve S3 ACLs across changes made through the file
+        # system, so a bucket relying on them would quietly lose them.
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: Name
+          Value: !Sub "${FileSystemName}-source"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -----------------------------------------------------------------------------------------------
+  # Synchronisation role
+  #
+  # Assumed by the service, not by the host. It is what copies objects into the file system's view
+  # and writes file-side changes back out, and it manages the EventBridge rules that drive the import
+  # direction. Scoped to this one bucket.
+  # -----------------------------------------------------------------------------------------------
+  SynchronizationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: !Sub "Assumed by S3 Files to synchronise ${FileSystemName} with its bucket."
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              # The service principal is elasticfilesystem, not s3files: S3 Files is built on
+              # Amazon EFS and assumes the role under the EFS principal. A trust policy naming
+              # s3files.amazonaws.com looks right and does not work.
+              Service: elasticfilesystem.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+              ArnLike:
+                aws:SourceArn: !Sub "arn:${AWS::Partition}:s3files:${AWS::Region}:${AWS::AccountId}:file-system/*"
+      Policies:
+        - PolicyName: synchronise-this-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3BucketPermissions
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                Resource: !GetAtt SourceBucket.Arn
+                Condition:
+                  StringEquals:
+                    aws:ResourceAccount: !Ref "AWS::AccountId"
+              - Sid: S3ObjectPermissions
+                Effect: Allow
+                # Wildcarded on purpose, following the documented policy: synchronisation uses the
+                # version-specific operations (GetObjectVersion, GetObjectVersionTagging) as well as
+                # the plain ones, and enumerating them invites a gap on the next API addition.
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:DeleteObject*
+                  - s3:GetObject*
+                  - s3:List*
+                  - s3:PutObject*
+                Resource: !Sub "${SourceBucket.Arn}/*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceAccount: !Ref "AWS::AccountId"
+              - Sid: EventBridgeManage
+                Effect: Allow
+                Action:
+                  - events:DeleteRule
+                  - events:DisableRule
+                  - events:EnableRule
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                Condition:
+                  StringEquals:
+                    events:ManagedBy: elasticfilesystem.amazonaws.com
+                Resource: !Sub "arn:${AWS::Partition}:events:*:*:rule/DO-NOT-DELETE-S3-Files*"
+              - Sid: EventBridgeRead
+                Effect: Allow
+                Action:
+                  - events:DescribeRule
+                  - events:ListRuleNamesByTarget
+                  - events:ListRules
+                  - events:ListTargetsByRule
+                Resource: !Sub "arn:${AWS::Partition}:events:*:*:rule/*"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -----------------------------------------------------------------------------------------------
+  # File system
+  # -----------------------------------------------------------------------------------------------
+  FileSystem:
+    Type: AWS::S3Files::FileSystem
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      # Bucket takes an ARN, not a name.
+      Bucket: !GetAtt SourceBucket.Arn
+      RoleArn: !GetAtt SynchronizationRole.Arn
+      AcceptBucketWarning: true
+      SynchronizationConfiguration:
+        ImportDataRules:
+          # An empty prefix scopes the rule to the whole bucket. ON_DIRECTORY_FIRST_ACCESS is the
+          # documented default behaviour: metadata for a directory, and data for objects under the
+          # size threshold, are imported the first time the directory is listed. That first access
+          # is slower than every later one, which is why the measurement script warms the directory
+          # before timing anything.
+          - Prefix: ""
+            SizeLessThan: !Ref SmallFileImportThresholdBytes
+            Trigger: ON_DIRECTORY_FIRST_ACCESS
+        ExpirationDataRules:
+          - DaysAfterLastAccess: !Ref HighPerformanceStorageExpirationDays
+      Tags:
+        - Key: Name
+          Value: !Ref FileSystemName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -----------------------------------------------------------------------------------------------
+  # Mount target and its security group
+  #
+  # One rule, one port. The mount helper always uses TLS and IAM, and both ride the same TCP 2049 as
+  # the NFS traffic, so there is no second port to open for encryption or for authentication.
+  # -----------------------------------------------------------------------------------------------
+  MountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${FileSystemName} mount target. Inbound from the measurement host only."
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref MeasurementHostSecurityGroupId
+          Description: NFS, and with it the TLS and IAM the mount helper requires.
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          # EC2 validates this string against a restricted character set that excludes the
+          # apostrophe. cfn-lint does not check it, so an apostrophe here fails at CREATE time with
+          # "Invalid rule description" -- measured 2026-09-01, and the reason this reads awkwardly.
+          Description: >-
+            The mount target replies on established connections. A blanket egress rule is kept
+            rather than narrowed, because narrowing it would be a guess about service-side traffic
+            that this template has not verified.
+      Tags:
+        - Key: Name
+          Value: !Sub "${FileSystemName}-mount-target"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  MountTarget:
+    Type: AWS::S3Files::MountTarget
+    Properties:
+      FileSystemId: !GetAtt FileSystem.FileSystemId
+      SubnetId: !Ref SubnetId
+      SecurityGroups:
+        - !Ref MountTargetSecurityGroup
+
+  # -----------------------------------------------------------------------------------------------
+  # Access point
+  #
+  # Not optional, and this was learned by running it. A client role scoped to s3files:ClientMount and
+  # s3files:ClientWrite cannot write anywhere on the mount -- measured 2026-09-01, root's own mkdir at
+  # the mount root returned EACCES. The two ways out are s3files:ClientRootAccess, which bypasses
+  # POSIX permission checks, and an access point that maps clients to a POSIX identity. AWS documents
+  # the second as the preferred one, and it is what this stack creates.
+  #
+  # Consequence to carry into any tooling: RootDirectory shifts the key namespace. With the path
+  # below, bucket key `measure/a/b` appears on the mount as `<mount>/a/b`. Code that treats a mount
+  # path as an S3 key polls a location that cannot exist, and because the failure is a timeout rather
+  # than an error it is indistinguishable from the service being slow.
+  # -----------------------------------------------------------------------------------------------
+  AccessPoint:
+    Type: AWS::S3Files::AccessPoint
+    Properties:
+      FileSystemId: !GetAtt FileSystem.FileSystemId
+      PosixUser:
+        Uid: !Ref PosixUid
+        Gid: !Ref PosixGid
+      RootDirectory:
+        Path: !Ref AccessPointRootPath
+        CreationPermissions:
+          OwnerUid: !Ref PosixUid
+          OwnerGid: !Ref PosixGid
+          Permissions: "0755"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  Status:
+    Description: >-
+      Provenance of this template. Read it before quoting anything produced with it.
+    Value: >-
+      Deployed and verified 2026-09-01 (CREATE_COMPLETE in 375 s, all six resources). Two defects
+      were found by deploying rather than by cfn-lint: a security group rule description containing
+      an apostrophe, which EC2 rejects, and this output claiming the stack had never been deployed.
+      The measurements it supports are in docs/ja/verification/s3files-measured.md.
+
+  FileSystemId:
+    Description: >-
+      S3 Files file system ID. This is the value the mount command takes, and the --file-system-id
+      argument of scripts/measure_s3files_visibility.py.
+    Value: !GetAtt FileSystem.FileSystemId
+
+  SourceBucketName:
+    Description: >-
+      The bucket the file system is a view of. Writes over the S3 API in the measurement go here,
+      and reads over NFS come from the file system built on it.
+    Value: !Ref SourceBucket
+
+  SynchronizationRoleArn:
+    Description: Role the service assumes to synchronise. Not attached to any host.
+    Value: !GetAtt SynchronizationRole.Arn
+
+  HowToReadTheMountTargetState:
+    Description: >-
+      A mount target is reachable only once it reports available, and a mount attempted before then
+      fails in a way that reads like a security group problem. CloudFormation returning
+      CREATE_COMPLETE is not the same signal, so check the state rather than the stack.
+    Value: !Sub >-
+      aws s3files list-mount-targets --region ${AWS::Region}
+      --file-system-id ${FileSystem.FileSystemId}
+      --query 'mountTargets[].[mountTargetId,status,availabilityZoneId]' --output table
+      # note: the s3files API uses list-/get- and lowerCamelCase members, not describe-/PascalCase
+
+  AccessPointId:
+    Description: >-
+      Mount through this, not through the file system root: `mount -t s3files -o
+      accesspoint=<id>,actimeo=0 <fs-id>:/ /mnt/s3files`. Measured 2026-09-01: without it, a client
+      role that has ClientMount and ClientWrite but not ClientRootAccess cannot create anything.
+    Value: !GetAtt AccessPoint.AccessPointId
+
+  KeyPrefixForTooling:
+    Description: >-
+      The bucket key prefix the mount root corresponds to. Pass it to
+      scripts/measure_s3files_visibility.py as --key-prefix. Omitting it makes every mount-side poll
+      wait for a path that cannot exist, which times out instead of failing.
+
+      An S3 key prefix carries no leading slash, so the leading one is stripped here. Emitting
+      "/measure/" was the first version and it is wrong: nothing in the bucket starts with a slash.
+      Note this Select/Split form handles a single-level path only.
+    Value: !Join ["", [!Select [1, !Split ["/", !Ref AccessPointRootPath]], "/"]]
+
+  HostPolicyToAttach:
+    Description: >-
+      The measurement host needs two things this stack deliberately does not give it, because its
+      IAM role belongs to the aws-origin stack: permission to mount and write to the file system,
+      and direct read access to the bucket's objects. Attach the managed policy, then the inline one.
+      Without the first, the mount fails; without the second, the mount succeeds and large reads
+      lose the direct-from-S3 path that the fourth measurement direction is about.
+    Value: !Sub >-
+      aws iam attach-role-policy --role-name <the aws-origin stack's host role>
+      --policy-arn arn:${AWS::Partition}:iam::aws:policy/AmazonS3FilesClientFullAccess ;
+      then allow s3:GetObject, s3:GetObjectVersion on ${SourceBucket.Arn}/* and s3:ListBucket on
+      ${SourceBucket.Arn}
+
+  TeardownOrder:
+    Description: >-
+      Order matters, and the reason is the prerequisite that cannot be turned off. Versioning means
+      the bucket holds a version chain and a delete marker for every object the measurement wrote,
+      and CloudFormation cannot delete a bucket that is not empty, so delete-stack fails at the very
+      end after removing everything else.
+    Value: >-
+      unmount on the host, empty every version and delete marker, then delete the stack. Four
+      constraints fix that order, and the fourth was found by doing it: (1) versioning means the
+      bucket holds a version chain and a delete marker per object, so `aws s3 rm` is not enough;
+      (2) the access point and mount target go before the file system; (3) the bucket cannot be
+      deleted while a file system is attached (BucketHasS3FileSystemAttached), so the file system is
+      not last; (4) delete-file-system refuses with ConflictException while data is pending export,
+      and the PendingExports metric read 0 while it was still refused -- wait, or use
+      --force-delete and accept losing data not yet exported. runbook.sh destroy implements this and
+      confirms by counting what is left rather than by trusting the delete calls.
+
+  NextStep:
+    Description: What to do once this stack is CREATE_COMPLETE.
+    Value: >-
+      Follow docs/ja/deployment/aws-s3files-compare.md: attach the host policy above, wait for the
+      mount target to report available, mount with environments/s3files-compare/mount-s3files.sh,
+      then run scripts/measure_s3files_visibility.py.

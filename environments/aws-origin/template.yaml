@@ -90,8 +90,12 @@ Parameters:
     Default: 128
     AllowedValues: [128, 256, 512, 1024, 2048, 4096]
     Description: >-
-      Provisioned throughput, billed whether or not it is used. 128 is enough to observe visibility
-      behaviour; it is not enough to characterise throughput, and this stack is not sized for that.
+      Provisioned throughput, billed whether or not it is used, and the ceiling a throughput
+      measurement against this file system is measuring. 128 is the tier the visibility records were
+      taken on, so it is the tier that compares with them. It is also the reason a throughput figure
+      from this stack is not comparable, as a bare number, with one from an elastic service: this
+      value was purchased, the elastic one was not. Raising it is an online update and takes tens of
+      minutes; the cost of the higher tiers is the reason it is not the default.
 
   SvmName:
     Type: String
@@ -137,14 +141,55 @@ Parameters:
     Type: String
     Default: t3.small
     Description: >-
-      The host runs an NFS client and the AWS CLI. It is not in the measurement path for throughput,
-      so it does not need to be large.
+      t3.small is enough for the visibility and semantics work, where the host issues one request at
+      a time and its network is nowhere near the limit. It is not enough for a throughput
+      measurement, and the reason is worth stating because the failure is silent: if the instance
+      network saturates first, the result is a measurement of EC2 network credits wearing the
+      storage's name, and nothing in the output says so. For the throughput runs this is set to
+      c5n.9xlarge, whose published network figure is a flat 50 Gbps. Most smaller c5n sizes are
+      quoted as "Up to 25 Gbps", which is a burst ceiling with a lower sustained baseline, so they
+      cannot rule the client out at the 2048 MBps tier (16.4 Gbps) or against a service documented
+      to serve up to 3 GiB/s to one client (24 Gbps). c5n.9xlarge is the smallest c5n with a figure
+      that is not prefixed "Up to", and its 36 vCPU keep 64 concurrent TLS streams off the CPU as a
+      second confound. It is not free: $2.448/h against $0.272/h for c5n.xlarge in ap-northeast-1
+      (on-demand Linux, effective 2026-08-01), which is why it is not the default and why the runs
+      are short.
 
   HostVolumeSizeGiB:
     Type: Number
     Default: 20
     MinValue: 8
     Description: Root volume size for the verification host.
+
+  AssociatePublicIp:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Leave false where the subnet reaches AWS services through a NAT gateway or VPC endpoints. Set
+      true only in a subnet that has neither, because Session Manager needs to reach the SSM
+      endpoints and a host with no route to them registers nowhere and cannot be reached at all —
+      the instance comes up healthy and is simply absent from Session Manager, which is a confusing
+      way to lose twenty minutes. A public IP is not an inbound path here: the host security group
+      has no inbound rule.
+
+  HostS3DataAccess:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Grants the host the S3 data-path actions, needed only when the host itself drives the
+      measurement rather than just mounting. Off by default so the ordinary verification host keeps
+      read-only FSx for ONTAP permissions and no write path to object storage.
+
+  HostS3ResourceArns:
+    Type: CommaDelimitedList
+    Default: "*"
+    Description: >-
+      What HostS3DataAccess applies to. The default is "*" and that is deliberately visible rather
+      than hidden: the S3 Access Point is created by a separate stack and an S3 Files bucket by a
+      separate runbook, so neither ARN exists when this template is deployed. Narrow it to the two
+      ARNs once they do, especially in an account shared with other people's buckets.
 
   ProjectName:
     Type: String
@@ -161,6 +206,10 @@ Parameters:
 
 Conditions:
   WantHost: !Equals [!Ref DeployVerificationHost, "true"]
+  WantPublicIp: !Equals [!Ref AssociatePublicIp, "true"]
+  WantS3DataAccess: !And
+    - !Equals [!Ref DeployVerificationHost, "true"]
+    - !Equals [!Ref HostS3DataAccess, "true"]
 
 Resources:
   # ---------------------------------------------------------------------------------------------
@@ -184,9 +233,29 @@ Resources:
         SecretStringTemplate: '{"username":"fsxadmin"}'
         GenerateStringKey: password
         PasswordLength: 32
-        # ONTAP rejects several punctuation characters in this password, and the failure surfaces
-        # during file system creation rather than at validation time.
-        ExcludeCharacters: '"@/\:;,`$'
+        # All punctuation is excluded, and the reason is worth the space because the failure mode is
+        # silent and expensive.
+        #
+        # This previously excluded only '"@/\:;,`$'. A file system created with that setting got a
+        # generated password containing ! # < > ] ^ | } and **the password in the secret was not the
+        # password the file system ended up with.** Creation succeeded, the stack reported
+        # CREATE_COMPLETE, and the defect only appeared later as HTTP 401 from the ONTAP REST API
+        # with the body {"error":{"code":"6691623","message":"User is not authorized."}} -- a message
+        # that points at permissions rather than at authentication, so the obvious next move is to
+        # go and check roles that were never the problem.
+        #
+        # Everything that matters about this architecture's serve side is ONTAP-only: FlexCache,
+        # cluster peering and SVM peering have no AWS API. So a file system whose fsxadmin credential
+        # does not work is a file system on which the serve side cannot be built at all, and nothing
+        # in the AWS console says so.
+        #
+        # Which character was responsible was not identified. Excluding all punctuation removes the
+        # question rather than answering it, which is the right trade here: 32 alphanumeric
+        # characters is about 190 bits, so nothing is lost by dropping the symbols.
+        # RequireEachIncludedType keeps upper, lower and digits all present for ONTAP's complexity
+        # requirement.
+        ExcludePunctuation: true
+        RequireEachIncludedType: true
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -290,10 +359,19 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
+          # Two EC2 limits apply to a rule description and neither is visible to cfn-lint, so both
+          # are enforced by `make sg-descriptions` instead:
+          #
+          #   1. Only a-zA-Z0-9 and . _-:/()#,@[]+=&;{}!$* are accepted. An em dash, an apostrophe
+          #      or a quote fails the create with `Invalid rule description`, whose message lists
+          #      what is allowed rather than what was rejected.
+          #   2. The limit is 255 characters.
+          #
+          # Explanations therefore live in comments like this one, which have neither limit, and the
+          # description below stays short and plainly punctuated.
           Description: >-
             Outbound for SSM, Secrets Manager, the S3 data path and package installation. No inbound
-            rule exists at all — the host is reached through Session Manager, so it needs no open
-            port and no key pair.
+            rule exists at all: the host is reached through Session Manager.
       Tags:
         - Key: Name
           Value: !Sub "${FileSystemName}-verify-host"
@@ -408,6 +486,55 @@ Resources:
                   - fsx:DescribeVolumes
                   - fsx:DescribeS3AccessPointAttachments
                 Resource: "*"
+        - !If
+          - WantS3DataAccess
+          - PolicyName: s3-data-path
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                # The object actions the measurement scripts use, and nothing administrative: no
+                # CreateBucket, no DeleteBucket, no policy or versioning changes. The version-scoped
+                # actions are here because an S3 Files bucket must have versioning on, so an
+                # overwrite leaves a previous version behind and a cleanup that only removes current
+                # versions leaves the bucket non-empty.
+                - Effect: Allow
+                  Action:
+                    - s3:PutObject
+                    - s3:GetObject
+                    - s3:DeleteObject
+                    - s3:GetObjectVersion
+                    - s3:DeleteObjectVersion
+                    - s3:AbortMultipartUpload
+                    - s3:ListMultipartUploadParts
+                    - s3:ListBucket
+                    - s3:ListBucketVersions
+                    - s3:ListBucketMultipartUploads
+                    - s3:GetBucketLocation
+                  Resource: !Ref HostS3ResourceArns
+                # Mounting an S3 Files file system is authorised by these, not by the s3: actions
+                # above. ClientRootAccess is included because objects arriving over the S3 API
+                # materialise owned by root, and without it a directory so created cannot be written
+                # to from the mount even by the access point's own POSIX identity.
+                - Effect: Allow
+                  Action:
+                    - s3files:ClientMount
+                    - s3files:ClientWrite
+                    - s3files:ClientRootAccess
+                    # ListMountTargets and GetFileSystem, not Describe*: the s3files API has no
+                    # Describe action of any kind, and cfn-lint is what caught the invented one.
+                    - s3files:ListMountTargets
+                    - s3files:GetFileSystem
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - elasticfilesystem:ClientMount
+                    - elasticfilesystem:ClientWrite
+                    - elasticfilesystem:ClientRootAccess
+                  Resource: "*"
+                - Effect: Allow
+                  Action: cloudwatch:GetMetricStatistics
+                  Resource: "*"
+          - !Ref AWS::NoValue
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -429,10 +556,22 @@ Resources:
       # date-specific and is the usual reason a template stops deploying months later.
       ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
       InstanceType: !Ref HostInstanceType
-      SubnetId: !Ref SubnetId
       IamInstanceProfile: !Ref HostProfile
+      # Two mutually exclusive shapes. EC2 rejects SubnetId and SecurityGroupIds alongside
+      # NetworkInterfaces, and AssociatePublicIpAddress exists only on the latter, so the choice has
+      # to be made at the property level rather than by adding one flag.
+      SubnetId: !If [WantPublicIp, !Ref AWS::NoValue, !Ref SubnetId]
       SecurityGroupIds:
-        - !Ref HostSecurityGroup
+        !If [WantPublicIp, !Ref AWS::NoValue, [!Ref HostSecurityGroup]]
+      NetworkInterfaces: !If
+        - WantPublicIp
+        - - DeviceIndex: "0"
+            AssociatePublicIpAddress: true
+            SubnetId: !Ref SubnetId
+            GroupSet:
+              - !Ref HostSecurityGroup
+            DeleteOnTermination: true
+        - !Ref AWS::NoValue
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
@@ -447,6 +586,12 @@ Resources:
           #!/bin/bash
           set -euo pipefail
           dnf install -y nfs-utils jq >/dev/null 2>&1 || yum install -y nfs-utils jq >/dev/null 2>&1
+
+          # python3.12 explicitly, not the distribution default. On Amazon Linux 2023 that default is
+          # 3.9, where datetime.UTC does not exist, so every measurement script here fails on import
+          # with a name that gives no hint that the interpreter is the problem.
+          dnf install -y python3.12 python3.12-pip >/dev/null 2>&1 || true
+          python3.12 -m pip install --quiet boto3 >/dev/null 2>&1 || true
 
           # Two mount points, because the client cache decides what a reader sees and the difference
           # is large. With Linux defaults (acdirmin=30, acdirmax=60) a file that appears in a
@@ -525,6 +670,21 @@ Outputs:
       Secret holding the fsxadmin credential. Only the verification host can read it. Never print the
       value into a log, an issue or a commit.
     Value: !Ref OntapAdminSecret
+
+  HostSecurityGroupId:
+    Condition: WantHost
+    Description: >-
+      The security group on the verification host. Other stacks take this as input rather than a CIDR
+      so that they grant access to this host and not to whatever else shares its range: the S3 Files
+      comparison stack uses it as the source of its NFS ingress rule.
+    Value: !Ref HostSecurityGroup
+
+  HostRoleArn:
+    Condition: WantHost
+    Description: >-
+      The host role, which is the principal to name in an S3 Access Point policy so that only this
+      host can write through it.
+    Value: !GetAtt HostRole.Arn
 
   VerificationHostId:
     Condition: WantHost

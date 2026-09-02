@@ -1,0 +1,11 @@
+[
+  { "ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0" },
+  { "ParameterKey": "SubnetId", "ParameterValue": "subnet-0123456789abcdef0" },
+  { "ParameterKey": "MeasurementHostSecurityGroupId", "ParameterValue": "sg-0123456789abcdef0" },
+  { "ParameterKey": "FileSystemName", "ParameterValue": "s3burst-s3files-compare" },
+  { "ParameterKey": "BucketName", "ParameterValue": "" },
+  { "ParameterKey": "SmallFileImportThresholdBytes", "ParameterValue": "131072" },
+  { "ParameterKey": "HighPerformanceStorageExpirationDays", "ParameterValue": "30" },
+  { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
+  { "ParameterKey": "Environment", "ParameterValue": "verify" }
+]

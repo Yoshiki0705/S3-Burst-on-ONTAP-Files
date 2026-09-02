@@ -8,7 +8,23 @@
 | [`aws-origin/`](aws-origin/) | 収集側（Origin）: FSx for ONTAP、SVM、Origin ボリューム、VPC 内の検証ホスト | CloudFormation | [日本語](../docs/ja/deployment/aws-cloudformation.md) / [English](../docs/en/deployment/aws-cloudformation.md) |
 | [`onprem-cache/`](onprem-cache/) | 配布側（Cache）: FlexCache ボリュームと読み取り専用の NFS エクスポート | Terraform | [日本語](../docs/ja/deployment/onprem-terraform.md) / [English](../docs/en/deployment/onprem-terraform.md) |
 
-## なぜツールが 2 つなのか
+## 比較対象の環境
+
+上の 2 つはこの構成そのものです。もう 1 つ、**比較のための環境**があります。
+
+| ディレクトリ | 何をデプロイするか | ツール | ガイド |
+|---|---|---|---|
+| [`s3files-compare/`](s3files-compare/) | 比較対象: Amazon S3 Files のファイルシステムとマウントターゲット。収集側スタックの VPC・サブネット・検証ホストを引き継ぐ | CloudFormation | [日本語](../docs/ja/deployment/aws-s3files-compare.md) |
+
+**このディレクトリは未実行の草案です。** 一度もデプロイしていません。
+同じ要求に対する別の設計を、同一ホスト・同一クロックで測るために用意したもので、
+数値は[比較検証](../docs/ja/verification/s3files-vs-flexcache.md)に入りますが、
+実測前なので表は空です。
+
+破棄はバージョニングのために順序が決まっています。`teardown.sh` を使ってください。
+バケットを空にせずに `delete-stack` すると、ファイルシステムを消し終えた状態で失敗します。
+
+## ツールが 2 つである理由
 
 **収集側は AWS の中だけで完結します。** FSx for ONTAP、SVM、ボリューム、検証ホスト、IAM、
 Secrets Manager はすべて AWS のリソースなので、CloudFormation で 1 スタックになります。
