@@ -444,7 +444,7 @@ Cache は後からそれを取り込むため、Cache をマウントしてい�
 
 サーバー側で検出する候補は [FPolicy](https://docs.netapp.com/us-en/ontap/nas-audit/fpolicy-config-types-concept.html) だが、**Origin 側については使えないことが確定した。**
 S3 Access Point 経由で届いた書き込みは FPolicy 通知を発火せず、`mandatory` 指定の同期ポリシーでも
-遮断されない（実測 2026-08-26、ONTAP 9.18.1P3D1、UNIX / WINDOWS identity 両方。[FPolicy と S3 Access Point のカバレッジ実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-monitoring-coverage-implications.md)）。
+遮断されない（実測 2026-08-26、ONTAP 9.18.1P3D1、UNIX / WINDOWS identity 両方。[FPolicy と S3 Access Point のカバレッジ実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/errata-fpolicy-s3ap-coverage.md)）。
 FPolicy の event が受け付けるプロトコルは `cifs` / `nfsv3` / `nfsv4` のみで、S3 に相当する値は存在しない。
 
 **Cache 側で発火するかは未検証のまま残っている。** この構成の書き込みは Origin に届くため、
