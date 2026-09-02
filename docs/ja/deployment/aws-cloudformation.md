@@ -46,6 +46,10 @@
 cd environments/aws-origin
 cp params.example.json params.json    # params.json は追跡されません
 # VpcId と SubnetId を自分の値に変更する
+#
+# スループットを測る場合は params.throughput.example.json を使う。t3.small ではなく
+# c5n.9xlarge を指定し、ホストに S3 のデータ経路権限を与える構成で、費用が上がる。
+# 差分の理由はそのファイルの _comment に書いてある
 
 aws cloudformation deploy \
   --template-file template.yaml \

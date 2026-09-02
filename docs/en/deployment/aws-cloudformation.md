@@ -47,6 +47,10 @@ and [the environments index](../../../environments/README.md) for why.
 ```bash
 cd environments/aws-origin
 cp params.example.json params.json    # params.json is gitignored
+#
+# To measure throughput, start from params.throughput.example.json instead. It names c5n.9xlarge
+# rather than t3.small and grants the host the S3 data path, so it costs materially more. The
+# reason behind each difference is in that file's _comment.
 # replace VpcId and SubnetId with your own
 
 aws cloudformation deploy \

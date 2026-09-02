@@ -11,6 +11,9 @@
   { "ParameterKey": "DeployVerificationHost", "ParameterValue": "true" },
   { "ParameterKey": "HostInstanceType", "ParameterValue": "t3.small" },
   { "ParameterKey": "HostVolumeSizeGiB", "ParameterValue": "20" },
+  { "ParameterKey": "AssociatePublicIp", "ParameterValue": "false" },
+  { "ParameterKey": "HostS3DataAccess", "ParameterValue": "false" },
+  { "ParameterKey": "HostS3ResourceArns", "ParameterValue": "*" },
   { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
   { "ParameterKey": "Environment", "ParameterValue": "verify" }
 ]
