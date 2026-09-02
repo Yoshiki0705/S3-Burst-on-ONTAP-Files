@@ -9,14 +9,14 @@ PY ?= python3
         audit secrets pinning zizmor links links-external budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors test all new-pattern \
         diagrams diagrams-check \
-        terraform finops finops-write \
+        terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-lint: markdown python cfn terraform ## Markdown, Python, CloudFormation and Terraform
+lint: markdown python cfn sg-descriptions terraform ## Markdown, Python, CloudFormation and Terraform
 
 # `RUFF` and `ZIZMOR` are overridable so that the recipes below can be driven against a stub
 # binary. The defect they guard against lives in the recipe's shell, not in any Python, so a test
@@ -92,6 +92,9 @@ cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is
 		cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
 	fi
 
+sg-descriptions: ## Security group rule descriptions must use only characters EC2 accepts
+	@$(PY) tools/check_sg_rule_descriptions.py
+
 terraform: ## Validate and format-check every Terraform root (skipped when terraform is absent)
 	@if ! command -v terraform >/dev/null 2>&1; then \
 		echo "terraform not installed - skipping (brew install terraform)"; \
@@ -139,6 +142,11 @@ diagrams: ## Regenerate the diagrams and export SVG + PNG (needs the AWS icon pa
 
 diagrams-check: ## Confirm the committed diagrams match their spec (needs the AWS icon package)
 	@$(PY) tools/build_diagrams.py --check
+
+# There is deliberately no `slides` target. The LT deck and its generator both live under
+# `.private/`, which is gitignored, because the generator contains the deck's text. A target
+# pointing at a gitignored path is a broken target in a fresh clone.
+# Run it directly:  python3 .private/slides/build_slides.py
 
 audit: ## Pre-publication audit (naming / vendor-ref / neutrality / PII / conflation)
 	@$(PY) tools/audit_public_output.py
