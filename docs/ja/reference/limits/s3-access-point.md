@@ -39,7 +39,7 @@
 | アカウント | アクセスポイントとボリュームが同一アカウント | ドキュメント記載 | 同上 |
 | `NetworkOrigin` | 作成後は変更できない | ドキュメント記載 | 同上。**到達性は origin の種別ではなく呼び出し元の位置とルーティングで決まる。** Gateway エンドポイントは VPC 内で発生したトラフィックだけをルーティングし、VPN / Direct Connect / ピア VPC / Transit Gateway 経由の呼び出しには Interface エンドポイントが必要（[ネットワークアクセス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)） |
 | 認可 | AWS 側と ONTAP 側の両方が許可する必要がある | ドキュメント記載 | [二層認可](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) |
-| アクセスポイントポリシーのサイズ | ドキュメント上の上限は 20 KB。**判定は正規化後の文書に対して行われる** | ドキュメント記載 / **別環境での実測** | 24,620 B は受理、24,861 B は `MalformedPolicy: Normalized policy document exceeds the maximum allowed size`。境界は書き方で動くので**手元の JSON のバイト数を予算にできない**。FSx API がフィールドとして受け付ける 200,000 文字は実効上限ではない（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#ポリシーサイズの上限は正規化後で判定される)。ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。**このリポジトリでは測っていない**） |
+| アクセスポイントポリシーのサイズ | ドキュメント上の上限は 20 KB。**判定は正規化後の文書に対して行われる** | ドキュメント記載 / **別環境での実測** | 24,620 B は受理、24,861 B は `MalformedPolicy: Normalized policy document exceeds the maximum allowed size`。境界は書き方で動くので**手元の JSON のバイト数を予算にできない**。FSx API がフィールドとして受け付ける 200,000 文字は実効上限ではない（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#正規化後で判定されるポリシーサイズの上限)。ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。**このリポジトリでは測っていない**） |
 
 ## ネットワークで絞るときに効く条件キー
 
@@ -63,7 +63,7 @@ VPC と一致しないリクエストを拒否する明示的な拒否と同等�
 
 この節は AWS のドキュメント記載である。このリポジトリでは実測していない。
 実測されているのは `aws:SourceVpce` が S3 ゲートウェイエンドポイント経由で埋まることだけで、
-[条件キーの実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#条件キーはリクエストに載っているときしか比較できません)にある。
+[条件キーの実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#リクエストに載っているときに限られる条件キーの比較)にある。
 
 ## 監査で追えるものと追えないもの
 
@@ -78,8 +78,8 @@ ONTAP のファイルアクセス監査は S3 Access Point 経由のアクセス
 | ローカルユーザーかどうか | `SubjectUserIsLocal` が、実際にはローカルの Windows ユーザーに対して `false` | このフィールドを判定条件に使えない |
 | UNIX 実効スタイルのボリュームの操作 | SVM で監査を有効化しても**記録が 1 件も出ない**（同一 SVM・同一設定の NTFS ボリュームでは記録あり）。mode bits は監査情報を持たないため、対象を指定する **ACE（SACL）が必要** | UNIX ボリュームで監査が要件なら、有効化だけでは足りない |
 
-いずれも[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログには誰が記録されるか)（`WINDOWS` タイプの AP、ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。
-UNIX ボリュームの件は[この節](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#unix-セキュリティスタイルのボリュームでは監査を有効化しても記録されない)）。**このリポジトリでは測っていない。**
+いずれも[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログに記録される主体)（`WINDOWS` タイプの AP、ONTAP 9.18.1P3D1、2026-08-17〜18、`ap-northeast-1`。
+UNIX ボリュームの件は[この節](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#unix-セキュリティスタイルのボリュームでの監査記録の不在)）。**このリポジトリでは測っていない。**
 AD グループで認可を分けても、監査は AP に紐づく 1 つの識別情報として記録される。
 
 ## 対象外の機能

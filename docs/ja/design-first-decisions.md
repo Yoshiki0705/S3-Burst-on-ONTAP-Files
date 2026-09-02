@@ -66,7 +66,7 @@ FSx for ONTAP 側で S3 Access Point に Windows 識別情報を使う構成と 
 識別情報は、その SVM が名前解決できるユーザーであれば足りる。**どちらの型でも外部の
 ディレクトリサービスは必須ではない。** UNIX 識別情報は LDAP や NIS を使わず SVM のローカルユーザーで、
 Windows 識別情報は workgroup モードの CIFS サーバーに作ったローカルユーザーで、それぞれ読み書きが
-通った実測がある（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2-の前提--ap-に固定する-id-はファイルシステム側に実在していなければならない)）。workgroup モードは Active Directory ドメインが利用できない場合の
+通った実測がある（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2-の前提--ファイルシステム側に実在している必要のある固定-id)）。workgroup モードは Active Directory ドメインが利用できない場合の
 代替として公式に手順が示されている（[SMB server in a workgroup](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html)）。
 ただし NTLM 認証のみで Kerberos に対応せず、GPO・VSS・SMB3 CA 共有なども対象外になる。
 

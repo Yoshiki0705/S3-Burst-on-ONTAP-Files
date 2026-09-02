@@ -27,7 +27,7 @@
 | 測定方法 | 書き込み（S3 PutObject）と読み取り（NFS `cat`）を**同一ホスト・同一クロック**で実行 |
 | S3 クライアント | `aws s3api`（リクエストごとに起動）。持続セッションでの再測定は[全方向比較](cross-protocol-directions.md) |
 
-> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--ファイルシステム側の権限が絞り込みを担う)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
+> **識別情報についての注記**: この測定はアクセスポイントの識別情報を UNIX の root で行っています。アクセスポイント経由の全リクエストがこの 1 つの識別情報で認可されるため、root を指定するとファイル権限による絞り込みが効きません（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--絞り込みを担うファイルシステム側の権限)）。測定条件としてそのまま記録しますが、推奨構成ではありません。書き込みに必要な権限だけを持つ専用ユーザーを使い、用途ごとにアクセスポイントを分けてください（`FileSystemIdentity` は作成後に変更できません）。
 
 ## 測定結果
 
