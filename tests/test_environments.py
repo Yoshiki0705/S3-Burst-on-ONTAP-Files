@@ -284,7 +284,7 @@ def _declared_parameters(template: str) -> set[str]:
     body = template.split("Parameters:", 1)[1]
     for terminator in ("\nConditions:", "\nResources:", "\nMappings:"):
         body = body.split(terminator, 1)[0]
-    return set(re.findall(r"^  ([A-Za-z0-9]+):$", body, re.M))
+    return set(re.findall(r"^  ([A-Za-z0-9]+):$", body, re.MULTILINE))
 
 
 def _example_parameters(name: str) -> dict[str, str]:

@@ -77,7 +77,7 @@ IDENTIFIER = re.compile(
 # and it cannot be had for free: `1.234` as a decimal and as a grouped integer are indistinguishable,
 # so supporting it means normalising some real decimals away.
 NUMBER = re.compile(
-    r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(億|万|million|billion|thousand)?", re.I
+    r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(億|万|million|billion|thousand)?", re.IGNORECASE
 )
 SCALE = {
     "億": 10**8,
