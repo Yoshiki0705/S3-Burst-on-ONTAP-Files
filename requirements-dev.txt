@@ -17,7 +17,7 @@ cfn-lint==1.56.0
 # grows, and an unpinned install would turn the gate red with no commit behind it. The consequence of
 # pinning is that a new rule does not reach us until the pin moves, which is why the workflow also
 # runs on a schedule — see .github/workflows/zizmor.yml.
-zizmor==1.29.0
+zizmor==1.30.0
 # checkov scans the CloudFormation and the workflow files for security posture, which cfn-lint has no
 # opinion about: cfn-lint proves a template is well formed, not that a function is unbounded or a
 # secret unencrypted. Pinned for the same reason as the rest, and with the same consequence -- a new
