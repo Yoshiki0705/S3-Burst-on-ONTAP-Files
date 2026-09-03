@@ -10,7 +10,7 @@
 # a local pass with a different version does not predict CI.
 #
 # The validators in tools/ are stdlib-only by design and need nothing from this file.
-ruff==0.16.5
+ruff==0.16.6
 pytest==9.1.1
 cfn-lint==1.56.0
 # zizmor audits the workflow files themselves. Pinned for the same reason as the rest: its rule set
