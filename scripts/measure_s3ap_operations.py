@@ -290,10 +290,10 @@ def check_upload_part_copy(
         destination = f"{prefix}/copy-dest-{source_ap.rsplit('/', 1)[-1]}.bin"
         state: dict = {}
 
-        def initiate(d=destination):
-            state["upload_id"] = client.create_multipart_upload(
-                Bucket=access_point, Key=d
-            )["UploadId"]
+        def initiate(d=destination, s=state):
+            s["upload_id"] = client.create_multipart_upload(Bucket=access_point, Key=d)[
+                "UploadId"
+            ]
             return "created"
 
         if not recorder.run("control: CreateMultipartUpload", "succeeds", initiate)[0]:
@@ -304,10 +304,10 @@ def check_upload_part_copy(
         recorder.run(
             "control: UploadPart (not a copy) on that upload",
             "succeeds",
-            lambda d=destination: client.upload_part(
+            lambda d=destination, s=state: client.upload_part(
                 Bucket=access_point,
                 Key=d,
-                UploadId=state["upload_id"],
+                UploadId=s["upload_id"],
                 PartNumber=1,
                 Body=body,
             )["ETag"],
@@ -315,10 +315,10 @@ def check_upload_part_copy(
         recorder.run(
             f"UploadPartCopy, source through {label}",
             "under test",
-            lambda a=source_ap, d=destination: client.upload_part_copy(
+            lambda a=source_ap, d=destination, s=state: client.upload_part_copy(
                 Bucket=access_point,
                 Key=d,
-                UploadId=state["upload_id"],
+                UploadId=s["upload_id"],
                 PartNumber=2,
                 CopySource={"Bucket": a, "Key": source_key},
             )["CopyPartResult"]["ETag"],
@@ -336,9 +336,9 @@ def check_upload_part_copy(
         recorder.run(
             "cleanup: AbortMultipartUpload",
             "succeeds",
-            lambda d=destination: (
+            lambda d=destination, s=state: (
                 client.abort_multipart_upload(
-                    Bucket=access_point, Key=d, UploadId=state["upload_id"]
+                    Bucket=access_point, Key=d, UploadId=s["upload_id"]
                 )
                 and "aborted"
                 or "aborted"

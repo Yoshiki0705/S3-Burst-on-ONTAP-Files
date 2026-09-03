@@ -95,7 +95,7 @@ def fetch(from_file: Path | None) -> str:
             ) from exc
     request = urllib.request.Request(SOURCE_URL, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             return response.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, TimeoutError, ValueError) as exc:
         raise SystemExit(
