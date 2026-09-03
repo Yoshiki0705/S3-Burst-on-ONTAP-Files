@@ -37,6 +37,9 @@ SKIP_DIRS = (
     ".hypothesis",
     # .terraform/ holds the downloaded provider, which ships its own README and links.
     ".terraform",
+    # .venv/ is where requirements-dev.txt installs; .gitignore expects it at this path. Its
+    # site-packages carry third-party docs whose links are not ours to keep working.
+    ".venv",
 )
 
 # [text](target) - skips image embeds (leading !) and reference-style definitions.

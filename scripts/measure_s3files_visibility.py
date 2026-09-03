@@ -182,9 +182,10 @@ def describe_environment(region: str, file_system_id: str, mount_point: str) -> 
     environment["nfs_version"] = version[0] if version else "not reported by findmnt"
     try:
         client = boto3.client("s3files", region_name=region)
-    except (
-        Exception
-    ) as exc:  # botocore raises several unrelated types for an unknown service
+    # botocore raises several unrelated types for an unknown service, and none of them is
+    # documented, so narrowing this would silently stop reporting the environment on the next
+    # botocore release rather than recording why it could not be read.
+    except Exception as exc:  # noqa: BLE001
         environment["file_system_api"] = f"not read: {type(exc).__name__}"
         return environment
     # The s3files API models its members in lowerCamelCase, unlike the FSx API that this
@@ -365,7 +366,7 @@ def direction_size_threshold(
         # of a read measurement.
         last = mount_path(mount_point, keys[-1], args.key_prefix)
         appeared = poll_until(
-            lambda p=last: p.exists() and p.stat().st_size == size,
+            lambda p=last, s=size: p.exists() and p.stat().st_size == s,
             args.timeout,
             args.poll_interval,
         )

@@ -16,7 +16,6 @@ from __future__ import annotations
 import check_translation_drift as drift
 import pytest
 
-
 # --- number normalisation ----------------------------------------------------------------------
 
 
