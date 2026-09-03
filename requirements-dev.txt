@@ -12,7 +12,7 @@
 # The validators in tools/ are stdlib-only by design and need nothing from this file.
 ruff==0.15.20
 pytest==9.1.1
-cfn-lint==1.52.1
+cfn-lint==1.56.0
 # zizmor audits the workflow files themselves. Pinned for the same reason as the rest: its rule set
 # grows, and an unpinned install would turn the gate red with no commit behind it. The consequence of
 # pinning is that a new rule does not reach us until the pin moves, which is why the workflow also
