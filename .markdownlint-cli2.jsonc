@@ -49,6 +49,10 @@
     ".pytest_cache/**",
     ".ruff_cache/**",
     "**/__pycache__/**",
-    "**/.terraform/**"
+    "**/.terraform/**",
+    // .venv/ is where requirements-dev.txt is installed, and .gitignore expects it here. Its
+    // site-packages ship thousands of third-party .md files, so leaving it in scope makes the
+    // verdict depend on whether the dev tools happen to be installed locally.
+    ".venv/**"
   ]
 }

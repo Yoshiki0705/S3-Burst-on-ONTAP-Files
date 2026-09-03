@@ -62,7 +62,7 @@ format-python: ## Apply ruff formatting to tools/, scripts/ and tests/
 
 markdown: ## Run markdownlint if available (skipped when not installed)
 	@if command -v markdownlint-cli2 >/dev/null 2>&1; then \
-		markdownlint-cli2 "**/*.md" "#node_modules" "#.private" "#.kiro" "#.pytest_cache" "#.ruff_cache" "#**/.terraform"; \
+		markdownlint-cli2 "**/*.md" "#node_modules" "#.private" "#.kiro" "#.pytest_cache" "#.ruff_cache" "#**/.terraform" "#.venv"; \
 	else \
 		echo "markdownlint-cli2 not installed - skipping (npm install -g markdownlint-cli2)"; \
 	fi

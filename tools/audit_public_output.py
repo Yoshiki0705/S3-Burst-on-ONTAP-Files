@@ -68,6 +68,9 @@ SKIP_DIRS = (
     ".hypothesis",
     # .terraform/ holds the downloaded provider, which ships its own README and links.
     ".terraform",
+    # .venv/ is where requirements-dev.txt installs, at the path .gitignore expects. Auditing
+    # third-party site-packages would make the file count depend on the local install.
+    ".venv",
 )
 SCAN_SUFFIXES = {".md", ".txt", ".yml", ".yaml", ".json"}
 
