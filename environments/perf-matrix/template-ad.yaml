@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# =================================================================================================
+# UNEXECUTED DRAFT. AWS Managed Microsoft AD, so that an SMB case can be measured at all.
+#
+# Why this exists rather than reusing what the account already has: two SVMs in this account carry a
+# record of having joined `MEAS.FSXN.LOCAL`, but **no ENI answers at the DNS addresses in that record
+# and the account has no Managed AD directory.** The controllers are gone. An SVM reporting `CREATED`
+# only means the join settings were stored, not that a join can happen now. So SMB was blocked on a
+# directory, not on a client, and this file removes that blocker.
+#
+# Three things here are not the obvious choice, and each is load-bearing:
+#
+# 1. **Two subnets, in two Availability Zones.** Managed AD requires exactly that and will not accept
+#    one. Every other file in this directory puts everything in one subnet on purpose, so this is the
+#    single exception -- and it has a consequence for the measurement, not just for the deployment:
+#    the domain controller sits on the **authentication and name-mapping** path for SMB, so an SMB
+#    figure includes whatever latency reaching a controller in another Availability Zone costs. That
+#    belongs next to the figure. It does **not** put the DC on the data path; bytes do not traverse it.
+#
+# 2. **Standard edition, not Enterprise.** Standard is $0.073 per domain-controller-hour in
+#    ap-northeast-1 and a directory has two controllers, so **$0.146/hour**. Enterprise is $0.2225 per
+#    controller-hour, three times as much, and buys directory scale -- object counts, more Regions --
+#    none of which changes an SMB throughput number. (Price List API, usagetype
+#    `APN1-Std-MicrosoftAD-DC-Usage`, effective 2026-08-01.)
+#
+# 3. **The admin password comes from Secrets Manager, not from a parameter.** A `NoEcho` parameter is
+#    still recoverable from the stack, and this directory's whole point is that other people run it.
+#
+# `AWS::DirectoryService::MicrosoftAD` has no `Tags` property, so this resource cannot carry the
+# `DeleteAfterMeasurement` tag the rest of the environment is verified by. Teardown deletes it by
+# stack name, and the verification step reads the directory list back rather than filtering on a tag.
+#
+# Creation takes 15 to 30 minutes, and CloudFormation waits. Start it before the storage targets so
+# that wait overlaps something useful instead of billing $53/hour of idle EFS and FSx for ONTAP.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. AWS Managed Microsoft AD (Standard) for the SMB cases of the protocol matrix. Two
+  subnets in two Availability Zones are a service requirement, not a measurement choice.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement}
+        Parameters: [VpcId, SubnetIds]
+      - Label: {default: Directory}
+        Parameters: [AdDomainName, AdShortName, AdAdminPasswordSecretArn]
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: >-
+      The same VPC as the clients and the storage targets. A directory in a peered VPC would add a
+      routing dependency to every SMB session for no measurement benefit.
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >-
+      Exactly two, in two different Availability Zones -- a Managed AD requirement. One of them should
+      be the subnet everything else is in, so that at least one controller is Availability-Zone-local
+      to the clients and the SVM.
+  AdDomainName:
+    Type: String
+    Default: perfmatrix.local
+    AllowedPattern: "^[a-z0-9-]+\\.[a-z0-9.-]+$"
+    Description: >-
+      A name that is not in use anywhere reachable from this VPC. The distinguished name is derived
+      from this by splitting on dots, so a two-label name gives DC=perfmatrix,DC=local.
+  AdShortName:
+    Type: String
+    Default: PERFMATRIX
+    AllowedPattern: "^[A-Z0-9-]{1,15}$"
+    Description: >-
+      The NetBIOS name of the domain, at most 15 characters. Managed AD creates an intermediate
+      organizational unit named after this, and computer objects go under it -- so this value ends up
+      inside the OU path the SVM join needs. Read it back with describe-directories rather than
+      retyping it; a mismatch there is the most common cause of a join that fails without saying why.
+  AdAdminPasswordSecretArn:
+    Type: String
+    AllowedPattern: "^arn:aws[a-z-]*:secretsmanager:.+$"
+    Description: >-
+      ARN of a Secrets Manager secret holding a JSON object with a `password` key. Used for the
+      directory's Admin account, and again later for the SVM join and the Windows domain join, so all
+      three read one secret rather than three copies of a password.
+
+# No NamePrefix parameter here, unlike every other template in this directory.
+# `AWS::DirectoryService::MicrosoftAD` has no `Tags` property, so there is nothing for a prefix to
+# name: the directory is identified by its domain name and by the stack that owns it. The teardown
+# verification accounts for that by listing every directory in the Region rather than filtering on a
+# tag it cannot have.
+
+Resources:
+  ManagedAd:
+    Type: AWS::DirectoryService::MicrosoftAD
+    # Delete rather than Retain. A retained directory keeps billing after the stack is gone and is
+    # then invisible to the teardown verification, which is the exact failure this environment is
+    # written to avoid.
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Ref AdDomainName
+      ShortName: !Ref AdShortName
+      Edition: Standard
+      Password: !Sub "{{resolve:secretsmanager:${AdAdminPasswordSecretArn}:SecretString:password}}"
+      # No alias: an alias is permanent once set and cannot be reused, so a throwaway directory should
+      # not consume one.
+      CreateAlias: false
+      EnableSso: false
+      VpcSettings:
+        VpcId: !Ref VpcId
+        SubnetIds: !Ref SubnetIds
+
+Outputs:
+  DirectoryId:
+    Value: !Ref ManagedAd
+    Description: Pass to the Windows client stack, which joins the domain with this.
+  DirectoryDnsIpAddresses:
+    Value: !Join [",", !GetAtt ManagedAd.DnsIpAddresses]
+    Description: >-
+      The two controller addresses. The Windows client must be pointed at these before its domain
+      join runs, and the SVM join takes them as DnsIps.
+  DomainName:
+    Value: !Ref AdDomainName
+  ShortName:
+    Value: !Ref AdShortName
+    Description: >-
+      The intermediate organizational unit is named after this. The SVM join needs
+      OU=Computers,OU=<this>,DC=... -- omitting the middle component is a documented cause of failure.
+  SecurityGroupLookup:
+    Value: !Sub >-
+      aws ds describe-directories --directory-ids ${ManagedAd}
+      --query 'DirectoryDescriptions[0].VpcSettings.SecurityGroupId' --output text
+    Description: >-
+      CloudFormation does not return the security group Managed AD creates for its controllers, so
+      this is the command that does. Whether that group already admits the client and SVM security
+      groups on the AD ports is something to read, not to assume -- `runbook.sh ad-ports` reads it and
+      adds what is missing.
+  HourlyCostNote:
+    Value: >-
+      Standard edition bills $0.073 per domain-controller-hour in ap-northeast-1 and a directory has
+      two controllers, so about $0.146/hour while this stack exists. Stopping instances does not
+      affect it; only deleting the stack does.

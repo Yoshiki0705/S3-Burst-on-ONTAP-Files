@@ -2,17 +2,26 @@
 # =================================================================================================
 # The protocol-matrix measurement, in the order the steps have to happen.
 #
-# Not a one-shot script. Each phase is a subcommand, because two of them are gates that a human has
-# to read the output of before the next one is worth running:
+# Not a one-shot script. Each phase is a subcommand, because several of them are gates that a human
+# has to read the output of before the next one is worth running:
 #
 #   - `preflight` refuses to go further if a documented-unsupported case is in the plan, or if the
 #     NVMe read cache is still enabled on the file system whose disk path is about to be measured.
+#   - `windows-status` reads whether the Windows client actually joined the domain. A CREATE_COMPLETE
+#     stack means the association exists, not that the join happened.
 #   - `costs` prints what is currently running and what it bills per hour. Run it between phases.
 #
-# The order matters in one specific way: **the NVMe read cache has to be off before the disk-path
-# read, and turning it off is an ONTAP CLI operation, not an AWS one.** A read taken with it on is
-# served from cache and the SSD IOPS setting has no effect on the number, which is the single mistake
-# that cost the most re-measurement last time.
+# The order matters in three specific ways:
+#
+#   1. **The NVMe read cache has to be off before the disk-path read**, and turning it off is an ONTAP
+#      CLI operation, not an AWS one. A read taken with it on is served from cache and the SSD IOPS
+#      setting has no effect on the number -- the single mistake that cost the most re-measurement.
+#   2. **The directory comes before the storage targets.** It takes 15 to 30 minutes to create. Doing
+#      it after would spend that wait with $53/hour of EFS and FSx for ONTAP sitting idle.
+#   3. **EFS Provisioned comes last and leaves first.** At $30.30/hour it is the most expensive line
+#      here, it bills from CREATE_COMPLETE rather than from first mount, and it is wanted for exactly
+#      one pattern. It gets its own stack so that `drop-efs-provisioned` can remove it the moment that
+#      pattern is done, without touching anything else.
 #
 # Nothing here creates a resource that cannot be deleted. No SnapLock, no retention, no Object Lock.
 # =================================================================================================
@@ -22,7 +31,11 @@ REGION="${AWS_REGION:-ap-northeast-1}"
 PREFIX="${NAME_PREFIX:-perfmatrix}"
 STACK_CLIENTS="${PREFIX}-clients"
 STACK_EFS="${PREFIX}-efs"
+STACK_EFS_PROV="${PREFIX}-efs-prov"
 STACK_GEN2="${PREFIX}-gen2"
+STACK_AD="${PREFIX}-ad"
+STACK_WINDOWS="${PREFIX}-windows"
+STACK_SMB_SVM="${PREFIX}-smb-svm"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() { printf '\n=== %s\n' "$*"; }
@@ -32,7 +45,12 @@ require() { command -v "$1" >/dev/null 2>&1 || die "$1 is not on PATH"; }
 require aws
 require python3
 
-# --- phases --------------------------------------------------------------------------------------
+stack_output() {
+  aws cloudformation describe-stacks --region "$REGION" --stack-name "$1" \
+    --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+}
+
+# --- clients -------------------------------------------------------------------------------------
 
 deploy_clients() {
   [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
@@ -44,41 +62,167 @@ deploy_clients() {
     --capabilities CAPABILITY_IAM \
     --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
-  CLIENT_SG="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
-  printf 'ClientSecurityGroupId=%s\n' "$CLIENT_SG"
+  printf 'ClientSecurityGroupId=%s\n' "$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
 }
 
-deploy_efs() {
-  local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
-  # Provisioned at the ap-northeast-1 maximum. This is the most expensive line in the whole
-  # measurement at about $30.30/hour, and it bills from CREATE_COMPLETE, not from first mount.
-  log "EFS: $STACK_EFS (provisioned 3072 MiBps, about \$30.30/hour from now)"
+# --- directory -----------------------------------------------------------------------------------
+
+# First, because it is the slowest thing here and the only one whose wait costs nothing.
+deploy_ad() {
+  [[ -n "${VPC_ID:-}" ]] || die "set VPC_ID"
+  [[ -n "${SUBNET_ID:-}" && -n "${SUBNET_ID_2:-}" ]] \
+    || die "set SUBNET_ID and SUBNET_ID_2: Managed AD requires two subnets in two Availability Zones"
+  [[ "$SUBNET_ID" != "$SUBNET_ID_2" ]] || die "SUBNET_ID_2 must be a different subnet, in a different AZ"
+  [[ -n "${AD_SECRET_ARN:-}" ]] || die "set AD_SECRET_ARN to a Secrets Manager secret with a 'password' key"
+  log "Managed AD: $STACK_AD (about \$0.146/hour; 15-30 minutes to create)"
   aws cloudformation deploy \
     --region "$REGION" \
-    --stack-name "$STACK_EFS" \
+    --stack-name "$STACK_AD" \
+    --template-file "$HERE/template-ad.yaml" \
+    --parameter-overrides \
+      "VpcId=$VPC_ID" "SubnetIds=$SUBNET_ID,$SUBNET_ID_2" \
+      "AdDomainName=${AD_DOMAIN_NAME:-perfmatrix.local}" \
+      "AdShortName=${AD_SHORT_NAME:-PERFMATRIX}" \
+      "AdAdminPasswordSecretArn=$AD_SECRET_ARN" \
+    --no-fail-on-empty-changeset
+  printf 'DirectoryId=%s\n' "$(stack_output "$STACK_AD" DirectoryId)"
+  printf 'DnsIpAddresses=%s\n' "$(stack_output "$STACK_AD" DirectoryDnsIpAddresses)"
+}
+
+# Whether the directory's own security group already admits the clients and the SVM interfaces is
+# something to read rather than assume. This reads it and adds what is missing.
+ad_ports() {
+  local dir_id sg_ad sg_clients sg_fs
+  dir_id="$(stack_output "$STACK_AD" DirectoryId)"
+  [[ -n "$dir_id" && "$dir_id" != "None" ]] || die "no DirectoryId; run './runbook.sh ad' first"
+  sg_ad="$(aws ds describe-directories --region "$REGION" --directory-ids "$dir_id" \
+    --query 'DirectoryDescriptions[0].VpcSettings.SecurityGroupId' --output text)"
+  [[ -n "$sg_ad" && "$sg_ad" != "None" ]] || die "could not read the directory's security group"
+  sg_clients="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
+  sg_fs="$(stack_output "$STACK_GEN2" FileSystemSecurityGroupId)"
+  # Both are required rather than optional. Skipping a missing one quietly would leave the SVM
+  # interfaces unable to reach a controller, and `join-svm` would then fail in a way that reads as a
+  # permissions problem rather than a missing rule.
+  [[ -n "$sg_clients" && "$sg_clients" != "None" ]] || die "no client security group; run './runbook.sh clients' first"
+  [[ -n "$sg_fs" && "$sg_fs" != "None" ]] || die "no file system security group; run './runbook.sh gen2' first"
+
+  log "directory security group $sg_ad: current inbound sources"
+  aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg_ad" \
+    --query 'SecurityGroups[0].IpPermissions[].{Proto:IpProtocol,From:FromPort,To:ToPort,Groups:UserIdGroupPairs[].GroupId,Cidrs:IpRanges[].CidrIp}' \
+    --output table
+
+  # All protocols from these two groups only. The AD port set spans TCP and UDP from 53 through the
+  # dynamic RPC range at 49152-65535; writing it out as fifteen rules would not narrow *who* can reach
+  # the controllers, which is what actually restricts this -- and a missing rule in that list presents
+  # as a permissions failure rather than a network one, which is the harder thing to diagnose.
+  local src
+  for src in "$sg_clients" "$sg_fs"; do
+    [[ -n "$src" && "$src" != "None" ]] || continue
+    if aws ec2 authorize-security-group-ingress --region "$REGION" --group-id "$sg_ad" \
+         --ip-permissions "IpProtocol=-1,UserIdGroupPairs=[{GroupId=$src,Description=\"perfmatrix: AD ports from the measurement clients and the SVM interfaces\"}]" \
+         >/dev/null 2>&1; then
+      printf 'added: %s -> %s\n' "$src" "$sg_ad"
+    else
+      # Almost always InvalidPermission.Duplicate, which is the desired end state. Re-read below
+      # rather than trusting either branch.
+      printf 'not added (already present, or refused): %s -> %s\n' "$src" "$sg_ad"
+    fi
+  done
+
+  log "verify: the two groups below must appear as inbound sources"
+  printf 'clients: %s\nSVM interfaces: %s\n' "$sg_clients" "$sg_fs"
+  aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg_ad" \
+    --query 'SecurityGroups[0].IpPermissions[].UserIdGroupPairs[].GroupId' --output text
+}
+
+# --- storage targets -----------------------------------------------------------------------------
+
+# EFS twice over, because the two modes answer different questions and only one of them is affordable
+# to leave running. Elastic has the higher ceiling in ap-northeast-1 (60 GiBps read against 3 GiBps)
+# and bills per GB accessed; Provisioned is the reserved-rate mode, which is what compares like for
+# like against an FSx for ONTAP throughput capacity setting, and costs $30.30/hour to hold.
+deploy_efs() {
+  local mode="${1:-elastic}"
+  local stack params
+  [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
+  local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
+  case "$mode" in
+    elastic)
+      stack="$STACK_EFS"
+      params=("ThroughputMode=elastic")
+      log "EFS elastic: $stack (no hourly throughput charge; \$0.07 per GB accessed)"
+      ;;
+    provisioned)
+      stack="$STACK_EFS_PROV"
+      params=("ThroughputMode=provisioned" "ProvisionedThroughputInMibps=3072")
+      log "EFS provisioned 3072 MiBps: $stack (about \$30.30/hour from CREATE_COMPLETE)"
+      cat <<'NOTE'
+This is the most expensive resource in the environment and it is wanted for one pattern only.
+Run that pattern, then './runbook.sh drop-efs-provisioned' immediately -- not at the end of the day.
+NOTE
+      printf 'Continue? [y/N] '
+      read -r reply; [[ "$reply" == "y" ]] || die "aborted"
+      ;;
+    *) die "usage: runbook.sh efs [elastic|provisioned]" ;;
+  esac
+  aws cloudformation deploy \
+    --region "$REGION" \
+    --stack-name "$stack" \
     --template-file "$HERE/template-efs.yaml" \
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
-      "ThroughputMode=provisioned" "ProvisionedThroughputInMibps=3072" "NamePrefix=$PREFIX" \
+      "${params[@]}" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
 }
 
+# Its own phase so the expensive one can go the moment its single pattern is finished, rather than
+# waiting for a full teardown.
+drop_efs_provisioned() {
+  log "deleting $STACK_EFS_PROV"
+  aws cloudformation delete-stack --region "$REGION" --stack-name "$STACK_EFS_PROV"
+  aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "$STACK_EFS_PROV" \
+    || die "$STACK_EFS_PROV did not reach DELETE_COMPLETE; it is still billing -- check its events"
+  # Read the state back. A delete call returning without error is not evidence.
+  log "verify: no EFS file system should remain from this stack"
+  aws efs describe-file-systems --region "$REGION" \
+    --query 'FileSystems[].{Id:FileSystemId,Mode:ThroughputMode,Mibps:ProvisionedThroughputInMibps}' \
+    --output table
+}
+
 deploy_gen2() {
+  [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
   [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN to a Secrets Manager secret with a 'password' key"
   local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
   # The template takes bytes and CloudFormation cannot multiply, so the conversion happens here.
   # 900 GiB holds more than twice the 256 GB in-memory cache, which is what the read has to exceed.
   local vol_gib="${VOLUME_SIZE_GIB:-900}"
   local vol_bytes=$(( vol_gib * 1024 * 1024 * 1024 ))
-  log "gen2 FSx for ONTAP: $STACK_GEN2 (6144 MBps, ${vol_gib} GiB volume, about \$22.66/hour from now)"
+  # 2,048 GiB rather than 1,024: the SMB SVM adds a second volume of the same size on this same file
+  # system, and both need to be large enough to read past the in-memory cache. The extra SSD is
+  # $0.15/GB-month, about $0.21/hour.
+  local ssd_gib="${GEN2_STORAGE_GIB:-2048}"
+  # Empty unless the directory exists. When set, the template adds SMB ingress and the outbound rule
+  # without which an AD join cannot complete.
+  local sg_ad=""
+  if aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACK_AD" >/dev/null 2>&1; then
+    local dir_id; dir_id="$(stack_output "$STACK_AD" DirectoryId)"
+    sg_ad="$(aws ds describe-directories --region "$REGION" --directory-ids "$dir_id" \
+      --query 'DirectoryDescriptions[0].VpcSettings.SecurityGroupId' --output text 2>/dev/null || true)"
+    [[ "$sg_ad" == "None" ]] && sg_ad=""
+    printf 'directory present; passing AdSecurityGroupId=%s\n' "$sg_ad"
+  else
+    printf 'no directory stack; deploying NFS-only (no SMB ingress, no AD egress)\n'
+  fi
+  log "gen2 FSx for ONTAP: $STACK_GEN2 (6144 MBps, ${ssd_gib} GiB SSD, ${vol_gib} GiB volume, about \$22.78/hour)"
   aws cloudformation deploy \
     --region "$REGION" \
     --stack-name "$STACK_GEN2" \
     --template-file "$HERE/template-fsxn-gen2.yaml" \
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
+      "AdSecurityGroupId=$sg_ad" \
       "ThroughputCapacityPerHAPair=6144" "ProvisionedSsdIops=200000" \
-      "VolumeSizeBytes=$vol_bytes" \
+      "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
 }
@@ -94,6 +238,193 @@ raise_gen1() {
   aws fsx update-file-system --region "$REGION" --file-system-id "$GEN1_FS_ID" \
     --ontap-configuration 'ThroughputCapacity=2048,DiskIopsConfiguration={Mode=USER_PROVISIONED,Iops=80000}'
 }
+
+# --- SMB -----------------------------------------------------------------------------------------
+
+deploy_smb_svm() {
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  local vol_gib="${VOLUME_SIZE_GIB:-900}"
+  local vol_bytes=$(( vol_gib * 1024 * 1024 * 1024 ))
+  log "SMB SVM: $STACK_SMB_SVM on $fs_id (created unjoined; 'join-svm' performs the join)"
+  aws cloudformation deploy \
+    --region "$REGION" \
+    --stack-name "$STACK_SMB_SVM" \
+    --template-file "$HERE/template-smb-svm.yaml" \
+    --parameter-overrides \
+      "FileSystemId=$fs_id" "SvmNetBiosName=${SVM_NETBIOS_NAME:-PMSMB1}" \
+      "VolumeSizeBytes=$vol_bytes" "NamePrefix=$PREFIX" \
+    --no-fail-on-empty-changeset
+  printf 'SmbStorageVirtualMachineId=%s\n' "$(stack_output "$STACK_SMB_SVM" SmbStorageVirtualMachineId)"
+}
+
+deploy_windows() {
+  [[ -n "${SUBNET_ID:-}" ]] || die "set SUBNET_ID"
+  local sg dir_id dir_name dns
+  sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
+  dir_id="$(stack_output "$STACK_AD" DirectoryId)"
+  dir_name="$(stack_output "$STACK_AD" DomainName)"
+  dns="$(stack_output "$STACK_AD" DirectoryDnsIpAddresses)"
+  [[ -n "$dir_id" && "$dir_id" != "None" ]] || die "no DirectoryId; run './runbook.sh ad' first"
+  log "Windows client: $STACK_WINDOWS (about \$2.448/hour while running)"
+  aws cloudformation deploy \
+    --region "$REGION" \
+    --stack-name "$STACK_WINDOWS" \
+    --template-file "$HERE/template-windows.yaml" \
+    --capabilities CAPABILITY_IAM \
+    --parameter-overrides \
+      "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
+      "DirectoryId=$dir_id" "DirectoryName=$dir_name" "DirectoryDnsIpAddresses=$dns" \
+      "NamePrefix=$PREFIX" \
+    --no-fail-on-empty-changeset
+  printf 'WindowsInstanceId=%s\n' "$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
+  printf 'Now run: ./runbook.sh windows-status\n'
+}
+
+# The stack reaching CREATE_COMPLETE says the association exists. This says whether the instance
+# arrived in Systems Manager and whether the join actually ran.
+windows_status() {
+  local instance assoc
+  instance="$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
+  assoc="$(stack_output "$STACK_WINDOWS" DomainJoinAssociationId)"
+  [[ -n "$instance" && "$instance" != "None" ]] || die "no Windows instance; run './runbook.sh windows' first"
+
+  log "Systems Manager: is the instance there at all"
+  # An instance absent from this list is usually a private subnet without the ssm, ssmmessages and
+  # ec2messages interface endpoints, and it looks like a directory problem from every other angle.
+  aws ssm describe-instance-information --region "$REGION" \
+    --filters "Key=InstanceIds,Values=$instance" \
+    --query 'InstanceInformationList[].{Id:InstanceId,Ping:PingStatus,Platform:PlatformName,Agent:AgentVersion}' \
+    --output table
+
+  log "domain join association: outcome"
+  aws ssm describe-association-executions --region "$REGION" --association-id "$assoc" \
+    --query 'AssociationExecutions[0:3].{Status:Status,Created:CreatedTime,Detail:DetailedStatus}' \
+    --output table
+
+  cat <<'NOTE'
+`Success` here is still second-hand. Confirm from the instance itself:
+
+    aws ssm start-session --target <instance-id>
+    (Get-ComputerInfo).CsDomain          # the domain name, not WORKGROUP
+    Get-DnsClientServerAddress           # must show the controller addresses
+
+If the association failed, the reason is in the command output rather than in the status above:
+
+    aws ssm list-command-invocations --instance-id <instance-id> --details \
+      --query 'CommandInvocations[0].CommandPlugins[].Output'
+NOTE
+}
+
+# Joins the SMB SVM to the directory. A separate step from the stack on purpose: a join that lands in
+# MISCONFIGURED is corrected by running this again against the same SVM, whereas a failure inside
+# CloudFormation rolls the SVM back and leaves an orphaned computer object whose name must not be
+# reused.
+join_svm() {
+  [[ -n "${AD_SECRET_ARN:-}" ]] || die "set AD_SECRET_ARN"
+  local svm_id dir_id domain short dns
+  svm_id="${SMB_SVM_ID:-$(stack_output "$STACK_SMB_SVM" SmbStorageVirtualMachineId)}"
+  [[ -n "$svm_id" && "$svm_id" != "None" ]] || die "no SMB SVM; run './runbook.sh smb-svm' first"
+  dir_id="$(stack_output "$STACK_AD" DirectoryId)"
+
+  # Read the domain's own values back rather than retyping them. The short name is what the
+  # intermediate organizational unit is named after, and a mismatch there is the most common cause of
+  # a join that fails without explaining itself.
+  domain="$(aws ds describe-directories --region "$REGION" --directory-ids "$dir_id" \
+    --query 'DirectoryDescriptions[0].Name' --output text)"
+  short="$(aws ds describe-directories --region "$REGION" --directory-ids "$dir_id" \
+    --query 'DirectoryDescriptions[0].ShortName' --output text)"
+  dns="$(aws ds describe-directories --region "$REGION" --directory-ids "$dir_id" \
+    --query 'DirectoryDescriptions[0].DnsIpAddrs' --output text)"
+
+  # AWS Managed AD puts computer objects under an intermediate OU named after the short name. Omitting
+  # that middle component is a documented cause of failure, so it is derived here rather than guessed.
+  local ou="OU=Computers,OU=${short}"
+  local part
+  for part in ${domain//./ }; do ou="${ou},DC=${part}"; done
+
+  log "joining $svm_id to $domain"
+  printf 'OU: %s\nNetBIOS: %s\nDnsIps: %s\n' "$ou" "${SVM_NETBIOS_NAME:-PMSMB1}" "$dns"
+
+  # Built by python3 into a mode-600 temporary file, and removed on exit. The password is neither in
+  # this script nor in the process arguments, where `ps` would show it.
+  local cfg; cfg="$(mktemp)"
+  chmod 600 "$cfg"
+  # shellcheck disable=SC2064  # expand $cfg now: the trap must name this file, not whatever is set later
+  trap "rm -f '$cfg'" EXIT
+
+  local secret
+  secret="$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$AD_SECRET_ARN" \
+    --query SecretString --output text)"
+
+  # FileSystemAdministratorsGroup is Domain Admins, not AWS Delegated FSx Administrators: the delegated
+  # group has insufficient permissions for an SVM join and the failure reads as "unmet port
+  # requirements or insufficient service account permissions", which sends you to the wrong layer.
+  SECRET_JSON="$secret" OU_DN="$ou" DOMAIN="$domain" DNS_IPS="$dns" \
+  NETBIOS="${SVM_NETBIOS_NAME:-PMSMB1}" AD_USER="${AD_ADMIN_USER:-Admin}" \
+  python3 - "$cfg" <<'PY'
+import json, os, sys
+
+secret = json.loads(os.environ["SECRET_JSON"])
+config = {
+    "NetBiosName": os.environ["NETBIOS"],
+    "SelfManagedActiveDirectoryConfiguration": {
+        "DomainName": os.environ["DOMAIN"],
+        "OrganizationalUnitDistinguishedName": os.environ["OU_DN"],
+        "UserName": os.environ["AD_USER"],
+        "Password": secret["password"],
+        "DnsIps": os.environ["DNS_IPS"].split(),
+        "FileSystemAdministratorsGroup": "Domain Admins",
+    },
+}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump(config, handle)
+PY
+
+  aws fsx update-storage-virtual-machine --region "$REGION" \
+    --storage-virtual-machine-id "$svm_id" \
+    --active-directory-configuration "file://$cfg" \
+    --query 'StorageVirtualMachine.Lifecycle' --output text
+  rm -f "$cfg"
+
+  # Poll. The call returning is not the join succeeding.
+  log "polling lifecycle (2-5 minutes is normal)"
+  local i state
+  for i in $(seq 1 40); do
+    state="$(aws fsx describe-storage-virtual-machines --region "$REGION" \
+      --storage-virtual-machine-ids "$svm_id" \
+      --query 'StorageVirtualMachines[0].Lifecycle' --output text)"
+    printf '  %2d/40 %s\n' "$i" "$state"
+    case "$state" in
+      CREATED) break ;;
+      MISCONFIGURED|FAILED) break ;;
+    esac
+    sleep 15
+  done
+
+  if [[ "$state" != "CREATED" ]]; then
+    aws fsx describe-storage-virtual-machines --region "$REGION" \
+      --storage-virtual-machine-ids "$svm_id" \
+      --query 'StorageVirtualMachines[0].LifecycleTransitionReason.Message' --output text
+    cat <<'NOTE'
+MISCONFIGURED is recoverable against this same SVM. Before retrying, check in this order:
+  1. Does the directory security group admit the SVM interfaces?  ./runbook.sh ad-ports
+  2. Was the gen2 stack deployed with AdSecurityGroupId set?      ./runbook.sh gen2
+     Without its outbound rule the SVM cannot reach a controller at all.
+  3. Is the OU path right, including the intermediate OU named after the short name?
+  4. Set SVM_NETBIOS_NAME to a name not used before -- a failed attempt leaves a computer object
+     behind, and reusing its name collides.
+NOTE
+    die "join did not reach CREATED (last state: $state)"
+  fi
+
+  log "joined. SMB endpoint:"
+  aws fsx describe-storage-virtual-machines --region "$REGION" \
+    --storage-virtual-machine-ids "$svm_id" \
+    --query 'StorageVirtualMachines[0].Endpoints.Smb.DNSName' --output text
+}
+
+# --- gates and accounting ------------------------------------------------------------------------
 
 # The gate that matters. A disk-path read taken with the NVMe cache enabled is a cache measurement.
 preflight() {
@@ -127,49 +458,74 @@ costs() {
   aws efs describe-file-systems --region "$REGION" \
     --query 'FileSystems[].{Id:FileSystemId,Mode:ThroughputMode,Mibps:ProvisionedThroughputInMibps,SizeBytes:SizeInBytes.Value}' \
     --output table
+  aws ds describe-directories --region "$REGION" \
+    --query 'DirectoryDescriptions[].{Id:DirectoryId,Name:Name,Type:Type,Edition:Edition,Stage:Stage}' \
+    --output table
   aws ec2 describe-instances --region "$REGION" \
     --filters "Name=tag:DeleteAfterMeasurement,Values=true" "Name=instance-state-name,Values=running" \
     --query 'Reservations[].Instances[].{Id:InstanceId,Type:InstanceType,Name:Tags[?Key==`Name`]|[0].Value}' \
     --output table
   cat <<'NOTE'
 Hourly, at ap-northeast-1 On-Demand prices read on 2026-09-04:
-  EFS provisioned 3072 MiBps   $30.30
-  gen2 6144 MBps + 200k IOPS   $22.66
-  gen1 2048 MBps + 80k IOPS    $ 4.90 each
-  c5n.9xlarge                  $ 2.45
-  c5n.2xlarge                  $ 0.54 each
+  EFS provisioned 3072 MiBps   $30.30   delete to stop
+  gen2 6144 MBps + 200k IOPS   $22.78   delete, or lower the specified value
+  gen1 2048 MBps + 80k IOPS    $ 4.90   each; lower the specified value
+  c5n.9xlarge Linux            $ 2.45   stops when stopped
+  c5n.9xlarge Windows          $ 2.45   stops when stopped
+  c5n.2xlarge                  $ 0.54   each; stops when stopped
+  Managed AD Standard          $ 0.15   $0.073 per controller-hour, two controllers
+  gen2 SSD 2048 GiB            included in the $22.78 above, at $0.15 per GB-month
 EFS Elastic is not on this list because it bills per GB accessed, not per hour.
 NOTE
-}
-
-stack_output() {
-  aws cloudformation describe-stacks --region "$REGION" --stack-name "$1" \
-    --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
 }
 
 usage() {
   cat <<'USAGE'
 Usage: runbook.sh <phase>
 
-  clients      Create the measurement clients and the shared security group
-  efs          Create the EFS target (provisioned 3072 MiBps, about $30.30/hour)
-  gen2         Create the second-generation FSx for ONTAP target (about $22.66/hour)
-  raise-gen1   Raise the existing first-generation file system to 2048 MBps (prompts; takes ~24 min)
-  preflight    Print the support matrix and gate on the NVMe read cache being disabled
-  costs        Show what is billing by the hour right now
-  teardown     Hand off to teardown.sh
+Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> windows-status
+       -> preflight -> efs elastic -> measure -> efs provisioned -> measure -> drop it -> teardown
 
-Environment: VPC_ID, SUBNET_ID, GEN1_FS_ID, FSXADMIN_SECRET_ARN, NAME_PREFIX, AWS_REGION
+  ad                     Create AWS Managed Microsoft AD (15-30 min, ~$0.146/hour). Do this first.
+  clients                Create the Linux clients and the shared security group
+  gen2                   Create the second-generation FSx for ONTAP target (~$22.78/hour)
+  ad-ports               Read the directory's security group and admit the clients and SVM interfaces
+  smb-svm                Create the SMB-only SVM and its NTFS volume, unjoined
+  join-svm               Join that SVM to the directory, and poll until it is CREATED
+  windows                Create the Windows client and its domain-join association (~$2.448/hour)
+  windows-status         Read whether the instance arrived and whether the join ran
+  raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
+  preflight              Print the support matrix and gate on the NVMe read cache being disabled
+  efs elastic            Create the EFS target in elastic mode ($0.07/GB accessed, no hourly charge)
+  efs provisioned        Create a second EFS in provisioned mode at 3072 MiBps (~$30.30/hour)
+  drop-efs-provisioned   Delete that one, immediately after its single pattern
+  costs                  Show what is billing right now
+  teardown               Hand off to teardown.sh
+
+Environment:
+  required   VPC_ID SUBNET_ID
+  for AD     SUBNET_ID_2 (different AZ) AD_SECRET_ARN
+  for gen2   FSXADMIN_SECRET_ARN
+  for gen1   GEN1_FS_ID
+  optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB AD_DOMAIN_NAME AD_SHORT_NAME
+             AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE
 }
 
 case "${1:-}" in
-  clients)    deploy_clients ;;
-  efs)        deploy_efs ;;
-  gen2)       deploy_gen2 ;;
-  raise-gen1) raise_gen1 ;;
-  preflight)  preflight ;;
-  costs)      costs ;;
-  teardown)   exec "$HERE/teardown.sh" ;;
-  *)          usage; exit 1 ;;
+  ad)                   deploy_ad ;;
+  ad-ports)             ad_ports ;;
+  clients)              deploy_clients ;;
+  efs)                  deploy_efs "${2:-elastic}" ;;
+  drop-efs-provisioned) drop_efs_provisioned ;;
+  gen2)                 deploy_gen2 ;;
+  smb-svm)              deploy_smb_svm ;;
+  join-svm)             join_svm ;;
+  windows)              deploy_windows ;;
+  windows-status)       windows_status ;;
+  raise-gen1)           raise_gen1 ;;
+  preflight)            preflight ;;
+  costs)                costs ;;
+  teardown)             exec "$HERE/teardown.sh" ;;
+  *)                    usage; exit 1 ;;
 esac
