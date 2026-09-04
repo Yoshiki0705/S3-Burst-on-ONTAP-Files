@@ -20,7 +20,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 #   6,144 MBps x $2.013            = $12,368 / month
 #   200,000 SSD IOPS above the free 3 per GiB = about $4,017 / month
 #   1,024 GiB SSD x $0.15          = $154 / month
-#   total, about $16,630 / month at 2,048 GiB of SSD, or **$22.78 / hour**
+#   total, about $16,812 / month at 4,096 GiB of SSD, or **$23.03 / hour**
 #
 # **This is the most expensive resource in the measurement after EFS Provisioned.** Delete it as soon
 # as the E pattern is done. Reducing ThroughputCapacityPerHAPair is the cheaper lever, but the
@@ -73,15 +73,35 @@ Parameters:
       exceeds the first generation's 750 MBps write ceiling.
   StorageCapacityGiB:
     Type: Number
-    Default: 1024
+    Default: 4096
     MinValue: 1024
     Description: >-
-      1,024 GiB is enough because the disk-path measurement disables the NVMe read cache and only
-      needs to exceed the 256 GB in-memory cache. Reading past both layers instead would need
-      several TB and the storage to hold it.
+      **Sized for IOPS, not for data.** Two 900 GiB volumes need 2,048 GiB, but FSx for ONTAP caps
+      provisioned SSD IOPS at 50 per GB of SSD, so 200,000 IOPS needs at least 4,000 GiB. The extra
+      capacity is what stops SSD IOPS from binding before the throughput capacity does -- see
+      ProvisionedSsdIops. The data itself only has to exceed the 256 GB in-memory cache, which is why
+      the volumes are far smaller than this.
   ProvisionedSsdIops:
     Type: Number
     Default: 200000
+    # **This value is tied to StorageCapacityGiB and the tie is not a soft limit.** FSx for ONTAP
+    # refuses more than 50 provisioned SSD IOPS per GB of SSD, and refuses it at create time with a
+    # BadRequest that costs a full stack rollback to discover:
+    #
+    #   Invalid SSD IOPS provided: 200000 IOPS. [...] does not support provisioning more than
+    #   50 IOPS per GB of SSD storage capacity on a ONTAP file system.
+    #
+    # (The elided word is the service name in its short form, which this repository does not use.)
+    #
+    # So 200,000 IOPS needs at least 4,000 GiB of SSD. That is why the SSD here is far larger than the
+    # data being read: it is bought for the IOPS, not for the capacity. `runbook.sh gen2` checks the
+    # ratio before calling CloudFormation.
+    #
+    # Why this many: with the NVMe cache off, a read is served from SSD, so SSD IOPS can become the
+    # binding limit instead of the throughput capacity -- and a result limited by IOPS recorded as a
+    # throughput ceiling is simply wrong. 6,144 MB/s needs about 98,300 IOPS at 64 KiB. At 2,048 GiB
+    # the ceiling would be 102,400, a 4% margin. At 4,096 GiB it is 204,800, so throughput binds first
+    # and the figure measures what it claims to.
     Description: >-
       The SSD IOPS baseline at 6,144 MBps. Provisioned rather than AUTOMATIC, because AUTOMATIC gives
       3 IOPS per GiB and would make IOPS the binding constraint instead of the thing being measured.
@@ -204,7 +224,7 @@ Resources:
 
   FileSystem:
     Type: AWS::FSx::FileSystem
-    # Retain would be the wrong default here: this file system costs $22.78/hour and exists to be
+    # Retain would be the wrong default here: this file system costs $23.03/hour and exists to be
     # deleted. Delete means a failed rollback does not leave it running.
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -306,4 +326,4 @@ Outputs:
   HourlyCostNote:
     Value: !Sub
       - "About $${Hourly} per hour while this stack exists. Delete it when the E pattern is done."
-      - Hourly: "22.78 at 6144 MBps with 200,000 provisioned IOPS and 2,048 GiB of SSD"
+      - Hourly: "23.03 at 6144 MBps with 200,000 provisioned IOPS and 4,096 GiB of SSD"

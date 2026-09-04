@@ -47,6 +47,8 @@ Metadata:
         Parameters: [DirectoryId, DirectoryName, DirectoryDnsIpAddresses]
       - Label: {default: Client}
         Parameters: [InstanceType, LatestWindowsAmiId]
+      - Label: {default: Staging}
+        Parameters: [StagingBucketName]
       - Label: {default: Naming}
         Parameters: [NamePrefix]
 
@@ -54,6 +56,14 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: The VPC the subnet is in. Needed for the Directory Service interface endpoint.
+  StagingBucketName:
+    Type: String
+    Default: ""
+    Description: >-
+      Bucket the measurement tooling is staged in. This host needs it for the same reason the Linux
+      clients do -- no route to the internet -- and for one more: a Windows Server image ships no Java,
+      and `Add-WindowsCapability` cannot fetch anything either. Verified: OpenSSH.Server installation
+      fails with 0x80072ee2. So the JDK and VDBENCH arrive over S3.
   CreateDirectoryServiceEndpoint:
     Type: String
     Default: "true"
@@ -107,6 +117,7 @@ Parameters:
 
 Conditions:
   MakeDsEndpoint: !Equals [!Ref CreateDirectoryServiceEndpoint, "true"]
+  HasStagingBucket: !Not [!Equals [!Ref StagingBucketName, ""]]
 
 Resources:
   # About $0.014/hour. The cheapest resource here and the one without which the SMB case does not
@@ -173,6 +184,19 @@ Resources:
                   - fsx:DescribeStorageVirtualMachines
                   - fsx:DescribeVolumes
                 Resource: "*"
+              # Read-only on the staging bucket alone, matching the Linux clients.
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action: s3:GetObject
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/*"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action: s3:ListBucket
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+                - !Ref "AWS::NoValue"
       Tags:
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
