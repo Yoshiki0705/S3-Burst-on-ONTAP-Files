@@ -129,6 +129,8 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | S3 Files の実測値と落とし穴を見る | [S3 Files 実測記録](docs/ja/verification/s3files-measured.md) | 10 分 |
 | スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |
 | プロトコル別に測れる組み合わせを知る | [プロトコル別の可否](docs/ja/verification/protocol-matrix-efs-vs-ontap.md) | 5 分 |
+| 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
+| 検証環境の費用を見積もる | [検証パターンごとの費用構造](docs/ja/reference/comparison/finops-performance-test-patterns.md) | 10 分 |
 | 費用を見積もる | [FinOps の費用構造](docs/ja/reference/comparison/finops-s3-vs-s3ap.md) | 15 分 |
 | 作る前に決めることを確認する | [最初に決めること](docs/ja/design-first-decisions.md) | 5 分 |
 | 何がどこまで確かめられているか知る | [検証状況](docs/ja/verification-status.md) | 5 分 |
