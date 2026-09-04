@@ -99,6 +99,10 @@ Resources:
         StorageVirtualMachineId: !Ref SmbStorageVirtualMachine
         JunctionPath: !Sub "/${NamePrefix}_smb_vol"
         SecurityStyle: NTFS
+        # Required by the API, and false for the same reason as the NFS volume: the test data is
+        # incompressible by design, and the setting cannot be changed after data is written until
+        # background processing finishes.
+        StorageEfficiencyEnabled: false
         SizeInBytes: !Ref VolumeSizeBytes
         TieringPolicy:
           # None, for the same reason as the NFS volume: data moving to the capacity pool part-way

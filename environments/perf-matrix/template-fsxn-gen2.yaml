@@ -276,6 +276,14 @@ Resources:
         StorageVirtualMachineId: !Ref StorageVirtualMachine
         JunctionPath: !Sub "/${NamePrefix}_gen2_vol"
         SecurityStyle: UNIX
+        # Required by the API -- omitting it fails validation, and it fails *after* the file system has
+        # been built, so the rollback discards about 25 minutes of waiting.
+        #
+        # false, and that is the measurement's choice rather than a default. The test data is
+        # incompressible on purpose (dedup and compression ratios of 1), so inline efficiency has
+        # nothing to gain and only adds work on the write path. It also has to be decided now: once
+        # data is written, the setting cannot be changed until background processing has finished.
+        StorageEfficiencyEnabled: false
         SizeInBytes: !Ref VolumeSizeBytes
         TieringPolicy:
           # No capacity pool tiering. Cold data moving to the pool mid-measurement would change what
