@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# =================================================================================================
+# UNEXECUTED DRAFT. The Windows client, which is the only way an SMB case gets measured.
+#
+# It is a c5n.9xlarge, the same instance type as the Linux single-host client, for one reason: a
+# comparison between SMB and NFS is only a comparison if the client side of both is the same. Its
+# 50 Gbps is a guaranteed figure rather than an "Up to", so a plateau can be attributed to the storage
+# rather than to the instance. $2.448/hour, and it stops when the instance stops.
+#
+# **The domain join is the part that goes wrong, and it goes wrong quietly.** Two specifics:
+#
+# 1. **DNS has to be pointed at the domain controllers before the join runs.** A Windows instance uses
+#    the VPC resolver by default, which cannot resolve the directory's name. The join then fails, and
+#    the association reports `Failed` without the reason being visible in the association status --
+#    only in the command output. UserData sets DNS first for exactly this reason.
+#
+# 2. **The join uses `AWS::SSM::Association` with the AWS-managed `AWS-JoinDirectoryServiceDomain`
+#    document.** Not the `SsmAssociations` property on the instance, and not a custom document
+#    containing `aws:domainJoin`: a custom document is schema version 2.2, and an association created
+#    with an instance id rejects that version. Both alternatives look correct in a template and fail
+#    at deploy time.
+#
+# The role carries `AmazonSSMDirectoryServiceAccess` as well as `AmazonSSMManagedInstanceCore`. Without
+# the first, the join document cannot read the directory and the instance is reachable but never joins
+# -- which presents as a directory problem rather than a permissions one.
+#
+# **A private subnet needs three interface endpoints** -- `ssm`, `ssmmessages` and `ec2messages` --
+# or the instance shows `running` in EC2 and never appears in Systems Manager at all. This template
+# does not create them, because the subnet is passed in and may already have them or have a NAT path.
+# `runbook.sh windows-status` reads whether the instance actually arrived, rather than assuming it did.
+#
+# VDBENCH and a Java runtime are not installed here. VDBENCH is fetched from Oracle under a licence
+# that has to be accepted by a person, so it is a manual step on the instance, recorded in the README.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. Windows measurement client for the SMB cases, joined to AWS Managed Microsoft AD
+  through the AWS-JoinDirectoryServiceDomain document and reachable over AWS Systems Manager.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement}
+        Parameters: [SubnetId, ClientSecurityGroupId]
+      - Label: {default: Directory}
+        Parameters: [DirectoryId, DirectoryName, DirectoryDnsIpAddresses]
+      - Label: {default: Client}
+        Parameters: [InstanceType, LatestWindowsAmiId]
+      - Label: {default: Naming}
+        Parameters: [NamePrefix]
+
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      The same subnet as the Linux clients and the storage targets, so the SMB and NFS figures differ
+      by protocol rather than by network position.
+  ClientSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >-
+      The measurement clients' group, reused rather than duplicated. The SVM's SMB ingress rule names
+      this group, so a Windows client in a group of its own would be refused at the storage side.
+  DirectoryId:
+    Type: String
+    AllowedPattern: "^d-[0-9a-f]{10}$"
+    Description: The DirectoryId output of the Active Directory stack.
+  DirectoryName:
+    Type: String
+    Description: The fully qualified domain name, matching the directory exactly.
+  DirectoryDnsIpAddresses:
+    Type: CommaDelimitedList
+    Description: >-
+      The two controller addresses, from the directory stack's output. Used twice: to set the
+      instance's DNS before the join, and as the join document's own dnsIpAddresses.
+  InstanceType:
+    Type: String
+    Default: c5n.9xlarge
+    Description: >-
+      Matches the Linux single-host client. Its bandwidth is a guaranteed figure, which is what lets a
+      plateau be read as the storage ceiling rather than the client's.
+  LatestWindowsAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
+    Description: >-
+      By SSM parameter rather than a pinned id, so the stack does not carry an AMI that ages out of the
+      Region. The SMB client is part of what is measured, so the OS build is recorded at measurement
+      time instead of being fixed here.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+    AllowedPattern: "^[a-z0-9-]{3,20}$"
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        # The one that is easy to leave out. Without it the join document cannot read the directory,
+        # and the symptom is an instance that is reachable but unjoined.
+        - arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess
+      Policies:
+        - PolicyName: measurement-reads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Read-only, so the client can resolve the SMB endpoint it mounts without the endpoint
+              # being baked into the stack, and cannot alter the thing it is measuring.
+              - Effect: Allow
+                Action:
+                  - fsx:DescribeFileSystems
+                  - fsx:DescribeStorageVirtualMachines
+                  - fsx:DescribeVolumes
+                Resource: "*"
+      Tags:
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  WindowsClient:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestWindowsAmiId
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref ClientSecurityGroupId]
+      IamInstanceProfile: !Ref InstanceProfile
+      # No KeyName. Access is over Systems Manager, so there is no Administrator password to retrieve
+      # and no key material left behind in a shared account.
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            # Raised IOPS because the test data is generated locally before being written to the share.
+            # A slow root volume would make the generator the bottleneck and the result would be a
+            # measurement of gp3.
+            VolumeSize: 200
+            VolumeType: gp3
+            Iops: 16000
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            <powershell>
+            # Point DNS at the domain controllers before anything tries to resolve the domain. The SSM
+            # association that performs the join runs on its own schedule and will fail silently if
+            # this has not happened yet.
+            $adapter = Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1
+            Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ${DnsList}
+            # Written so the state is checkable after the fact rather than inferred from the join
+            # working. `Get-DnsClientServerAddress` at measurement time should agree with this file.
+            "DNS set to ${DnsList} at $(Get-Date -Format o)" |
+              Out-File -FilePath C:\perfmatrix-bootstrap.log -Encoding utf8 -Append
+            New-Item -Path C:\bench -ItemType Directory -Force | Out-Null
+            </powershell>
+          - DnsList: !Join [",", !Ref DirectoryDnsIpAddresses]
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-client-windows"}
+        - {Key: Role, Value: smb-single-host}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  # A separate resource, not the instance's SsmAssociations property, and the AWS-managed document, not
+  # a custom one. Both of the alternatives are rejected at deploy time -- see the header.
+  DomainJoinAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: AWS-JoinDirectoryServiceDomain
+      Targets:
+        - Key: InstanceIds
+          Values: [!Ref WindowsClient]
+      Parameters:
+        directoryId: [!Ref DirectoryId]
+        directoryName: [!Ref DirectoryName]
+        dnsIpAddresses:
+          - !Select [0, !Ref DirectoryDnsIpAddresses]
+          - !Select [1, !Ref DirectoryDnsIpAddresses]
+
+Outputs:
+  WindowsInstanceId:
+    Value: !Ref WindowsClient
+    Description: >-
+      Connect with 'aws ssm start-session --target <this>'. It appearing here is not evidence it
+      joined the domain; `runbook.sh windows-status` reads that.
+  DomainJoinAssociationId:
+    Value: !Ref DomainJoinAssociation
+    Description: >-
+      Read the outcome with `aws ssm describe-association-executions --association-id <this>`. A
+      CREATE_COMPLETE stack says the association exists, not that the join succeeded.
+  JoinVerificationHint:
+    Value: >-
+      Verify from the instance, not from the association status. Over Session Manager run
+      '(Get-ComputerInfo).CsDomain' and confirm it returns the domain name rather than WORKGROUP.
+  MountHint:
+    Value: >-
+      Mount as a domain account that the volume's NTFS permissions admit. The directory's Admin
+      account is in Domain Admins and will work; a non-privileged account is the more representative
+      choice and should be created in the directory if the result is meant to reflect one.
+  HourlyCostNote:
+    Value: "About $2.448/hour while running. This one does stop when the instance is stopped."

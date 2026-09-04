@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. Second-generation FSx for ONTAP for the E2 pattern.
+# UNEXECUTED DRAFT. Second-generation FSx for ONTAP for the E pattern.
 #
 # Why a second file system exists at all, when a first-generation one is already deployed:
 #
@@ -20,10 +20,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 #   6,144 MBps x $2.013            = $12,368 / month
 #   200,000 SSD IOPS above the free 3 per GiB = about $4,017 / month
 #   1,024 GiB SSD x $0.15          = $154 / month
-#   total, about $16,539 / month, or **$22.66 / hour**
+#   total, about $16,630 / month at 2,048 GiB of SSD, or **$22.78 / hour**
 #
 # **This is the most expensive resource in the measurement after EFS Provisioned.** Delete it as soon
-# as the E2 pattern is done. Reducing ThroughputCapacityPerHAPair is the cheaper lever, but the
+# as the E pattern is done. Reducing ThroughputCapacityPerHAPair is the cheaper lever, but the
 # change takes time to apply -- 24 minutes was measured for a first-generation 128 to 2048 change --
 # so a teardown at the end of the window is the plan, not a step-down between patterns.
 #
@@ -31,14 +31,14 @@ AWSTemplateFormatVersion: "2010-09-09"
 # making a volume, an SVM or the file system undeletable; the whole point is that it is deleted.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. Second-generation Single-AZ FSx for ONTAP file system, SVM and volume for the E2
+  UNEXECUTED DRAFT. Second-generation Single-AZ FSx for ONTAP file system, SVM and volume for the E
   ceiling-comparison pattern, in an existing VPC and subnet.
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label: {default: Placement (must match the other targets and the clients)}
-        Parameters: [VpcId, SubnetId, ClientSecurityGroupId]
+        Parameters: [VpcId, SubnetId, ClientSecurityGroupId, AdSecurityGroupId]
       - Label: {default: Performance}
         Parameters: [ThroughputCapacityPerHAPair, StorageCapacityGiB, ProvisionedSsdIops]
       - Label: {default: Volume}
@@ -55,6 +55,14 @@ Parameters:
   ClientSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
     Description: NFS and the ONTAP management port are allowed from this group only.
+  AdSecurityGroupId:
+    Type: String
+    Default: ""
+    Description: >-
+      The security group AWS Managed AD created for its domain controllers, from
+      `aws ds describe-directories`. Leave empty for an NFS-only deployment. When set, SMB ingress and
+      outbound to the controllers are added -- **an AD-joined SVM cannot complete its join without the
+      outbound rule**, because the rest of this file deliberately has no egress at all.
   ThroughputCapacityPerHAPair:
     Type: Number
     Default: 6144
@@ -97,6 +105,9 @@ Parameters:
       ARN of an existing Secrets Manager secret holding the fsxadmin password. Passed by reference so
       the password is never a template parameter, a stack event or a console field.
     AllowedPattern: "^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$"
+
+Conditions:
+  HasAd: !Not [!Equals [!Ref AdSecurityGroupId, ""]]
 
 Resources:
   FileSystemSecurityGroup:
@@ -160,9 +171,40 @@ Resources:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-fs-sg"}
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
+  # The SMB path, added only when a directory exists. Separate resources rather than more entries in
+  # the lists above, so an NFS-only deployment produces exactly the rules it did before this was added.
+  SmbFromClients:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasAd
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 445
+      ToPort: 445
+      SourceSecurityGroupId: !Ref ClientSecurityGroupId
+      Description: >-
+        SMB from the measurement clients. Port 139 is not opened: SMB 2.0 and later do not use NetBIOS
+        session service, and every dialect being measured here is 2.0 or later.
+
+  # Without this the join fails, and it fails in a way that reads as a permissions problem. An
+  # AD-joined SVM contacts its controllers for Kerberos, LDAP and the win-to-unix name-mapping lookup
+  # that ONTAP performs on file system operations once CIFS is enabled.
+  AdOutbound:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: HasAd
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: "-1"
+      DestinationSecurityGroupId: !Ref AdSecurityGroupId
+      # The AD port set spans TCP and UDP from 53 through the dynamic RPC range at 49152-65535, so
+      # enumerating it as fifteen rules would not narrow which hosts can be reached. That is already
+      # just this one group. (EC2 caps a rule description at 255 characters, hence the short form.)
+      Description: >-
+        To the domain controllers only, named by security group rather than address
+
   FileSystem:
     Type: AWS::FSx::FileSystem
-    # Retain would be the wrong default here: this file system costs $22.66/hour and exists to be
+    # Retain would be the wrong default here: this file system costs $22.78/hour and exists to be
     # deleted. Delete means a failed rollback does not leave it running.
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -227,6 +269,17 @@ Resources:
 Outputs:
   FileSystemId:
     Value: !Ref FileSystem
+  FileSystemSecurityGroupId:
+    Value: !Ref FileSystemSecurityGroup
+    Description: >-
+      The group on the SVM's network interfaces. The directory's own security group has to admit this
+      one on the AD ports, which is what `runbook.sh ad-ports` arranges.
+  StorageVirtualMachineId:
+    Value: !Ref StorageVirtualMachine
+    Description: >-
+      The NFS SVM. **Do not join this one to a domain.** Enabling CIFS on an SVM makes ONTAP perform a
+      win-to-unix lookup on file system operations, which puts the domain controller on the path of
+      every NFS figure measured here. The SMB cases use a second SVM created by template-smb-svm.yaml.
   ManagementEndpointLookup:
     Value: !Sub >-
       aws fsx describe-file-systems --file-system-ids ${FileSystem}
@@ -252,5 +305,5 @@ Outputs:
       and the SSD IOPS setting has no effect on it.
   HourlyCostNote:
     Value: !Sub
-      - "About $${Hourly} per hour while this stack exists. Delete it when the E2 pattern is done."
-      - Hourly: "22.66 at 6144 MBps with 200,000 provisioned IOPS"
+      - "About $${Hourly} per hour while this stack exists. Delete it when the E pattern is done."
+      - Hourly: "22.78 at 6144 MBps with 200,000 provisioned IOPS and 2,048 GiB of SSD"

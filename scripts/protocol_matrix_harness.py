@@ -14,7 +14,8 @@ Three things it refuses to do, each because the alternative produces a number th
 
 1. **It will not report a case it could not mount.** An unsupported protocol is an absent row, not a
    zero. `--dry-run` prints which cases would be skipped and why, from the documented support matrix,
-   before anything is created.
+   before anything is created. SMB is reported separately again: it is supported by FSx for ONTAP but
+   mounted from Windows, so this script does not drive it and says so rather than implying it will.
 2. **It records effective mount options, not requested ones.** `rsize=1048576` can be requested and
    granted as 65536 while the mount still succeeds.
 3. **It will not drive the S3 API.** auto_vdbench runs VDBENCH against a mounted path; VDBENCH has no
@@ -256,10 +257,19 @@ def main() -> int:
         all_cases.extend(build_cases(target, args.mount_root, args.protocols))
 
     if args.dry_run:
-        print("case                     status   reason")
+        print("case                     status      reason")
         for case in all_cases:
-            state = "would run" if case.supported else "skip"
-            print(f"{case.name:24s} {state:8s} {case.reason}")
+            if not case.supported:
+                state, reason = "skip", case.reason
+            elif case.protocol == "smb":
+                # Supported by the target, but not by this script: it mounts from Linux. Saying
+                # "would run" here would imply the run covers it, and the gap would only surface
+                # afterwards, as a missing row nobody was expecting.
+                state = "elsewhere"
+                reason = "run auto_vdbench on the Windows client; this script does not drive SMB"
+            else:
+                state, reason = "would run", ""
+            print(f"{case.name:24s} {state:11s} {reason}")
         print(
             "\nSupport status is documented, not measured. "
             "See docs/ja/verification/protocol-matrix-efs-vs-ontap.md"

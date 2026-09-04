@@ -14,10 +14,11 @@ Transform: AWS::LanguageExtensions
 #   - **Eight c5n.2xlarge** for the host-count test, where the question is whether the total grows
 #     with the number of clients. One large instance cannot answer that.
 #
-# There is no Windows client. SMB is not in this round: the domain controllers the existing SVMs were
-# joined to no longer exist -- no ENI answers at their recorded DNS addresses and the account has no
-# Managed AD -- so an SMB case would be blocked on standing up a directory, not on a client. When a
-# directory exists, add the Windows client and the SMB case together.
+# The Windows client for the SMB cases is **not** here; it is in template-windows.yaml. Two reasons to
+# keep it separate: it cannot be created until the directory exists, and it carries an IAM role and an
+# SSM association that the Linux clients have no use for. It does join **this** security group, though
+# -- the storage side names this group in its SMB ingress rule, so a Windows client in a group of its
+# own would be refused at the target.
 #
 # Cost while running, at ap-northeast-1 On-Demand prices from the Price List API on 2026-09-04:
 #   c5n.9xlarge  $2.448/hour

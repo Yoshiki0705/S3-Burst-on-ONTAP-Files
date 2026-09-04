@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# =================================================================================================
+# UNEXECUTED DRAFT. A second storage virtual machine, for the SMB cases only.
+#
+# **Why a second SVM instead of joining the one that already exists.** Enabling CIFS on an SVM makes
+# ONTAP perform a win-to-unix name-mapping lookup as part of file system operations on that SVM, and
+# that lookup needs a reachable domain controller. Joining the NFS SVM would therefore put the
+# directory on the path of every NFS figure in this matrix -- the NFS numbers would no longer be
+# measuring what the NFS numbers are supposed to measure, and a directory hiccup would show up as a
+# storage result. Two SVMs on one file system keeps the two protocol paths independent of each other.
+#
+# **What the two SVMs do share: the file system's throughput capacity.** They are separate identities,
+# not separate performance envelopes. An SMB run and an NFS run at the same time would divide one
+# 6,144 MBps figure between them and neither result would mean anything. Measure one at a time, and
+# say so next to the numbers.
+#
+# **This template does not join the domain.** It creates the SVM unjoined, and `runbook.sh join-svm`
+# performs the join with `update-storage-virtual-machine`. That split is deliberate: a join that lands
+# in `MISCONFIGURED` is retried against the same SVM with corrected values, whereas a failure inside
+# CloudFormation rolls the SVM back and the next attempt starts from nothing -- and leaves an orphaned
+# computer object in the directory that the next attempt must not reuse the name of. The join is the
+# step most likely to need a second try, so it is the step kept out of the stack.
+#
+# Storage: the volume here is a second 900 GiB volume on the same file system, so the file system needs
+# at least 2,048 GiB of SSD rather than the 1,024 GiB that the NFS volume alone needs. The extra
+# 1,024 GiB is $0.15/GB-month, about $0.21/hour -- immaterial beside the file system's $22.78, and it
+# is what lets the SMB read exceed the 256 GB in-memory cache the same way the NFS read does.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. A second, SMB-only storage virtual machine and an NTFS volume on an existing
+  FSx for ONTAP file system. Created unjoined; runbook.sh join-svm performs the Active Directory join.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Target file system}
+        Parameters: [FileSystemId]
+      - Label: {default: SVM and volume}
+        Parameters: [VolumeSizeBytes]
+      - Label: {default: Naming}
+        Parameters: [NamePrefix]
+
+Parameters:
+  FileSystemId:
+    Type: String
+    AllowedPattern: "^fs-[0-9a-f]{8,}$"
+    Description: >-
+      The FileSystemId output of the second-generation stack. The SMB SVM goes on the same file system
+      as the NFS SVM so that both are measured against one throughput capacity setting -- which also
+      means they cannot be measured at the same time.
+  # There is deliberately no NetBIOS name parameter. The name is supplied at join time, by
+  # `runbook.sh join-svm` through SVM_NETBIOS_NAME, because it is the value most likely to need
+  # changing between attempts: it must be at most 15 characters, different from the domain's own short
+  # name, and unique across every SVM in the domain -- and a failed attempt leaves a computer object
+  # behind whose name the next attempt collides with. A template parameter would tie that change to a
+  # stack update.
+  VolumeSizeBytes:
+    Type: Number
+    MinValue: 21474836480
+    # No default, and the value is not written out here. A twelve-digit byte count is
+    # indistinguishable from an AWS account id to a secret scanner, so the runbook computes it from a
+    # size in GiB and passes it in -- CloudFormation cannot multiply, and this repository's audit
+    # would flag the literal.
+    Description: >-
+      Set by the runbook from VOLUME_SIZE_GIB, which defaults to 900 GiB. Large enough that a read pass
+      exceeds the 256 GB in-memory cache, which is the condition for the figure to be a storage figure
+      rather than a cache figure. The minimum here is 20 GiB, the ONTAP volume floor.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+    AllowedPattern: "^[a-z0-9-]{3,20}$"
+
+Resources:
+  SmbStorageVirtualMachine:
+    Type: AWS::FSx::StorageVirtualMachine
+    DeletionPolicy: Delete
+    Properties:
+      FileSystemId: !Ref FileSystemId
+      Name: !Sub "${NamePrefix}-smb-svm"
+      # NTFS, because this SVM serves a Windows client and NTFS is the permission model such a client
+      # would actually be given. Security style selects which permission model ONTAP consults, not how
+      # fast it serves -- but it is part of the configuration, so it is recorded rather than left to
+      # the default.
+      RootVolumeSecurityStyle: NTFS
+      # No ActiveDirectoryConfiguration here. See the header: the join is a runbook step so that a
+      # MISCONFIGURED result can be corrected on this same SVM.
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-smb-svm"}
+        - {Key: Protocol, Value: smb}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  SmbVolume:
+    Type: AWS::FSx::Volume
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}_smb_vol"
+      VolumeType: ONTAP
+      OntapConfiguration:
+        StorageVirtualMachineId: !Ref SmbStorageVirtualMachine
+        JunctionPath: !Sub "/${NamePrefix}_smb_vol"
+        SecurityStyle: NTFS
+        SizeInBytes: !Ref VolumeSizeBytes
+        TieringPolicy:
+          # None, for the same reason as the NFS volume: data moving to the capacity pool part-way
+          # through a run would change what the read is being served from.
+          Name: NONE
+        SnapshotPolicy: none
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-smb-vol"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+Outputs:
+  SmbStorageVirtualMachineId:
+    Value: !Ref SmbStorageVirtualMachine
+    Description: Pass to `runbook.sh join-svm`, which joins it to the directory.
+  SmbShareHint:
+    Value: !Sub "\\\\<svm-smb-dns>\\c$\\${NamePrefix}_smb_vol"
+    Description: >-
+      The SVM's SMB DNS name appears only after the join succeeds. Read it with
+      `aws fsx describe-storage-virtual-machines --query 'StorageVirtualMachines[0].Endpoints.Smb'`.
+      FSx for ONTAP exposes volumes under the administrative c$ share by default.
+  SmbDnsLookup:
+    Value: !Sub >-
+      aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids ${SmbStorageVirtualMachine}
+      --query 'StorageVirtualMachines[0].Endpoints.Smb.DNSName' --output text
+  SharedThroughputWarning:
+    Value: >-
+      This SVM shares the file system's throughput capacity with the NFS SVM. Run SMB and NFS
+      measurements at different times, and record which SVM was idle.
