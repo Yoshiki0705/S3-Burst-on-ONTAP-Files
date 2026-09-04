@@ -67,7 +67,7 @@ deploy_clients() {
     --template-file "$HERE/template-clients.yaml" \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "NamePrefix=$PREFIX" \
-      "StagingBucketName=${STAGING_BUCKET:-}" \
+      "StagingBucketName=${STAGING_BUCKET:-}" "FsxAdminSecretArn=${FSXADMIN_SECRET_ARN:-}" \
     --no-fail-on-empty-changeset
   printf 'ClientSecurityGroupId=%s\n' "$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
   [[ -n "${STAGING_BUCKET:-}" ]] \
@@ -496,25 +496,93 @@ NOTE
 
 # --- gates and accounting ------------------------------------------------------------------------
 
+# Reads or changes the NVMe read cache over the ONTAP REST API, from a client, because there is no AWS
+# API for it. Run as `nvme-cache show` or `nvme-cache off`.
+#
+# The password is read on the client from Secrets Manager rather than passed in: a Run Command's
+# parameters are kept in Systems Manager's command history.
+nvme_cache() {
+  local action="${1:-show}"
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN"
+  local instance; instance="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  [[ -n "$instance" && "$instance" != "None" ]] || die "no client; run './runbook.sh clients' first"
+
+  local mgmt="management.${fs_id}.fsx.${REGION}.amazonaws.com"
+  local read_cmd="curl -s -k -u \"fsxadmin:\$PW\" \"https://${mgmt}/api/private/cli/system/node/external-cache?fields=node,is-enabled\" | python3 -m json.tool"
+  local script
+  case "$action" in
+    show) script="$read_cmd" ;;
+    off)
+      # PATCH, then sleep, then read. **The PATCH returning is not evidence.** Judge by the second read.
+      script="curl -s -k -X PATCH -u \"fsxadmin:\$PW\" -H 'Content-Type: application/json' -d '{\"is_enabled\": false}' \"https://${mgmt}/api/private/cli/system/node/external-cache?node=*\" >/dev/null; sleep 30; $read_cmd"
+      ;;
+    *) die "usage: runbook.sh nvme-cache [show|off]" ;;
+  esac
+
+  log "NVMe read cache on $fs_id: $action"
+
+  # Built by python3 into a file rather than passed with the --parameters shorthand. The shorthand is
+  # parsed by the CLI itself and cannot survive the nested quoting these commands need -- it fails with
+  # "Expected: ',', received: 'f'", pointing at a quote inside the curl invocation.
+  local payload; payload="$(mktemp)"
+  # shellcheck disable=SC2064  # expand now, so the trap names this file
+  trap "rm -f '$payload'" RETURN
+  SECRET_ARN="$FSXADMIN_SECRET_ARN" REGION_NAME="$REGION" SCRIPT="$script" \
+    python3 - "$payload" <<'PY'
+import json, os, sys
+
+fetch_password = (
+    "PW=$(aws secretsmanager get-secret-value"
+    f" --region {os.environ['REGION_NAME']}"
+    f" --secret-id {os.environ['SECRET_ARN']}"
+    " --query SecretString --output text"
+    " | python3 -c 'import json,sys;print(json.load(sys.stdin)[\"password\"])')"
+)
+payload = {"Parameters": {"commands": ["set -uo pipefail", fetch_password, os.environ["SCRIPT"]]}}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump(payload, handle)
+PY
+
+  local cmd_id
+  cmd_id="$(aws ssm send-command --region "$REGION" --instance-ids "$instance" \
+    --document-name AWS-RunShellScript --timeout-seconds 600 \
+    --cli-input-json "file://$payload" \
+    --query 'Command.CommandId' --output text)"
+  local i state
+  for i in $(seq 1 30); do
+    state="$(aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" \
+      --instance-id "$instance" --query Status --output text)"
+    [[ "$state" == "InProgress" || "$state" == "Pending" ]] || break
+    sleep 15
+  done
+  aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" --instance-id "$instance" \
+    --query 'StandardOutputContent' --output text
+  [[ "$state" == "Success" ]] || die "the command did not succeed (status: $state)"
+  printf '\nRead the is_enabled values above. Every node must report false before the disk-path read.\n'
+}
+
 # The gate that matters. A disk-path read taken with the NVMe cache enabled is a cache measurement.
 preflight() {
   log "preflight"
   python3 "$HERE/../../scripts/protocol_matrix_harness.py" --dry-run
 
-  log "NVMe read cache state (must be disabled before the disk-path read)"
+  log "NVMe read cache state"
+  nvme_cache show
   cat <<'NOTE'
-This cannot be read or changed through the AWS API. Over the ONTAP CLI:
 
-    system node external-cache show
-    system node external-cache modify -node * -is-enabled false
-    system node external-cache show          # confirm both nodes report false
+If any node reports true, turn it off and confirm:
 
-Judge by the second show, not by the modify returning without error.
+    ./runbook.sh nvme-cache off
+
+That is a REST call to the ONTAP private CLI passthrough -- there is no AWS API for this setting, and
+the PATCH returning without error is not evidence. The phase re-reads the state afterwards.
 
 With the cache off, a read only has to exceed the in-memory cache: 256 GB at 2048 MBps and at
 6144 MBps. Read at least 512 GB in one pass.
 NOTE
-  printf 'Confirmed the NVMe read cache is disabled on every target being measured? [y/N] '
+  printf 'Confirmed every node reports is_enabled false? [y/N] '
   read -r reply; [[ "$reply" == "y" ]] || die "stopping: measure the cache off, or record that it was on"
 }
 
@@ -564,6 +632,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   join-svm               Join that SVM to the directory, and poll until it is CREATED
   windows                Create the Windows client and its domain-join association (~$2.448/hour)
   windows-status         Read whether the instance arrived and whether the join ran
+  nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
   preflight              Print the support matrix and gate on the NVMe read cache being disabled
   efs elastic            Create the EFS target in elastic mode ($0.07/GB accessed, no hourly charge)
@@ -596,6 +665,7 @@ case "${1:-}" in
   windows)              deploy_windows ;;
   windows-status)       windows_status ;;
   raise-gen1)           raise_gen1 ;;
+  nvme-cache)           nvme_cache "${2:-show}" ;;
   preflight)            preflight ;;
   costs)                costs ;;
   teardown)             exec "$HERE/teardown.sh" ;;

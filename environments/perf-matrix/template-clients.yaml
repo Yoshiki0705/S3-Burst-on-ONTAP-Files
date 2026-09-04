@@ -41,6 +41,8 @@ Metadata:
         Parameters: [SingleHostInstanceType, LadderInstanceType, LatestAmiId]
       - Label: {default: Staging}
         Parameters: [StagingBucketName]
+      - Label: {default: ONTAP access}
+        Parameters: [FsxAdminSecretArn]
       - Label: {default: Naming}
         Parameters: [NamePrefix]
 
@@ -80,6 +82,14 @@ Parameters:
       with no NAT and no public address cannot reach PyPI or GitHub -- verified by timeout, while the
       S3 gateway endpoint answers -- so VDBENCH, auto_vdbench and the Python wheels arrive over S3 or
       not at all. Leave empty to grant no S3 access.
+  FsxAdminSecretArn:
+    Type: String
+    Default: ""
+    Description: >-
+      The `fsxadmin` secret, read by the client rather than passed to it. Disabling the NVMe read cache
+      is an ONTAP operation with no AWS API, so it happens from here over the ONTAP REST API -- and a
+      password handed to a Run Command would sit in Systems Manager's command history afterwards.
+      Read-only, and on this one secret. Leave empty to grant nothing.
   NamePrefix:
     Type: String
     Default: perfmatrix
@@ -87,6 +97,7 @@ Parameters:
 
 Conditions:
   HasStagingBucket: !Not [!Equals [!Ref StagingBucketName, ""]]
+  HasFsxAdminSecret: !Not [!Equals [!Ref FsxAdminSecretArn, ""]]
 
 Resources:
   # The one group every target's ingress rule points at. Targets allow this group rather than a CIDR,
@@ -168,6 +179,12 @@ Resources:
                   Action:
                     - s3:ListBucket
                   Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasFsxAdminSecret
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref FsxAdminSecretArn
                 - !Ref "AWS::NoValue"
       Tags:
         - {Key: DeleteAfterMeasurement, Value: "true"}
