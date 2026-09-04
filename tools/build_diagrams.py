@@ -123,6 +123,7 @@ ICONS = {
         "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
         "Arch_AWS-Interconnect_64.svg"
     ),
+    "efs": ("Architecture-Service-Icons_{d}/Arch_Storage/64/Arch_Amazon-EFS_64.svg"),
     "direct_connect": (
         "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
         "Arch_AWS-Direct-Connect_64.svg"
@@ -140,6 +141,7 @@ ICON_SIZE = {
     "fsx_ontap": 80,
     "aws_interconnect": 80,
     "direct_connect": 80,
+    "efs": 80,
     # Non-AWS service icons, held at 80 so they read as peers of the AWS service icons beside them
     # rather than as something less important. Each vendor's own rules are met at this size:
     #
@@ -442,6 +444,115 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "NFS / SMB (read / write) *2",
     },
     # --- throughput bottlenecks (Part 2) ---------------------------------------------------------
+    # --- protocol test matrix -------------------------------------------------------------------
+    "panel_read_paths": {
+        "ja": "A. 同じデータを 2 つの経路で読む（S3 API で 1 回だけ書く）",
+        "en": "A. Reading the same data over two paths (written once over the S3 API)",
+    },
+    "panel_efs": {"ja": "D. Amazon EFS", "en": "D. Amazon EFS"},
+    "panel_ontap_protocols": {
+        "ja": "E. Amazon FSx for NetApp ONTAP",
+        "en": "E. Amazon FSx for NetApp ONTAP",
+    },
+    "efs_node": {"ja": "Amazon EFS", "en": "Amazon EFS"},
+    "linux_client": {"ja": "Linux Client", "en": "Linux Client"},
+    "windows_client": {"ja": "Windows Client", "en": "Windows Client"},
+    "write_then_a1": {
+        "ja": "① S3 API で 1 回だけ書く　→　② A-1: 同じ経路で読む",
+        "en": "1. Write once over the S3 API  ->  2. A-1: read back over the same path",
+    },
+    "read_a2": {
+        "ja": "③ A-2: 同じデータを NFS / SMB で読む",
+        "en": "3. A-2: read the same data over NFS / SMB",
+    },
+    "efs_protocols": {
+        "ja": "対応: NFSv4.0 / NFSv4.1<br><b>非対応: SMB・NFSv3・NFSv4.2・nconnect</b>"
+        "<br>Windows を実行する EC2 からのマウントも<b>非対応</b>",
+        "en": "Supported: NFSv4.0 / NFSv4.1<br><b>Not supported: SMB, NFSv3, NFSv4.2, nconnect</b>"
+        "<br>Mounting from an EC2 instance running Windows is <b>not supported</b> either",
+    },
+    "ontap_protocols": {
+        "ja": "対応: SMB (2.0 / 3.0 / 3.1.1)<br>NFSv3 / v4.0 / v4.1 / v4.2"
+        "<br>nconnect は最大 16 接続",
+        "en": "Supported: SMB (2.0 / 3.0 / 3.1.1)<br>NFSv3 / v4.0 / v4.1 / v4.2"
+        "<br>nconnect up to 16 connections",
+    },
+    "comparable_only": {
+        "ja": "D と E を同じ列に並べられるのは NFSv4.0 と NFSv4.1 だけ",
+        "en": "Only NFSv4.0 and NFSv4.1 can be put in the same column for D and E",
+    },
+    "matrix_note": {
+        "ja": note_body(
+            "補足 — 可否はドキュメント記載、性能値は未測定",
+            (
+                (
+                    "※1",
+                    "A-1 と A-2 は同じデータに対して行う",
+                    "書き込みは S3 API で 1 回だけ実施し、そのあと読み取りの経路を変える。"
+                    "書き直すと、比較対象にデータ配置の差が混ざる",
+                ),
+                (
+                    "※2",
+                    "既存の測定では A-1 と A-2 の比較が成立していない",
+                    "S3 API 読み取りの既存値は圧縮可能なテストデータで測っており、"
+                    "オブジェクトの大きさと並列の作り方も NFS 側と揃っていない",
+                ),
+                (
+                    "※3",
+                    "D で SMB・NFSv3・NFSv4.2 が空欄なのは、遅いのではなく非対応",
+                    "Amazon EFS は NFSv4.0 と NFSv4.1 のみ対応し、Windows を実行する "
+                    "EC2 インスタンスからのマウントにも対応しない。nconnect も非対応",
+                ),
+                (
+                    "※4",
+                    "ファイルプロトコルは auto_vdbench、S3 API は別のスクリプトで測る",
+                    "auto_vdbench は VDBENCH をマウントパスに対して駆動するツールで、"
+                    "S3 API のワークロードは生成しない。2 つの値を並べるときは測定器が違うと添える",
+                ),
+                (
+                    "※5",
+                    "この図に性能値は入っていない",
+                    "測定手順・必要な環境・未測定の一覧は docs/ja/verification/"
+                    "throughput-protocol-matrix-plan.md にある",
+                ),
+            ),
+        ),
+        "en": note_body(
+            "Notes — support status is documented; the performance figures are unmeasured",
+            (
+                (
+                    "*1",
+                    "A-1 and A-2 run against the same data",
+                    "The write happens once over the S3 API, and only the read path changes after "
+                    "that. Rewriting would mix a difference in data placement into the comparison",
+                ),
+                (
+                    "*2",
+                    "The existing measurements do not make an A-1 to A-2 comparison",
+                    "The existing S3 API read figure was taken with compressible test data, and "
+                    "neither the object size nor the shape of the concurrency matches the NFS side",
+                ),
+                (
+                    "*3",
+                    "SMB, NFSv3 and NFSv4.2 are blank under D because they are unsupported, not slow",
+                    "Amazon EFS supports NFSv4.0 and NFSv4.1 only, and does not support mounting "
+                    "from an EC2 instance running Windows. It does not support nconnect either",
+                ),
+                (
+                    "*4",
+                    "File protocols are measured with auto_vdbench, the S3 API with a separate script",
+                    "auto_vdbench drives VDBENCH against a mounted path and does not generate S3 API "
+                    "workloads. Where both appear together, say that the instruments differ",
+                ),
+                (
+                    "*5",
+                    "There are no performance figures in this diagram",
+                    "The procedure, the environment it needs and the list of what is unmeasured are "
+                    "in docs/ja/verification/throughput-protocol-matrix-plan.md",
+                ),
+            ),
+        ),
+    },
     "panel_this_arch": {
         "ja": "A. 本構成（FSx for ONTAP S3 Access Point → FlexCache → NFS / SMB）",
         "en": "A. This architecture (FSx for ONTAP S3 Access Point -> FlexCache -> NFS / SMB)",
@@ -1306,7 +1417,108 @@ def _bottlenecks() -> Diagram:
     )
 
 
-DIAGRAMS = (_overview(), _single_site(), _cross_cloud(), _bottlenecks())
+def _protocol_matrix() -> Diagram:
+    """The test patterns that are not yet measured: two read paths on one dataset, and D against E.
+
+    Panel A exists because the comparison it names does not exist yet. The write happens once and
+    only the read path changes, which is the one arrangement the existing measurements do not have.
+
+    Panels D and E carry their protocol lists as text rather than as separate rows, because what
+    matters is which entries are absent on the D side. Absent is not slow: EFS supports NFSv4.0 and
+    NFSv4.1 and nothing else here, so the Windows client is drawn only under E and D carries the
+    reason it has none.
+
+    No number appears anywhere in this figure. Nothing in it has been measured.
+    """
+    row_a, row_d, row_e = 185, 455, 700
+    return Diagram(
+        name="s3burst-protocol-test-matrix",
+        diagram_id="s3burst-protocol-matrix",
+        width=1180,
+        height=1075,
+        groups=(
+            Group("panel_a2", "panel_read_paths", 40, 60, 1100, 250),
+            Group("panel_d", "panel_efs", 40, 325, 1100, 210),
+            Group("panel_e", "panel_ontap_protocols", 40, 550, 1100, 260),
+        ),
+        nodes=(
+            Node("m_s3c", "users", "s3_client", *centred("users", 150, row_a)),
+            Node(
+                "m_ap",
+                "s3_access_point",
+                "s3_access_point",
+                *centred("s3_access_point", 360, row_a),
+            ),
+            Node(
+                "m_origin",
+                "fsx_ontap",
+                "origin_vol_short",
+                *centred("fsx_ontap", 600, row_a),
+            ),
+            Node(
+                "m_file", "client", "nfs_client_short", *centred("client", 900, row_a)
+            ),
+            Node("d_linux", "client", "linux_client", *centred("client", 200, row_d)),
+            Node("d_efs", "efs", "efs_node", *centred("efs", 520, row_d)),
+            Node(
+                "e_linux", "client", "linux_client", *centred("client", 200, row_e - 60)
+            ),
+            Node(
+                "e_win", "client", "windows_client", *centred("client", 200, row_e + 60)
+            ),
+            Node(
+                "e_ontap",
+                "fsx_ontap",
+                "cache_volume_fsx",
+                *centred("fsx_ontap", 520, row_e),
+            ),
+        ),
+        texts=(
+            # Inside the panel, not on its border. Two captions rather than three: the write and
+            # the A-1 read are the same leg travelled twice, so splitting them across two x
+            # positions would say they are different links.
+            TextBox("t_write_a1", "write_then_a1", 130, 262, 520, 20),
+            TextBox("t_a2", "read_a2", 660, 262, 440, 20),
+            TextBox("t_efs_p", "efs_protocols", 640, 410, 460, 90),
+            TextBox("t_ontap_p", "ontap_protocols", 640, 640, 460, 90),
+            TextBox("t_comparable", "comparable_only", 600, 770, 520, 20),
+        ),
+        edges=(
+            Edge("m1", "m_s3c", "m_ap", "s3_api_rw", both_ways=True),
+            Edge("m2", "m_ap", "m_origin", both_ways=True),
+            # A-2 leaves the same volume the S3 API wrote to. One way: this leg is the read.
+            Edge("m3", "m_origin", "m_file", "nfs_smb_read"),
+            Edge("d1", "d_linux", "d_efs", both_ways=True),
+            # Fixed entry points. Left to itself draw.io lands both of these on the same point and
+            # routes the second one back around, which reads as a link between the two clients.
+            Edge(
+                "e1",
+                "e_linux",
+                "e_ontap",
+                both_ways=True,
+                exit_at=(1.0, 0.5),
+                entry_at=(0.0, 0.25),
+            ),
+            Edge(
+                "e2",
+                "e_win",
+                "e_ontap",
+                both_ways=True,
+                exit_at=(1.0, 0.5),
+                entry_at=(0.0, 0.75),
+            ),
+        ),
+        notes=(Note("note", "matrix_note", 40, 830, 1100, 205),),
+    )
+
+
+DIAGRAMS = (
+    _overview(),
+    _single_site(),
+    _cross_cloud(),
+    _bottlenecks(),
+    _protocol_matrix(),
+)
 
 
 # --- rendering -----------------------------------------------------------------------------------
