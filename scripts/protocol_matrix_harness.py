@@ -242,10 +242,20 @@ def unmount_case(case: Case) -> None:
 
 
 def measure(
-    case: Case, auto_vdbench: Path, report_root: Path, extra: list[str]
+    case: Case,
+    auto_vdbench: Path,
+    python: str,
+    report_root: Path,
+    extra: list[str],
 ) -> None:
     report_dir = report_root / case.name
+    # Invoked through an explicit interpreter rather than executed directly. auto_vdbench's shebang is
+    # `#!/usr/bin/python`, a path Amazon Linux 2023 does not provide at all -- running it directly gives
+    # "cannot execute: required file not found", which names neither Python nor the shebang. And
+    # `python3` there is 3.9, while the dependencies are installed under 3.11, so even a corrected
+    # shebang would pick the wrong one.
     cmd = [
+        python,
         str(auto_vdbench),
         "start",
         "--report-dir",
@@ -274,6 +284,14 @@ def main() -> int:
     parser.add_argument("--export", help="Export path on the server")
     parser.add_argument("--report-root", type=Path, default=Path("report"))
     parser.add_argument("--auto-vdbench", type=Path, default=Path("auto_vdbench.py"))
+    parser.add_argument(
+        "--python",
+        default="python3.11",
+        help=(
+            "Interpreter to run auto_vdbench with. Not python3: on Amazon Linux 2023 that is 3.9, "
+            "and auto_vdbench's dependencies install under 3.11."
+        ),
+    )
     parser.add_argument(
         "--auto-vdbench-conf",
         type=Path,
@@ -353,7 +371,7 @@ def main() -> int:
             print(f"  effective options: {case.effective_options}")
             for note in case.notes:
                 print(f"  note: {note}")
-            measure(case, args.auto_vdbench, args.report_root, extra)
+            measure(case, args.auto_vdbench, args.python, args.report_root, extra)
         finally:
             unmount_case(case)
 

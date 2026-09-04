@@ -24,6 +24,12 @@
 #      pattern is done, without touching anything else.
 #
 # Nothing here creates a resource that cannot be deleted. No SnapLock, no retention, no Object Lock.
+#
+# One operational note. `ad` and `gen2` run for 15 to 40 minutes, and bash reads a script
+# incrementally rather than all at once -- so editing this file while one of those is in flight
+# corrupts the running invocation's parse and it dies with a syntax error at a line that is fine on
+# disk. The deploy itself survives, because the failure lands after the wait returns, but the exit
+# status is a lie. If a long phase is running and this file needs editing, run the phase from a copy.
 # =================================================================================================
 set -euo pipefail
 
@@ -236,7 +242,14 @@ deploy_gen2() {
       "ThroughputCapacityPerHAPair=6144" "ProvisionedSsdIops=$iops" \
       "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
-    --no-fail-on-empty-changeset
+    --no-fail-on-empty-changeset \
+    --disable-rollback
+  # --disable-rollback because the slowest resource in this stack is created first. A file system takes
+  # roughly 25 minutes, and a validation failure on the volume after that discards all of it. With
+  # rollback disabled the stack stops at CREATE_FAILED with the file system intact, and the deploy can
+  # be retried against it once the failing resource is fixed. It is the one stack here where that
+  # trade is worth making: a half-created file system still bills, so read `costs` if a retry is not
+  # going to happen promptly.
 }
 
 # Raises the existing first-generation file system to its ap-northeast-1 maximum. Separate from the
