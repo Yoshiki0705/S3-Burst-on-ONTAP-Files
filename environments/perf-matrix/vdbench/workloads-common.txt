@@ -1,0 +1,74 @@
+**********************************************************************
+* UNEXECUTED DRAFT. Workload and run definitions, shared verbatim by the
+* NFS and the SMB parameter files.
+*
+* This file exists so that the two protocols are driven by *the same*
+* definitions rather than by two files that were meant to match. It is
+* included by vdbench-linux-nfs.txt and vdbench-windows-smb.txt, which
+* differ only in their host and storage definitions -- so a diff of those
+* two files is the complete list of differences between the two runs.
+*
+* Why VDBENCH directly here, when auto_vdbench is the instrument for
+* everything else: auto_vdbench drives load over `ssh root@host` and its
+* helper scripts use GNU userland (`stat -c`, `ps -e -o pid,cmd`,
+* `kill -TERM`). It cannot drive a Windows host. Running it on the Linux
+* side and something else on the Windows side would leave the SMB figure
+* incomparable, so the head-to-head pair is taken with VDBENCH directly on
+* both sides instead. auto_vdbench still produces the latency curves for
+* the NFS and EFS protocol matrix.
+*
+* The shapes below mirror what auto_vdbench generates, so the direct
+* figures sit next to its figures without a change of form:
+*   wd=<name>,sd=*,seekpct=100,xfersize=<n>k,rdpct=<n>   (random)
+*   wd=<name>,sd=*,seekpct=.0,xfersize=<n>k,rdpct=<n>    (sequential)
+**********************************************************************
+
+* Read and write are separated rather than mixed by default. A 70/30 mix
+* reports one number for two behaviours, and the write ceiling is the one
+* that differs most between generations.
+*
+* 1 MiB sequential read is the ceiling case: at 6,144 MB/s it needs about
+* 6,144 IOPS, so neither SSD IOPS nor request overhead gets in the way.
+* 64 KiB is where SSD IOPS starts to matter (about 98,300 IOPS at
+* 6,144 MB/s). 4 KiB cannot reach the throughput ceiling at all and is
+* included to show where the limit stops being throughput.
+
+* --- sequential, read ------------------------------------------------
+wd=seq-bs1024k-read100,sd=*,seekpct=.0,xfersize=1024k,rdpct=100
+wd=seq-bs64k-read100,sd=*,seekpct=.0,xfersize=64k,rdpct=100
+
+* --- sequential, write -----------------------------------------------
+wd=seq-bs1024k-read0,sd=*,seekpct=.0,xfersize=1024k,rdpct=0
+wd=seq-bs64k-read0,sd=*,seekpct=.0,xfersize=64k,rdpct=0
+
+* --- random ----------------------------------------------------------
+wd=rand-bs4k-read100,sd=*,seekpct=100,xfersize=4k,rdpct=100
+wd=rand-bs4k-read0,sd=*,seekpct=100,xfersize=4k,rdpct=0
+wd=rand-bs64k-read100,sd=*,seekpct=100,xfersize=64k,rdpct=100
+
+**********************************************************************
+* Run definitions.
+*
+* iorate=max on purpose: these runs look for the ceiling, which is a
+* different question from the latency-against-IOPS curves that
+* auto_vdbench produces. Both belong in the report, labelled as what they
+* are.
+*
+* elapsed=300 with warmup=60. Shorter runs on this storage have been seen
+* to land inside a cache-warming window and read high.
+*
+* threads=512 matches auto_vdbench's default so the concurrency is not
+* another difference between the two instruments. If latency is flat at
+* the top of the range the load is too light; if it is very high the load
+* is too heavy. Record whichever value was used -- it is part of the
+* result, not a detail of the tool.
+**********************************************************************
+rd=default,iorate=max,warmup=60,elapsed=300,interval=1,threads=512
+
+rd=seq-read-1024k,wd=seq-bs1024k-read100
+rd=seq-read-64k,wd=seq-bs64k-read100
+rd=seq-write-1024k,wd=seq-bs1024k-read0
+rd=seq-write-64k,wd=seq-bs64k-read0
+rd=rand-read-4k,wd=rand-bs4k-read100
+rd=rand-write-4k,wd=rand-bs4k-read0
+rd=rand-read-64k,wd=rand-bs64k-read100

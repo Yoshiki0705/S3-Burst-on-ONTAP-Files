@@ -383,9 +383,42 @@ auto_vdbench を呼ぶ。非対応の組み合わせは理由つきでスキッ�
 ケースを区別するのはレポートディレクトリ名である。**ハーネス側で別のパスを選ぶと、どのケースでも
 設定ファイルが指す 1 か所が測られ、結果は測っていないケース名で保存される。**
 
-**SMB は Windows 側で auto_vdbench を直接実行する。** ハーネスは SMB をマウントしない（Windows を
-駆動しないため）。**結果は同じケース名のディレクトリに置き、Linux 側の結果と同じ表に載せるときは
-クライアント OS が違うことを書く。**
+#### SMB は auto_vdbench では駆動できない
+
+**auto_vdbench は Linux 前提である。** 実物で確認した根拠は 2 つ。
+
+- 生成される VDBENCH のホスト定義が `hd=default,shell=ssh` と `hd=hd{n},system={host},user=root`
+- `make_testfile.sh` が各ホストへ `ssh root@$SERVER` で `stat -c %s` / `ps -e -o pid,cmd` /
+  `kill -TERM` / `rm -f` を実行する（GNU のユーザーランド）
+
+Windows に sshd を入れても後者が通らない。そもそも `Add-WindowsCapability -Online -Name
+OpenSSH.Server` は **`0x80072ee2` で失敗する**（Windows Update から取得する仕組みで、この VPC は
+インターネットに出られない）。
+
+**したがって SMB 対 NFS は、VDBENCH を両側で直接実行した対で測る。** `vdbench/` にその
+パラメータファイルがある。
+
+| ファイル | 役割 |
+|---|---|
+| `vdbench/workloads-common.txt` | `wd=` と `rd=` の定義。**両側が同一のこのファイルを include する** |
+| `vdbench/vdbench-linux-nfs.txt` | Linux 側の `hd=` と `sd=` のみ |
+| `vdbench/vdbench-windows-smb.txt` | Windows 側の `hd=` と `sd=` のみ |
+
+**2 つのファイルの diff が、2 つの実行の差の全部である。** 差は 3 つしかない。
+
+1. ホスト定義（Linux / Windows）
+2. パスの形（POSIX / マップしたドライブ）
+3. `openflag`: `o_direct` / `directio`
+
+**3 番目は消せない。** 「クライアントのキャッシュを迂回する」を両プラットフォームで意味する単一の
+フラグが無いので、**どちらを使ったかを結果に併記する。** 書かなければ、2 つの数値の差の一部は
+プロトコルではなくクライアントのページキャッシュである。
+
+**ワークロード定義の形は auto_vdbench が生成するものに合わせてある**（`seekpct` / `xfersize` /
+`rdpct`、`threads=512`、1 ホスト 1 ファイル）。auto_vdbench 側の曲線と並べたときに形が変わらない。
+
+**`iorate=max` で回すのは上限を見るためで、auto_vdbench が出すレイテンシ曲線とは別の問いである。**
+両方をレポートに載せるときは、どちらがどちらかを書く。
 
 **EFS はマウント方法を変える。** 素の `mount -t nfs` ではクライアント 1 台あたり 500 MiBps で
 止まる。`amazon-efs-utils` 2.0 以降のヘルパーで 1,500 MiBps になる。**どちらを使ったかを記録する。**

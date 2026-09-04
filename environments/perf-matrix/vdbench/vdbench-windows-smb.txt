@@ -1,0 +1,51 @@
+**********************************************************************
+* UNEXECUTED DRAFT. The SMB side of the head-to-head pair.
+*
+* Run on the Windows client against a mapped drive on the AD-joined SVM:
+*
+*   net use Z: \\<svm-smb-dns>\c$\<volume> /user:PERFMATRIX\<account> *
+*   cd C:\bench
+*   C:\bench\vdbench50407\vdbench.bat -f vdbench-windows-smb.txt -o C:\bench\report-smb
+*
+* Everything that decides the workload is in workloads-common.txt, which
+* the NFS file includes too. The differences between the two runs are
+* exactly three, and all three are here:
+*
+*   1. the host definition (Windows against Linux)
+*   2. the path form (a mapped drive against a POSIX path)
+*   3. openflag: directio here, o_direct there
+*
+* On the third: there is no single flag meaning "bypass the client cache"
+* on both platforms. The report has to say which was used on each side,
+* because otherwise part of the gap between the two numbers is the
+* client's cache rather than the protocol.
+*
+* A mapped drive rather than a UNC path in `lun=`. Both can work, but a
+* drive letter makes the credential used explicit at map time, and the
+* account is part of the result: a member of Domain Admins bypasses part
+* of the permission evaluation, so a non-privileged domain account is the
+* representative choice.
+**********************************************************************
+
+* Same instance type as the Linux client. A comparison between SMB and NFS
+* is only a comparison if the client side is the same on both.
+hd=default,shell=vdbench,jvms=16
+hd=hd1,system=localhost
+
+**********************************************************************
+* 600 GB, for the same reason as the NFS side: it has to exceed the
+* 256 GB in-memory read cache, with the NVMe layer disabled over the
+* ONTAP CLI before the run.
+*
+* Note that this volume is NTFS security style while the NFS volume is
+* UNIX. Security style selects which permission model ONTAP consults, not
+* how fast it serves -- but it is part of the configuration and belongs
+* next to the figure.
+*
+* Both SVMs share the file system's throughput capacity. Run this while
+* the NFS side is idle, and record that it was.
+**********************************************************************
+sd=default,openflag=directio,size=600g
+sd=sd1-1,host=hd1,lun=Z:\file1
+
+include=workloads-common.txt

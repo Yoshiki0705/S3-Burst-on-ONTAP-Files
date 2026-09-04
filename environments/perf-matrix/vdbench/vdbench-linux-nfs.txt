@@ -1,0 +1,47 @@
+**********************************************************************
+* UNEXECUTED DRAFT. The NFS side of the head-to-head pair.
+*
+* Run on the Linux client against a mounted FSx for ONTAP NFS export:
+*
+*   cd /opt/bench
+*   vdbench -f /path/to/vdbench-linux-nfs.txt -o /opt/bench/report-nfs
+*
+* Everything that decides the workload is in workloads-common.txt, which
+* the SMB file includes too. A diff between this file and
+* vdbench-windows-smb.txt is therefore the complete list of differences
+* between the two runs, and there are exactly three:
+*
+*   1. the host definition (Linux against Windows)
+*   2. the path form (POSIX against a mapped drive)
+*   3. openflag: o_direct here, directio there
+*
+* The third is not cosmetic and it cannot be removed. There is no single
+* flag meaning "bypass the client cache" on both platforms, so the report
+* has to state which was used on each side. Without it, part of the
+* difference between the two numbers is the client's page cache rather
+* than the protocol.
+**********************************************************************
+
+* One host: the single-host figure. Its bandwidth is a guaranteed 50 Gbps,
+* which is what allows a plateau to be read as the storage ceiling rather
+* than the client's.
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* 600 GB, and the size is doing work.
+*
+* The second-generation file system has 256 GB of in-memory read cache.
+* A read pass smaller than that never reaches SSD, and the SSD IOPS
+* setting then has no effect on the number -- which is how a cache
+* measurement ends up labelled as a storage measurement. 600 GB is more
+* than twice the cache, with the NVMe layer disabled separately over the
+* ONTAP CLI before the run.
+*
+* One file per host, matching what auto_vdbench generates, so the access
+* shape does not differ between the two instruments.
+**********************************************************************
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/target/file1
+
+include=workloads-common.txt
