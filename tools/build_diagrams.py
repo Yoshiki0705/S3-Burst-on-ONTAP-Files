@@ -441,6 +441,139 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "NFS / SMB（読み書き）※2",
         "en": "NFS / SMB (read / write) *2",
     },
+    # --- throughput bottlenecks (Part 2) ---------------------------------------------------------
+    "panel_this_arch": {
+        "ja": "A. 本構成（FSx for ONTAP S3 Access Point → FlexCache → NFS / SMB）",
+        "en": "A. This architecture (FSx for ONTAP S3 Access Point -> FlexCache -> NFS / SMB)",
+    },
+    "panel_amazon_s3": {
+        "ja": "B. Amazon S3（S3 API のみ）",
+        "en": "B. Amazon S3 (S3 API only)",
+    },
+    "panel_s3_files_path": {
+        "ja": "C. Amazon S3 Files（バケットを NFS でマウント）",
+        "en": "C. Amazon S3 Files (mount a bucket over NFS)",
+    },
+    "client_host": {"ja": "クライアントホスト", "en": "Client host"},
+    "s3_client_n": {"ja": "S3 Client × N", "en": "S3 Client × N"},
+    "origin_vol_short": {
+        "ja": "Amazon FSx for NetApp ONTAP (Origin)",
+        "en": "Amazon FSx for NetApp ONTAP (Origin)",
+    },
+    "cache_vol_short": {
+        "ja": "Amazon FSx for NetApp ONTAP (Cache)",
+        "en": "Amazon FSx for NetApp ONTAP (Cache)",
+    },
+    "efs_proxy_box": {"ja": "efs-proxy", "en": "efs-proxy"},
+    "nfs_client_short": {"ja": "NFS / SMB Client", "en": "NFS / SMB Client"},
+    "nfs_client_local": {"ja": "NFS Client", "en": "NFS Client"},
+    "amazon_s3_node": {"ja": "Amazon S3", "en": "Amazon S3"},
+    "bn_this_arch": {
+        "ja": "ボトルネック: 指定したスループットキャパシティ（全クライアントで共有）",
+        "en": "Bottleneck: the throughput capacity you specify (shared by every client)",
+    },
+    "bn_amazon_s3": {
+        "ja": "ボトルネック: クライアント側のネットワーク帯域（台数を増やすと合計が伸びる）",
+        "en": "Bottleneck: client-side network bandwidth (the total grows as hosts are added)",
+    },
+    "bn_s3_files": {
+        "ja": "ボトルネック: efs-proxy の CPU（クライアント上）",
+        "en": "Bottleneck: efs-proxy CPU, on the client",
+    },
+    "loopback_mount": {"ja": "NFS mount (127.0.0.1)", "en": "NFS mount (127.0.0.1)"},
+    "s3_api": {"ja": "S3 API", "en": "S3 API"},
+    "flexcache_edge": {"ja": "FlexCache", "en": "FlexCache"},
+    "nfs_smb_read": {"ja": "NFS / SMB", "en": "NFS / SMB"},
+    "bottleneck_note": {
+        "ja": note_body(
+            "補足 — 実測値と、当たっていた上限の種類",
+            (
+                (
+                    "※1",
+                    "A は指定値で頭打ち。クライアントを増やしても合計は増えない",
+                    "2048 MBps 指定時の書き込み 415 MB/s（415.1 / 415.7。非圧縮、8 MiB、並列 64）。"
+                    "このとき効いていたのは HA ペアの書き込み上限 750 MBps で、その 55%。"
+                    "クライアント 4 台で合計 1.01 倍",
+                ),
+                (
+                    "※2",
+                    "A の Cache は Origin とは別のファイルシステムで、自分のスループット"
+                    "キャパシティを持つ",
+                    "両側 128 MBps 指定で、Cache 常駐の読み取りが Origin 直読みの 2.31 倍"
+                    "（882.7 / 907.1 対 383.3 MB/s）。初回は充填を伴うため 306.8 MB/s",
+                ),
+                (
+                    "※3",
+                    "B はクライアント側が頭打ちの位置。台数に比例して合計が伸びる",
+                    "1 台 581.5 MB/s から 8 台 4783.2 MB/s まで書き込みが 8.23 倍、"
+                    "1 台あたりは落ちない。8 台合計 38.3 Gbps で比例のまま",
+                ),
+                (
+                    "※4",
+                    "C は NFS クライアントが同一ホストの efs-proxy に接続する",
+                    "8 ストリームで読み取り約 450 MB/s。16 ストリームでも読み取りは伸びず、"
+                    "そのとき CPU は efs-proxy に 67.3 + 18.1 + 14.9%（8 vCPU）",
+                ),
+                (
+                    "※5",
+                    "C で nconnect が増やすのは NFS クライアントと efs-proxy の間の接続本数",
+                    "頭打ちの位置は efs-proxy 自身の CPU なので、対応していても届かない。"
+                    "経路の efs-proxy --tls は転送中の暗号化が既定であることの代価",
+                ),
+                (
+                    "※6",
+                    "測定は NFS のみ。SMB は未測定",
+                    "2026-09-01 および 09-02、ap-northeast-1、ONTAP 9.18.1P3D1、SINGLE_AZ_1、"
+                    "SSD 1024 GiB、クライアントは c5n.9xlarge（台数を振る試験は c5n.2xlarge × 8）",
+                ),
+            ),
+        ),
+        "en": note_body(
+            "Notes — measured values, and which kind of ceiling each one hit",
+            (
+                (
+                    "*1",
+                    "A plateaus at the value you specified; adding clients does not raise the total",
+                    "415 MB/s writes with 2048 MBps specified (415.1 / 415.7; incompressible, 8 MiB, "
+                    "concurrency 64). What bound was the 750 MBps HA-pair write ceiling, and that is "
+                    "55% of it. Four clients gave 1.01x in total",
+                ),
+                (
+                    "*2",
+                    "The cache in A is a separate file system with its own throughput capacity",
+                    "With 128 MBps specified on both sides, a resident cache read runs at 2.31x a "
+                    "direct origin read (882.7 / 907.1 against 383.3 MB/s). The first read fills the "
+                    "cache and comes back at 306.8 MB/s",
+                ),
+                (
+                    "*3",
+                    "B plateaus on the client side, and the total grows with host count",
+                    "Writes rise 8.23x from 581.5 MB/s on one host to 4783.2 MB/s on eight, with "
+                    "per-host throughput flat. Still proportional at 38.3 Gbps across eight hosts",
+                ),
+                (
+                    "*4",
+                    "In C the NFS client connects to an efs-proxy on the same host",
+                    "Reads reach about 450 MB/s at eight streams and go no further at sixteen, where "
+                    "CPU sits on efs-proxy at 67.3 + 18.1 + 14.9% of an 8 vCPU host",
+                ),
+                (
+                    "*5",
+                    "What nconnect would raise in C is the count of connections between the NFS "
+                    "client and efs-proxy",
+                    "The plateau is efs-proxy's own CPU, so support for it would not reach the "
+                    "plateau. The efs-proxy --tls in the path is the cost of encryption in transit "
+                    "being the default",
+                ),
+                (
+                    "*6",
+                    "NFS only; SMB was not measured",
+                    "2026-09-01 and 09-02, ap-northeast-1, ONTAP 9.18.1P3D1, SINGLE_AZ_1, "
+                    "1024 GiB of SSD, client c5n.9xlarge (c5n.2xlarge × 8 for the host-count test)",
+                ),
+            ),
+        ),
+    },
     "single_site_note": {
         "ja": note_body(
             "補足",
@@ -1063,7 +1196,92 @@ def _cross_cloud() -> Diagram:
     )
 
 
-DIAGRAMS = (_overview(), _single_site(), _cross_cloud())
+def _bottlenecks() -> Diagram:
+    """Where each of the three measured paths plateaus.
+
+    Three panels, one per path, because the point of the figure is that the same "MB/s" comes from a
+    different place in each. The bottleneck is called out under the element that carries it rather
+    than in a legend, so a reader cannot take the number without the location.
+
+    Panel C wraps the client and the proxy in one frame. That the NFS client connects to a process on
+    its own host is the structural fact the panel exists to show — drawn as two separate columns it
+    reads as a network hop, which is what makes `nconnect` look like the answer.
+
+    efs-proxy gets a plain box, not an icon. There is no AWS asset for it, and borrowing another
+    mark would attribute it to whoever's mark was borrowed.
+    """
+    row_a, row_b, row_c = 175, 420, 665
+    return Diagram(
+        name="s3burst-throughput-bottlenecks",
+        diagram_id="s3burst-bottlenecks",
+        width=1180,
+        height=1035,
+        groups=(
+            Group("panel_a", "panel_this_arch", 40, 60, 1100, 230),
+            Group("panel_b", "panel_amazon_s3", 40, 305, 1100, 230),
+            Group("panel_c", "panel_s3_files_path", 40, 550, 1100, 230),
+        ),
+        frames=(
+            # The client and the proxy sit on one host. Drawn as a container so the loopback mount
+            # inside it is unmistakable.
+            Frame("c_host", "client_host", 80, 585, 330, 145),
+        ),
+        nodes=(
+            Node("a_client", "users", "s3_client", *centred("users", 140, row_a)),
+            Node(
+                "a_ap",
+                "s3_access_point",
+                "s3_access_point",
+                *centred("s3_access_point", 330, row_a),
+            ),
+            Node(
+                "a_origin",
+                "fsx_ontap",
+                "origin_vol_short",
+                *centred("fsx_ontap", 550, row_a),
+            ),
+            Node(
+                "a_cache",
+                "fsx_ontap",
+                "cache_vol_short",
+                *centred("fsx_ontap", 800, row_a),
+            ),
+            Node(
+                "a_file", "client", "nfs_client_short", *centred("client", 1030, row_a)
+            ),
+            Node("b_client", "users", "s3_client_n", *centred("users", 140, row_b)),
+            Node("b_s3", "s3", "amazon_s3_node", *centred("s3", 550, row_b)),
+            Node("c_client", "users", "s3_client", *centred("users", 140, row_c)),
+            Node("c_files", "s3", "s3_files", *centred("s3", 640, row_c)),
+            Node(
+                "c_bucket",
+                "s3_bucket",
+                "s3_bucket",
+                *centred("s3_bucket", 880, row_c),
+            ),
+        ),
+        texts=(
+            TextBox("a_bn", "bn_this_arch", 380, 250, 620, 20),
+            TextBox("b_bn", "bn_amazon_s3", 200, 495, 700, 20),
+            TextBox("c_bn", "bn_s3_files", 200, 742, 480, 20),
+            # A plain box, since no AWS asset exists for this process.
+            TextBox("c_proxy", "efs_proxy_box", 290, 645, 110, 40),
+        ),
+        edges=(
+            Edge("q1", "a_client", "a_ap", "s3_api"),
+            Edge("q2", "a_ap", "a_origin"),
+            Edge("q3", "a_origin", "a_cache", "flexcache_edge"),
+            Edge("q4", "a_cache", "a_file", "nfs_smb_read"),
+            Edge("q5", "b_client", "b_s3", "s3_api"),
+            Edge("q6", "c_client", "c_proxy", "loopback_mount"),
+            Edge("q7", "c_proxy", "c_files"),
+            Edge("q8", "c_files", "c_bucket"),
+        ),
+        notes=(Note("note", "bottleneck_note", 40, 800, 1100, 215),),
+    )
+
+
+DIAGRAMS = (_overview(), _single_site(), _cross_cloud(), _bottlenecks())
 
 
 # --- rendering -----------------------------------------------------------------------------------
