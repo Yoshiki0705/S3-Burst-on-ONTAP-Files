@@ -61,8 +61,11 @@ deploy_clients() {
     --template-file "$HERE/template-clients.yaml" \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "NamePrefix=$PREFIX" \
+      "StagingBucketName=${STAGING_BUCKET:-}" \
     --no-fail-on-empty-changeset
   printf 'ClientSecurityGroupId=%s\n' "$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
+  [[ -n "${STAGING_BUCKET:-}" ]] \
+    || printf 'STAGING_BUCKET not set: the clients have no S3 read access, and this subnet has no path to PyPI or GitHub.\n'
 }
 
 # --- directory -----------------------------------------------------------------------------------
@@ -507,6 +510,8 @@ Environment:
   for AD     SUBNET_ID_2 (different AZ) AD_SECRET_ARN
   for gen2   FSXADMIN_SECRET_ARN
   for gen1   GEN1_FS_ID
+  for tools  STAGING_BUCKET -- the clients have no route to PyPI or GitHub, so VDBENCH,
+             auto_vdbench and the Python wheels come in over S3
   optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB AD_DOMAIN_NAME AD_SHORT_NAME
              AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE

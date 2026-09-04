@@ -39,6 +39,8 @@ Metadata:
         Parameters: [VpcId, SubnetId]
       - Label: {default: Clients}
         Parameters: [SingleHostInstanceType, LadderInstanceType, LatestAmiId]
+      - Label: {default: Staging}
+        Parameters: [StagingBucketName]
       - Label: {default: Naming}
         Parameters: [NamePrefix]
 
@@ -70,10 +72,21 @@ Parameters:
       Amazon Linux 2023 by SSM parameter rather than a pinned AMI id, so the stack does not carry an
       AMI that ages out of the Region. The kernel version is recorded at measurement time instead,
       because the NFS client is part of what is being measured.
+  StagingBucketName:
+    Type: String
+    Default: ""
+    Description: >-
+      Bucket the measurement tooling is staged in. **This is not a convenience.** A client in a subnet
+      with no NAT and no public address cannot reach PyPI or GitHub -- verified by timeout, while the
+      S3 gateway endpoint answers -- so VDBENCH, auto_vdbench and the Python wheels arrive over S3 or
+      not at all. Leave empty to grant no S3 access.
   NamePrefix:
     Type: String
     Default: perfmatrix
     AllowedPattern: "^[a-z0-9-]{3,20}$"
+
+Conditions:
+  HasStagingBucket: !Not [!Equals [!Ref StagingBucketName, ""]]
 
 Resources:
   # The one group every target's ingress rule points at. Targets allow this group rather than a CIDR,
@@ -140,6 +153,22 @@ Resources:
                   - cloudwatch:GetMetricData
                   - cloudwatch:ListMetrics
                 Resource: "*"
+              # Read-only, and on the staging bucket alone. The client pulls tooling; it never writes
+              # there, so a corrupted upload cannot originate from the host being measured.
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/*"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+                - !Ref "AWS::NoValue"
       Tags:
         - {Key: DeleteAfterMeasurement, Value: "true"}
 

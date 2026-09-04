@@ -53,8 +53,9 @@ Elastic の 1/20 の読み取り上限しか持たないのに、この表で最
 | **2 つ目のサブネット（別 AZ）** | **Managed AD のサービス要件。** この環境で唯一の例外で、下の「AD が測定値に入る形」を読むこと |
 | 既存の第一世代 FSx for ONTAP の ID | A と E1 で流用する。このディレクトリは作らない（作ると削除もできてしまう） |
 | Secrets Manager のシークレット 2 つ（`password` キー） | 第二世代の `fsxadmin` と、AD の `Admin`。テンプレートのパラメータにしないため |
-| VDBENCH と Java | auto_vdbench の前提。**VDBENCH は Oracle アカウントでのサインインとライセンス同意が必要**で、自動取得できない。展開して PATH に入れる。**Windows クライアントにも入れる** |
-| [auto_vdbench](https://github.com/shuichi-taketani/auto_vdbench) | ファイルプロトコル側の測定器。`pip install requests pandas matplotlib openpyxl pymsteams scipy plotly kaleido slack-sdk` |
+| VDBENCH | auto_vdbench の前提。**Oracle アカウントでのサインインとライセンス同意が必要**で、自動取得できない。**Windows クライアントにも入れる** |
+| [auto_vdbench](https://github.com/shuichi-taketani/auto_vdbench) | ファイルプロトコル側の測定器 |
+| S3 バケット 1 つ（ステージング用） | **クライアントはインターネットに出られない。** 測定ツールはここを経由して持ち込む（手順 2） |
 
 Linux クライアントも Windows クライアントも鍵ペアを持たず、パブリックアドレスも持たない。
 **接続は AWS Systems Manager（Session Manager）で行う。** 共有アカウントに鍵を残さないため。
@@ -75,6 +76,7 @@ export SUBNET_ID_2=subnet-yyyyyyyyyyyyyyyy # AD 用。別 AZ であること
 export GEN1_FS_ID=fs-xxxxxxxxxxxxxxxxx     # 既存の第一世代
 export FSXADMIN_SECRET_ARN=arn:aws:secretsmanager:...
 export AD_SECRET_ARN=arn:aws:secretsmanager:...
+export STAGING_BUCKET=perfmatrix-staging-xxxxxxxxxxxx  # 測定ツールの持ち込み経路（手順 2）
 export NAME_PREFIX=perfmatrix
 export VOLUME_SIZE_GIB=900                 # 省略時 900。runbook がバイトへ換算する
 ```
@@ -88,14 +90,76 @@ export VOLUME_SIZE_GIB=900                 # 省略時 900。runbook がバイ�
 **最初に実行する。** 作成に 15〜30 分かかり、CloudFormation はその間待つ。**あとに回すと、その
 待ち時間を $53/時 の EFS と FSx for ONTAP を遊ばせながら過ごすことになる。**
 
-### 2. クライアントと共有セキュリティグループ
+### 2. クライアント、共有セキュリティグループ、測定ツールの持ち込み
 
 ```bash
+export STAGING_BUCKET=<測定ツールを置くバケット>
 ./runbook.sh clients
 ```
 
 各ターゲットの ingress は CIDR ではなくこのセキュリティグループを参照するので、これが無いと
-ターゲットが作れない。
+ターゲットが作れない。作成直後は 9 台すべてが起動しているので、**台数を増やす試験まで使わない
+ladder 8 台はすぐ停止する**（$6.80/時 → $2.45/時）。
+
+**クライアントはインターネットに出られない。** 実測した状態は次のとおり。
+
+| 到達先 | 結果 |
+|---|---|
+| PyPI、GitHub | **到達しない**（タイムアウト。NAT もパブリック IP も無い） |
+| S3（ゲートウェイエンドポイント） | 到達する |
+| Amazon Linux 2023 リポジトリ | 到達する（S3 経由で配信されるため） |
+
+したがって **`pip install` と `git clone` は動かない。** 測定ツールは S3 に置いて引き込む。
+`STAGING_BUCKET` を渡すと、クライアントのロールにそのバケットの**読み取り権限だけ**が付く。
+書き込みは付けない。測定対象のホストから壊れた成果物が生まれないようにするため。
+
+インターネットに出られる手元の環境で用意する。
+
+```bash
+git clone --depth 1 https://github.com/shuichi-taketani/auto_vdbench.git
+tar -czf auto_vdbench.tar.gz --exclude .git auto_vdbench
+
+# Linux x86_64 / CPython 3.11 向けの wheel だけを取得する
+pip download --only-binary=:all: \
+  --platform manylinux2014_x86_64 --python-version 3.11 --implementation cp --abi cp311 \
+  -d wheels -r auto_vdbench/requirements.txt
+pip download --only-binary=:all: \
+  --platform manylinux1_x86_64 --python-version 3.11 --implementation cp --abi cp311 \
+  -d wheels 'kaleido==0.2.1'
+
+aws s3 cp auto_vdbench.tar.gz "s3://$STAGING_BUCKET/tooling/"
+aws s3 sync wheels "s3://$STAGING_BUCKET/wheels/"
+```
+
+**`kaleido` は 0.2.1 を明示する。** 1.x は静止画の書き出しに外部の Chrome を要求するので、
+インターネットに出られないホストでは PNG 出力が落ちる。0.2.1 は Chromium を同梱する。
+**落ちるのは PNG だけで、HTML と CSV は 1.x でも出る。**
+
+クライアント側（Session Manager 経由）:
+
+```bash
+dnf install -y python3.11 python3.11-pip java-17-amazon-corretto-headless amazon-efs-utils nfs-utils unzip
+mkdir -p /opt/wheels /opt/bench /mnt/bench/target
+aws s3 sync "s3://$STAGING_BUCKET/wheels/" /opt/wheels/
+aws s3 cp "s3://$STAGING_BUCKET/tooling/auto_vdbench.tar.gz" /opt/bench/
+tar -xzf /opt/bench/auto_vdbench.tar.gz -C /opt/bench
+python3.11 -m pip install --no-index --find-links=/opt/wheels \
+  -r /opt/bench/auto_vdbench/requirements.txt 'kaleido==0.2.1'
+```
+
+**既定の `python3` は 3.9 である。** auto_vdbench は `python3.11` で動かす。
+`amazon-efs-utils` はリポジトリに **3.3.1** があるので、ヘルパー経路（クライアント 1 台あたり
+1,500 MiBps）はインターネット無しで使える。
+
+**VDBENCH はこの経路に含められない。** Oracle アカウントでのサインインとライセンス同意が必要なので、
+手元でダウンロードして S3 に置き、同じ経路で引き込む。
+
+```bash
+aws s3 cp vdbench50407.zip "s3://$STAGING_BUCKET/tooling/"
+# クライアント側
+aws s3 cp "s3://$STAGING_BUCKET/tooling/vdbench50407.zip" /tmp/
+unzip -q -d /opt/bench/vdbench /tmp/vdbench50407.zip && chmod +x /opt/bench/vdbench/vdbench
+```
 
 ### 3. 第二世代のターゲット
 
