@@ -341,4 +341,5 @@ Amazon S3 側は合計が 2.02 倍になり、1 台あたりは変わりませ�
 | [同一ボリュームの検証記録](s3ap-nfs-visibility.md) | 削除の反映とマルチパートの可視性 |
 | [代替案との比較](../reference/comparison/alternatives.md) | S3 Files を含む選択肢の代償 |
 | [FinOps の費用構造](../reference/comparison/finops-s3-vs-s3ap.md) | 費用次元での比較 |
+| [性能の語の日英対訳](../reference/glossary/performance-terms-ja-en.md) | 上限の種別と測定条件の語を日英でずらさないための表 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
