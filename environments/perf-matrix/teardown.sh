@@ -98,10 +98,26 @@ delete_stack "${PREFIX}-gen2"
 delete_stack "${PREFIX}-clients"
 
 # Last of the created things, for the reason in the header.
-log "step 6 of 7: the directory"
+log "step 6 of 8: the directory"
 delete_stack "${PREFIX}-ad"
 
-log "step 7 of 7: step the pre-existing first-generation file system back down"
+# Not a stack: created by hand because the clients have no route to PyPI or GitHub and the tooling had
+# to arrive over S3. It holds VDBENCH, which is licensed, so it does not get left behind.
+log "step 7 of 8: the staging bucket"
+if [[ -n "${STAGING_BUCKET:-}" ]]; then
+  if aws s3api head-bucket --bucket "$STAGING_BUCKET" >/dev/null 2>&1; then
+    aws s3 rm "s3://$STAGING_BUCKET" --recursive --only-show-errors \
+      || warn "could not empty s3://$STAGING_BUCKET"
+    aws s3api delete-bucket --bucket "$STAGING_BUCKET" --region "$REGION" \
+      || warn "could not delete s3://$STAGING_BUCKET"
+  else
+    printf 'not present: s3://%s\n' "$STAGING_BUCKET"
+  fi
+else
+  printf 'STAGING_BUCKET not set; skipping. If a staging bucket was created, it still holds VDBENCH.\n'
+fi
+
+log "step 8 of 8: step the pre-existing first-generation file system back down"
 if [[ -n "${GEN1_FS_ID:-}" ]]; then
   # Not deleted: it predates this directory. Stepping the throughput capacity down is what stops the
   # bulk of its cost. SSD capacity cannot be reduced, so that part stays either way.
@@ -148,6 +164,10 @@ if [[ -n "$left_efs" ]]; then
   warn "EFS file systems present (this account had none before the measurement): $left_efs"
 fi
 [[ -n "$left_ad" ]] && warn "directories present (this account had none before the measurement): $left_ad"
+
+if [[ -n "${STAGING_BUCKET:-}" ]] && aws s3api head-bucket --bucket "$STAGING_BUCKET" >/dev/null 2>&1; then
+  warn "staging bucket still present: s3://$STAGING_BUCKET (it holds licensed VDBENCH)"
+fi
 
 gen1_state="$(aws fsx describe-file-systems --region "$REGION" \
   --query "FileSystems[?FileSystemId=='${GEN1_FS_ID:-none}'].OntapConfiguration.ThroughputCapacity" \
