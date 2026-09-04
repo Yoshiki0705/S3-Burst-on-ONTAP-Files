@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# =================================================================================================
+# UNEXECUTED DRAFT. Second-generation FSx for ONTAP for the E2 pattern.
+#
+# Why a second file system exists at all, when a first-generation one is already deployed:
+#
+# **The first-generation write ceiling does not move.** A first-generation Single-AZ file system in
+# ap-northeast-1 stops at 750 MBps for writes and 2,048 MBps for reads, per HA pair, and it has one
+# HA pair. Raising the throughput capacity does not raise those. Amazon EFS in the same Region
+# reaches 5 GiBps write and 60 GiBps read per file system on Elastic throughput, so showing anything
+# beyond the first generation's range needs the second generation, which delivers 6,144 MBps read
+# and 1,024 MBps write per HA pair and scales to 12 pairs.
+#
+# This stack provisions one pair at 6,144 MBps. That is the ceiling comparison, not a like-for-like
+# cost comparison: second-generation throughput capacity costs $2.013 per MBps-month against the
+# first generation's $0.906, so per MBps purchased the first generation is cheaper. What the second
+# generation buys is a range the first generation cannot reach at any price.
+#
+# Cost, at ap-northeast-1 On-Demand prices read from the Price List API on 2026-09-04:
+#   6,144 MBps x $2.013            = $12,368 / month
+#   200,000 SSD IOPS above the free 3 per GiB = about $4,017 / month
+#   1,024 GiB SSD x $0.15          = $154 / month
+#   total, about $16,539 / month, or **$22.66 / hour**
+#
+# **This is the most expensive resource in the measurement after EFS Provisioned.** Delete it as soon
+# as the E2 pattern is done. Reducing ThroughputCapacityPerHAPair is the cheaper lever, but the
+# change takes time to apply -- 24 minutes was measured for a first-generation 128 to 2048 change --
+# so a teardown at the end of the window is the plan, not a step-down between patterns.
+#
+# SnapLock, retention and privileged-delete are absent on purpose. Nothing here should be capable of
+# making a volume, an SVM or the file system undeletable; the whole point is that it is deleted.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. Second-generation Single-AZ FSx for ONTAP file system, SVM and volume for the E2
+  ceiling-comparison pattern, in an existing VPC and subnet.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement (must match the other targets and the clients)}
+        Parameters: [VpcId, SubnetId, ClientSecurityGroupId]
+      - Label: {default: Performance}
+        Parameters: [ThroughputCapacityPerHAPair, StorageCapacityGiB, ProvisionedSsdIops]
+      - Label: {default: Volume}
+        Parameters: [VolumeSizeBytes]
+      - Label: {default: Naming and credentials}
+        Parameters: [NamePrefix, FsxAdminPasswordSecretArn]
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Single-AZ, so one subnet. Use the same one as the clients.
+  ClientSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: NFS and the ONTAP management port are allowed from this group only.
+  ThroughputCapacityPerHAPair:
+    Type: Number
+    Default: 6144
+    AllowedValues: [1536, 3072, 6144]
+    Description: >-
+      The only values SINGLE_AZ_2 accepts. 6144 gives 6,144 MBps read and 1,024 MBps write per pair,
+      and an NVMe read cache of 1,900 GB with 256 GB in memory. 3072 is the cheaper option that still
+      exceeds the first generation's 750 MBps write ceiling.
+  StorageCapacityGiB:
+    Type: Number
+    Default: 1024
+    MinValue: 1024
+    Description: >-
+      1,024 GiB is enough because the disk-path measurement disables the NVMe read cache and only
+      needs to exceed the 256 GB in-memory cache. Reading past both layers instead would need
+      several TB and the storage to hold it.
+  ProvisionedSsdIops:
+    Type: Number
+    Default: 200000
+    Description: >-
+      The SSD IOPS baseline at 6,144 MBps. Provisioned rather than AUTOMATIC, because AUTOMATIC gives
+      3 IOPS per GiB and would make IOPS the binding constraint instead of the thing being measured.
+  VolumeSizeBytes:
+    Type: String
+    AllowedPattern: "^[0-9]{11,13}$"
+    Description: >-
+      Volume size in bytes, which is the unit the API takes. No default, and no GiB-to-bytes mapping
+      in this file: CloudFormation has no multiplication, string concatenation produces a number that
+      looks right and is not, and a table of byte literals here is indistinguishable from a table of
+      account IDs to a secret scanner. runbook.sh computes it, where arithmetic exists. Size it to
+      hold more than twice the 256 GB in-memory cache, which is what a read has to exceed once the
+      NVMe read cache is disabled -- 900 GiB is what the runbook passes.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+    AllowedPattern: "^[a-z0-9-]{3,20}$"
+  FsxAdminPasswordSecretArn:
+    Type: String
+    Description: >-
+      ARN of an existing Secrets Manager secret holding the fsxadmin password. Passed by reference so
+      the password is never a template parameter, a stack event or a console field.
+    AllowedPattern: "^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$"
+
+Resources:
+  FileSystemSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} gen2 FSx for ONTAP: NFS and ONTAP management from the clients"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 111
+          ToPort: 111
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: rpcbind, needed by NFSv3
+        - IpProtocol: udp
+          FromPort: 111
+          ToPort: 111
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: rpcbind over UDP, needed by NFSv3
+        - IpProtocol: tcp
+          FromPort: 635
+          ToPort: 635
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: mountd, needed by NFSv3
+        - IpProtocol: udp
+          FromPort: 635
+          ToPort: 635
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: mountd over UDP, needed by NFSv3
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: NFS, all versions
+        - IpProtocol: udp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: NFS over UDP, needed by NFSv3
+        - IpProtocol: tcp
+          FromPort: 4045
+          ToPort: 4046
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: NFS lock manager and status monitor, needed by NFSv3
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: ONTAP CLI, used to disable the NVMe read cache before the disk-path measurement
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: ONTAP REST API, used to read volume counters during a measurement
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 127.0.0.1/32
+          Description: >-
+            No egress needed for NFS or the management path. This placeholder exists because omitting
+            SecurityGroupEgress would let CloudFormation add allow-all.
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-gen2-fs-sg"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  FileSystem:
+    Type: AWS::FSx::FileSystem
+    # Retain would be the wrong default here: this file system costs $22.66/hour and exists to be
+    # deleted. Delete means a failed rollback does not leave it running.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      FileSystemType: ONTAP
+      StorageType: SSD
+      StorageCapacity: !Ref StorageCapacityGiB
+      SubnetIds: [!Ref SubnetId]
+      SecurityGroupIds: [!Ref FileSystemSecurityGroup]
+      OntapConfiguration:
+        DeploymentType: SINGLE_AZ_2
+        # One pair. Reaching EFS's 60 GiBps read would take eleven, which is not a cost this
+        # measurement justifies -- the point is that the first generation's range ends, not that
+        # this one matches EFS.
+        HAPairs: 1
+        # Set per pair rather than in total. With one pair the two are equal, but writing it this way
+        # means adding a pair does not silently divide the per-pair capacity.
+        ThroughputCapacityPerHAPair: !Ref ThroughputCapacityPerHAPair
+        DiskIopsConfiguration:
+          Mode: USER_PROVISIONED
+          Iops: !Ref ProvisionedSsdIops
+        FsxAdminPassword: !Sub "{{resolve:secretsmanager:${FsxAdminPasswordSecretArn}:SecretString:password}}"
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-gen2"}
+        - {Key: Purpose, Value: protocol-matrix-measurement}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  # UNIX security style, and no Active Directory. SMB is not measured on this file system: the
+  # domain controllers the existing SVMs were joined to no longer exist, so an SMB case here would
+  # be blocked on standing up a directory rather than on anything this stack does.
+  StorageVirtualMachine:
+    Type: AWS::FSx::StorageVirtualMachine
+    DeletionPolicy: Delete
+    Properties:
+      FileSystemId: !Ref FileSystem
+      Name: !Sub "${NamePrefix}-gen2-svm"
+      RootVolumeSecurityStyle: UNIX
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-gen2-svm"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  Volume:
+    Type: AWS::FSx::Volume
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}_gen2_vol"
+      VolumeType: ONTAP
+      OntapConfiguration:
+        StorageVirtualMachineId: !Ref StorageVirtualMachine
+        JunctionPath: !Sub "/${NamePrefix}_gen2_vol"
+        SecurityStyle: UNIX
+        SizeInBytes: !Ref VolumeSizeBytes
+        TieringPolicy:
+          # No capacity pool tiering. Cold data moving to the pool mid-measurement would change what
+          # the disk path is being measured against, and the pool has its own latency profile.
+          Name: NONE
+        SnapshotPolicy: none
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-gen2-vol"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+Outputs:
+  FileSystemId:
+    Value: !Ref FileSystem
+  ManagementEndpointLookup:
+    Value: !Sub >-
+      aws fsx describe-file-systems --file-system-ids ${FileSystem}
+      --query 'FileSystems[0].OntapConfiguration.Endpoints.Management.DNSName' --output text
+    Description: >-
+      CloudFormation does not return the ONTAP management endpoint, so this is the command that does.
+      The ONTAP CLI is where the NVMe read cache gets disabled.
+  SvmNfsEndpointLookup:
+    Value: !Sub >-
+      aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids ${StorageVirtualMachine}
+      --query 'StorageVirtualMachines[0].Endpoints.Nfs.DNSName' --output text
+    Description: The SVM's NFS DNS name, which is what the clients mount.
+  NfsMountHint:
+    Value: !Sub "mount -t nfs -o nfsvers=4.1,nconnect=16 <svm-nfs-dns>:/${NamePrefix}_gen2_vol /mnt/bench/gen2"
+    Description: >-
+      The SVM's NFS DNS name comes from `aws fsx describe-storage-virtual-machines`. nconnect is set
+      because a Linux NFS mount opens one TCP connection by default and stops near 590 MB/s.
+  DisableNvmeCacheReminder:
+    Value: >-
+      Before the disk-path measurement, disable the NVMe read cache on both nodes with
+      'system node external-cache modify -node * -is-enabled false' over the ONTAP CLI, then confirm
+      with 'system node external-cache show'. Without this, a read under 1,900 GB is served from cache
+      and the SSD IOPS setting has no effect on it.
+  HourlyCostNote:
+    Value: !Sub
+      - "About $${Hourly} per hour while this stack exists. Delete it when the E2 pattern is done."
+      - Hourly: "22.66 at 6144 MBps with 200,000 provisioned IOPS"

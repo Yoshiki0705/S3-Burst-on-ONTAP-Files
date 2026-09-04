@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# =================================================================================================
+# UNEXECUTED DRAFT. Amazon EFS for the D pattern of the protocol matrix.
+#
+# Two things about this file carry the reasoning, and neither is obvious from the AWS console:
+#
+# 1. **Provisioned is not the fast mode in Tokyo.** ap-northeast-1 sits in the upper group for
+#    Elastic (60 GiBps read / 5 GiBps write per file system) and the lower group for Provisioned
+#    (3 GiBps / 1 GiBps). Choosing Provisioned to "get more" gets one twentieth of the read ceiling.
+#    Both are offered here because they answer different questions: Provisioned is the reserved-rate
+#    mode, which is what compares like-for-like against an FSx for ONTAP throughput capacity, and
+#    Elastic is where the higher ceiling is. The default is Provisioned at its Tokyo maximum, which
+#    is the expensive one -- see the cost note below before deploying.
+#
+# 2. **The file system ceiling is not reachable from one client.** A client mounted with the plain
+#    NFS client tops out at 500 MiBps; the mount helper at version 2.0 or later raises that to
+#    1,500 MiBps. Neither reaches 3,072. Whatever this stack provisions, a single-host number is a
+#    client-side measurement, and the report has to say which mount was used.
+#
+# Cost, at ap-northeast-1 On-Demand prices read from the Price List API on 2026-09-04:
+#   - Provisioned throughput: $7.20 per MBps-month. At 3,072 MiBps that is $22,118/month,
+#     **$30.30/hour**, which is the single most expensive line in the whole measurement.
+#   - Elastic throughput: no reserved charge; $0.07 per GB read or written. A 512 GB read costs $36.
+#   - Standard storage: $0.36 per GB-month.
+# Deleting the file system stops the throughput charge. Stopping the clients does not.
+#
+# It deliberately does not create a VPC, a subnet or a client. All are passed in: the point of the
+# comparison is that every target is measured from the same hosts in the same subnet, so a second
+# subnet would add an Availability Zone hop to one side only.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. Amazon EFS file system and mount target for the D pattern of the EFS against
+  FSx for ONTAP protocol matrix, in an existing VPC and subnet.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement (must match the other targets and the clients)}
+        Parameters: [VpcId, SubnetId, ClientSecurityGroupId]
+      - Label: {default: Performance}
+        Parameters: [ThroughputMode, ProvisionedThroughputInMibps]
+      - Label: {default: Naming}
+        Parameters: [NamePrefix]
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC the clients are in. The mount target lands here.
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      The subnet the clients are in. One mount target per Availability Zone is the EFS limit, and one
+      is all this measurement wants: a second AZ would put a hop on one side of the comparison.
+  ClientSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >-
+      The security group the measurement clients use. NFS (2049) is allowed from this group only,
+      rather than from a CIDR, so the rule names what may mount rather than where it may come from.
+  ThroughputMode:
+    Type: String
+    Default: provisioned
+    AllowedValues: [provisioned, elastic, bursting]
+    Description: >-
+      provisioned reserves a rate and bills for it hourly; in ap-northeast-1 it caps at 3 GiBps read.
+      elastic reserves nothing, bills $0.07 per GB accessed, and caps at 60 GiBps read. bursting is
+      included for completeness and caps at 3 GiBps.
+  ProvisionedThroughputInMibps:
+    Type: Number
+    Default: 3072
+    MinValue: 1
+    MaxValue: 3072
+    Description: >-
+      Only used when ThroughputMode is provisioned. 3072 MiBps is the ap-northeast-1 maximum and
+      costs about $30.30/hour. Ignored in the other modes.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+    AllowedPattern: "^[a-z0-9-]{3,20}$"
+    Description: Prefix for the Name tags, so the stack's resources are identifiable in a shared account.
+
+Conditions:
+  IsProvisioned: !Equals [!Ref ThroughputMode, provisioned]
+
+Resources:
+  # Encrypted with the AWS managed key rather than a customer managed key. A CMK would add a key
+  # policy to get wrong for no measurable difference: the subject here is throughput, and encryption
+  # at rest is on either way.
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: !Ref ThroughputMode
+      ProvisionedThroughputInMibps:
+        !If [IsProvisioned, !Ref ProvisionedThroughputInMibps, !Ref "AWS::NoValue"]
+      BackupPolicy:
+        # Off on purpose. This file system holds generated test data for hours and backing it up
+        # would bill for copies of /dev/urandom.
+        Status: DISABLED
+      FileSystemTags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-efs"}
+        - {Key: Purpose, Value: protocol-matrix-measurement}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  MountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} EFS mount target: NFS from the measurement clients only"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: NFSv4 from the measurement clients
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 127.0.0.1/32
+          Description: >-
+            No egress needed. A mount target answers on an existing connection; this placeholder
+            exists because omitting SecurityGroupEgress would let CloudFormation add allow-all.
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-efs-mt-sg"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  MountTarget:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref SubnetId
+      SecurityGroups: [!Ref MountTargetSecurityGroup]
+
+Outputs:
+  FileSystemId:
+    Value: !Ref FileSystem
+    Description: Pass this to the harness as the EFS target.
+  MountCommandHelper:
+    Value: !Sub "sudo mount -t efs -o tls ${FileSystem}:/ /mnt/bench/efs"
+    Description: >-
+      Mount with the helper (amazon-efs-utils 2.0 or later) to get the 1,500 MiBps per-client
+      ceiling. Record that this is the form used.
+  MountCommandPlainNfs:
+    Value: !Sub
+      - "sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600 ${Dns}:/ /mnt/bench/efs"
+      - Dns: !Sub "${FileSystem}.efs.${AWS::Region}.amazonaws.com"
+    Description: >-
+      The plain NFS form, which caps at 500 MiBps per client. Use it only to record that the two
+      forms differ; do not report its number as the file system's ceiling.
+  ThroughputModeInUse:
+    Value: !Ref ThroughputMode
+    Description: Record this next to every figure. It sets the file system ceiling.
+  HourlyThroughputCostNote:
+    Value: !If
+      - IsProvisioned
+      - !Sub "provisioned ${ProvisionedThroughputInMibps} MiBps: about $${ProvisionedThroughputInMibps} x 7.20 / 730 per hour"
+      - "elastic or bursting: no reserved throughput charge; elastic bills $0.07 per GB accessed"
+    Description: A reminder that the throughput charge continues while the file system exists.
