@@ -53,8 +53,8 @@ Elastic の 1/20 の読み取り上限しか持たないのに、この表で最
 | **2 つ目のサブネット（別 AZ）** | **Managed AD のサービス要件。** この環境で唯一の例外で、下の「AD が測定値に入る形」を読むこと |
 | 既存の第一世代 FSx for ONTAP の ID | A と E1 で流用する。このディレクトリは作らない（作ると削除もできてしまう） |
 | Secrets Manager のシークレット 2 つ（`password` キー） | 第二世代の `fsxadmin` と、AD の `Admin`。テンプレートのパラメータにしないため |
-| VDBENCH と Java | auto_vdbench の前提。VDBENCH は Oracle のサイトでライセンス同意のうえ取得する。**Windows クライアントにも入れる** |
-| [auto_vdbench](https://github.com/shuichi-taketani/auto_vdbench) | ファイルプロトコル側の測定器 |
+| VDBENCH と Java | auto_vdbench の前提。**VDBENCH は Oracle アカウントでのサインインとライセンス同意が必要**で、自動取得できない。展開して PATH に入れる。**Windows クライアントにも入れる** |
+| [auto_vdbench](https://github.com/shuichi-taketani/auto_vdbench) | ファイルプロトコル側の測定器。`pip install requests pandas matplotlib openpyxl pymsteams scipy plotly kaleido slack-sdk` |
 
 Linux クライアントも Windows クライアントも鍵ペアを持たず、パブリックアドレスも持たない。
 **接続は AWS Systems Manager（Session Manager）で行う。** 共有アカウントに鍵を残さないため。
@@ -216,16 +216,33 @@ Provisioned の 20 倍の上限を持つ。
 
 ### 10. 測定
 
+**先に `conf/auto_vdbench.conf` を用意する。** コマンドラインでは指定できない項目がここにあり、
+**測定内容を決めるのは主にこのファイルである。**
+
+| 設定 | この測定での値 | 理由 |
+|---|---|---|
+| `testfile_dir` | マウント先のパス（例 `/mnt/bench/target`） | **auto_vdbench が書き込む先はここだけで、コマンドラインで渡せない。** ハーネスはこの値を読んで、全ケースをこの 1 か所へ順にマウントする |
+| `testfile_size` | **600 以上**（GB、サーバーあたり） | 256 GB のインメモリキャッシュを超えるため。合計はサーバー台数倍になる |
+| `server_list` | 起動しているホスト名の一覧 | **台数を増やす試験はこの一覧で決まる。** インスタンスを起動するだけでは負荷は増えない |
+| `server_threads` | 調整対象 | 並列度。グラフが平坦なら増やし、レイテンシが高すぎるなら減らす |
+| `storage_type` | `NetApp_ONTAP` | ONTAP 側のカウンタも採る |
+| `ontap_id` / `ontap_passwd` | fsxadmin の資格情報 | **この設定ファイルは ONTAP のパスワードを平文で持つ。** クライアント上にだけ置き、リポジトリには入れない |
+
 ファイルプロトコル側（Linux、NFS）:
 
 ```bash
 python3 ../../scripts/protocol_matrix_harness.py \
   --target ontap --host <svm-nfs-dns> --export /<volume-junction> \
-  --mount-root /mnt/bench --report-root report/ --summary summary-ontap.json
+  --auto-vdbench-conf ~/auto_vdbench/conf/auto_vdbench.conf \
+  --report-root report/ --summary summary-ontap.json
 ```
 
 ハーネスは**プロトコルを 1 つずつマウントし、要求値ではなく実効のマウントオプションを記録して**
 auto_vdbench を呼ぶ。非対応の組み合わせは理由つきでスキップし、失敗として記録しない。
+
+**マウント先はハーネスが決めない。** 設定ファイルの `testfile_dir` を読んでそこへマウントする。
+ケースを区別するのはレポートディレクトリ名である。**ハーネス側で別のパスを選ぶと、どのケースでも
+設定ファイルが指す 1 か所が測られ、結果は測っていないケース名で保存される。**
 
 **SMB は Windows 側で auto_vdbench を直接実行する。** ハーネスは SMB をマウントしない（Windows を
 駆動しないため）。**結果は同じケース名のディレクトリに置き、Linux 側の結果と同じ表に載せるときは
@@ -249,11 +266,20 @@ python3 ../../scripts/measure_s3_throughput.py --help
 クライアントは 8 台すべて作られる。**1 / 2 / 4 / 6 / 8 台の測定は、起動する台数を変えて行う。**
 同じホストが各段に参加するので、段ごとに別の集合を測ることにならない。
 
+**インスタンスの起動と、`server_list` の更新の両方が必要である。** auto_vdbench は
+`server_list` に並んだホストへ負荷をかけるので、**起動しただけのホストは負荷を出さない。**
+逆に `server_list` に停止中のホストが残っていると測定が失敗する。
+
 ```bash
 aws ec2 start-instances --instance-ids <ladder-1>            # 1 台
+# conf/auto_vdbench.conf の server_list を起動した 1 台だけにする
 aws ec2 start-instances --instance-ids <ladder-2>            # 2 台
+# server_list を 2 台に更新する
 # ...
 ```
+
+ホスト名の解決は `add_hosts.sh` と `set_hostnames.sh`（auto_vdbench 付属）で揃える。
+クライアント間の SSH（22 番）はこの環境のセキュリティグループで既に開いている。
 
 ### 12. 費用の確認
 

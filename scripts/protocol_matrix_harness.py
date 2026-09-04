@@ -25,9 +25,16 @@ Three things it refuses to do, each because the alternative produces a number th
 Support status comes from docs/ja/verification/protocol-matrix-efs-vs-ontap.md. Keep the two in step:
 this table is what makes the tool skip a case instead of failing halfway through it.
 
+One thing it does *not* decide: where to mount. auto_vdbench writes into the `testfile_dir` named in
+its own configuration file and takes no command-line option for it, so the mount point is read from
+there and every case is mounted at that one path in turn. Cases are told apart by their report
+directory. Choosing a path here instead would leave each case measuring whatever the configuration
+names, under a report name that did not produce it.
+
 Usage:
     ./protocol_matrix_harness.py --dry-run
-    ./protocol_matrix_harness.py --target ontap --host <mgmt-ip> --export /vol1 --mount-root /mnt/bench
+    ./protocol_matrix_harness.py --target ontap --host <svm-nfs-dns> --export /vol1 \
+        --auto-vdbench-conf ~/auto_vdbench/conf/auto_vdbench.conf
 """
 
 from __future__ import annotations
@@ -82,6 +89,42 @@ NFS_VERS = {
 }
 
 
+def read_testfile_dir(conf_path: Path) -> str:
+    """Return `testfile_dir` from an auto_vdbench configuration file.
+
+    This is the whole reason the harness does not choose its own mount point. auto_vdbench takes the
+    directory it writes into from its configuration file and has no command-line option for it, so a
+    harness that mounted each case somewhere of its own choosing would leave every case measuring
+    whatever path the configuration happens to name -- silently, and with results filed under case
+    names that did not produce them.
+
+    The file is documented as "commented JSON": JSON with lines starting `#` treated as comments.
+    """
+    if not conf_path.is_file():
+        raise SystemExit(
+            f"protocol_matrix_harness: no auto_vdbench configuration at {conf_path}. "
+            "Pass --auto-vdbench-conf. The mount point is read from it, not chosen here."
+        )
+    stripped = "\n".join(
+        line
+        for line in conf_path.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    try:
+        conf = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(
+            f"protocol_matrix_harness: could not parse {conf_path} as commented JSON: {exc}"
+        ) from exc
+    testfile_dir = conf.get("testfile_dir")
+    if not testfile_dir:
+        raise SystemExit(
+            f"protocol_matrix_harness: {conf_path} has no testfile_dir. "
+            "Set it to the directory each target will be mounted at."
+        )
+    return str(testfile_dir)
+
+
 @dataclass
 class Case:
     target: str
@@ -129,7 +172,7 @@ def effective_mount_options(mount_point: Path) -> str:
 # --- the run -------------------------------------------------------------------------------------
 
 
-def build_cases(target: str, mount_root: Path, protocols: list[str]) -> list[Case]:
+def build_cases(target: str, mount_point: Path, protocols: list[str]) -> list[Case]:
     cases = []
     for protocol in protocols:
         key = (target, protocol)
@@ -142,7 +185,9 @@ def build_cases(target: str, mount_root: Path, protocols: list[str]) -> list[Cas
             Case(
                 target=target,
                 protocol=protocol,
-                mount_point=mount_root / f"{target}-{protocol}".replace(".", ""),
+                # Every case uses the same mount point, because auto_vdbench writes to one configured
+                # directory. Cases are told apart by their report directory, not by their path.
+                mount_point=mount_point,
                 supported=supported,
                 reason=""
                 if supported
@@ -227,9 +272,17 @@ def main() -> int:
     parser.add_argument("--target", choices=["efs", "ontap"], required=False)
     parser.add_argument("--host", help="NFS server address")
     parser.add_argument("--export", help="Export path on the server")
-    parser.add_argument("--mount-root", type=Path, default=Path("/mnt/bench"))
     parser.add_argument("--report-root", type=Path, default=Path("report"))
     parser.add_argument("--auto-vdbench", type=Path, default=Path("auto_vdbench.py"))
+    parser.add_argument(
+        "--auto-vdbench-conf",
+        type=Path,
+        default=Path("conf/auto_vdbench.conf"),
+        help=(
+            "auto_vdbench configuration file. Its testfile_dir is the mount point every case uses, "
+            "because auto_vdbench has no command-line option for the directory it writes to."
+        ),
+    )
     parser.add_argument(
         "--protocols",
         nargs="+",
@@ -252,9 +305,17 @@ def main() -> int:
     else:
         parser.error("--target is required unless --dry-run is used")
 
+    # In a dry run the configuration file may not exist yet, and the support matrix is the point of
+    # that mode, so the mount point is only resolved for a real run.
+    mount_point = (
+        Path("<from auto_vdbench testfile_dir>")
+        if args.dry_run
+        else Path(read_testfile_dir(args.auto_vdbench_conf))
+    )
+
     all_cases: list[Case] = []
     for target in targets:
-        all_cases.extend(build_cases(target, args.mount_root, args.protocols))
+        all_cases.extend(build_cases(target, mount_point, args.protocols))
 
     if args.dry_run:
         print("case                     status      reason")
@@ -278,6 +339,8 @@ def main() -> int:
 
     if not (args.host and args.export):
         parser.error("--host and --export are required for a real run")
+
+    print(f"mount point (from {args.auto_vdbench_conf} testfile_dir): {mount_point}")
 
     for case in all_cases:
         print(f"[{case.name}]")
