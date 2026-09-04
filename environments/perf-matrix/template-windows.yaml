@@ -40,7 +40,9 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label: {default: Placement}
-        Parameters: [SubnetId, ClientSecurityGroupId]
+        Parameters: [VpcId, SubnetId, ClientSecurityGroupId]
+      - Label: {default: Reachability}
+        Parameters: [CreateDirectoryServiceEndpoint]
       - Label: {default: Directory}
         Parameters: [DirectoryId, DirectoryName, DirectoryDnsIpAddresses]
       - Label: {default: Client}
@@ -49,6 +51,20 @@ Metadata:
         Parameters: [NamePrefix]
 
 Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC the subnet is in. Needed for the Directory Service interface endpoint.
+  CreateDirectoryServiceEndpoint:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      **The join fails without a path to the Directory Service API.**
+      `AWS-JoinDirectoryServiceDomain` creates the computer account by calling
+      `ds.<region>.amazonaws.com` over HTTPS, not by talking to a controller, so DNS resolving and
+      `nltest /dsgetdc` succeeding prove nothing about whether it will work. Observed failure with no
+      route: `Failed to create domain computer account ... Unable to connect to the remote server`
+      against a public address on port 443. Set to false only if the VPC already has this endpoint.
   SubnetId:
     Type: AWS::EC2::Subnet::Id
     Description: >-
@@ -89,7 +105,47 @@ Parameters:
     Default: perfmatrix
     AllowedPattern: "^[a-z0-9-]{3,20}$"
 
+Conditions:
+  MakeDsEndpoint: !Equals [!Ref CreateDirectoryServiceEndpoint, "true"]
+
 Resources:
+  # About $0.014/hour. The cheapest resource here and the one without which the SMB case does not
+  # happen at all.
+  DsEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: MakeDsEndpoint
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} Directory Service endpoint: HTTPS from the clients"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ClientSecurityGroupId
+          Description: Directory Service API from the measurement clients
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 127.0.0.1/32
+          Description: >-
+            No egress needed. This placeholder exists because omitting SecurityGroupEgress would let
+            CloudFormation add allow-all.
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-ds-endpoint-sg"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  DirectoryServiceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: MakeDsEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ds"
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+      SubnetIds: [!Ref SubnetId]
+      SecurityGroupIds: [!Ref DsEndpointSecurityGroup]
+      # Private DNS on, so ds.<region>.amazonaws.com resolves to this endpoint without the join
+      # document needing to be told about it.
+      PrivateDnsEnabled: true
+
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -169,6 +225,10 @@ Resources:
 
   # A separate resource, not the instance's SsmAssociations property, and the AWS-managed document, not
   # a custom one. Both of the alternatives are rejected at deploy time -- see the header.
+  # No DependsOn pointing at the endpoint: it is conditional, and DependsOn cannot be made conditional.
+  # The association's first run can therefore land before the endpoint answers, or before the instance
+  # has finished setting its DNS. `runbook.sh windows` re-runs it explicitly with
+  # start-associations-once rather than pretending the ordering is guaranteed.
   DomainJoinAssociation:
     Type: AWS::SSM::Association
     Properties:

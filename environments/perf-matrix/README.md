@@ -241,11 +241,42 @@ Linux 側と同じ c5n.9xlarge にしてある。**SMB と NFS の比較は、�
 それをしないと参加が失敗し、**その理由が association の状態には出ずコマンド出力にしか出ない**
 ためである。`windows-status` は Systems Manager にインスタンスが来ているか、参加が走ったかを読む。
 
+#### ドメインコントローラへ届いても参加が失敗する理由
+
+**`AWS-JoinDirectoryServiceDomain` は computer account を Directory Service の API 経由で作る。**
+ドメインコントローラと直接 LDAP で話して作るのではない。したがって、
+
+- DNS がコントローラを向いている
+- `nltest /dsgetdc:<domain>` がコントローラを発見する
+
+**この 2 つが成立していても参加は失敗しうる。** 実際に踏んだ失敗は次のとおりで、上の 2 つは
+どちらも成功していた。
+
+```text
+Failed to create domain computer account 'EC2AMAZ-xxxxxxx',
+Message=A WebException with status ConnectFailure was thrown.
+System.Net.Sockets.SocketException: ... failed because connected host has failed to respond
+  52.195.199.130:443
+```
+
+**この VPC はインターネットに出られないので、`ds.<region>.amazonaws.com` に届かなかった。**
+`com.amazonaws.<region>.ds` のインターフェイスエンドポイントを作ると参加が成功する。
+テンプレートは既定でこれを作る（約 $0.014/時）。既に VPC にある場合は
+`CreateDirectoryServiceEndpoint=false` を渡す。
+
+**エラーは「ドメインの問題」の形をしているが、原因は AWS API への到達性である。** 探す場所が
+コントローラ側だと、いくら見ても何も見つからない。
+
+**association は明示的に再実行する。** エンドポイントは条件付きリソースなので、association から
+`DependsOn` で順序を付けられない。`runbook.sh windows` は deploy のあと
+`start-associations-once` を呼ぶ。
+
 **`Success` もまだ間接的な証拠である。** インスタンス自身で確認する。
 
 ```powershell
-(Get-ComputerInfo).CsDomain      # WORKGROUP ではなくドメイン名が返ること
-Get-DnsClientServerAddress       # コントローラのアドレスが出ること
+(Get-ComputerInfo).CsDomain          # WORKGROUP ではなくドメイン名が返ること
+(Get-ComputerInfo).CsPartOfDomain    # True
+Get-DnsClientServerAddress           # コントローラのアドレスが出ること
 ```
 
 ### 7. 可否の確認と NVMe キャッシュのゲート
