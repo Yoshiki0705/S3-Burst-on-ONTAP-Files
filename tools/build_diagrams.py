@@ -466,7 +466,14 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "efs_proxy_box": {"ja": "efs-proxy", "en": "efs-proxy"},
     "nfs_client_short": {"ja": "NFS / SMB Client", "en": "NFS / SMB Client"},
-    "nfs_client_local": {"ja": "NFS Client", "en": "NFS Client"},
+    "nfs_client_rw": {
+        "ja": "NFS Client (App / Pipeline)",
+        "en": "NFS Client (App / Pipeline)",
+    },
+    "s3_client_rw": {
+        "ja": "S3 Client (App / Pipeline)",
+        "en": "S3 Client (App / Pipeline)",
+    },
     "amazon_s3_node": {"ja": "Amazon S3", "en": "Amazon S3"},
     "bn_this_arch": {
         "ja": "ボトルネック: 指定したスループットキャパシティ（全クライアントで共有）",
@@ -480,10 +487,14 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "ボトルネック: efs-proxy の CPU（クライアント上）",
         "en": "Bottleneck: efs-proxy CPU, on the client",
     },
-    "loopback_mount": {"ja": "NFS mount (127.0.0.1)", "en": "NFS mount (127.0.0.1)"},
+    "loopback_mount": {
+        "ja": "NFS mount (127.0.0.1), rw",
+        "en": "NFS mount (127.0.0.1), rw",
+    },
     "s3_api": {"ja": "S3 API", "en": "S3 API"},
     "flexcache_edge": {"ja": "FlexCache", "en": "FlexCache"},
-    "nfs_smb_read": {"ja": "NFS / SMB", "en": "NFS / SMB"},
+    "nfs_smb_read": {"ja": "NFS / SMB（読み取り）", "en": "NFS / SMB (read)"},
+    "s3_api_rw": {"ja": "S3 API（読み書き）", "en": "S3 API (read / write)"},
     "bottleneck_note": {
         "ja": note_body(
             "補足 — 実測値と、当たっていた上限の種類",
@@ -888,9 +899,15 @@ class Edge:
     # the second one disappears under the first, taking its label with it.
     exit_at: tuple[float, float] | None = None
     entry_at: tuple[float, float] | None = None
+    # An arrowhead at both ends, for a leg where the same client moves data in both directions over
+    # the same protocol. Reaching for a second icon instead would say the read arrives from
+    # somewhere else, which is true of this architecture's NFS / SMB side and of nothing else here.
+    both_ways: bool = False
 
     def style(self) -> str:
         style = EDGE_STYLE
+        if self.both_ways:
+            style += "startArrow=open;startFill=0;"
         if self.exit_at:
             style += (
                 f"exitX={self.exit_at[0]};exitY={self.exit_at[1]};exitDx=0;exitDy=0;"
@@ -1224,7 +1241,7 @@ def _bottlenecks() -> Diagram:
         frames=(
             # The client and the proxy sit on one host. Drawn as a container so the loopback mount
             # inside it is unmistakable.
-            Frame("c_host", "client_host", 80, 585, 330, 145),
+            Frame("c_host", "client_host", 80, 585, 420, 145),
         ),
         nodes=(
             Node("a_client", "users", "s3_client", *centred("users", 140, row_a)),
@@ -1251,7 +1268,7 @@ def _bottlenecks() -> Diagram:
             ),
             Node("b_client", "users", "s3_client_n", *centred("users", 140, row_b)),
             Node("b_s3", "s3", "amazon_s3_node", *centred("s3", 550, row_b)),
-            Node("c_client", "users", "s3_client", *centred("users", 140, row_c)),
+            Node("c_client", "users", "nfs_client_rw", *centred("users", 140, row_c)),
             Node("c_files", "s3", "s3_files", *centred("s3", 640, row_c)),
             Node(
                 "c_bucket",
@@ -1265,17 +1282,25 @@ def _bottlenecks() -> Diagram:
             TextBox("b_bn", "bn_amazon_s3", 200, 495, 700, 20),
             TextBox("c_bn", "bn_s3_files", 200, 742, 480, 20),
             # A plain box, since no AWS asset exists for this process.
-            TextBox("c_proxy", "efs_proxy_box", 290, 645, 110, 40),
+            TextBox("c_proxy", "efs_proxy_box", 375, 645, 110, 40),
         ),
         edges=(
-            Edge("q1", "a_client", "a_ap", "s3_api"),
-            Edge("q2", "a_ap", "a_origin"),
+            # A's two client legs are not symmetric, and that asymmetry is the architecture. The
+            # S3 API side carries both directions (writes and reads were both measured over it), so
+            # it is drawn both ways. The NFS / SMB side is the read fan-out, so it is one way.
+            Edge("q1", "a_client", "a_ap", "s3_api_rw", both_ways=True),
+            Edge("q2", "a_ap", "a_origin", both_ways=True),
+            # One way on purpose: the cache pulls from the origin.
             Edge("q3", "a_origin", "a_cache", "flexcache_edge"),
             Edge("q4", "a_cache", "a_file", "nfs_smb_read"),
-            Edge("q5", "b_client", "b_s3", "s3_api"),
-            Edge("q6", "c_client", "c_proxy", "loopback_mount"),
-            Edge("q7", "c_proxy", "c_files"),
-            Edge("q8", "c_files", "c_bucket"),
+            # B and C move data both ways over one protocol from one client, so both ends carry an
+            # arrowhead rather than a second client icon standing in for the read.
+            Edge("q5", "b_client", "b_s3", "s3_api_rw", both_ways=True),
+            Edge("q6", "c_client", "c_proxy", "loopback_mount", both_ways=True),
+            # Deliberately unlabelled: what efs-proxy speaks to the service was not verified,
+            # and it is not NFS. NFS is only between the client and the proxy.
+            Edge("q7", "c_proxy", "c_files", both_ways=True),
+            Edge("q8", "c_files", "c_bucket", both_ways=True),
         ),
         notes=(Note("note", "bottleneck_note", 40, 800, 1100, 215),),
     )
