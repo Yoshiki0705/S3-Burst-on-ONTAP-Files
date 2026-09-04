@@ -121,6 +121,7 @@ A-1 の S3 API 読み取りには、このリポジトリの `scripts/measure_s3
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [スループット・IOPS・並列度の実測](throughput-iops-concurrency.md) | 既存の実測と、その限界 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
+| [測定環境（CloudFormation と手順）](../../../environments/perf-matrix/README.md) | テンプレート、実行順序、削除手順 |
 | [性能検証の考慮点](../reference/performance-testing-guide.md) | 測る前に確認すること、参照リンク |
 | [検証パターンごとの費用構造](../reference/comparison/finops-performance-test-patterns.md) | パターン別の費用と、消し忘れたときの額 |
 | [PoC チェックリスト](../poc-checklist.md) | 設計判断を進めるための確認順序 |

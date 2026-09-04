@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# Language extensions, for Fn::ForEach. Eight near-identical instances written out by hand would be
+# eight places for one of them to drift from the others, and the host-count test depends on them
+# being identical.
+Transform: AWS::LanguageExtensions
+# =================================================================================================
+# UNEXECUTED DRAFT. The measurement clients, and the security group every target allows.
+#
+# Two client shapes, because the two answer different questions:
+#
+#   - **One c5n.9xlarge** for the single-host numbers. Its 50 Gbps is a guaranteed figure, not an
+#     "Up to". That matters more than the size: on an instance whose bandwidth is quoted as "Up to",
+#     a plateau cannot be attributed to the storage rather than the client.
+#   - **Eight c5n.2xlarge** for the host-count test, where the question is whether the total grows
+#     with the number of clients. One large instance cannot answer that.
+#
+# There is no Windows client. SMB is not in this round: the domain controllers the existing SVMs were
+# joined to no longer exist -- no ENI answers at their recorded DNS addresses and the account has no
+# Managed AD -- so an SMB case would be blocked on standing up a directory, not on a client. When a
+# directory exists, add the Windows client and the SMB case together.
+#
+# Cost while running, at ap-northeast-1 On-Demand prices from the Price List API on 2026-09-04:
+#   c5n.9xlarge  $2.448/hour
+#   c5n.2xlarge  $0.544/hour x 8 = $4.352/hour
+# Stopping the instances stops these charges, unlike the storage side. Stop them between patterns.
+#
+# The instances get no public address and no key pair. Access is over AWS Systems Manager, so there
+# is no inbound rule for SSH and no key material to leave behind in a shared account.
+# =================================================================================================
+Description: >-
+  UNEXECUTED DRAFT. Measurement clients for the protocol matrix: one c5n.9xlarge for single-host
+  figures and eight c5n.2xlarge for the host-count test, reachable over AWS Systems Manager.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement}
+        Parameters: [VpcId, SubnetId]
+      - Label: {default: Clients}
+        Parameters: [SingleHostInstanceType, LadderInstanceType, LatestAmiId]
+      - Label: {default: Naming}
+        Parameters: [NamePrefix]
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      Every client and every target goes in this one subnet. A second Availability Zone would add a
+      hop to one side of the comparison only.
+  SingleHostInstanceType:
+    Type: String
+    Default: c5n.9xlarge
+    Description: >-
+      Its network bandwidth must be a guaranteed figure rather than "Up to", or a plateau cannot be
+      attributed to the storage side.
+  LadderInstanceType:
+    Type: String
+    Default: c5n.2xlarge
+    Description: >-
+      Used for the host-count test, where the number of hosts is what varies. Eight are always
+      created, and the run uses 1, 2, 4, 6 and 8 of them by starting a subset -- so the number of
+      hosts changes without any instance being replaced mid-test.
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: >-
+      Amazon Linux 2023 by SSM parameter rather than a pinned AMI id, so the stack does not carry an
+      AMI that ages out of the Region. The kernel version is recorded at measurement time instead,
+      because the NFS client is part of what is being measured.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+    AllowedPattern: "^[a-z0-9-]{3,20}$"
+
+Resources:
+  # The one group every target's ingress rule points at. Targets allow this group rather than a CIDR,
+  # so what may mount is named by identity rather than by address.
+  ClientSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} measurement clients"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          # Narrowing this to the targets would mean editing the group every time one is added, and
+          # the clients hold nothing but generated test data.
+          Description: >-
+            Outbound to NFS targets, Amazon S3, the ONTAP management endpoint and Systems Manager
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-clients-sg"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  # Clients talk to each other on the loopback-free path only for the host-count test's coordination;
+  # the rule exists so one host can start the others' runs without a public path.
+  ClientToClientSsh:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ClientSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      SourceSecurityGroupId: !Ref ClientSecurityGroup
+      Description: Coordination between measurement clients during the host-count test
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Session Manager, so the instances need no key pair and no inbound rule.
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: measurement-reads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Read-only describes, so a client can resolve the endpoints it mounts without those
+              # endpoints being baked into the stack. No create, no modify, no delete: the clients
+              # must not be able to change the thing they are measuring.
+              - Effect: Allow
+                Action:
+                  - fsx:DescribeFileSystems
+                  - fsx:DescribeStorageVirtualMachines
+                  - fsx:DescribeVolumes
+                  - elasticfilesystem:DescribeFileSystems
+                  - elasticfilesystem:DescribeMountTargets
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:ListMetrics
+                Resource: "*"
+      Tags:
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  SingleHostClient:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref SingleHostInstanceType
+      ImageId: !Ref LatestAmiId
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref ClientSecurityGroup]
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            # gp3 with raised IOPS because the test data is generated locally from /dev/urandom
+            # before being written to the target; a slow root volume would make the generator the
+            # bottleneck and the measurement would be of gp3. gp3 throughput is not settable through
+            # the Ebs block here, so raise it after launch with modify-volume if the generator turns
+            # out to be the limit.
+            VolumeSize: 200
+            VolumeType: gp3
+            Iops: 16000
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-client-single"}
+        - {Key: Role, Value: single-host}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  # An Auto Scaling group would scale more neatly, but the host-count test needs each host
+  # addressable and startable independently, and a group that replaces an instance mid-run would
+  # change the denominator of "per host" without saying so. All eight are created; the run starts a
+  # subset.
+  Fn::ForEach::LadderClients:
+    - Index
+    - ["1", "2", "3", "4", "5", "6", "7", "8"]
+    - LadderClient${Index}:
+        Type: AWS::EC2::Instance
+        Properties:
+          InstanceType: !Ref LadderInstanceType
+          ImageId: !Ref LatestAmiId
+          SubnetId: !Ref SubnetId
+          SecurityGroupIds: [!Ref ClientSecurityGroup]
+          IamInstanceProfile: !Ref InstanceProfile
+          BlockDeviceMappings:
+            - DeviceName: /dev/xvda
+              Ebs:
+                VolumeSize: 100
+                VolumeType: gp3
+                Encrypted: true
+                DeleteOnTermination: true
+          Tags:
+            - {Key: Name, Value: !Sub "${NamePrefix}-client-ladder-${Index}"}
+            - {Key: Role, Value: host-count}
+            - {Key: LadderIndex, Value: !Ref Index}
+            - {Key: DeleteAfterMeasurement, Value: "true"}
+
+Outputs:
+  ClientSecurityGroupId:
+    Value: !Ref ClientSecurityGroup
+    Description: Pass this to the EFS and FSx for ONTAP stacks as ClientSecurityGroupId.
+  SingleHostInstanceId:
+    Value: !Ref SingleHostClient
+    Description: Connect with 'aws ssm start-session --target <this>'.
+  LadderInstanceIds:
+    Value: !Join
+      - ","
+      - - !Ref LadderClient1
+        - !Ref LadderClient2
+        - !Ref LadderClient3
+        - !Ref LadderClient4
+        - !Ref LadderClient5
+        - !Ref LadderClient6
+        - !Ref LadderClient7
+        - !Ref LadderClient8
+    Description: >-
+      In ladder order. The host-count test starts the first 1, 2, 4, 6 and 8 of these, so the same
+      hosts participate at each step rather than a different subset each time.
+  StopWhenIdleReminder:
+    Value: >-
+      Stop the clients between patterns. Instance charges stop when the instance stops; the storage
+      side's throughput charges do not.

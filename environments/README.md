@@ -21,6 +21,22 @@
 数値は[比較検証](../docs/ja/verification/s3files-vs-flexcache.md)に入りますが、
 実測前なので表は空です。
 
+## プロトコル別の性能測定
+
+Amazon EFS と FSx for ONTAP を、同じサブネットの同じクライアントからプロトコル別に測るための
+環境です。
+
+| ディレクトリ | 何をデプロイするか | ツール | ガイド |
+|---|---|---|---|
+| [`perf-matrix/`](perf-matrix/) | 測定用: EFS、第二世代 FSx for ONTAP、クライアント 9 台。既存の第一世代は流用する | CloudFormation | [手順](perf-matrix/README.md) |
+
+**この環境は時間あたり約 $60 課金されます。** うち EFS Provisioned が $30.30、第二世代
+FSx for ONTAP が $22.66 で、**どちらも EC2 のように停止では止まりません。**
+全パターンが終わったら `perf-matrix/teardown.sh` を実行し、最後の検証行を確認してください。
+
+**SMB はこの環境では測りません。** 既存 SVM が参加していたドメインコントローラが存在せず、
+先にディレクトリを立てる必要があるためです。理由は[手順](perf-matrix/README.md)にあります。
+
 破棄はバージョニングのために順序が決まっています。`teardown.sh` を使ってください。
 バケットを空にせずに `delete-stack` すると、ファイルシステムを消し終えた状態で失敗します。
 
