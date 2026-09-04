@@ -14,12 +14,19 @@
 | **A-1** | FSx for ONTAP Origin ボリューム | S3 API | **S3 API** | 同一データを同じ経路で読んだ値 |
 | **A-2** | 同じボリューム、同じデータ | S3 API | **NFS / SMB** | 経路を変えるだけで読み取りがどう変わるか |
 | **D** | Amazon EFS | NFSv4.0 / NFSv4.1 | 同じ | EFS のプロトコル別 |
-| **E** | FSx for ONTAP | SMB / NFSv3 / NFSv4.0 / NFSv4.1 / NFSv4.2 | 同じ | FSx for ONTAP のプロトコル別 |
+| **E** | FSx for ONTAP 第一世代 | SMB / NFSv3 / NFSv4.0 / NFSv4.1 / NFSv4.2 | 同じ | FSx for ONTAP のプロトコル別 |
+| **E2** | FSx for ONTAP **第二世代** | NFSv4.1 | 同じ | 第一世代の到達範囲を超える上限の確認 |
 
 **A-1 と A-2 は同じデータに対して行う。** 書き込みを 1 回だけ実施し、そのあと読み取りの経路を
 変える。書き直すと、比較しているものがデータの配置差を含んでしまう。
 
 **D と E を同じ列に並べられるのは NFSv4.0 と NFSv4.1 だけである。** 他は E のみの行になる。
+
+**E2（第二世代）を入れる理由は上限の比較である。** 東京の EFS Elastic はファイルシステム単位で
+読み取り 61,440 MiBps・書き込み 5,120 MiBps で、**第一世代 Single-AZ の 2,048 / 750 MBps を
+大きく超える。** 第一世代の書き込み 750 MBps は指定値を上げても動かないので、そこを超える範囲を
+示すには第二世代が必要になる。**プロトコル別の測定は第一世代で行い、E2 は上限の確認だけに使う。**
+費用の内訳は[検証パターンごとの費用構造](../reference/comparison/finops-performance-test-patterns.md)にある。
 
 ## 既存の測定でこの比較が成立していない理由
 
@@ -67,6 +74,7 @@ A-1 の S3 API 読み取りには、このリポジトリの `scripts/measure_s3
 | Windows クライアント | SMB 測定用 | EFS は Windows からマウントできないので E のみ |
 | Active Directory | SMB 測定用 | SVM を参加させる |
 | VDBENCH | Oracle のサイトから取得（ライセンス同意が必要） | auto_vdbench の前提 |
+| FSx for ONTAP 第二世代 | 6,144 MBps ×1 HA ペア（E2 のみ） | 第一世代の到達範囲を超える上限の確認 |
 | Java | VDBENCH の実行に必要 | 同上 |
 
 **リードキャッシュの扱いを先に決めること。** FSx for ONTAP にはインメモリと NVMe の 2 層があり、
@@ -76,6 +84,12 @@ A-1 の S3 API 読み取りには、このリポジトリの `scripts/measure_s3
 
 **インライン効率化はデータを書く前に切る。** 書いた後では、バックグラウンド処理が終わるまで
 `PATCH` が拒否される。
+
+**EFS はマウント方法でクライアント 1 台あたりの上限が変わる。** Elastic かつ
+`amazon-efs-utils` 2.0 以降（または EFS CSI ドライバ）で 1,500 MiBps、**素の `mount -t nfs` では
+500 MiBps** である。**どちらでマウントしたかを記録する。** ファイルシステム単位の 61,440 MiBps に
+近づけるにはクライアントを並べる必要があり、1 台の測定値をファイルシステムの上限として読むと
+外す。
 
 ## 測定条件（両ツールで揃えるもの)
 
@@ -107,4 +121,6 @@ A-1 の S3 API 読み取りには、このリポジトリの `scripts/measure_s3
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [スループット・IOPS・並列度の実測](throughput-iops-concurrency.md) | 既存の実測と、その限界 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
+| [性能検証の考慮点](../reference/performance-testing-guide.md) | 測る前に確認すること、参照リンク |
+| [検証パターンごとの費用構造](../reference/comparison/finops-performance-test-patterns.md) | パターン別の費用と、消し忘れたときの額 |
 | [PoC チェックリスト](../poc-checklist.md) | 設計判断を進めるための確認順序 |
