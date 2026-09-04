@@ -276,11 +276,21 @@ deploy_windows() {
     --template-file "$HERE/template-windows.yaml" \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides \
-      "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
+      "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
       "DirectoryId=$dir_id" "DirectoryName=$dir_name" "DirectoryDnsIpAddresses=$dns" \
       "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
   printf 'WindowsInstanceId=%s\n' "$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
+
+  # Re-run the join deliberately. The association's own first run can fire before the instance has set
+  # its DNS or before the Directory Service endpoint answers, and CloudFormation cannot order those --
+  # the endpoint is conditional, so nothing can DependsOn it.
+  local assoc; assoc="$(stack_output "$STACK_WINDOWS" DomainJoinAssociationId)"
+  if [[ -n "$assoc" && "$assoc" != "None" ]]; then
+    printf 'triggering the domain join association once, now that the endpoint exists\n'
+    aws ssm start-associations-once --region "$REGION" --association-ids "$assoc" \
+      || printf 'could not trigger it; it will still run on its own schedule\n'
+  fi
   printf 'Now run: ./runbook.sh windows-status\n'
 }
 
