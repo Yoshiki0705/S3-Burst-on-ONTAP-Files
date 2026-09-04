@@ -23,7 +23,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 #
 # Storage: the volume here is a second 900 GiB volume on the same file system, so the file system needs
 # at least 2,048 GiB of SSD rather than the 1,024 GiB that the NFS volume alone needs. The extra
-# 1,024 GiB is $0.15/GB-month, about $0.21/hour -- immaterial beside the file system's $22.78, and it
+# 1,024 GiB is $0.15/GB-month, about $0.21/hour -- immaterial beside the file system's $23.03, and it
 # is what lets the SMB read exceed the 256 GB in-memory cache the same way the NFS read does.
 # =================================================================================================
 Description: >-

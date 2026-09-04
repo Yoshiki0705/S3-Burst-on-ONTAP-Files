@@ -200,10 +200,19 @@ deploy_gen2() {
   # 900 GiB holds more than twice the 256 GB in-memory cache, which is what the read has to exceed.
   local vol_gib="${VOLUME_SIZE_GIB:-900}"
   local vol_bytes=$(( vol_gib * 1024 * 1024 * 1024 ))
-  # 2,048 GiB rather than 1,024: the SMB SVM adds a second volume of the same size on this same file
-  # system, and both need to be large enough to read past the in-memory cache. The extra SSD is
-  # $0.15/GB-month, about $0.21/hour.
-  local ssd_gib="${GEN2_STORAGE_GIB:-2048}"
+  # 4,096 GiB, and the reason is IOPS rather than capacity. Two 900 GiB volumes only need 2,048, but
+  # FSx for ONTAP refuses more than 50 provisioned SSD IOPS per GB of SSD -- so 200,000 IOPS needs at
+  # least 4,000 GiB. Without the headroom, SSD IOPS binds before the throughput capacity does and the
+  # result is an IOPS measurement wearing a throughput label.
+  local ssd_gib="${GEN2_STORAGE_GIB:-4096}"
+  local iops="${GEN2_SSD_IOPS:-200000}"
+  # Checked here rather than discovered at create time: the service rejects the ratio with a
+  # BadRequest, and by then the stack has rolled back and the wait is spent.
+  local max_iops=$(( ssd_gib * 50 ))
+  if (( iops > max_iops )); then
+    die "$iops provisioned SSD IOPS needs at least $(( (iops + 49) / 50 )) GiB of SSD; ${ssd_gib} GiB allows ${max_iops}. Raise GEN2_STORAGE_GIB or lower GEN2_SSD_IOPS."
+  fi
+  printf 'SSD %s GiB allows up to %s provisioned IOPS; requesting %s\n' "$ssd_gib" "$max_iops" "$iops"
   # Empty unless the directory exists. When set, the template adds SMB ingress and the outbound rule
   # without which an AD join cannot complete.
   local sg_ad=""
@@ -216,7 +225,7 @@ deploy_gen2() {
   else
     printf 'no directory stack; deploying NFS-only (no SMB ingress, no AD egress)\n'
   fi
-  log "gen2 FSx for ONTAP: $STACK_GEN2 (6144 MBps, ${ssd_gib} GiB SSD, ${vol_gib} GiB volume, about \$22.78/hour)"
+  log "gen2 FSx for ONTAP: $STACK_GEN2 (6144 MBps, ${ssd_gib} GiB SSD, ${vol_gib} GiB volume, about \$23.03/hour)"
   aws cloudformation deploy \
     --region "$REGION" \
     --stack-name "$STACK_GEN2" \
@@ -224,7 +233,7 @@ deploy_gen2() {
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
       "AdSecurityGroupId=$sg_ad" \
-      "ThroughputCapacityPerHAPair=6144" "ProvisionedSsdIops=200000" \
+      "ThroughputCapacityPerHAPair=6144" "ProvisionedSsdIops=$iops" \
       "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
@@ -278,7 +287,7 @@ deploy_windows() {
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
       "DirectoryId=$dir_id" "DirectoryName=$dir_name" "DirectoryDnsIpAddresses=$dns" \
-      "NamePrefix=$PREFIX" \
+      "StagingBucketName=${STAGING_BUCKET:-}" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
   printf 'WindowsInstanceId=%s\n' "$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
 
@@ -481,13 +490,13 @@ costs() {
   cat <<'NOTE'
 Hourly, at ap-northeast-1 On-Demand prices read on 2026-09-04:
   EFS provisioned 3072 MiBps   $30.30   delete to stop
-  gen2 6144 MBps + 200k IOPS   $22.78   delete, or lower the specified value
+  gen2 6144 MBps + 200k IOPS   $23.03   delete, or lower the specified value
   gen1 2048 MBps + 80k IOPS    $ 4.90   each; lower the specified value
   c5n.9xlarge Linux            $ 2.45   stops when stopped
   c5n.9xlarge Windows          $ 2.45   stops when stopped
   c5n.2xlarge                  $ 0.54   each; stops when stopped
   Managed AD Standard          $ 0.15   $0.073 per controller-hour, two controllers
-  gen2 SSD 2048 GiB            included in the $22.78 above, at $0.15 per GB-month
+  gen2 SSD 4096 GiB            included in the $23.03 above, at $0.15 per GB-month
 EFS Elastic is not on this list because it bills per GB accessed, not per hour.
 NOTE
 }
@@ -501,7 +510,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
 
   ad                     Create AWS Managed Microsoft AD (15-30 min, ~$0.146/hour). Do this first.
   clients                Create the Linux clients and the shared security group
-  gen2                   Create the second-generation FSx for ONTAP target (~$22.78/hour)
+  gen2                   Create the second-generation FSx for ONTAP target (~$23.03/hour)
   ad-ports               Read the directory's security group and admit the clients and SVM interfaces
   smb-svm                Create the SMB-only SVM and its NTFS volume, unjoined
   join-svm               Join that SVM to the directory, and poll until it is CREATED
@@ -522,8 +531,8 @@ Environment:
   for gen1   GEN1_FS_ID
   for tools  STAGING_BUCKET -- the clients have no route to PyPI or GitHub, so VDBENCH,
              auto_vdbench and the Python wheels come in over S3
-  optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB AD_DOMAIN_NAME AD_SHORT_NAME
-             AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
+  optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB GEN2_SSD_IOPS AD_DOMAIN_NAME
+             AD_SHORT_NAME AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE
 }
 

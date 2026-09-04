@@ -5,7 +5,7 @@
 # The order is not arbitrary, and two different constraints set it.
 #
 # **Cost first.** The two most expensive resources go before anything that could fail and leave them
-# running: at $30.30 and $22.78 an hour, a teardown that stops halfway because a client would not
+# running: at $30.30 and $23.03 an hour, a teardown that stops halfway because a client would not
 # terminate is a teardown that costs money for the rest of the day.
 #
 # **Dependencies second, and they cut the other way from cost.** The SMB SVM lives on the
