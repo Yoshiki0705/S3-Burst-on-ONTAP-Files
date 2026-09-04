@@ -226,6 +226,7 @@ flexcache config modify -vserver snapmirror-s3-test -volume duality_fc_s3en -is-
 | [同一ボリュームの検証記録](s3ap-nfs-visibility.md) | 初回の同一ボリューム測定（NFS → S3 方向は本記録で訂正） |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
 | [用語の整理](../reference/glossary/object-access-on-ontap.md) | 機構の区別 |
+| [性能の語の日英対訳](../reference/glossary/performance-terms-ja-en.md) | 上限の種別と測定条件の語 |
 
 ---
 
