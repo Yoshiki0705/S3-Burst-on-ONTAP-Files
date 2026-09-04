@@ -156,10 +156,30 @@ python3.11 -m pip install --no-index --find-links=/opt/wheels \
 
 ```bash
 aws s3 cp vdbench50407.zip "s3://$STAGING_BUCKET/tooling/"
+
 # クライアント側
 aws s3 cp "s3://$STAGING_BUCKET/tooling/vdbench50407.zip" /tmp/
-unzip -q -d /opt/bench/vdbench /tmp/vdbench50407.zip && chmod +x /opt/bench/vdbench/vdbench
+unzip -q -d /opt/bench /tmp/vdbench50407.zip
+ln -sfn /opt/bench/vdbench50407 /opt/bench/vdbench
+chown -R root:root /opt/bench/vdbench50407
+chmod -R a+rX /opt/bench/vdbench50407
+chmod +x /opt/bench/vdbench50407/vdbench /opt/bench/vdbench50407/linux/*.so
+
+# PATH に置くのはラッパーにする。理由は下
+printf '#!/bin/sh\nexec /opt/bench/vdbench/vdbench "$@"\n' > /usr/local/bin/vdbench
+chmod +x /usr/local/bin/vdbench
+
+vdbench -t     # 自己テスト。"Vdbench execution completed successfully" を確認する
 ```
+
+**`vdbench` へのシンボリックリンクを PATH に置くと動かない。** 起動スクリプトは
+`dir=$(dirname $0)` で自分の位置を求め、そこからクラスパス（`$dir/classes`、`$dir/vdbench.jar`）を
+組む。`/usr/local/bin/vdbench` をリンクにすると `$dir` が `/usr/local/bin` になり、
+`Could not find or load main class Vdb.Vdbmain` で落ちる。**エラーは Java のクラスパスの話に見えて、
+原因は配置である。** `exec` するラッパーなら、置き換わった側の `$0` が実体のパスになるので解決する。
+
+**起動スクリプトは `-client` を渡す。** OpenJDK 17 では無視されるだけで、5.04.07 は問題なく完走する
+（実測）。
 
 ### 3. 第二世代のターゲット
 
