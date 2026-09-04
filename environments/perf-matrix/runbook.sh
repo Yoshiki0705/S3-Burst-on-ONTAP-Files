@@ -100,6 +100,14 @@ deploy_ad() {
 
 # Whether the directory's own security group already admits the clients and the SVM interfaces is
 # something to read rather than assume. This reads it and adds what is missing.
+# **Read-only by default, and usually a no-op.** Managed AD creates a security group that already
+# admits the whole VPC CIDR on every AD port -- verified on a real directory: 53, 88, 123, 135, 138,
+# 389, 445, 464, 636, 3268-3269, tcp 1024-65535 and icmp, all from the VPC CIDR. So when the clients
+# and the SVM interfaces are inside the directory's VPC, as they are here, nothing needs adding.
+#
+# Adding security-group-identity rules on top is not free: a group named by another group's rule cannot
+# be deleted, so each one becomes something teardown has to revoke first, in the right order. Set
+# AD_PORTS_ADD=1 only when the read below shows the traffic is genuinely not admitted.
 ad_ports() {
   local dir_id sg_ad sg_clients sg_fs
   dir_id="$(stack_output "$STACK_AD" DirectoryId)"
@@ -115,33 +123,57 @@ ad_ports() {
   [[ -n "$sg_clients" && "$sg_clients" != "None" ]] || die "no client security group; run './runbook.sh clients' first"
   [[ -n "$sg_fs" && "$sg_fs" != "None" ]] || die "no file system security group; run './runbook.sh gen2' first"
 
-  log "directory security group $sg_ad: current inbound sources"
-  aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg_ad" \
-    --query 'SecurityGroups[0].IpPermissions[].{Proto:IpProtocol,From:FromPort,To:ToPort,Groups:UserIdGroupPairs[].GroupId,Cidrs:IpRanges[].CidrIp}' \
+  local vpc_cidr
+  vpc_cidr="$(aws ec2 describe-vpcs --region "$REGION" --vpc-ids "$VPC_ID" \
+    --query 'Vpcs[0].CidrBlock' --output text)"
+
+  log "directory security group $sg_ad: inbound rules"
+  aws ec2 describe-security-group-rules --region "$REGION" --filters "Name=group-id,Values=$sg_ad" \
+    --query 'SecurityGroupRules[?!IsEgress].{Proto:IpProtocol,From:FromPort,To:ToPort,Cidr:CidrIpv4,Group:ReferencedGroupInfo.GroupId}' \
     --output table
 
+  # Kerberos, LDAP and SMB. If the VPC CIDR is admitted on these three, everything in the VPC can
+  # reach a controller and there is nothing to add.
+  local port covered=1
+  for port in 88 389 445; do
+    if [[ -z "$(aws ec2 describe-security-group-rules --region "$REGION" \
+                  --filters "Name=group-id,Values=$sg_ad" \
+                  --query "SecurityGroupRules[?!IsEgress && CidrIpv4=='$vpc_cidr' && FromPort<=\`$port\` && ToPort>=\`$port\`].SecurityGroupRuleId" \
+                  --output text)" ]]; then
+      printf 'port %s is NOT admitted from %s\n' "$port" "$vpc_cidr"
+      covered=0
+    fi
+  done
+
+  if (( covered )); then
+    log "the VPC CIDR $vpc_cidr is admitted on 88, 389 and 445"
+    printf 'Everything in this VPC can already reach a controller. Nothing to add.\n'
+    printf 'clients: %s\nSVM interfaces: %s\n' "$sg_clients" "$sg_fs"
+    [[ -n "${AD_PORTS_ADD:-}" ]] || return 0
+    printf 'AD_PORTS_ADD is set, so adding the group rules anyway.\n'
+  fi
+
+  if [[ -z "${AD_PORTS_ADD:-}" ]]; then
+    die "some AD ports are not admitted. Review the table above, then re-run with AD_PORTS_ADD=1"
+  fi
+
   # All protocols from these two groups only. The AD port set spans TCP and UDP from 53 through the
-  # dynamic RPC range at 49152-65535; writing it out as fifteen rules would not narrow *who* can reach
-  # the controllers, which is what actually restricts this -- and a missing rule in that list presents
-  # as a permissions failure rather than a network one, which is the harder thing to diagnose.
+  # dynamic RPC range; writing it out per port would not narrow *who* can reach the controllers, which
+  # is what actually restricts this.
   local src
   for src in "$sg_clients" "$sg_fs"; do
-    [[ -n "$src" && "$src" != "None" ]] || continue
     if aws ec2 authorize-security-group-ingress --region "$REGION" --group-id "$sg_ad" \
          --ip-permissions "IpProtocol=-1,UserIdGroupPairs=[{GroupId=$src,Description=\"perfmatrix: AD ports from the measurement clients and the SVM interfaces\"}]" \
          >/dev/null 2>&1; then
       printf 'added: %s -> %s\n' "$src" "$sg_ad"
     else
-      # Almost always InvalidPermission.Duplicate, which is the desired end state. Re-read below
-      # rather than trusting either branch.
       printf 'not added (already present, or refused): %s -> %s\n' "$src" "$sg_ad"
     fi
   done
 
-  log "verify: the two groups below must appear as inbound sources"
-  printf 'clients: %s\nSVM interfaces: %s\n' "$sg_clients" "$sg_fs"
-  aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg_ad" \
-    --query 'SecurityGroups[0].IpPermissions[].UserIdGroupPairs[].GroupId' --output text
+  log "verify: re-read"
+  aws ec2 describe-security-group-rules --region "$REGION" --filters "Name=group-id,Values=$sg_ad" \
+    --query 'SecurityGroupRules[?!IsEgress].ReferencedGroupInfo.GroupId' --output text
 }
 
 # --- storage targets -----------------------------------------------------------------------------
@@ -423,21 +455,27 @@ PY
   rm -f "$cfg"
 
   # Poll. The call returning is not the join succeeding.
-  log "polling lifecycle (2-5 minutes is normal)"
-  local i state
+  #
+  # **And `Lifecycle` alone cannot answer this.** An unjoined SVM is already `CREATED`, so polling for
+  # that returns on the first read and reports success before anything has happened -- observed: it
+  # printed "joined" while the SMB endpoint was still null, and the endpoint only appeared about a
+  # minute later. The evidence of a join is the join's own output: a NetBIOS name and an SMB endpoint.
+  log "polling for the join's own output (2-5 minutes is normal)"
+  local i state netbios smb
   for i in $(seq 1 40); do
-    state="$(aws fsx describe-storage-virtual-machines --region "$REGION" \
+    read -r state netbios smb <<<"$(aws fsx describe-storage-virtual-machines --region "$REGION" \
       --storage-virtual-machine-ids "$svm_id" \
-      --query 'StorageVirtualMachines[0].Lifecycle' --output text)"
-    printf '  %2d/40 %s\n' "$i" "$state"
+      --query 'StorageVirtualMachines[0].[Lifecycle,ActiveDirectoryConfiguration.NetBiosName,Endpoints.Smb.DNSName]' \
+      --output text)"
+    printf '  %2d/40 lifecycle=%s netbios=%s smb=%s\n' "$i" "$state" "$netbios" "$smb"
+    [[ "$smb" != "None" && -n "$smb" ]] && break
     case "$state" in
-      CREATED) break ;;
       MISCONFIGURED|FAILED) break ;;
     esac
     sleep 15
   done
 
-  if [[ "$state" != "CREATED" ]]; then
+  if [[ "$smb" == "None" || -z "$smb" ]]; then
     aws fsx describe-storage-virtual-machines --region "$REGION" \
       --storage-virtual-machine-ids "$svm_id" \
       --query 'StorageVirtualMachines[0].LifecycleTransitionReason.Message' --output text
@@ -450,13 +488,10 @@ MISCONFIGURED is recoverable against this same SVM. Before retrying, check in th
   4. Set SVM_NETBIOS_NAME to a name not used before -- a failed attempt leaves a computer object
      behind, and reusing its name collides.
 NOTE
-    die "join did not reach CREATED (last state: $state)"
+    die "no SMB endpoint after the join (lifecycle: $state). The SVM is not usable over SMB yet."
   fi
 
-  log "joined. SMB endpoint:"
-  aws fsx describe-storage-virtual-machines --region "$REGION" \
-    --storage-virtual-machine-ids "$svm_id" \
-    --query 'StorageVirtualMachines[0].Endpoints.Smb.DNSName' --output text
+  printf '\njoined. SMB endpoint: %s\n' "$smb"
 }
 
 # --- gates and accounting ------------------------------------------------------------------------
