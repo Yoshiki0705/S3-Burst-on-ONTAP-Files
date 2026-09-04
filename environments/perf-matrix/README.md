@@ -342,6 +342,19 @@ system node external-cache show          # 両ノードが false になったこ
 
 **`modify` がエラーを返さなかったことではなく、2 回目の `show` で判定する。**
 
+**ただしこの環境では SSH を使わない。** ONTAP の REST API に private CLI の通し口があるので、
+クライアントからそこを叩くフェーズにしてある。**パスワードは クライアント上で Secrets Manager から
+読む。** Run Command のパラメータは Systems Manager のコマンド履歴に残るためである。
+
+```bash
+./runbook.sh nvme-cache show   # 各ノードの is_enabled を表示する
+./runbook.sh nvme-cache off    # PATCH してから 30 秒待ち、読み直して表示する
+```
+
+**`PATCH` が返ったことは無効化の証拠ではない。** `off` は必ず読み直しの結果を表示する。実測では
+作成直後のファイルシステムは**両ノードで `is_enabled: true`** だった。つまり**何もしなければ、
+ディスク経路の測定はキャッシュの測定になる。**
+
 キャッシュを無効化すると、超えるべきはインメモリキャッシュだけになる。2,048 MBps と
 6,144 MBps のどちらも 256 GB なので、**一度に 512 GB 以上を読む。**
 
