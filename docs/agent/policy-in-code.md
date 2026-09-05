@@ -59,3 +59,36 @@ is reported as a broken reader, not as "none yet".
 The rule for any check added later: **decide what the absence of findings means before writing the
 success message.** If a scan that could not run and a scan that found nothing print the same line,
 the check will eventually report success forever.
+
+## Some rules cannot live in a checker, and the measurement says which
+
+Every rule above is enforced by code because it can be. The obligation to cite a source cannot be,
+and the reason is worth recording so it is not attempted a second time.
+
+The rule wanted: a claim about what a product cannot do, or a numeric ceiling, must have a source
+next to it. It exists because three claims in this repository were written as findings and turned out
+to be documented behaviour, and one negative about a vendor capability was written after a search that
+never opened the product's own feature table. Every one of them passed every other check here.
+
+Three detectors were written and measured against the tracked tree:
+
+| Detector | Findings | Why it does not work |
+|---|---|---|
+| Capability negatives and ceilings, source required within 3 lines | 167 | Matches the authoring rules that *describe* the wording, and the cells of support matrices, where the claim is the content |
+| Any figure carrying a throughput, IOPS or capacity unit | 868 | Measurement records are dense with figures, and their provenance sits in a table caption or a "conditions" section, not on the line |
+| "No source found" with no record of what was checked | 23, of which ~15 were noise | Matches glossary rows defining `unconfirmed`, and runtime errors — a missing Java binary is not a missing citation |
+
+None is usable. Widening the window until the tree passes would leave a check that cannot fail;
+annotating 868 lines produces markers nobody maintains. The third could be narrowed further, but at
+that point the detector is being shaped to fit the result it is wanted to produce, which is the
+failure mode this page exists to warn about.
+
+So the control is a process one, in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#できないと書く前に開くページ): a table naming the index page
+to open for each kind of claim, because in the case that prompted this, the answer was one row of a
+table on a page that was never opened. **A checker can see whether a citation is present. It cannot
+see whether anyone read it, and presence was never the thing that failed.**
+
+The general rule: **before adding a check, run it and read the findings.** A detector that fires
+hundreds of times on a tree the maintainers consider clean is not measuring the rule it was written
+for, and merging it teaches everyone to pass it rather than to follow the rule.
