@@ -302,13 +302,15 @@ Resources:
           # the disk path is being measured against, and the pool has its own latency profile.
           Name: NONE
         SnapshotPolicy: none
-        # Set explicitly because the documented default for a *volume* delete could not be found --
-        # the API reference describes the field without stating one, while the file-system-level
-        # SkipFinalBackup is documented as defaulting to true. What was observed is that four
-        # backups were left behind across two teardowns, typed USER_INITIATED, none of them taken by
-        # hand. Whatever the default is, saying it here removes the question, and the backup
-        # outlives the file system and bills for storage.
-        SkipFinalBackup: true
+        # There is deliberately no SkipFinalBackup here. It is a parameter of the DeleteVolume API,
+        # not a property of this resource -- AWS::FSx::Volume OntapConfiguration does not accept it,
+        # and CloudFormation gives no way to pass it when it deletes the volume for you. An earlier
+        # revision of this file set it anyway; cfn-lint rejects it with E3002, and the reason that
+        # went unnoticed is in `make cfn` rather than in cfn-lint (see the Makefile).
+        #
+        # So the final backup cannot be prevented from here. It is removed after the fact instead,
+        # by the backup step in teardown.sh, which also fails verification if any remain. Four were
+        # left behind across two teardowns before that step existed.
       Tags:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-vol"}
         - {Key: DeleteAfterMeasurement, Value: "true"}
