@@ -88,6 +88,7 @@ SMB・NFSv3・NFSv4.2 は E だけの行になるので、D との比較には�
 | ドキュメント | 内容 |
 |---|---|
 | [プロトコル別スループットの測定計画](throughput-protocol-matrix-plan.md) | 測定手順、必要な環境、未測定の一覧 |
+| [プロトコル別測定の結果](perf-matrix-results.md) | 測定できたケースの実測値と条件 |
 | [スループット・IOPS・並列度の実測](throughput-iops-concurrency.md) | S3 Access Point 経路と NFS 経路の実測 |
 | [S3 Files とこの構成の比較](s3files-vs-flexcache.md) | 設計点の違い |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
