@@ -191,6 +191,7 @@ SSD を 4,096 GiB にすると上限が 204,800 になり、64 KiB でもスル�
 
 | ドキュメント | 内容 |
 |---|---|
+| [プロトコル別測定の結果](perf-matrix-results.md) | 測定できたケースの実測値と条件 |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [スループット・IOPS・並列度の実測](throughput-iops-concurrency.md) | 既存の実測と、その限界 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |

@@ -164,14 +164,23 @@ Resources:
                   - cloudwatch:GetMetricData
                   - cloudwatch:ListMetrics
                 Resource: "*"
-              # Read-only, and on the staging bucket alone. The client pulls tooling; it never writes
-              # there, so a corrupted upload cannot originate from the host being measured.
+              # Read on the whole bucket, write only under results/. The point of the split is that the
+              # host being measured cannot alter the tooling it is measured with, while still being able
+              # to hand back what it produced -- and results have to come off the client somehow, since
+              # a Run Command's output is capped at a size no report fits in.
               - !If
                 - HasStagingBucket
                 - Effect: Allow
                   Action:
                     - s3:GetObject
                   Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/*"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action:
+                    - s3:PutObject
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/results/*"
                 - !Ref "AWS::NoValue"
               - !If
                 - HasStagingBucket
