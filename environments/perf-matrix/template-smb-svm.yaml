@@ -109,8 +109,9 @@ Resources:
           # None, for the same reason as the NFS volume: data moving to the capacity pool part-way
           # through a run would change what the read is being served from.
           Name: NONE
-        # No final backup on delete, for the same reason as the NFS volume: it survives the file
-        # system and bills, and a teardown that looks only for live resources will not see it.
+        # Set explicitly for the same reason as the NFS volume: the documented default for a volume
+        # delete could not be found, backups survive the file system and bill, and a teardown that
+        # looks only for live resources does not see them.
         SkipFinalBackup: true
         SnapshotPolicy: none
       Tags:
