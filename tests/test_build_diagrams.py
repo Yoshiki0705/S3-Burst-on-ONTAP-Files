@@ -116,10 +116,13 @@ def test_icons_inside_a_frame_stay_inside_it() -> None:
     A frame must hold something. It may hold a text box rather than an icon: where a vendor publishes
     no icon this repository can use, the service is named in a box instead, and substituting another
     vendor's mark would attribute the service to whoever's mark was borrowed. What stays forbidden is
-    an empty frame, which draws a boundary around nothing.
+    an empty frame, which draws a boundary around nothing -- unless it is declared `label_only`,
+    where the box is the element rather than a boundary around one.
     """
     for diagram in bd.DIAGRAMS:
         for frame in diagram.frames:
+            if frame.label_only:
+                continue
             inside = [
                 node
                 for node in diagram.nodes
