@@ -1,0 +1,75 @@
+**********************************************************************
+* The long write. One question: does the write rate hold, or decay?
+*
+* WHY THIS RUN EXISTS
+*
+* Two measurements on this file system exceeded the published write
+* figure for a second-generation Single-AZ HA pair, 1,024 MBps:
+*
+*   NFSv4.1, nconnect=16, 120 s window   2,055 MB/s
+*   SMB 3.1.1, 4 channels, 300 s window  1,698 MB/s
+*
+* Two protocols, two clients, two operating systems, both above the
+* published number. So it is not a quirk of one path. But neither run was
+* long enough to answer the question that matters for sizing: whether a
+* workload that writes for an hour sees that rate, or sees it briefly and
+* then settles to something lower once the storage has to destage what it
+* accepted.
+*
+* Both readings are consistent with the data collected so far:
+*
+*   1. the published figure is a floor and the hardware does more
+*   2. the first few minutes are absorbed, and the rate then falls
+*
+* A 15-minute run separates them. If the rate is still above 1,024 MBps
+* at minute 15 having written well over a terabyte, absorption cannot be
+* the whole explanation. If it decays, the per-interval series shows when
+* and to what.
+*
+* WHAT NOT TO DO WITH A SHORT WRITE FIGURE
+*
+* Do not quote 2,055 MB/s as this file system's write throughput. It was
+* measured over 120 seconds and this run exists precisely because that is
+* not long enough to know what it means.
+*
+* USAGE
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-sustained-write.txt -o /opt/bench/out-sustained
+*
+* PRECONDITIONS, all checked before starting
+*
+*   - snapshot policy on the volume is `none` and no snapshots exist.
+*     Overwriting a 600 GB file for 15 minutes writes more than a
+*     terabyte; with a snapshot policy active the overwritten blocks are
+*     retained instead of freed and the volume fills mid-run, which would
+*     look like a decay and would not be one.
+*   - the NVMe read cache is disabled on both nodes. It does not affect a
+*     write path, but leaving the file system in one state for every run
+*     in this set is what makes the runs comparable.
+*   - nconnect=16 confirmed in the *effective* mount options, not the
+*     requested ones.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* The same file, size and flag as every other run in this set, so the
+* figure sits beside them.
+*
+* Sequential writes wrap around the 600 GB file repeatedly rather than
+* extending it, so the volume's free space does not fall during the run.
+**********************************************************************
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/target/file1
+
+**********************************************************************
+* 900 seconds of steady state after 60 of warmup, reported every 10
+* seconds. The per-interval series is the result here -- the average over
+* the whole window would hide exactly the shape being looked for.
+*
+* threads=512 matches every other run in this set.
+**********************************************************************
+wd=wd_seq_write_1024k,sd=sd1-1,seekpct=.0,xfersize=1024k,rdpct=0
+
+rd=sustained-write-1024k,wd=wd_seq_write_1024k,iorate=max,warmup=60,elapsed=900,interval=10,threads=512
