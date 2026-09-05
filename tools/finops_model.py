@@ -1024,7 +1024,7 @@ def render_floor() -> list[str]:
         "",
         t(
             "S3 バケットに下限はない。1 バイトも置かなければ請求は発生しない。"
-            "FSx for ONTAP は SSD 1 TiB とスループットキャパシティ 1 段が最小構成で、"
+            "FSx for ONTAP は SSD 1 TiB とスループットキャパシティ 1 つが最小構成で、"
             "使用量に関わらずこの分が毎月かかる。"
         ),
         "",
@@ -1042,7 +1042,7 @@ def render_floor() -> list[str]:
         ),
         "",
         t(
-            "第二世代の最小スループットは 384 MBps で、第一世代の 128 MBps より 3 段上にあたる。"
+            "第二世代の最小スループットは 384 MBps で、第一世代の 128 MBps より 3 つ上の指定値にあたる。"
             "第二世代を選ぶ理由は MBps あたりの単価ではなく、"
             "SSD 512 TiB、200,000 IOPS、Single-AZ で最大 12 HA ペアという上限の側にある"
             "([世代の比較]({url}))。"
@@ -1146,7 +1146,7 @@ def render_scenario(sc: Scenario) -> list[str]:
                 [
                     t("スループットの余裕"),
                     t(
-                        "平均所要の {multiple} 倍を満たす最小の段を選ぶ",
+                        "平均所要の {multiple} 倍を満たす最小の指定値を選ぶ",
                         multiple=f"{sc.tput_headroom + 1:g}",
                     ),
                 ],

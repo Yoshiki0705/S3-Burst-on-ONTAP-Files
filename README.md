@@ -72,7 +72,7 @@ AWS は FlexCache を読み取り主体のワークフローに適するとし�
 
 | 方式 | 向く条件 | 向かない条件 |
 |---|---|---|
-| A. FSx for ONTAP S3 Access Point のみ | 利用側が NFSv3 や SMB を使う。Snapshot や FlexClone を収集直後のデータに効かせたい | 固定費の下限（SSD 1 TiB とスループット 1 段）を回収できない。利用側が S3 API で足りる |
+| A. FSx for ONTAP S3 Access Point のみ | 利用側が NFSv3 や SMB を使う。Snapshot や FlexClone を収集直後のデータに効かせたい | 固定費の下限（SSD 1 TiB とスループットキャパシティ 1 つ）を回収できない。利用側が S3 API で足りる |
 | B. S3 バケット + S3 Files | 利用側が AWS 上の Linux コンピュート（Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS）で、マウントヘルパーを入れられる。正本データを S3 バケットに残したい | NFSv3、SMB、AWS 外の利用側。ファイルシステム側の書き込みを 60 秒以内に S3 へ出したい。アーカイブ系ストレージクラスからファイルで読みたい |
 
 B の対応プロトコルは NFSv4.1 と NFSv4.2 だけで、NFSv3 と SMB は対象外です
