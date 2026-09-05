@@ -14,12 +14,18 @@
 * and version difference this environment produced, so it is the variable
 * that has to be pinned before any of the others mean anything.
 *
-* THERE IS NO FLUSH
+* NO DOCUMENTED FLUSH WAS FOUND
 *
-* FSx for ONTAP exposes exactly one cache control -- `system node
-* external-cache modify` for the NVMe layer, which this measurement disables
-* anyway. **The in-memory read cache cannot be flushed.** So residency has to
-* be controlled by the workload, not by a command before it.
+* The one cache control FSx for ONTAP documents is `system node external-cache
+* modify`, for the NVMe layer, which this measurement disables anyway. Searching
+* the ONTAP command reference for a way to drop the in-memory read cache turned
+* up only `flush` commands for export-policy access caches, which are unrelated.
+*
+* **That is "not found", not "does not exist".** Stated that way on purpose: in
+* this same project a claim of "no source found" turned out to be a page never
+* opened. If a documented way exists, this design is unnecessary rather than
+* wrong -- so residency is controlled by the workload here, which holds either
+* way.
 *
 * HOW IT IS CONTROLLED HERE
 *
