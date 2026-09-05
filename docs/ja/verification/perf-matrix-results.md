@@ -550,10 +550,13 @@ Single-AZ の書き込みを **1,024 MBps** としている。
 **逆算が合わない行を見つけたら、数字を捨てるのではなく条件を書き足す。** 捨てると再測定の費用が
 かかり、書き足せばその行は「別条件の実測値」として使える。
 
-## 自動バックアップが測定を壊した経路
+## 自動バックアップで測定が止まった経路
 
-**キャッシュ制御下の測定は完走しなかった。落ちた原因が、測るより先に知っておく価値のあるもの
-だったので記録する。**
+**キャッシュ制御下の測定は完走しなかった。原因は文書化済みの仕様であり、こちらの設計漏れである。**
+
+> **この節は当初「発見」として書いた。誤りだったので書き直した。** 下の挙動はすべて公式ドキュメントと
+> NetApp のナレッジベースに記載があり、**回避手段も documented である。** 実測して驚いた時点で
+> 調べていれば、止まる前に設計へ入れられた。**「想定と違った」を「未知の挙動」として書かない。**
 
 | 段階 | 観測 |
 |---|---|
@@ -571,34 +574,67 @@ Single-AZ の書き込みを **1,024 MBps** としている。
 ため、ボリュームが埋まっていく。** 2,600 GiB のファイルを上書きし続けたので、
 **書いた分がそのまま容量になった。**
 
+**この機構は公式に記載がある。**
+[Protecting your data with volume backups](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-backups.html)
+は、バックアップがまずボリュームのスナップショットを取り、**そのスナップショットはボリューム内に
+置かれて容量を消費し、次のバックアップが取られるまで残る**と書いている。
+さらに [FSx for ONTAP のスナップショットが空き容量を消費する理由](https://repost.aws/knowledge-center/fsx-ontap-correct-snapshot-spill)
+に、**アクティブファイルシステムから削除したデータも、スナップショットが参照している限り解放されない**
+とある。`rm` して空きが戻らなかったのはこれである。
+
 > **開始前に `snapshot-policy` とスナップショット数を確認しても防げない。** どちらも
 > 実行前は正常に読める。**スナップショットはまだ存在しないからである。**
-> 止めるには保持日数を 0 にする（`AutomaticBackupRetentionDays: 0`）。テンプレートに入れた。
 
-### バックアップを消しても ONTAP のスナップショットは残る
+### documented な回避手段を使っていなかった
+
+**ONTAP には、ボリュームが満杯になる前に容量を自動回収する仕組みがある。**
+[What is volume autosize in Data ONTAP?](https://kb.netapp.com/on-prem/ontap/Ontap_OS/OS-KBs/What_is_volume_autosize_in_Data_ONTAP)
+は、`volume autosize`（`grow` / `grow_shrink`）と **Snapshot autodelete** が協調して動き、
+`-space-mgmt-try-first` がどちらを先に試すかを決めると書いている。
+
+| 設定 | この測定環境の値 | 影響 |
+|---|---|---|
+| `autosize_mode` | **`off`**（テンプレートの既定のまま） | ボリュームは伸びない |
+| Snapshot autodelete | **未設定** | バックアップのスナップショットは自動削除されない |
+| `percent_snapshot_space` | 5%（既定） | 予備領域を超えた分はアクティブ領域へ溢れる |
+
+**3 つとも documented な調整点で、どれか 1 つでも入れていれば止まらなかった。**
+今回は測定の再現性を優先して `AutomaticBackupRetentionDays: 0` を選んだ（バックアップ自体を
+取らせない）。**autosize や autodelete は容量を動かすので、容量が測定条件そのものである
+このケースには向かない。** 本番構成なら逆で、autosize と autodelete を入れる。
+
+### バックアップの削除とスナップショットの削除は別操作
 
 | 操作 | 結果 |
 |---|---|
 | `aws fsx delete-backup` | 成功。バックアップは `DELETED` |
-| その直後のボリューム空き容量 | **変わらない**（519 GiB のまま） |
-| ONTAP 側のスナップショット | **`backup-00e9986d8bb0a7ea8` が 2,855 GiB を保持したまま存在** |
+| その直後のボリューム空き容量 | 変わらない（519 GiB のまま） |
+| ONTAP 側のスナップショット | `backup-00e9986d8bb0a7ea8` が 2,855 GiB を保持したまま存在 |
 | ONTAP から直接削除 | 空きが 894 GiB へ回復 |
 
-**AWS 側の API でバックアップを消すことと、ONTAP 側のスナップショットが消えることは別である。**
+**これは不具合ではない。** 上のドキュメントどおり、バックアップ用スナップショットは
+**次のバックアップが取られるまでボリューム内に残る**設計である。**バックアップという
+オブジェクトを消すことと、ボリューム内のスナップショットが消えることは別である**という
+点だけを覚えておけばよい。
 
 ### ボリューム削除時の最終バックアップ
-
-**ボリューム削除時、既定で最終バックアップが取られる。** 種別は `USER_INITIATED` で表示されるが、
-**手動で取ったものではない。**
 
 | 観測 | 値 |
 |---|---|
 | 撤去後に残っていたバックアップ | **4 件**（900 GiB 版 2 件、3,200 GiB 版 2 件） |
+| 種別 | `USER_INITIATED` と表示。**手動では 1 件も取っていない** |
 | `teardown.sh` の最終行 | **`nothing tagged for deletion remains`** と表示していた |
 | 実際 | バックアップストレージが課金され続けていた（最初の 2 件は 4 時間以上） |
 
-**撤去スクリプトが「生きているリソース」だけを見ていると、成功と報告しながら課金を残す。**
-ボリュームに `SkipFinalBackup: true` を入れ、`teardown.sh` にバックアップの削除と検証を追加した。
+**`SkipFinalBackup` の既定値は、ドキュメントで確認できていない。**
+[DeleteVolumeOntapConfiguration](https://docs.aws.amazon.com/fsx/latest/APIReference/API_DeleteVolumeOntapConfiguration.html)
+はこのフィールドの意味を書いているが既定値を明示していない（ファイルシステム削除側の
+`SkipFinalBackup` は既定 `true`、つまり取らない、と別ページに記載がある）。
+**上は「4 件残った」という観測であって、既定値についての主張ではない。**
+
+**既定値が何であれ、明示すれば曖昧さは消える。** ボリュームに `SkipFinalBackup: true` を入れ、
+`teardown.sh` にバックアップの削除と検証を追加した。**撤去スクリプトが「生きているリソース」
+だけを見ていると、成功と報告しながら課金を残す** — ここが本題である。
 
 ### シンプロビジョニングは埋められることを保証しない
 
@@ -606,11 +642,40 @@ Single-AZ の書き込みを **1,024 MBps** としている。
 **両方を埋めることはできない。** 合計 6,402 GiB になる。作成時にエラーは出ないので、
 **埋め始めてから気づく。**
 
+**そして使える容量は 4,096 GiB より小さい。** 集約は 3,896 GiB と読めた。
+[ONTAP Space Usage](https://kb.netapp.com/on-prem/ontap/Ontap_OS/OS-KBs/ONTAP_Space_Usage)
+に、**WAFL が総ディスク容量の約 10% を集約レベルのメタデータと性能のために予約する
+（ONTAP 9.12 以降は 5%）**とある。**プロビジョンした数字を使える容量として見積もらない。**
+
 ### 同じファイルに複数の SD を向けない
 
 **VDBENCH は SD ごとに `SD_format` を実行する。** 1 つのファイルに 8 つの SD（全体 1 つ +
 領域 7 つ）を向けたところ、**同じファイルを 8 回書こうとした**（合計 5,197 GiB）。
 領域ごとに測りたいなら、**領域ごとに別のファイルにする。**
+
+## S3 Access Point で断続的に AccessDenied になった件
+
+**観測のみ。原因は特定していない。**
+
+| 観測 | 値 |
+|---|---|
+| 構成 | UNIX 識別情報（`root`）、`NetworkOrigin: VPC`、アクセスポイントポリシーなし（IAM のみ） |
+| 成功した書き込み | **490 オブジェクト / 31 GiB**。NFS 側からファイルとして見えることも確認 |
+| 失敗 | 途中から `PutObject` が `AccessDenied`（`no identity-based policy allows`） |
+| IAM | 対象アクセスポイントのみに絞ったインラインポリシーを付与済み。付与から数分後の失敗 |
+
+**「途中まで成功して途中から失敗した」ので、権限の有無だけでは説明できない。** 公式に、
+この症状の原因候補が複数書かれている。
+
+| 文書 | 内容（要約） |
+|---|---|
+| [Troubleshooting S3 access point issues](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/troubleshooting-access-points-for-fsxn.html) | アクセスポイントが使う UNIX / Windows ユーザーが **name service から解決できなくなる**と失敗する |
+| [Managing access point access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html) | 認可は **IAM とファイルシステム権限の二層**で、両方が通る必要がある |
+| [centralized VPC endpoint 構成での AccessDenied](https://www.repost.aws/articles/ARIOhwOHPMSOupacb7AbcdAQ/managing-fsxn-s3-access-points-in-centralized-vpc-endpoint-architectures) | `NetworkOrigin: VPC` と Route 53 Resolver の転送が絡むと、**IAM もリソースポリシーも正しく見えるのに** AccessDenied になる |
+
+**どれが当たっているかは検証していない。** 環境を削除したので、確定させるには作り直して
+name service の解決性・二層目の権限・エンドポイント経路を 1 つずつ切り分ける必要がある。
+**この 1 点を「FSx for ONTAP の S3 Access Point は断続的に失敗する」という形で読まない。**
 
 ## 測定器そのもので踏んだ非互換
 
@@ -635,7 +700,7 @@ Single-AZ の書き込みを **1,024 MBps** としている。
 | ケース | 状態 |
 |---|---|
 | キャッシュ制御下の 7 シナリオ表 | **未測定。設計と仕組みは用意でき、自動バックアップに阻まれて完走しなかった**（上）。次回は `AutomaticBackupRetentionDays: 0` が入っているので同じ形で止まらない |
-| A-1 / A-2: S3 API と NFS の同一データ比較 | **未完。S3 API で書いたオブジェクトが NFS 側に 490 ファイル / 31 GiB として見えることは確認**したが、`PutObject` が断続的に `AccessDenied` になりスループット比較に至らなかった |
+| A-1 / A-2: S3 API と NFS の同一データ比較 | **未完。S3 API で書いたオブジェクトが NFS 側に 490 ファイル / 31 GiB として見えることは確認**した。`PutObject` が断続的に `AccessDenied` になり中断。**原因は未確認で、切り分けをしていない**（下） |
 | ヘルパーの 3 倍が Provisioned で出なかった理由 | **切り分け済み（モード。サイズは無関係）**。ただし Provisioned で効かない機構は未確認 |
 | 64 KiB 逐次読みが 64 KiB ランダム読みより遅い理由 | 未測定 |
 | 4 KiB ランダム書きの NFS 側（クライアント CPU 89% で飽和した 1 点） | **クライアント律速。より大きなクライアントで測り直しが必要** |

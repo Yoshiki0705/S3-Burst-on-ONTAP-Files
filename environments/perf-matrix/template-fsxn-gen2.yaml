@@ -250,7 +250,7 @@ Resources:
         FsxAdminPassword: !Sub "{{resolve:secretsmanager:${FsxAdminPasswordSecretArn}:SecretString:password}}"
         # 0, and this one is not a preference.
         #
-        # The default is 30 days with a daily backup at a fixed time, and a backup takes an ONTAP
+        # The default is 30 days with a daily backup at a fixed time. A backup takes an ONTAP
         # snapshot. An overwrite-heavy run that crosses that time then cannot reclaim the blocks it
         # overwrites, because the snapshot holds them: on this environment a run that started at
         # 14:30 UTC met the 15:00 UTC backup, the volume went from 88% to 100% full, and write
@@ -302,10 +302,12 @@ Resources:
           # the disk path is being measured against, and the pool has its own latency profile.
           Name: NONE
         SnapshotPolicy: none
-        # A final backup is taken when a volume is deleted unless told not to, and that backup
-        # outlives the file system and bills for backup storage. A teardown that checks only for live
-        # resources reports success while leaving it behind -- which is what happened here, twice,
-        # with 900 GiB and 3,200 GiB volumes.
+        # Set explicitly because the documented default for a *volume* delete could not be found --
+        # the API reference describes the field without stating one, while the file-system-level
+        # SkipFinalBackup is documented as defaulting to true. What was observed is that four
+        # backups were left behind across two teardowns, typed USER_INITIATED, none of them taken by
+        # hand. Whatever the default is, saying it here removes the question, and the backup
+        # outlives the file system and bills for storage.
         SkipFinalBackup: true
       Tags:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-vol"}
