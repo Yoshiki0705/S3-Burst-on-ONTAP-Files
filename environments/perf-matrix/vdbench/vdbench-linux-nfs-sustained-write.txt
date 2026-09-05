@@ -1,6 +1,12 @@
 **********************************************************************
 * The long write. One question: does the write rate hold, or decay?
 *
+* EXECUTED 2026-09-05. It held: 2,063.00 MB/s averaged over 900 seconds, with
+* the 10-second intervals between 1,749 and 2,128 and no downward trend, and
+* about 1.77 TiB written against 256 GB of in-memory cache and no data
+* reduction (efficiency disabled, space_savings.total = 0). So absorption is
+* not the explanation. Results in docs/ja/verification/perf-matrix-results.md.
+*
 * WHY THIS RUN EXISTS
 *
 * Two measurements on this file system exceeded the published write

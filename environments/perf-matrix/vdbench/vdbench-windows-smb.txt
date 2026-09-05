@@ -1,5 +1,7 @@
 **********************************************************************
-* UNEXECUTED DRAFT. The SMB side of the head-to-head pair.
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+*
+* The SMB side of the head-to-head pair.
 *
 * Run on the Windows client against a mapped drive on the AD-joined SVM:
 *

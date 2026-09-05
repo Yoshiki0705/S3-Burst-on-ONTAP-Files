@@ -1,5 +1,7 @@
 **********************************************************************
-* UNEXECUTED DRAFT. A reduced workload set, for targets that bill per
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+*
+* A reduced workload set, for targets that bill per
 * byte accessed.
 *
 * **Why this file exists at all: on Amazon EFS the benchmark design is

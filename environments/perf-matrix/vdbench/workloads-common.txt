@@ -1,5 +1,7 @@
 **********************************************************************
-* UNEXECUTED DRAFT. Workload and run definitions, shared verbatim by the
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+*
+* Workload and run definitions, shared verbatim by the
 * NFS and the SMB parameter files.
 *
 * This file exists so that the two protocols are driven by *the same*

@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. AWS Managed Microsoft AD, so that an SMB case can be measured at all.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# AWS Managed Microsoft AD, so that an SMB case can be measured at all.
 #
 # Why this exists rather than reusing what the account already has: two SVMs in this account carry a
 # record of having joined `MEAS.FSXN.LOCAL`, but **no ENI answers at the DNS addresses in that record
@@ -34,7 +35,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 # that wait overlaps something useful instead of billing $53/hour of idle EFS and FSx for ONTAP.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. AWS Managed Microsoft AD (Standard) for the SMB cases of the protocol matrix. Two
+  DEPLOYED AND TORN DOWN 2026-09-05. AWS Managed Microsoft AD (Standard) for the SMB cases of the protocol matrix. Two
   subnets in two Availability Zones are a service requirement, not a measurement choice.
 
 Metadata:

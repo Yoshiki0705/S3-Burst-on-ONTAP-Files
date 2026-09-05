@@ -4,7 +4,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 # being identical.
 Transform: AWS::LanguageExtensions
 # =================================================================================================
-# UNEXECUTED DRAFT. The measurement clients, and the security group every target allows.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# The measurement clients, and the security group every target allows.
 #
 # Two client shapes, because the two answer different questions:
 #
@@ -29,7 +30,7 @@ Transform: AWS::LanguageExtensions
 # is no inbound rule for SSH and no key material to leave behind in a shared account.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. Measurement clients for the protocol matrix: one c5n.9xlarge for single-host
+  DEPLOYED AND TORN DOWN 2026-09-05. Measurement clients for the protocol matrix: one c5n.9xlarge for single-host
   figures and eight c5n.2xlarge for the host-count test, reachable over AWS Systems Manager.
 
 Metadata:

@@ -1,6 +1,10 @@
 **********************************************************************
 * The host-count run. One question only: does the total stop climbing?
 *
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+* The LIF reading below was refuted: one LIF on one port carried 102 Gbps.
+* Read that file before reusing any number from this one.
+*
 * The single-host run reached 4,406 MB/s with nconnect=16 from one
 * c5n.9xlarge. Two readings fit that number equally well:
 *
@@ -61,6 +65,11 @@ sd=sd1-1,host=hd1,lun=/mnt/bench/target/file1
 * between host counts rather than a headline figure, and five host
 * counts at 300 seconds each is a long time to hold nine instances up.
 **********************************************************************
-wd=wd_seq_read_1024k,sd=sd1-1,xfersize=1024k,seekpct=eof,rdpct=100
+* seekpct=.0 -- sequential, wrapping at the end of the file. NOT seekpct=eof,
+* which ends the run when the file is reached rather than when `elapsed` is up.
+* With eof the points came back as avg_61-224 and avg_61-230 instead of
+* avg_61-240, so the host count was no longer the only thing differing between
+* them: the window length differed too.
+wd=wd_seq_read_1024k,sd=sd1-1,xfersize=1024k,seekpct=.0,rdpct=100
 
-rd=ladder-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,elapsed=180,warmup=60,threads=64
+rd=ladder-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,elapsed=180,warmup=60,interval=1,threads=64

@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. Amazon EFS for the D pattern of the protocol matrix.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# Amazon EFS for the D pattern of the protocol matrix.
 #
 # Two things about this file carry the reasoning, and neither is obvious from the AWS console:
 #
@@ -29,7 +30,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 # subnet would add an Availability Zone hop to one side only.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. Amazon EFS file system and mount target for the D pattern of the EFS against
+  DEPLOYED AND TORN DOWN 2026-09-05. Amazon EFS file system and mount target for the D pattern of the EFS against
   FSx for ONTAP protocol matrix, in an existing VPC and subnet.
 
 Metadata:

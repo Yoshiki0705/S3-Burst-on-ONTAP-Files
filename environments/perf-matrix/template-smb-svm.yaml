@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. A second storage virtual machine, for the SMB cases only.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# A second storage virtual machine, for the SMB cases only.
 #
 # **Why a second SVM instead of joining the one that already exists.** Enabling CIFS on an SVM makes
 # ONTAP perform a win-to-unix name-mapping lookup as part of file system operations on that SVM, and
@@ -27,7 +28,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 # is what lets the SMB read exceed the 256 GB in-memory cache the same way the NFS read does.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. A second, SMB-only storage virtual machine and an NTFS volume on an existing
+  DEPLOYED AND TORN DOWN 2026-09-05. A second, SMB-only storage virtual machine and an NTFS volume on an existing
   FSx for ONTAP file system. Created unjoined; runbook.sh join-svm performs the Active Directory join.
 
 Metadata:

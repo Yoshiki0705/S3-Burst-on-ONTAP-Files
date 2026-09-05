@@ -1,0 +1,50 @@
+**********************************************************************
+* Amazon EFS with Provisioned throughput. One pattern, and it is a control
+* rather than a comparison.
+*
+* WHAT IT CONTROLS FOR
+*
+* EFS on a plain mount measured 499.79 MB/s for reads and 499.75 MB/s for
+* writes -- read and write agreeing to that precision, which is the shape of
+* a per-client rate limit rather than of a bottleneck. The obvious objection
+* is that Elastic mode was the limit and Provisioned would lift it.
+*
+* The other reading is that the limit is not EFS's at all: AWS documents a
+* full-duplex 5 Gbps per network flow limit on EC2 instances, and 499.79 MB/s
+* is 4.0 Gbps. On that reading, provisioning 3,072 MiBps changes nothing on a
+* single connection, because the connection is what is full -- and EFS does
+* not support nconnect, so a plain mount cannot open a second flow.
+*
+* This run separates them. If the figure stays near 500 MB/s with 3,072 MiBps
+* provisioned, the limit was never Elastic mode.
+*
+* THE MOUNT HELPER VARIANT
+*
+* Run the same shape through the mount helper too. The helper puts a local
+* proxy in the path, which is how it reached 1,495.82 MB/s on Elastic -- more
+* than one flow's worth. Whether provisioning lifts *that* figure is the
+* second question, and it is the one a reader sizing a real workload asks.
+*
+* COST -- READ THIS BEFORE RUNNING
+*
+* Provisioned throughput at 3,072 MiBps bills from CREATE_COMPLETE, not from
+* first use. Delete the stack the moment this pattern is finished:
+*
+*   ./runbook.sh drop-efs-provisioned
+*
+* The test file is 32 GiB rather than the 300 GiB used on Elastic. EFS bills
+* $0.07 per GB accessed in both directions, and this run does not need a
+* large working set: the question is whether one connection can exceed one
+* flow's worth of bandwidth, and that is answered at any file size.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+sd=default,openflag=o_direct,size=32g
+sd=sd1-1,host=hd1,lun=/mnt/bench/efs-prov/file1
+
+* 512 threads, matching every other run in this set. 120 seconds after 30 of
+* warmup, matching the Elastic EFS runs so the two sit side by side.
+wd=wd_seq_read_1024k,sd=sd1-1,seekpct=.0,xfersize=1024k,rdpct=100
+
+rd=efs-prov-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,warmup=30,elapsed=120,interval=1,threads=512

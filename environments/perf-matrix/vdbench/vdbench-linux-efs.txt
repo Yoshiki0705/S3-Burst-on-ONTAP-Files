@@ -1,5 +1,7 @@
 **********************************************************************
-* UNEXECUTED DRAFT. Amazon EFS, from the same client as the FSx for ONTAP
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+*
+* Amazon EFS, from the same client as the FSx for ONTAP
 * runs.
 *
 *   vdbench -f vdbench-linux-efs.txt -o /opt/bench/report-efs

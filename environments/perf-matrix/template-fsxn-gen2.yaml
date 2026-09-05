@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. Second-generation FSx for ONTAP for the E pattern.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# Second-generation FSx for ONTAP for the E pattern.
 #
 # Why a second file system exists at all, when a first-generation one is already deployed:
 #
@@ -31,7 +32,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 # making a volume, an SVM or the file system undeletable; the whole point is that it is deleted.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. Second-generation Single-AZ FSx for ONTAP file system, SVM and volume for the E
+  DEPLOYED AND TORN DOWN 2026-09-05. Second-generation Single-AZ FSx for ONTAP file system, SVM and volume for the E
   ceiling-comparison pattern, in an existing VPC and subnet.
 
 Metadata:
