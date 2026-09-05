@@ -15,6 +15,18 @@ from what was known.
 
 ### Added
 
+- **`make ja-headings` enforces the noun-phrase rule for Japanese section headings**, and **22
+  headings across six documents were renamed to comply.** The rule had existed in prose only, and
+  every one of those headings passed every other gate. The check skips what it should: `#` and
+  front-matter titles, headings with no kana, fenced blocks, a heading ending in a counter (`1 つ`)
+  and one ending in an inline-code identifier — the last two were reported by an earlier version of
+  the detector and were already correct. It also catches the plain past (`〜ました`), which the
+  written form of the rule did not.
+  **Twenty-two anchors changed with those headings.** All fourteen inbound internal links were
+  updated in the same change and `make links` passes; the anchors were also checked against the
+  published and unpublished article drafts, which reference none of them. A renamed anchor is worth
+  naming here because GitHub serves an unknown fragment as the top of the page, so a citing document
+  never learns that it broke.
 - **A figure for the two ceilings a read can meet**, `s3burst-two-ceilings`, in the performance
   testing guide. The same file system, workload shape and connection count returned figures 5.5×
   apart, and the difference was whether the threads read overlapping regions. Drawn as one ceiling

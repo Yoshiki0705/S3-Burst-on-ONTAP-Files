@@ -65,6 +65,8 @@ jobs:
 
       - name: Audit public output
         run: python3 tools/audit_public_output.py
+      - name: Check Japanese heading style
+        run: python3 tools/check_ja_heading_style.py
 
       - name: Check for untranslated Japanese in English documents
         run: python3 tools/check_en_doc_language.py

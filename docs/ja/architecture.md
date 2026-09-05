@@ -14,7 +14,7 @@
 **Cache は Origin の性能を分けてもらう仕組みではなく、読み取り側に別の容量を足す仕組みである。**
 Cache は独立したファイルシステムなので、自分の throughput capacity・自分のメモリ・自分のバースト
 許容量を持つ。実測では、非圧縮データで **Cache 常駐の読み取りが Origin 直読みの 2.31 倍**だった
-（[実測記録](verification/throughput-iops-concurrency.md#c--flexcache-は-origin-より速い前回の53は逆でした)、
+（[実測記録](verification/throughput-iops-concurrency.md#c--origin-より速い-flexcache-と前回の53の逆転)、
 両側 128 MBps 段）。**代価は初回にかかる。** 一度も読まれていないデータの初回読み取りは常駐時の
 2.88 分の 1 で、この差は設計時に見込む必要がある。
 
