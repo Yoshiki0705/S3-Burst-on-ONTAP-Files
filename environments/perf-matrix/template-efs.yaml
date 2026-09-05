@@ -20,7 +20,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 #
 # Cost, at ap-northeast-1 On-Demand prices read from the Price List API on 2026-09-04:
 #   - Provisioned throughput: $7.20 per MBps-month. At 3,072 MiBps that is $22,118/month,
-#     **$30.30/hour**, which is the single most expensive line in the whole measurement.
+#     about **$9/hour** at the 1,024 MiBps account limit, and it cannot be stopped without deleting it.
 #   - Elastic throughput: no reserved charge; $0.07 per GB read or written. A 512 GB read costs $36.
 #   - Standard storage: $0.36 per GB-month.
 # Deleting the file system stops the throughput charge. Stopping the clients does not.
@@ -67,12 +67,18 @@ Parameters:
       included for completeness and caps at 3 GiBps.
   ProvisionedThroughputInMibps:
     Type: Number
-    Default: 3072
+    # 1024, not the region's 3072 read cap. Those are different limits and the
+    # difference is not visible until create fails: an account's provisionable
+    # maximum is a Service Quotas value, and this one rejected 3072 with
+    # "exceeds the maximum limit 1024.000000 MiB/s". Raise the default only
+    # after confirming the quota, not because the region's cap is higher.
+    Default: 1024
     MinValue: 1
     MaxValue: 3072
     Description: >-
-      Only used when ThroughputMode is provisioned. 3072 MiBps is the ap-northeast-1 maximum and
-      costs about $30.30/hour. Ignored in the other modes.
+      Only used when ThroughputMode is provisioned. 1024 MiBps is what this account can provision
+      and costs about $9/hour; the 3072 ceiling here is the ap-northeast-1 read cap, which is a
+      different limit and is not necessarily provisionable. Ignored in the other modes.
   NamePrefix:
     Type: String
     Default: perfmatrix
