@@ -522,10 +522,20 @@ nvme_cache() {
   esac
 
   log "NVMe read cache on $fs_id: $action"
+  ontap_rest_on_client "$instance" "$script"
+  printf '\nRead the is_enabled values above. Every node must report false before the disk-path read.\n'
+}
 
-  # Built by python3 into a file rather than passed with the --parameters shorthand. The shorthand is
-  # parsed by the CLI itself and cannot survive the nested quoting these commands need -- it fails with
-  # "Expected: ',', received: 'f'", pointing at a quote inside the curl invocation.
+# Runs a shell snippet on a client with $PW holding the fsxadmin password, and prints its output.
+#
+# The password is fetched on the client from Secrets Manager rather than passed in, because a Run
+# Command's parameters are retained in Systems Manager's command history.
+#
+# The payload is built as JSON into a file rather than passed with the --parameters shorthand. The
+# shorthand is parsed by the CLI itself and cannot survive the nested quoting these commands need; it
+# fails with "Expected: ',', received: 'f'", with the caret pointing inside the curl invocation.
+ontap_rest_on_client() {
+  local instance="$1" script="$2"
   local payload; payload="$(mktemp)"
   # shellcheck disable=SC2064  # expand now, so the trap names this file
   trap "rm -f '$payload'" RETURN
@@ -560,7 +570,47 @@ PY
   aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" --instance-id "$instance" \
     --query 'StandardOutputContent' --output text
   [[ "$state" == "Success" ]] || die "the command did not succeed (status: $state)"
-  printf '\nRead the is_enabled values above. Every node must report false before the disk-path read.\n'
+}
+
+# **The default that makes FSx for ONTAP look slow.** ONTAP ships tcp-max-xfer-size at 65536, and it is
+# a server-side ceiling: a client asking for rsize=1048576 gets 65536 and the mount still succeeds.
+# Observed on a freshly created file system, with the request and the grant differing by a factor of 16.
+#
+# Amazon EFS grants 1 MiB. So measuring FSx for ONTAP at its default against EFS at its default compares
+# 64 KiB transfers with 1 MiB ones, and the gap gets recorded as a difference between the products.
+#
+# Run `nfs-xfer-size show` to read it and `nfs-xfer-size raise` to set 1 MiB. Clients must remount.
+nfs_xfer_size() {
+  local action="${1:-show}"
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN"
+  local instance; instance="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  [[ -n "$instance" && "$instance" != "None" ]] || die "no client; run './runbook.sh clients' first"
+
+  local mgmt="management.${fs_id}.fsx.${REGION}.amazonaws.com"
+  local read_cmd="curl -s -k -u \"fsxadmin:\$PW\" \"https://${mgmt}/api/private/cli/vserver/nfs?fields=vserver,tcp-max-xfer-size\" | python3 -m json.tool"
+  local script
+  case "$action" in
+    show) script="$read_cmd" ;;
+    raise)
+      script="curl -s -k -X PATCH -u \"fsxadmin:\$PW\" -H 'Content-Type: application/json' -d '{\"tcp_max_xfer_size\": 1048576}' \"https://${mgmt}/api/private/cli/vserver/nfs?vserver=*\" >/dev/null; sleep 15; $read_cmd"
+      ;;
+    *) die "usage: runbook.sh nfs-xfer-size [show|raise]" ;;
+  esac
+
+  log "NFS tcp-max-xfer-size on $fs_id: $action"
+  ontap_rest_on_client "$instance" "$script"
+  cat <<'NOTE'
+
+Every vserver must read 1048576 before the file-protocol measurements.
+
+Then remount, and read the *effective* options rather than trusting the request:
+
+    grep ' /mnt/bench/target ' /proc/mounts
+
+A mount that was granted 65536 after asking for 1048576 succeeds silently.
+NOTE
 }
 
 # The gate that matters. A disk-path read taken with the NVMe cache enabled is a cache measurement.
@@ -633,6 +683,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   windows                Create the Windows client and its domain-join association (~$2.448/hour)
   windows-status         Read whether the instance arrived and whether the join ran
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
+  nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
   preflight              Print the support matrix and gate on the NVMe read cache being disabled
   efs elastic            Create the EFS target in elastic mode ($0.07/GB accessed, no hourly charge)
@@ -666,6 +717,7 @@ case "${1:-}" in
   windows-status)       windows_status ;;
   raise-gen1)           raise_gen1 ;;
   nvme-cache)           nvme_cache "${2:-show}" ;;
+  nfs-xfer-size)        nfs_xfer_size "${2:-show}" ;;
   preflight)            preflight ;;
   costs)                costs ;;
   teardown)             exec "$HERE/teardown.sh" ;;

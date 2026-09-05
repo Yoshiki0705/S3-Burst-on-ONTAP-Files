@@ -322,7 +322,29 @@ System.Net.Sockets.SocketException: ... failed because connected host has failed
 Get-DnsClientServerAddress           # コントローラのアドレスが出ること
 ```
 
-### 7. 可否の確認と NVMe キャッシュのゲート
+### 7. NFS 転送サイズの既定値
+
+```bash
+./runbook.sh nfs-xfer-size show
+./runbook.sh nfs-xfer-size raise    # 1 MiB にする
+```
+
+**ONTAP の `tcp-max-xfer-size` は既定で 65536 で、これはサーバー側の上限である。** クライアントが
+`rsize=1048576` を要求しても **65536 で成立し、マウントは成功する。** 実測した内容は次のとおり。
+
+```text
+# 要求: rsize=1048576,wsize=1048576
+# 実効:
+... vers=4.1,rsize=65536,wsize=65536,...
+```
+
+**Amazon EFS は 1 MiB を許可する。** したがって双方を既定値のまま測ると、**64 KiB の転送と 1 MiB の
+転送を比べていることになり、その差が製品の差として記録される。** 引き上げ後は実効値が
+`rsize=1048576,wsize=1048576` になった。
+
+**変更後はクライアントを再マウントし、実効オプションを読み直す。** 要求値ではなく実効値を記録する。
+
+### 8. 可否の確認と NVMe キャッシュのゲート
 
 ```bash
 ./runbook.sh preflight
@@ -358,7 +380,7 @@ system node external-cache show          # 両ノードが false になったこ
 キャッシュを無効化すると、超えるべきはインメモリキャッシュだけになる。2,048 MBps と
 6,144 MBps のどちらも 256 GB なので、**一度に 512 GB 以上を読む。**
 
-### 8. EFS — 2 つのモード
+### 9. EFS — 2 つのモード
 
 ```bash
 ./runbook.sh efs elastic       # 主要パターン。予約課金なし、$0.07/GB
@@ -377,7 +399,7 @@ Provisioned の 20 倍の上限を持つ。
 
 **別スタックにしてあるのは、Elastic 側に触らずにこれだけ消せるようにするためである。**
 
-### 9. 第一世代の引き上げ
+### 10. 第一世代の引き上げ
 
 ```bash
 ./runbook.sh raise-gen1   # 確認プロンプトあり
@@ -385,7 +407,7 @@ Provisioned の 20 倍の上限を持つ。
 
 **24 分かかった実測がある。** 測定の合間に上げ下げする運用にはしない。
 
-### 10. 測定
+### 11. 測定
 
 **先に `conf/auto_vdbench.conf` を用意する。** コマンドラインでは指定できない項目がここにあり、
 **測定内容を決めるのは主にこのファイルである。**
@@ -465,7 +487,7 @@ python3 ../../scripts/measure_s3_throughput.py --help
 **auto_vdbench は S3 API のワークロードを生成しない。** VDBENCH はマウントパスに対して動く。
 2 つの結果を同じ表に並べるときは、測定器が違うことを表に書く。
 
-### 11. 台数を増やす試験
+### 12. 台数を増やす試験
 
 クライアントは 8 台すべて作られる。**1 / 2 / 4 / 6 / 8 台の測定は、起動する台数を変えて行う。**
 同じホストが各段に参加するので、段ごとに別の集合を測ることにならない。
@@ -485,7 +507,7 @@ aws ec2 start-instances --instance-ids <ladder-2>            # 2 台
 ホスト名の解決は `add_hosts.sh` と `set_hostnames.sh`（auto_vdbench 付属）で揃える。
 クライアント間の SSH（22 番）はこの環境のセキュリティグループで既に開いている。
 
-### 12. 費用の確認
+### 13. 費用の確認
 
 ```bash
 ./runbook.sh costs
@@ -494,7 +516,7 @@ aws ec2 start-instances --instance-ids <ladder-2>            # 2 台
 **フェーズの合間に実行する。** いま何が課金されているかを一覧する。ディレクトリも一覧に入る。
 「止めたつもりだった」を防ぐため。
 
-### 13. 削除
+### 14. 削除
 
 ```bash
 ./teardown.sh
