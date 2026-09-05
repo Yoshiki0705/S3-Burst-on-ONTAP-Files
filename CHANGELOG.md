@@ -38,6 +38,14 @@ from what was known.
 
 ### Changed
 
+- **The EFS mount-helper speedup is a quota tier, not more TCP flows.** The claim was recorded as
+  "the mechanism by which the helper exceeds the single-flow limit", with the ratio left unexplained.
+  Both halves were wrong in the same way: the plain mount stops at a **documented per-client quota**
+  ([Amazon EFS quotas](https://docs.aws.amazon.com/efs/latest/ug/limits.html)), not at a flow limit,
+  and the measured **2.97×** matches **1,500 ÷ 500 = 3.0**, not the five flows counted on the wire.
+  The helper raises which quota applies; the flow count does not set the bandwidth. A reader who
+  designed against the earlier wording would expect more flows to buy more throughput, so this is a
+  correction rather than an addition. The measurement it rests on did not change.
 - **Azure moved from "planned" to Preview across every statement that asserted otherwise.** AWS added
   Azure to AWS Interconnect – multicloud in 2026-08 with four pairs (us-east-1, us-west-1,
   eu-central-1, ap-southeast-2), and the product page now reads "Microsoft Azure (Preview)".
