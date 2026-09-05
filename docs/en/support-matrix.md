@@ -99,6 +99,45 @@ is treated as something to verify.
 | Deletion order | Do not delete the origin side while a cache still exists. Releasing the cache and the SVM peer comes before removing the peering |
 | Writes on the cache side | Not addressed here. Writes are consolidated on the origin-side S3 Access Point |
 
+### Features available on the Origin but not on the Cache
+
+**NetApp publishes origin-side and cache-side support in one table**
+([Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)).
+**This architecture puts reads on the cache, so the rows where the cache reads "No" are the
+design constraints.**
+
+| Feature | Origin | Cache | Effect here |
+|---|---|---|---|
+| FabricPool tiering | Supported | **the cache itself cannot be tiered** (creating a cache for a tiered origin is supported from 9.7) | **Cache capacity sits entirely on the performance tier.** Tiering cannot make a large cache cheap |
+| Snapshots | Supported | **No** | No local recovery point on the cache |
+| SnapRestore | Supported | **No** | Nothing to roll back to on the cache |
+| Volume cloning (FlexClone) | Supported (9.6 and later) | **No** | No derived copies from the cache |
+| Tamperproof snapshots | Supported | **No** | Tamper-proof retention on the origin only |
+| SnapLock | No | No | Unavailable on either side |
+| Quotas and qtrees | Supported | **No** | Per-tenant capacity control belongs to the origin |
+| Asynchronous SnapMirror | Supported | **No** | A cache cannot be a replication source |
+| ONTAP S3 NAS bucket | Supported (9.12.1 and later) | Supported (**9.18.1** and later) | The duality version floor. **Not used in this architecture** (below) |
+| FPolicy | Supported (9.7 and later) | Supported (NFS 9.7, **SMB 9.14.1** and later) | FPolicy for SMB consumers raises the version floor |
+| SMB Change Notify | Supported | Supported (**9.14.1** and later) | As above |
+| Auditing | Supported (9.7 and later) | Supported (9.7 and later) | Cache-side access can be audited |
+| File-level QoS | — | **No** | No per-file QoS on the cache |
+| Thin provisioning | Supported | Supported (9.7 and later) | A cache is sparse, so this is the default shape |
+| Compression / deduplication / compaction | Supported | Supported | Effective on the cache too |
+
+**Two things follow.**
+
+1. **Data protection can only live at the origin.** Snapshots, SnapRestore, cloning, tamperproof
+   snapshots and SnapMirror are all unsupported on the cache, so **the only available design is
+   "if the cache is lost, refill it from the origin".** Do not treat a cache as a recovery unit.
+2. **Cache capacity cannot be made cheap by tiering.** Because a cache cannot be tiered,
+   [the "at least 10 percent of the origin" sizing guidance](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html)
+   is the only mechanism that keeps it small. **Do not estimate on the basis of holding a
+   full-size cache cheaply.**
+
+> **Do not use the `ONTAP S3 NAS bucket` row as evidence about S3 Access Points.** They are
+> separate mechanisms and this architecture uses neither on the cache side. The distinction is in
+> [Object access on ONTAP](reference/glossary/object-access-on-ontap.md).
+
 ## Related documents
 
 | Document | Contents |

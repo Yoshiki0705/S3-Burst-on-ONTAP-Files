@@ -94,6 +94,43 @@ FSx for ONTAP を Origin として使えるかは
 | 削除順序 | Cache を残したまま Origin 側を削除しない。ピアリングの削除は Cache と SVM ピアの解除が先 |
 | Cache 側の書き込み | この構成では扱わない。書き込みは Origin 側の S3 Access Point に集約する |
 
+### Origin では使えて Cache では使えない機能
+
+**NetApp は Origin 側と Cache 側の対応可否を 1 つの表にまとめている**
+（[Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)）。
+**この構成は読み取りを Cache に寄せるので、Cache 側が「No」の行が設計上の制約になる。**
+
+| 機能 | Origin | Cache | この構成への影響 |
+|---|---|---|---|
+| FabricPool 階層化 | 対応 | **Cache 自体は階層化できない**（Cache 作成自体は 9.7 以降で可） | **Cache の容量はすべて性能層に載る。** 階層化で Cache を安く大きくすることはできない |
+| Snapshot | 対応 | **不可** | Cache 側にローカルの復旧点を持てない |
+| SnapRestore | 対応 | **不可** | Cache 側で巻き戻せない |
+| ボリュームクローン（FlexClone） | 対応（9.6 以降） | **不可** | Cache からの派生コピーを作れない |
+| Tamperproof snapshot | 対応 | **不可** | 改ざん防止の保持は Origin 側でのみ |
+| SnapLock | 不可 | 不可 | どちらの側でも使えない |
+| Quota / qtree | 対応 | **不可** | テナント別の容量制御は Origin 側で行う |
+| SnapMirror 非同期 | 対応 | **不可** | Cache を複製元にできない |
+| ONTAP S3 NAS バケット | 対応（9.12.1 以降） | 対応（**9.18.1 以降**） | duality の対応バージョン。**この構成では使わない**（下） |
+| FPolicy | 対応（9.7 以降） | 対応（NFS 9.7、**SMB 9.14.1** 以降） | SMB 利用側で FPolicy を使うならバージョン下限が上がる |
+| SMB Change Notify | 対応 | 対応（**9.14.1** 以降） | 同上 |
+| 監査 | 対応（9.7 以降） | 対応（9.7 以降） | Cache 側のアクセスも監査できる |
+| ファイル単位の QoS | — | **不可** | Cache 側で個別ファイルに QoS をかけられない |
+| Thin provisioning | 対応 | 対応（9.7 以降） | Cache は疎なので既定でこの形になる |
+| 圧縮 / 重複排除 / コンパクション | 対応 | 対応 | Cache 側でも効く |
+
+**要点は 2 つである。**
+
+1. **データ保護は Origin 側にしか置けない。** Snapshot・SnapRestore・クローン・
+   tamperproof snapshot・SnapMirror がすべて Cache 側で不可なので、**「Cache が消えても
+   Origin から再充填すればよい」という設計にしかできない。** Cache を復旧単位として扱わない。
+2. **Cache の容量は階層化で安くできない。** Cache 自体が階層化できないため、
+   [サイジング指針の「Origin の最低 10%」](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html)
+   が容量を抑える唯一の仕組みになる。**全量分の Cache を安く置く前提で見積もらない。**
+
+> **`ONTAP S3 NAS バケット` の行を、S3 Access Point の根拠に使わないこと。** 2 つは別の機構で、
+> この構成はどちらも Cache 側では使わない。区別は
+> [ONTAP 上のオブジェクトアクセス](reference/glossary/object-access-on-ontap.md)にある。
+
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |

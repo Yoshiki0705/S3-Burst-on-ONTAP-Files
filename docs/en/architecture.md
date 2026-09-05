@@ -136,6 +136,42 @@ accounts for half the value of considering this architecture.
 | Writing to the Cache side is faster | FlexCache can take writes, but this architecture confines the Cache to reads and consolidates writes on the Origin-side S3 Access Point |
 | Billing works the same way as an S3 bucket | It does not. On top of SSD capacity, the capacity pool, SSD IOPS, throughput capacity and backups, **requests and data transfer through the S3 Access Point are charged as well** ([FSx for ONTAP pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/)). The dimensions are mapped in [FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md) |
 | The procedure is the same on any platform | It is not. Supported configurations and minimum versions differ ([Portability](portability.md)) |
+| The Cache side has the same features as the Origin | It does not. **Snapshots, SnapRestore, cloning, SnapMirror and quotas are all unsupported on a FlexCache volume**, and **the cache itself cannot be tiered** ([supported and unsupported features](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)). The two consequences below decide the design |
+| Tiering keeps a large Cache cheap | It does not. **A FlexCache volume cannot be tiered**, so its capacity sits entirely on the performance tier |
+
+### The Cache side is not a recovery unit
+
+**What is unsupported on the cache decides how this architecture recovers.**
+[Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)
+lists **snapshots, SnapRestore, volume cloning, tamperproof snapshots and asynchronous
+SnapMirror as unsupported on a FlexCache volume.** The row-by-row list is in the
+[support matrix](support-matrix.md).
+
+**That leaves exactly one design.**
+
+| Decision | The answer here |
+|---|---|
+| Recovering a broken cache | **Refill it from the origin.** There is no way to hold a recovery point on the cache |
+| What gets backed up | **The origin volume only.** The cache is not counted as a backup target |
+| Tamper-proof retention | Considered on the origin side only |
+| Per-tenant capacity control | Origin-side quotas and qtrees. **Neither can be set on the cache** |
+
+**This is a constraint, not a defect.** The cache is a sparse read-side replica and the
+authoritative data is at the origin. **Counting the cache as "another copy" means counting
+something unprotected as protected.**
+
+### Cache capacity cannot be lowered by tiering
+
+**A cache can be created for an origin that has FabricPool tiering enabled** (ONTAP 9.7 and
+later). **The FlexCache volume itself, however, cannot be tiered** — same table.
+
+**So cache capacity sits entirely on the performance tier.** What keeps it small is not tiering
+but the fact that a cache is sparse. The
+[sizing guidance](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html) gives
+**at least 10 percent of the origin** as the best practice, and that is what an estimate rests on.
+
+**"Hold everything on the cache side and let tiering make the cold part cheap" does not work.**
+An estimate built on it accumulates performance-tier capacity once per consuming site.
 
 ## Representative use cases
 

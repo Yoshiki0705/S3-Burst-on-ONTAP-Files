@@ -129,6 +129,41 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 | Cache 側に書けば速い | FlexCache は書き込みを扱えるが、この構成は Cache を読み取り用途とし、書き込みを Origin 側の S3 Access Point に集約する |
 | S3 バケットと同じ料金体系になる | ならない。SSD 容量、キャパシティプール、SSD IOPS、スループットキャパシティ、バックアップに加えて、**S3 Access Point 経由のリクエストとデータ転送も課金される**（[FSx for ONTAP 料金](https://aws.amazon.com/fsx/netapp-ontap/pricing/)）。次元の対応は[FinOps の費用構造](reference/comparison/finops-s3-vs-s3ap.md) |
 | どのプラットフォームでも同じ手順 | 同じではない。対応構成と最小バージョンが異なる（[移植性](portability.md)） |
+| Cache 側でも Origin と同じ機能が使える | 使えない。**Snapshot・SnapRestore・クローン・SnapMirror・quota は Cache 側では非対応**で、**Cache 自体は階層化もできない**（[対応可否表](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)）。下の 2 点が設計に効く |
+| 階層化で Cache を安く大きくできる | できない。**Cache 自体を階層化できない**ので容量はすべて性能層に載る |
+
+### Cache 側は復旧単位にならない
+
+**Cache 側で使えない機能が、この構成の復旧設計を決めている。**
+[Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)
+によれば、**Snapshot・SnapRestore・ボリュームクローン・tamperproof snapshot・SnapMirror
+非同期は、いずれも Cache 側では非対応**である。行ごとの一覧は[対応状況](support-matrix.md)にある。
+
+**したがって取れる設計は 1 つに絞られる。**
+
+| 決めること | この構成での答え |
+|---|---|
+| Cache が壊れたときの復旧 | **Origin から再充填する。** Cache 側に復旧点を置く手段がない |
+| バックアップの対象 | **Origin ボリュームのみ。** Cache をバックアップ対象に数えない |
+| 改ざん防止の保持 | Origin 側でのみ検討する |
+| テナント別の容量制御 | Origin 側の quota / qtree で行う。**Cache 側では設定できない** |
+
+**これは制約であって欠陥ではない。** Cache は疎な読み取り用の複製で、真正のデータは Origin に
+ある。**Cache を「もう 1 つのコピー」として数えると、保護されていないものを保護済みと数える
+ことになる。**
+
+### Cache の容量は階層化で下げられない
+
+**FabricPool 階層化が有効な Origin に対して Cache を作ることはできる**（ONTAP 9.7 以降）。
+**ただし Cache ボリューム自体は階層化できない**（同じ対応可否表）。
+
+**つまり Cache の容量はすべて性能層に載る。** 容量を抑える仕組みは階層化ではなく、
+**Cache が疎であること**だけである。
+[サイジング指針](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html)は
+**Origin の最低 10%** を best practice としており、これが見積りの土台になる。
+
+**「Cache 側にも全量置いて、コールドは階層化で安くする」は成り立たない。**
+見積りでこれを前提にすると、配布先の拠点数だけ性能層の容量が積み上がる。
 
 ## 代表ユースケース
 
