@@ -332,7 +332,9 @@ deploy_windows() {
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
       "DirectoryId=$dir_id" "DirectoryName=$dir_name" "DirectoryDnsIpAddresses=$dns" \
-      "StagingBucketName=${STAGING_BUCKET:-}" "NamePrefix=$PREFIX" \
+      "StagingBucketName=${STAGING_BUCKET:-}" "BenchUserSecretArn=${BENCHUSER_SECRET_ARN:-}" \
+      "AdAdminSecretArn=${AD_SECRET_ARN:-}" \
+      "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
   printf 'WindowsInstanceId=%s\n' "$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
 
