@@ -162,7 +162,8 @@ SMB 4 チャネルで 63〜65%。**接続を 4 倍にしても 4 KiB は 1.5〜1
 
 **素のマウントは読みも書きも正確に 500 MB/s で張り付いた。** 499.79 と 499.75 である。
 **読み書きが対称に同じ値になるのは、帯域の詰まりではなくクライアント単位のレート制限の形**である
-（EFS Elastic のファイルシステム上限は読み 61,440 / 書き 5,120 MiBps と非対称）。FSx for ONTAP の
+（EFS Elastic のファイルシステム上限は読み 61,440 / 書き 5,120 MiBps と非対称。
+[Amazon EFS quotas](https://docs.aws.amazon.com/efs/latest/ug/limits.html)）。FSx for ONTAP の
 単一接続側は 591.6 / 590.3 / 587.4 と揺れており、こちらは詰まりの形をしている。
 
 **マウントヘルパーは一律に速いわけではない。** 大きな逐次読みでは 3 倍だが、書き込みは 1.7 倍、
@@ -287,8 +288,11 @@ Multichannel はサーバー側の設定**で、どちらも既定では単一�
 | SVM の IP 宛て確立済み TCP | **4 本**（`Get-NetTCPConnection`） |
 
 **NIC が 1 枚でもチャネルは 4 本張れた。** RSS 対応 NIC が 1 枚あれば Windows は複数チャネルを
-張るので、「複数 NIC がないと Multichannel は効かない」は当てはまらない。ただし **上限は 4 で、
-`max_connections_per_session` の 32 でも `nconnect` の 16 でもない。**
+張るので、「複数 NIC がないと Multichannel は効かない」は当てはまらない。ただし
+**このクライアントで観測したチャネル数は 4 であり、`max_connections_per_session` の 32 でも
+`nconnect` の 16 でもなかった。** 4 が製品の上限なのか、この NIC・この OS・この構成で
+そうなったのかは**確認していない**（`CurrentChannels` と `MaxChannels` がともに 4 と読めた、
+という観測である）。
 
 **チャネル数はアイドル時に減る。** 負荷をかけている間に読むこと。
 
