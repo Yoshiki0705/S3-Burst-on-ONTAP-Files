@@ -1,0 +1,60 @@
+**********************************************************************
+* Amazon EFS Elastic, 32 GiB test file. An isolation run, not a new
+* measurement.
+*
+* WHAT IT ISOLATES
+*
+* The mount helper was reported as roughly 3x on a plain mount:
+*
+*   Elastic,     300 GiB file, plain mount    499.79 MB/s
+*   Elastic,     300 GiB file, mount helper  1495.82 MB/s
+*
+* It did not reproduce on the provisioned file system:
+*
+*   Provisioned,  32 GiB file, plain mount    499.79 MB/s
+*   Provisioned,  32 GiB file, mount helper   498.61 MB/s
+*
+* Those two runs differ in **two** ways at once -- throughput mode and test
+* file size -- so the 3x claim was withdrawn rather than explained. The file
+* size differs because the provisioned file system bills $0.07 per GB written
+* and a 300 GiB file written single-threaded took 20 minutes; the smaller file
+* was a cost decision, and it cost the comparison instead.
+*
+* This run holds the mode at Elastic and moves the size to 32 GiB, which
+* leaves exactly one difference against the original Elastic pair:
+*
+*   if it reads ~1,495 MB/s -> the size was not what mattered, the mode was
+*   if it reads   ~500 MB/s -> the size was what mattered, not the mode
+*
+* Either answer is publishable. What is not publishable is the pair as it
+* stands.
+*
+* RUN DEFINITION IS IDENTICAL TO THE PROVISIONED FILE
+*
+* Deliberately byte-identical to vdbench-linux-efs-provisioned.txt in
+* everything except the path and the size, so a diff of the two files is the
+* complete list of differences between the two runs. Do not "tidy" one
+* without the other.
+*
+* USAGE -- run it twice, plain then helper, against the same file
+*
+*   mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard \
+*         <fs-id>.efs.<region>.amazonaws.com:/ /mnt/bench/efs
+*   ... run ...
+*   umount /mnt/bench/efs && mount -t efs -o tls <fs-id>:/ /mnt/bench/efs
+*   ... run again ...
+*
+* COST: EFS Elastic bills $0.07 per GB in both directions and there is no
+* hourly reservation. Writing the file is about $2.24; each read pass is
+* about $0.07 per GB read, so a 120-second run at 1,500 MB/s costs about $12.
+* Budget the reads, not the storage.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+sd=default,openflag=o_direct,size=32g
+sd=sd1-1,host=hd1,lun=/mnt/bench/efs/file1
+
+wd=wd_seq_read_1024k,sd=sd1-1,seekpct=.0,xfersize=1024k,rdpct=100
+
+rd=efs-32g-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
