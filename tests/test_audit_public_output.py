@@ -292,3 +292,41 @@ def test_the_category_list_and_its_regex_agree_in_both_directions() -> None:
         "every alternative except the 'all' sentinel needs a category -- an orphan alternative is a "
         "marker that suppresses nothing while looking like it does."
     )
+
+
+def test_coinages_are_rejected() -> None:
+    """Words this repository invented and used as if they were standard Japanese.
+
+    Every one of these reached a document and was found by a reader rather than by a check. `段`
+    had spread to 84 occurrences and was recorded in the glossary as the translation of "tier".
+    """
+    for line, word in (
+        ("### G — Amazon S3 は 8 台まで折れません", "折れません"),
+        ("### 使用率上昇時の書き込み崩落", "崩落"),
+        ("4 台で 4.22 倍だったラダーを 8 台まで伸ばしました", "ラダー"),
+        ("同一器具で 2 回測って 45% 違った", "器具"),
+        ("128 MBps 段で測った", "段"),
+        ("指定値ではなく段を上げる", "段を上げ"),
+        ("同じ天井に座っていた", "天井に座"),
+    ):
+        cats = categories(line)
+        assert "coinage" in cats, f"{word} in {line!r} was not reported"
+
+
+def test_ordinary_japanese_senses_of_the_same_characters_pass() -> None:
+    # 段 is a normal word outside the invented sense. Flagging these would push authors to mark
+    # whole files, which is how an allow marker stops meaning anything.
+    for line in (
+        "S3 Files が前段に置かれたバケット",
+        "S3 Standard のストレージ単価は使用量で段階が変わる",
+        "代替手段はポーリング",
+        "| ディレクトリ深さ | 1,000 段まで |",
+        "4 段の引用符を通る",
+        "指定値を上げる前に SSD IOPS を確認する",
+    ):
+        assert "coinage" not in categories(line), line
+
+
+def test_a_coinage_can_be_allowed_on_the_line() -> None:
+    # The rule that documents the coinage has to be able to quote it.
+    assert "coinage" not in categories("段を上げる <!-- allow:coinage -->")

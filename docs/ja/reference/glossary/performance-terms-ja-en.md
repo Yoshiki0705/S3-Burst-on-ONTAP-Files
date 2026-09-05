@@ -11,7 +11,7 @@
 
 | 日本語 | English | 指しているもの |
 |---|---|---|
-| 購入した段 / 購入した上限 | purchased tier / purchased ceiling | ファイルシステム作成時に選ぶ throughput capacity。共有され、読み手を増やしても増えない |
+| 購入した指定値 / 購入した上限 | purchased tier / purchased ceiling | ファイルシステム作成時に選ぶ throughput capacity。共有され、読み手を増やしても増えない |
 | throughput capacity | throughput capacity（訳さない） | AWS の設定項目名。日本語でもそのまま使う |
 | 弾性の上限 | elastic limit | 購入しない上限。クライアントを増やした分だけ伸びる |
 | ローカルプロキシの CPU 上限 | local proxy CPU limit | 同一ホストのプロセス（`efs-proxy` など）が先に飽和する形 |
@@ -35,7 +35,7 @@
 | 未検証 | unverified | 記載はあるが実機で追っていない |
 | 未確認 | unconfirmed | 公開ドキュメントに記載を見つけられていない |
 | 該当なし（機構が無い） | not applicable (no such mechanism) | **unmeasured と区別する** |
-| 段 | tier | throughput capacity の段階 |
+| 指定値 | tier | ファイルシステムに指定した throughput capacity の値。**「段」と書かない**（この文書での造語だった。一般的な日本語の技術用語ではない） |
 | 並列度 | concurrency | ストリーム数と区別する場合は stream count |
 | マウント実効オプション | effective mount options | 指定値ではなく実際に効いている値 |
 | 非圧縮データ | incompressible data | `/dev/urandom` 由来 |

@@ -96,7 +96,7 @@ TRANSLATIONS: dict[str, str] = {
     # --- the fixed floor -----------------------------------------------------------------------
     "### 固定費の下限": "### The floor",
     "S3 バケットに下限はない。1 バイトも置かなければ請求は発生しない。"
-    "FSx for ONTAP は SSD 1 TiB とスループットキャパシティ 1 段が最小構成で、"
+    "FSx for ONTAP は SSD 1 TiB とスループットキャパシティ 1 つが最小構成で、"
     "使用量に関わらずこの分が毎月かかる。": "An S3 bucket has no floor: store nothing and nothing is billed. "
     "The smallest FSx for ONTAP file system is 1 TiB of SSD and one throughput capacity step, "
     "and that much is billed every month whatever the usage.",
@@ -107,7 +107,7 @@ TRANSLATIONS: dict[str, str] = {
     "SSD 分": "SSD portion",
     "スループット分": "Throughput portion",
     "月額下限": "Monthly floor",
-    "第二世代の最小スループットは 384 MBps で、第一世代の 128 MBps より 3 段上にあたる。"
+    "第二世代の最小スループットは 384 MBps で、第一世代の 128 MBps より 3 つ上の指定値にあたる。"
     "第二世代を選ぶ理由は MBps あたりの単価ではなく、"
     "SSD 512 TiB、200,000 IOPS、Single-AZ で最大 12 HA ペアという上限の側にある"
     "([世代の比較]({url}))。"
@@ -184,7 +184,7 @@ TRANSLATIONS: dict[str, str] = {
     "平均所要スループット": "Average throughput required",
     "キャパシティプールへ落とす割合": "Fraction tiered to the capacity pool",
     "スループットの余裕": "Throughput headroom",
-    "平均所要の {multiple} 倍を満たす最小の段を選ぶ": "the smallest step that covers {multiple}x the average requirement",
+    "平均所要の {multiple} 倍を満たす最小の指定値を選ぶ": "the smallest step that covers {multiple}x the average requirement",
     "SSD のプロビジョニング余裕": "SSD provisioning headroom",
     "効率適用後の {share} 増し": "{share} above the post-efficiency figure",
     "着信面 (S3) の保持期間": "Retention in the S3 landing area (months)",

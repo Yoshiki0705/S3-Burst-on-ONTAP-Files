@@ -82,13 +82,47 @@ CATEGORIES = (
     "role-label",
     "conflation",
     "hype",
+    "coinage",
 )
 ALLOW = re.compile(
-    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|hype|all)"
+    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|hype|coinage|all)"
 )
 # Bounded so the trailing "-->" of the HTML comment is not swallowed into the category list.
 FILE_ALLOW = re.compile(r"audit-file-allow:\s*([a-z-]+(?:\s*,\s*[a-z-]+)*)")
 FILE_ALLOW_SCAN_LINES = 40
+
+# ---------------------------------------------------------------- coinage
+#
+# Words this repository invented and then used as if they were standard Japanese technical terms.
+# Each was pointed out by a reader, not caught by a check, and each had spread before it was: 段
+# reached 84 occurrences and was defined in the glossary as the translation of "tier", which is how a
+# coinage stops looking like one.
+#
+# The list is deliberately literal. A general "is this a coinage" test does not exist, so each entry
+# is a specific string with a specific replacement, and the legitimate senses of the same character
+# are left alone -- 前段, 段階, 手段, 1,000 段 (directory depth) are ordinary Japanese.
+COINAGE_RULES: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r"折れない|折れません|折れなかった|折れる位置"),
+        "a curve does not 折れる in Japanese; use 比例が崩れる / 比例しなくなる / 頭打ちになる",
+    ),
+    (re.compile(r"崩落"), "崩落 is a landslide; use 急落 or 低下"),
+    (re.compile(r"ラダー"), "use 台数を増やす試験 / 台数試験"),
+    (re.compile(r"同じ帯"), "use 同じ範囲 / 同水準"),
+    (
+        re.compile(r"同一器具|同じ器具|器具も"),
+        "器具 is laboratory glassware; use 測定ツール",
+    ),
+    (
+        re.compile(r"\d\s*MBps 段|段を上げ|段を下げ|段が上限|買った段|購入した段"),
+        "段 was this document's coinage for a throughput-capacity tier; use 指定値, "
+        "or 構成 for the file system at that value",
+    ),
+    (
+        re.compile(r"天井に座|ポートに乗って"),
+        "a calque; use 同じ上限で止まる / ポートを通る",
+    ),
+]
 
 # ---------------------------------------------------------------- naming
 
@@ -345,6 +379,10 @@ def audit_line(
         for pattern, message in HYPE_RULES:
             if pattern.search(line):
                 findings.append(("hype", message))
+    if "coinage" not in allowed:
+        for pattern, message in COINAGE_RULES:
+            if pattern.search(line):
+                findings.append(("coinage", message))
 
     if "pii" not in allowed:
         for pattern, message in PII_RULES:

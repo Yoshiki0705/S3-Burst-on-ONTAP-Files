@@ -15,6 +15,18 @@ from what was known.
 
 ### Added
 
+- **Seven words this repository invented were replaced with ordinary Japanese, and `make audit` now
+  rejects them** under a `coinage` category. A reader found them; no check did. `段`, used for a
+  throughput-capacity tier, had reached **84 occurrences and was recorded in the glossary as the
+  translation of "tier"** — once a coinage is in the glossary it stops looking like one, so the
+  glossary row was the actual fix. It is now `指定値` for the value and `構成` for the file system at
+  that value. Also replaced: `折れない` (a curve does not 折れる) → `比例が崩れない`, `崩落` → <!-- allow:coinage -->
+  `急落`, `ラダー` → `台数試験`, `同じ帯` → `同じ範囲`, `器具` → `測定ツール`, and the calques <!-- allow:coinage -->
+  `天井に座る` / `ポートに乗る`. <!-- allow:coinage -->
+  **The ordinary senses of the same characters are untouched** — `前段`, `段階`, `手段`, `1,000 段`
+  for directory depth, `4 段の引用符`. That distinction is why the rule is a list of literal strings
+  rather than a test for coinage in general, which does not exist. Two headings were renamed, so
+  their anchors moved and the inbound links moved with them.
 - **`make ja-headings` enforces the noun-phrase rule for Japanese section headings**, and **22
   headings across six documents were renamed to comply.** The rule had existed in prose only, and
   every one of those headings passed every other gate. The check skips what it should: `#` and
