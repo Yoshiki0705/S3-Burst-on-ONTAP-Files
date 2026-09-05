@@ -195,8 +195,14 @@ deploy_efs() {
       ;;
     provisioned)
       stack="$STACK_EFS_PROV"
-      params=("ThroughputMode=provisioned" "ProvisionedThroughputInMibps=3072")
-      log "EFS provisioned 3072 MiBps: $stack (about \$30.30/hour from CREATE_COMPLETE)"
+      # 1,024 MiB/s, not the 3,072 this asked for first. The account's limit is
+      # 1,024 and the stack fails at create with "exceeds the maximum limit
+      # 1024.000000 MiB/s" -- a Service Quotas value, so an account that has
+      # requested an increase may accept more. Raise it here only after
+      # confirming the quota, not on the assumption that a larger number works.
+      stack="$STACK_EFS_PROV"
+      params=("ThroughputMode=provisioned" "ProvisionedThroughputInMibps=${EFS_PROVISIONED_MIBPS:-1024}")
+      log "EFS provisioned ${EFS_PROVISIONED_MIBPS:-1024} MiBps: $stack (about \$9/hour at 1,024 from CREATE_COMPLETE)"
       cat <<'NOTE'
 This is the most expensive resource in the environment and it is wanted for one pattern only.
 Run that pattern, then './runbook.sh drop-efs-provisioned' immediately -- not at the end of the day.

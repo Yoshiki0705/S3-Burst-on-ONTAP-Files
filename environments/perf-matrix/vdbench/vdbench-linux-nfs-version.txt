@@ -1,0 +1,52 @@
+**********************************************************************
+* One shape, run once per NFS version. What differs between runs is the
+* `vers=` in the mount and nothing else.
+*
+* WHY ONLY ONE SHAPE
+*
+* Seven shapes per version would be about two hours of file system time for
+* a question that one shape answers: whether the version changes the
+* ceiling. 1 MiB sequential read is the shape the ceiling was established
+* with, so this point sits directly beside the main table.
+*
+* WHAT TO WATCH BESIDES THE THROUGHPUT
+*
+* AWS documents nconnect as supported on NFSv3 and NFSv4.1+ -- which leaves
+* NFSv4.0 out. EFS has already shown what "not supported" can look like from
+* the client side: the mount succeeds, the option appears in the effective
+* options, and then I/O stalls. So for each version, record:
+*
+*   1. whether the mount succeeds
+*   2. what `vers=` the *effective* options report, not what was asked for
+*   3. whether nconnect appears in the effective options
+*   4. how many TCP connections to port 2049 actually open under load
+*
+* Item 4 is the one that cannot be faked. A client can report nconnect=16
+* while holding one connection.
+*
+* REBOOT BETWEEN VERSIONS
+*
+* nconnect is cached per server on the client: a fresh request is silently
+* dropped while another mount of the same server exists, and an unmount
+* followed by a remount can still report the old value. Both were
+* reproduced on this client. A reboot is the only clearing step that was
+* confirmed to work, so each version starts from one.
+*
+* USAGE
+*
+*   mount -t nfs -o vers=<V>,nconnect=16,rsize=1048576,wsize=1048576,hard \
+*         <svm-nfs-endpoint>:/<volume> /mnt/bench/target
+*   findmnt -no OPTIONS /mnt/bench/target      # read this, not the command above
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-version.txt -o /opt/bench/out-vers-<V>
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/target/file1
+
+* 512 threads and a 300 second window, matching the main comparison table.
+wd=wd_seq_read_1024k,sd=sd1-1,seekpct=.0,xfersize=1024k,rdpct=100
+
+rd=version-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,warmup=60,elapsed=300,interval=1,threads=512

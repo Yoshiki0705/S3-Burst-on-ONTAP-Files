@@ -350,6 +350,43 @@ System.Net.Sockets.SocketException: ... failed because connected host has failed
 Get-DnsClientServerAddress           # コントローラのアドレスが出ること
 ```
 
+#### Systems Manager から Windows を駆動するときの 3 つの罠
+
+**どれも「コマンドは成功したのに結果が空」という形で出る。**
+
+| 事象 | 原因 | 対処 |
+|---|---|---|
+| `aws : The term 'aws' is not recognized` | この AMI に `aws.exe` が無い | **`AWSPowerShell` モジュールを使う**（`Get-SECSecretValue -SecretId … -Region …`）。入っている |
+| `java` が見つからない。マシン PATH には入っているのに | **SSM エージェントがエージェント起動時の環境を持っている。** あとから `setx` で足した PATH は子プロセスに伝わらない | コマンドの中で `$env:Path` に足してから `Start-Process` する |
+| `net use` が `System error 53`（ネットワークパスが見つからない） | JSON → SSM → PowerShell → `cmd` と 4 段の引用符を通るため、`\\host\share` のバックスラッシュ数が合わなくなる | **`New-SmbMapping` を使う。** パラメータ渡しなので入れ子の引用符が要らない |
+
+**シークレットの取得が失敗しても、その後のコマンドは走り続ける。** 上の 1 つ目では
+ユーザー名が空文字列になり、`New-SmbMapping` は
+`The specified username is invalid`（Windows System Error 2202）を返した。
+**空の値で組み立てられたコマンドのエラーメッセージは、原因を指さない。**
+
+#### SMB Multichannel を有効にしたあと
+
+**サーバー側で有効にしただけでは既存セッションのチャネルは増えない。**
+
+```powershell
+Get-SmbMapping -LocalPath 'S:' | Remove-SmbMapping -Force
+New-SmbMapping -LocalPath 'S:' -RemotePath '\\<netbios>.<domain>\<share>' `
+  -UserName '<DOMAIN>\<user>' -Password $pw -Persistent $false
+```
+
+**チャネル数は負荷をかけている間に読む。** アイドルでは減る。
+
+```powershell
+Get-SmbMultichannelConnection -IncludeNotSelected |
+  Where-Object ServerName -like '<netbios>*' |
+  Select-Object CurrentChannels, MaxChannels
+Get-NetTCPConnection -RemoteAddress <svm-data-lif> | Measure-Object   # 裏取り
+```
+
+**NIC 1 枚でも 4 本張れた。** RSS 対応 NIC が 1 枚あれば足りる。ただし
+**`max_connections_per_session` を 32 にしても `MaxChannels` は 4 だった。**
+
 ### 7. NFS 転送サイズの既定値
 
 ```bash
@@ -420,12 +457,25 @@ Provisioned の 20 倍の上限を持つ。
 予約レートのモードは 1 パターンだけ、別スタックで短時間だけ立てる。
 
 ```bash
-./runbook.sh efs provisioned          # 確認プロンプトあり。$30.30/時
+./runbook.sh efs provisioned          # 確認プロンプトあり。1,024 MiBps で約 $9/時
 # ... 1 パターンだけ測る ...
 ./runbook.sh drop-efs-provisioned     # すぐ消す。削除後に状態を読み直して表示する
 ```
 
 **別スタックにしてあるのは、Elastic 側に触らずにこれだけ消せるようにするためである。**
+
+**要求値は 1,024 MiB/s である。3,072 では作成が失敗した。**
+
+```text
+The requested provisioned throughput of 3072.000000 MiB/s
+exceeds the maximum limit 1024.000000 MiB/s
+```
+
+**Service Quotas の値なので、引き上げ済みの account では通る。** 通ると仮定して大きな値を
+書かない。上げるなら `EFS_PROVISIONED_MIBPS` で渡す。
+
+**テストファイルの作成時間を見積もりに入れる。** 単一スレッドの `dd`（`bs=1M`、`oflag=direct`）で
+**28.7 MB/s** しか出ず、32 GiB に 1,195 秒かかった。300 GiB を同じやり方で作ると 3 時間である。
 
 ### 10. 第一世代の引き上げ
 
@@ -517,23 +567,35 @@ python3 ../../scripts/measure_s3_throughput.py --help
 
 ### 12. 台数を増やす試験
 
-クライアントは 8 台すべて作られる。**1 / 2 / 4 / 6 / 8 台の測定は、起動する台数を変えて行う。**
-同じホストが各段に参加するので、段ごとに別の集合を測ることにならない。
-
-**インスタンスの起動と、`server_list` の更新の両方が必要である。** auto_vdbench は
-`server_list` に並んだホストへ負荷をかけるので、**起動しただけのホストは負荷を出さない。**
-逆に `server_list` に停止中のホストが残っていると測定が失敗する。
+**`ladder.sh` が受け持つ。** インスタンスはタグから見つけるので、ID を書き写さない。
 
 ```bash
-aws ec2 start-instances --instance-ids <ladder-1>            # 1 台
-# conf/auto_vdbench.conf の server_list を起動した 1 台だけにする
-aws ec2 start-instances --instance-ids <ladder-2>            # 2 台
-# server_list を 2 台に更新する
-# ...
+# 8 台を起動し、各台に VDBENCH と JDK を S3 経由で入れ、nconnect=16 でマウントしておく
+./ladder.sh mounts                 # 実効オプションと接続数を全台で確認する
+./ladder.sh run 1 2 4 6 8          # 同じファイルを全台が読む
+./ladder.sh disjoint 8             # 重ならない領域を各台に割り当てる
+./ladder.sh unmount && ./ladder.sh stop
 ```
 
-ホスト名の解決は `add_hosts.sh` と `set_hostnames.sh`（auto_vdbench 付属）で揃える。
-クライアント間の SSH（22 番）はこの環境のセキュリティグループで既に開いている。
+**`run` と `disjoint` の両方を実行する。片方だけでは誤読する。** 同じ 128 接続で、
+`run` は 11,916 MB/s、`disjoint` は 2,173 MB/s だった。**差はデータを共有しているかだけで、
+前者はキャッシュの上限、後者はディスクの上限を測っている。**
+
+**SSH mesh は組まない。** VDBENCH は 1 台から複数ホストを駆動できるが、そのためには全台へ
+root の公開鍵を置く必要があり、**外し忘れた鍵は測定値より寿命が長い。** 代わりに各台が
+自分の VDBENCH を走らせ、**共通のエポック時刻まで待ってから開始する。** 合算が成り立つのは
+定常窓が重なっているからで、SSM の配信ずれは待ち合わせと 60 秒のウォームアップが吸収する。
+
+**1 台あたりの負荷を固定し、台数だけを変える。** 総スレッド数を固定して台数で割ると、
+1 点ごとに 2 つが同時に変わり、頭打ちの原因がまた 2 つに戻る。
+
+**クライアント側の合計は証拠にならない。** `ladder.sh` は各点で ONTAP の物理ポートの累積
+カウンタ（`nic_common` の `transmit_bytes`）を 2 点サンプルして差分し、合計の隣に並べて出す。
+**同居する `transmit_bytes_per_sec` は流れている最中でも 0 を返したので使っていない。**
+
+**ウィンドウが揃っているかも見る。** `seekpct=eof` だと EOF 到達で早期終了し、`avg_61-224` と
+`avg_61-240` のように**窓の長さが点ごとに変わる。** 合算しても意味がないので、
+パラメータは `seekpct=.0` である。
 
 ### 13. 費用の確認
 

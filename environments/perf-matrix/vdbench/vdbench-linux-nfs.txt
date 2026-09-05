@@ -1,5 +1,7 @@
 **********************************************************************
-* UNEXECUTED DRAFT. The NFS side of the head-to-head pair.
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+*
+* The NFS side of the head-to-head pair.
 *
 * Run on the Linux client against a mounted FSx for ONTAP NFS export:
 *

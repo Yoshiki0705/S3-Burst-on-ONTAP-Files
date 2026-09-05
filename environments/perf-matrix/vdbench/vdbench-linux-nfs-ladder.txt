@@ -1,0 +1,75 @@
+**********************************************************************
+* The host-count run. One question only: does the total stop climbing?
+*
+* EXECUTED 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+* The LIF reading below was refuted: one LIF on one port carried 102 Gbps.
+* Read that file before reusing any number from this one.
+*
+* The single-host run reached 4,406 MB/s with nconnect=16 from one
+* c5n.9xlarge. Two readings fit that number equally well:
+*
+*   1. the file system is at its ceiling
+*   2. the one NFS data LIF the SVM has is at its ceiling
+*
+* Nothing in a single-host measurement separates them, because a single
+* host reaches the LIF and the file system through the same path. Adding
+* hosts separates them: more hosts arrive at the same LIF, so if the LIF
+* is the limit the total holds still while the per-host share falls.
+*
+* Run it as 1, 2, 4, 6 and 8 hosts. What changes between points is the
+* number of hosts and nothing else.
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-ladder.txt -o /opt/bench/out-ladder
+*
+* Started on every host at a shared wall-clock epoch, so the steady
+* windows overlap and the per-host figures can be summed. The
+* orchestrator passes the epoch; each host waits for it before starting.
+**********************************************************************
+* Per-host load is held constant and the host count varies. The
+* alternative -- fixing the total thread count and dividing it by the
+* host count -- makes each point differ in two ways at once, and a
+* plateau then has two candidate causes again.
+*
+* 64 threads over nconnect=16 on 8 vCPU. The single-host run used 512
+* threads on 36 vCPU, so this is the same order of oversubscription per
+* core. It is well above what one c5n.2xlarge can absorb, which is what
+* makes the per-host share a measurement of the server's allocation
+* rather than of the client's appetite.
+**********************************************************************
+hd=default,shell=ssh,jvms=8
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* Same file, same size, same flag as the single-host run, so this point
+* is comparable with it.
+*
+* Every host reads the same file. That is deliberate: it lets the
+* second-generation file system's in-memory read cache serve part of the
+* load, which takes SSD out of the picture and leaves the network path
+* as the thing being measured. Reading 600 GB -- more than twice the
+* 256 GB cache -- keeps it from becoming a cache-only measurement.
+*
+* Read-only, so sharing one file across hosts introduces no write
+* contention.
+**********************************************************************
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/target/file1
+
+**********************************************************************
+* 1 MiB sequential read, unthrottled. The one shape the single-host
+* ceiling was established with, so the two are directly comparable.
+*
+* 180 seconds of steady state after 60 of warmup. Shorter than the
+* single-host 300, because the point of interest here is the ratio
+* between host counts rather than a headline figure, and five host
+* counts at 300 seconds each is a long time to hold nine instances up.
+**********************************************************************
+* seekpct=.0 -- sequential, wrapping at the end of the file. NOT seekpct=eof,
+* which ends the run when the file is reached rather than when `elapsed` is up.
+* With eof the points came back as avg_61-224 and avg_61-230 instead of
+* avg_61-240, so the host count was no longer the only thing differing between
+* them: the window length differed too.
+wd=wd_seq_read_1024k,sd=sd1-1,xfersize=1024k,seekpct=.0,rdpct=100
+
+rd=ladder-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,elapsed=180,warmup=60,interval=1,threads=64

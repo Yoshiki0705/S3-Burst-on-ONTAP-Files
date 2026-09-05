@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # =================================================================================================
-# UNEXECUTED DRAFT. The Windows client, which is the only way an SMB case gets measured.
+# DEPLOYED AND TORN DOWN 2026-09-05. Results in docs/ja/verification/perf-matrix-results.md.
+# The Windows client, which is the only way an SMB case gets measured.
 #
 # It is a c5n.9xlarge, the same instance type as the Linux single-host client, for one reason: a
 # comparison between SMB and NFS is only a comparison if the client side of both is the same. Its
@@ -33,7 +34,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 # that has to be accepted by a person, so it is a manual step on the instance, recorded in the README.
 # =================================================================================================
 Description: >-
-  UNEXECUTED DRAFT. Windows measurement client for the SMB cases, joined to AWS Managed Microsoft AD
+  DEPLOYED AND TORN DOWN 2026-09-05. Windows measurement client for the SMB cases, joined to AWS Managed Microsoft AD
   through the AWS-JoinDirectoryServiceDomain document and reachable over AWS Systems Manager.
 
 Metadata:
