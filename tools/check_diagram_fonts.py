@@ -31,7 +31,10 @@ The second half is what stops the file becoming permanent: fixing a diagram forc
 there is no way to add a line without a reviewer seeing it.
 
 Nothing here is specific to one repository: paths are discovered rather than configured, so this file
-is copied between repositories unchanged.
+is copied between repositories as-is with **one line** adjusted -- the suppression on the parse call
+in `_parse()`. A repository whose ruff selects `S` needs `# noqa: S314` there; one that selects
+`RUF100` without `S` rejects the same comment as unused. The two cannot both be satisfied by one
+line, so the divergence is isolated to that function rather than left to spread.
 
 Run:  python3 tools/check_diagram_fonts.py
       python3 tools/check_diagram_fonts.py --selftest
@@ -124,12 +127,20 @@ def sizes(cell: ET.Element) -> list[float]:
     return found
 
 
+def _parse(text: str) -> ET.Element:
+    """Parse a committed .drawio from this repository -- never user-supplied data.
+
+    The whole function exists to hold one line. The suppression has to sit on the call itself: moved
+    to a line of its own, a formatter can shift it off the statement it applies to and the finding
+    comes back. And the exact comment differs per repository (see the module docstring), so keeping
+    it here means one known line to adjust instead of hunting for it.
+    """
+    return ET.fromstring(text)  # nosec B314
+
+
 def inspect(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
-    # The input is a committed .drawio from this repository, not user-supplied data. The suppression
-    # sits on the call line rather than above it: moved to its own line a formatter can shift it away
-    # from the statement it applies to, and bandit then reports the finding again.
-    root = ET.fromstring(text)  # nosec B314  our own generated file
+    root = _parse(text)
     for model in root.iter("mxGraphModel"):
         page_width = float(model.get("pageWidth") or PUBLICATION_WIDTH)
         width, origin = rendered_width(path, page_width)
