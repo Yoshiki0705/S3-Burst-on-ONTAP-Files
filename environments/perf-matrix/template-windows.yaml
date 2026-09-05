@@ -49,6 +49,8 @@ Metadata:
         Parameters: [InstanceType, LatestWindowsAmiId]
       - Label: {default: Staging}
         Parameters: [StagingBucketName]
+      - Label: {default: SMB measurement account}
+        Parameters: [BenchUserSecretArn, AdAdminSecretArn]
       - Label: {default: Naming}
         Parameters: [NamePrefix]
 
@@ -110,6 +112,22 @@ Parameters:
       By SSM parameter rather than a pinned id, so the stack does not carry an AMI that ages out of the
       Region. The SMB client is part of what is measured, so the OS build is recorded at measurement
       time instead of being fixed here.
+  AdAdminSecretArn:
+    Type: String
+    Default: ""
+    Description: >-
+      The directory's Admin secret. Needed because Systems Manager runs as SYSTEM, which is the machine
+      account, and a machine account cannot create a user in the directory -- `New-ADUser` returns
+      "Access is denied". The account below is therefore created with `-Credential`. Read-only, on this
+      one secret.
+  BenchUserSecretArn:
+    Type: String
+    Default: ""
+    Description: >-
+      Secret holding the credentials of a **non-privileged** domain account, created for the SMB runs
+      and read on this host rather than passed to it. A member of `Domain Admins` bypasses part of the
+      permission evaluation, so measuring as the directory's Admin account would not represent what a
+      normal client sees. Read-only, on this one secret. Leave empty to grant nothing.
   NamePrefix:
     Type: String
     Default: perfmatrix
@@ -118,6 +136,8 @@ Parameters:
 Conditions:
   MakeDsEndpoint: !Equals [!Ref CreateDirectoryServiceEndpoint, "true"]
   HasStagingBucket: !Not [!Equals [!Ref StagingBucketName, ""]]
+  HasBenchUserSecret: !Not [!Equals [!Ref BenchUserSecretArn, ""]]
+  HasAdAdminSecret: !Not [!Equals [!Ref AdAdminSecretArn, ""]]
 
 Resources:
   # About $0.014/hour. The cheapest resource here and the one without which the SMB case does not
@@ -196,6 +216,24 @@ Resources:
                 - Effect: Allow
                   Action: s3:ListBucket
                   Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasStagingBucket
+                - Effect: Allow
+                  Action: s3:PutObject
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/results/*"
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasBenchUserSecret
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref BenchUserSecretArn
+                - !Ref "AWS::NoValue"
+              - !If
+                - HasAdAdminSecret
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref AdAdminSecretArn
                 - !Ref "AWS::NoValue"
       Tags:
         - {Key: DeleteAfterMeasurement, Value: "true"}

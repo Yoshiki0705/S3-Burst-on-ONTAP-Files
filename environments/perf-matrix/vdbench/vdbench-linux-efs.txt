@@ -1,0 +1,46 @@
+**********************************************************************
+* UNEXECUTED DRAFT. Amazon EFS, from the same client as the FSx for ONTAP
+* runs.
+*
+*   vdbench -f vdbench-linux-efs.txt -o /opt/bench/report-efs
+*
+* **The mount is what this file is really about, and it cannot be made
+* identical to the FSx for ONTAP one.** Three differences, none of them
+* removable:
+*
+* 1. **No nconnect.** EFS does not support it. The FSx for ONTAP figures
+*    taken with nconnect=16 are therefore not comparable to anything here;
+*    the comparable run is the one taken *without* nconnect, and the
+*    report has to pair them that way. Measured without nconnect, any
+*    mount of anything lands near the single-connection ceiling and the
+*    storage behind it stops being visible.
+* 2. **Two mount paths, with different ceilings.** A plain `mount -t nfs`
+*    caps at 500 MiBps per client; the amazon-efs-utils helper
+*    (`mount -t efs -o tls`) raises that to 1,500 MiBps by putting a local
+*    proxy in the path. Those are two different measurements of the same
+*    file system, and both belong in the report, labelled.
+* 3. **File size.** 300 GB here against 600 GiB on FSx for ONTAP. The
+*    600 GiB was sized to exceed a 256 GB in-memory read cache that EFS
+*    does not have; and on a per-GB-accessed target, size is money.
+*
+* The workload set is reduced for cost -- see workloads-efs-core.txt. That
+* is a constraint, not a judgement, and it is stated next to every figure
+* taken with it.
+**********************************************************************
+
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost
+
+**********************************************************************
+* 300 GB. Smaller than the FSx for ONTAP file for two reasons stated
+* above. o_direct still bypasses the client page cache, which is what the
+* size would otherwise be protecting against.
+*
+* The mount point is deliberately not /mnt/bench/target: keeping EFS and
+* FSx for ONTAP on separate paths means a run cannot silently measure the
+* target that happened to be mounted last.
+**********************************************************************
+sd=default,openflag=o_direct,size=300g
+sd=sd1-1,host=hd1,lun=/mnt/bench/efs/file1
+
+include=workloads-efs-core.txt

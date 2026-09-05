@@ -131,9 +131,37 @@ aws s3 cp auto_vdbench.tar.gz "s3://$STAGING_BUCKET/tooling/"
 aws s3 sync wheels "s3://$STAGING_BUCKET/wheels/"
 ```
 
-**`kaleido` は 0.2.1 を明示する。** 1.x は静止画の書き出しに外部の Chrome を要求するので、
-インターネットに出られないホストでは PNG 出力が落ちる。0.2.1 は Chromium を同梱する。
-**落ちるのは PNG だけで、HTML と CSV は 1.x でも出る。**
+**`kaleido` と `plotly` は対で固定する。** `requirements.txt` の解決に任せると噛み合わない。
+
+| パッケージ | 固定する版 | 理由 |
+|---|---|---|
+| `plotly` | **5.24.1** | 6 以降は kaleido ≥1 を要求する |
+| `kaleido` | **0.2.1** | Chromium を同梱する。**1.x は実行時に外部 Chrome を取得しようとする** |
+
+**kaleido を 0.2.1 にするだけでは足りない。** plotly 7 が入ると
+`Image export requires the Kaleido package, v1.0.0 or greater` で PNG 出力が落ちる。
+**この 2 つは同時に指定する。**
+
+```bash
+pip download --only-binary=:all: \
+  --platform manylinux2014_x86_64 --python-version 3.11 --implementation cp --abi cp311 \
+  -d wheels 'plotly==5.24.1'
+```
+
+**numpy 2.x では auto_vdbench がレポート生成で落ちる。**
+
+```text
+AttributeError: module 'numpy' has no attribute 'RankWarning'
+```
+
+`np.RankWarning` は numpy 2 で `np.exceptions` へ移動した。**測定は完走したあとに落ちるので、
+VDBENCH の出力は残っている。** 例外を見て測定失敗と判断すると取れているデータを捨てることになる。
+両方の版で動く形へ置き換える。
+
+```bash
+sed -i "s/np\.RankWarning/getattr(np, 'RankWarning', np.exceptions.RankWarning)/" auto_vdbench.py
+python3.11 auto_vdbench.py create-report --report-dir <既存のレポート>   # 測り直さずに再生成できる
+```
 
 クライアント側（Session Manager 経由）:
 
