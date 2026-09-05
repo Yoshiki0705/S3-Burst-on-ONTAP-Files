@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-10T00:00:00.000Z" agent="build_diagrams.py" version="24.0.0" type="device">
+  <diagram id="s3burst-two-ceilings" name="s3burst-two-ceilings">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="880" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tc_fs" value="FSx for ONTAP ファイルサーバー" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=17;fontStyle=1;fontColor=#232F3E;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;spacingTop=4;dashed=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="800" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_cache" value="インメモリ + NVMe&#10;リードキャッシュ" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=none;fontColor=#232F3E;fontSize=16;verticalAlign=top;align=center;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="270" width="320" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_disk" value="SSD ストレージ&#10;(プロビジョンド IOPS)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=none;fontColor=#232F3E;fontSize=16;verticalAlign=top;align=center;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="270" width="320" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_cap_cache" value="上限: ネットワーク経路&#10;(領域が重なるほど近づく)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=none;fontColor=#232F3E;fontSize=16;verticalAlign=top;align=center;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="320" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_cap_disk" value="上限: ディスク経路&#10;(領域が重ならないほど近づく)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;fillColor=none;fontColor=#232F3E;fontSize=16;verticalAlign=top;align=center;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="400" width="320" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_users" value="NFS / SMB クライアント" style="sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;imageAspect=1;aspect=fixed;fontSize=16;fontColor=#232F3E;image=data:image/svg+xml,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iNDhweCIgaGVpZ2h0PSI0OHB4IiB2aWV3Qm94PSIwIDAgNDggNDgiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8dGl0bGU+SWNvbi1SZXNvdXJjZS9HZW5lcmFsLVJlc291cmNlL1Jlc19DbGllbnRfNDhfTGlnaHQ8L3RpdGxlPgogICAgPGcgaWQ9Ikljb24tUmVzb3VyY2UvR2VuZXJhbC1SZXNvdXJjZS9SZXNfQ2xpZW50XzQ4IiBzdHJva2U9Im5vbmUiIHN0cm9rZS13aWR0aD0iMSIgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj4KICAgICAgICA8cGF0aCBkPSJNNDIuMjk5LDM4Ljc3MyBMNDIuMjk5LDQwLjY5NiBDNDIuMjk5LDQxLjEzNCA0MS45NDUsNDEuNDkgNDEuNTA2LDQxLjQ5IEwzMC43NjIsNDEuNDkgQzMwLjMyMyw0MS40OSAyOS45NjgsNDEuMTM0IDI5Ljk2OCw0MC42OTYgTDI5Ljk2OCwzOC43NzMgQzI5Ljk2OCwzOC4zMzUgMzAuMzIzLDM3Ljk4IDMwLjc2MiwzNy45OCBMNDEuNTA2LDM3Ljk4IEM0MS45NDUsMzcuOTggNDIuMjk5LDM4LjMzNSA0Mi4yOTksMzguNzczIEw0Mi4yOTksMzguNzczIFogTTQzLjc5Nyw0Mi4zOTkgQzQzLjc5Nyw0Mi43NTQgNDMuNTA4LDQzLjA0NCA0My4xNTMsNDMuMDQ0IEw0LjY0NSw0My4wNDQgQzQuMjg5LDQzLjA0NCA0LDQyLjc1NCA0LDQyLjM5OSBMNCwzNy4wMTEgQzQsMzYuNjU2IDQuMjg5LDM2LjM2NyA0LjY0NSwzNi4zNjcgTDQzLjE1MywzNi4zNjcgQzQzLjUwOCwzNi4zNjcgNDMuNzk3LDM2LjY1NiA0My43OTcsMzcuMDExIEw0My43OTcsNDIuMzk5IFogTTQzLjE1MywzNC4zNjcgTDQuNjQ1LDM0LjM2NyBDMy4xODcsMzQuMzY3IDIsMzUuNTUzIDIsMzcuMDExIEwyLDQyLjM5OSBDMiw0My44NTcgMy4xODcsNDUuMDQ0IDQuNjQ1LDQ1LjA0NCBMNDMuMTUzLDQ1LjA0NCBDNDQuNjExLDQ1LjA0NCA0NS43OTcsNDMuODU3IDQ1Ljc5Nyw0Mi4zOTkgTDQ1Ljc5NywzNy4wMTEgQzQ1Ljc5NywzNS41NTMgNDQuNjExLDM0LjM2NyA0My4xNTMsMzQuMzY3IEw0My4xNTMsMzQuMzY3IFogTTcuNTAxLDI3LjIxIEw0MC4yNjQsMjcuMjEgTDQwLjI2NCw3LjUwMiBMNy41MDEsNy41MDIgTDcuNTAxLDI3LjIxIFogTTQwLjg0Miw1LjUwMiBMNi45MjQsNS41MDIgQzYuMTQsNS41MDIgNS41MDEsNi4xMzkgNS41MDEsNi45MjMgTDUuNTAxLDI3Ljc4OCBDNS41MDEsMjguNTcyIDYuMTQsMjkuMjEgNi45MjQsMjkuMjEgTDQwLjg0MiwyOS4yMSBDNDEuNjI2LDI5LjIxIDQyLjI2NCwyOC41NzIgNDIuMjY0LDI3Ljc4OCBMNDIuMjY0LDYuOTIzIEM0Mi4yNjQsNi4xMzkgNDEuNjI2LDUuNTAyIDQwLjg0Miw1LjUwMiBMNDAuODQyLDUuNTAyIFogTTQzLjc5NywzMC4wNjcgQzQzLjc5NywzMC40MjIgNDMuNTA4LDMwLjcxMSA0My4xNTMsMzAuNzExIEw0LjY0NSwzMC43MTEgQzQuMjg5LDMwLjcxMSA0LDMwLjQyMiA0LDMwLjA2NyBMNCw0LjY0NCBDNCw0LjI4OSA0LjI4OSw0IDQuNjQ1LDQgTDQzLjE1Myw0IEM0My41MDgsNCA0My43OTcsNC4yODkgNDMuNzk3LDQuNjQ0IEw0My43OTcsMzAuMDY3IFogTTQzLjE1MywyIEw0LjY0NSwyIEMzLjE4NywyIDIsMy4xODYgMiw0LjY0NCBMMiwzMC4wNjcgQzIsMzEuNTI1IDMuMTg3LDMyLjcxMSA0LjY0NSwzMi43MTEgTDQzLjE1MywzMi43MTEgQzQ0LjYxMSwzMi43MTEgNDUuNzk3LDMxLjUyNSA0NS43OTcsMzAuMDY3IEw0NS43OTcsNC42NDQgQzQ1Ljc5NywzLjE4NiA0NC42MTEsMiA0My4xNTMsMiBMNDMuMTUzLDIgWiIgaWQ9IkZpbGwtMyIgZmlsbD0iIzIzMkYzRCI+PC9wYXRoPgogICAgPC9nPgo8L3N2Zz4=;" vertex="1" parent="1">
+          <mxGeometry x="416" y="66" width="48" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_e_hit" value="キャッシュにある" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#232F3E;" edge="1" source="tc_users" target="tc_cache" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_e_miss" value="キャッシュに無い" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#232F3E;" edge="1" source="tc_users" target="tc_disk" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_e_cache_cap" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#232F3E;" edge="1" source="tc_cache" target="tc_cap_cache" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tc_e_disk_cap" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#232F3E;" edge="1" source="tc_disk" target="tc_cap_disk" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
