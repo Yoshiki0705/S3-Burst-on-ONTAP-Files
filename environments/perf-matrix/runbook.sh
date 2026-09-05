@@ -18,7 +18,7 @@
 #      setting has no effect on the number -- the single mistake that cost the most re-measurement.
 #   2. **The directory comes before the storage targets.** It takes 15 to 30 minutes to create. Doing
 #      it after would spend that wait with $53/hour of EFS and FSx for ONTAP sitting idle.
-#   3. **EFS Provisioned comes last and leaves first.** At $30.30/hour it is the most expensive line
+#   3. **EFS Provisioned comes last and leaves first.** At about $9/hour (1,024 MiBps, the account limit) it is still an unstoppable line
 #      here, it bills from CREATE_COMPLETE rather than from first mount, and it is wanted for exactly
 #      one pattern. It gets its own stack so that `drop-efs-provisioned` can remove it the moment that
 #      pattern is done, without touching anything else.
@@ -181,7 +181,7 @@ ad_ports() {
 # EFS twice over, because the two modes answer different questions and only one of them is affordable
 # to leave running. Elastic has the higher ceiling in ap-northeast-1 (60 GiBps read against 3 GiBps)
 # and bills per GB accessed; Provisioned is the reserved-rate mode, which is what compares like for
-# like against an FSx for ONTAP throughput capacity setting, and costs $30.30/hour to hold.
+# like against an FSx for ONTAP throughput capacity setting, and costs about $9/hour to hold at 1,024 MiBps.
 deploy_efs() {
   local mode="${1:-elastic}"
   local stack params
@@ -663,7 +663,7 @@ costs() {
     --output table
   cat <<'NOTE'
 Hourly, at ap-northeast-1 On-Demand prices read on 2026-09-04:
-  EFS provisioned 3072 MiBps   $30.30   delete to stop
+  EFS provisioned 1024 MiBps   ~$9      delete to stop
   gen2 6144 MBps + 200k IOPS   $23.03   delete, or lower the specified value
   gen1 2048 MBps + 80k IOPS    $ 4.90   each; lower the specified value
   c5n.9xlarge Linux            $ 2.45   stops when stopped
@@ -695,7 +695,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
   preflight              Print the support matrix and gate on the NVMe read cache being disabled
   efs elastic            Create the EFS target in elastic mode ($0.07/GB accessed, no hourly charge)
-  efs provisioned        Create a second EFS in provisioned mode at 3072 MiBps (~$30.30/hour)
+  efs provisioned        Create a second EFS in provisioned mode at 1024 MiBps (~$9/hour)
   drop-efs-provisioned   Delete that one, immediately after its single pattern
   costs                  Show what is billing right now
   teardown               Hand off to teardown.sh

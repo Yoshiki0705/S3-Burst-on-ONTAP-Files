@@ -30,12 +30,16 @@ Amazon EFS と FSx for ONTAP を、同じサブネットの同じクライアン
 |---|---|---|---|
 | [`perf-matrix/`](perf-matrix/) | 測定用: EFS、第二世代 FSx for ONTAP、クライアント 9 台。既存の第一世代は流用する | CloudFormation | [手順](perf-matrix/README.md) |
 
-**この環境は時間あたり約 $60 課金されます。** うち EFS Provisioned が $30.30、第二世代
-FSx for ONTAP が $22.66 で、**どちらも EC2 のように停止では止まりません。**
+**全部を同時に立てると時間あたり約 $46 課金されます**（[内訳](perf-matrix/README.md)）。うち第二世代
+FSx for ONTAP が $23.03、EFS Provisioned が約 $9（1,024 MiBps、このアカウントでプロビジョン
+できる上限）で、**どちらも EC2 のように停止では止まりません。**
 全パターンが終わったら `perf-matrix/teardown.sh` を実行し、最後の検証行を確認してください。
 
-**SMB はこの環境では測りません。** 既存 SVM が参加していたドメインコントローラが存在せず、
-先にディレクトリを立てる必要があるためです。理由は[手順](perf-matrix/README.md)にあります。
+**SMB もこの環境で測ります。** そのためにディレクトリを立て、AD に参加した SVM を作ります
+（既存 SVM が参加していたドメインコントローラが存在しないため）。理由は[手順](perf-matrix/README.md)にあります。
+
+**この環境は 2026-09-05 に立てて測り、削除済みです。** 結果は
+[プロトコル別測定の結果](../docs/ja/verification/perf-matrix-results.md)にあります。
 
 破棄はバージョニングのために順序が決まっています。`teardown.sh` を使ってください。
 バケットを空にせずに `delete-stack` すると、ファイルシステムを消し終えた状態で失敗します。
