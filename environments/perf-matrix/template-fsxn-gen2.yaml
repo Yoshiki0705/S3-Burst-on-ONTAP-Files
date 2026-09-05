@@ -248,6 +248,17 @@ Resources:
           Mode: USER_PROVISIONED
           Iops: !Ref ProvisionedSsdIops
         FsxAdminPassword: !Sub "{{resolve:secretsmanager:${FsxAdminPasswordSecretArn}:SecretString:password}}"
+        # 0, and this one is not a preference.
+        #
+        # The default is 30 days with a daily backup at a fixed time, and a backup takes an ONTAP
+        # snapshot. An overwrite-heavy run that crosses that time then cannot reclaim the blocks it
+        # overwrites, because the snapshot holds them: on this environment a run that started at
+        # 14:30 UTC met the 15:00 UTC backup, the volume went from 88% to 100% full, and write
+        # throughput fell from 2,200 MB/s to 267 MB/s before failing outright.
+        #
+        # Checking `snapshot-policy` and the snapshot count before starting does not catch it --
+        # both read clean, because the snapshot does not exist yet.
+        AutomaticBackupRetentionDays: 0
       Tags:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2"}
         - {Key: Purpose, Value: protocol-matrix-measurement}
@@ -291,6 +302,11 @@ Resources:
           # the disk path is being measured against, and the pool has its own latency profile.
           Name: NONE
         SnapshotPolicy: none
+        # A final backup is taken when a volume is deleted unless told not to, and that backup
+        # outlives the file system and bills for backup storage. A teardown that checks only for live
+        # resources reports success while leaving it behind -- which is what happened here, twice,
+        # with 900 GiB and 3,200 GiB volumes.
+        SkipFinalBackup: true
       Tags:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-vol"}
         - {Key: DeleteAfterMeasurement, Value: "true"}

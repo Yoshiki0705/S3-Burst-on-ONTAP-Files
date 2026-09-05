@@ -1,0 +1,128 @@
+**********************************************************************
+* The same seven shapes, with cache residency fixed by construction.
+*
+* WHY THIS FILE EXISTS
+*
+* The first pass at this table was not reproducible. Identical settings,
+* identical parameter file, identical instrument, measured twice:
+*
+*   1 MiB sequential read, nconnect=16, 512 threads   3,551.18 MB/s
+*   the same, hours later                             5,148.56 MB/s
+*
+* 45% apart, and the only thing that differed was what the file system had
+* in its read cache when the run started. That is larger than every protocol
+* and version difference this environment produced, so it is the variable
+* that has to be pinned before any of the others mean anything.
+*
+* THERE IS NO FLUSH
+*
+* FSx for ONTAP exposes exactly one cache control -- `system node
+* external-cache modify` for the NVMe layer, which this measurement disables
+* anyway. **The in-memory read cache cannot be flushed.** So residency has to
+* be controlled by the workload, not by a command before it.
+*
+* HOW IT IS CONTROLLED HERE
+*
+* Every shape reads its own region of one large file, and no two shapes share
+* a region. A shape therefore starts with the cache full of the *previous*
+* shape's region, which is disjoint from its own, so it begins at close to
+* zero residency every time regardless of what ran before.
+*
+* Two sizes decide whether that works.
+*
+*   1. A region must be larger than the cache. In-memory read cache on this
+*      configuration is 256 GB = 238 GiB. At 371 GiB per region, a shape that
+*      wrapped inside its region would still not find all of it resident.
+*   2. A region must be larger than what the window can consume, so it does
+*      not wrap at all. The fastest shape reaches about 2,300 MB/s -- the disk
+*      ceiling here -- and 150 seconds of that is 337 GiB, inside 371 GiB.
+*
+* ORDER MATTERS, AND SO DOES THE FILL
+*
+* The file is filled head to tail before measuring, which leaves the cache
+* holding the *tail*. So region 1 -- the head -- is measured first and starts
+* cold. Region 7 is measured last, by which point six intervening shapes have
+* displaced the tail many times over. Reversing the order would hand the first
+* shape a warm start and reintroduce exactly the variance this file removes.
+*
+* WHAT THIS TABLE IS AND IS NOT
+*
+* It is the **disk path**: reads that the cache cannot serve. It is therefore
+* lower than the shared-file figures, and it does not replace them -- those
+* measured the network path with the cache doing the work, which is also a
+* real thing a workload can experience. Publish both, labelled. A single
+* number for this file system does not exist.
+*
+* PRECONDITIONS, all read back before starting
+*
+*   - volume 3,200 GiB, file 2,600 GiB, snapshot policy `none`, no snapshots
+*   - storage efficiency disabled and space_savings.total = 0. Without this,
+*     the fill pattern could be reduced and the reads would not touch disk
+*   - NVMe read cache disabled on both nodes
+*   - nconnect=16 in the *effective* mount options
+*
+* USAGE
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-cachecontrolled.txt -o /opt/bench/out-cc
+*
+* The fill run is RD 1 and takes about 21 minutes at 2,000 MB/s. Skip it only
+* if the file already holds non-reducible data of the right size.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* One file, seven disjoint regions, plus sd_fill spanning the whole file.
+*
+* 100/7 = 14.2857 per cent each, which is 371 GiB of 2,600 GiB.
+**********************************************************************
+* `lun=` cannot go on sd=default -- VDBENCH rejects it with "You may not specify
+* the 'lun=' parameter for sd=default" -- so every SD names the file itself. The
+* shared attributes still come from sd=default.
+sd=default,openflag=o_direct,size=2600g,host=hd1
+
+sd=sd_fill,lun=/mnt/bench/target/file1
+sd=sd1,lun=/mnt/bench/target/file1,range=(0,14.2857)
+sd=sd2,lun=/mnt/bench/target/file1,range=(14.2857,28.5714)
+sd=sd3,lun=/mnt/bench/target/file1,range=(28.5714,42.8571)
+sd=sd4,lun=/mnt/bench/target/file1,range=(42.8571,57.1429)
+sd=sd5,lun=/mnt/bench/target/file1,range=(57.1429,71.4286)
+sd=sd6,lun=/mnt/bench/target/file1,range=(71.4286,85.7143)
+sd=sd7,lun=/mnt/bench/target/file1,range=(85.7143,100)
+
+**********************************************************************
+* Shapes. Identical to workloads-common.txt except that each is bound to its
+* own region rather than to `sd=*`, and the window is 30 + 120 rather than
+* 60 + 300 so that a region is not consumed.
+**********************************************************************
+* seekpct=eof on the fill, and only on the fill. It ends when the file has been
+* written once, which is the whole point: a time-bounded fill either stops short
+* -- leaving a sparse tail that reads back as zeros, which ONTAP returns without
+* going to disk -- or runs past the end and wraps to the head, which would leave
+* the head resident in cache and hand region 1 a warm start. Neither is
+* recoverable after the fact, because both look like a normal fill in the log.
+wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+wd=wd1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=100
+wd=wd2,sd=sd2,seekpct=.0,xfersize=64k,rdpct=100
+wd=wd3,sd=sd3,seekpct=.0,xfersize=1024k,rdpct=0
+wd=wd4,sd=sd4,seekpct=.0,xfersize=64k,rdpct=0
+wd=wd5,sd=sd5,seekpct=100,xfersize=4k,rdpct=100
+wd=wd6,sd=sd6,seekpct=100,xfersize=4k,rdpct=0
+wd=wd7,sd=sd7,seekpct=100,xfersize=64k,rdpct=100
+
+* The fill. Not a measurement -- its number is the write path with an empty
+* cache and it is reported so the fill rate is on the record, not so it is
+* quoted.
+* elapsed is a cap, not the duration: seekpct=eof ends the run. 2,600 GiB at the
+* measured 2,047 MB/s write rate is about 1,330 seconds, so 2,700 leaves room for
+* a slower fill without cutting one short.
+rd=cc-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=2700,interval=30,threads=512
+
+rd=cc-seq-read-1024k,wd=wd1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-read-64k,wd=wd2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-write-1024k,wd=wd3,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-write-64k,wd=wd4,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-read-4k,wd=wd5,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-write-4k,wd=wd6,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-read-64k,wd=wd7,iorate=max,warmup=30,elapsed=120,interval=1,threads=512

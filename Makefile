@@ -8,7 +8,7 @@ PY ?= python3
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors test all new-pattern \
-        diagrams diagrams-check \
+        diagrams diagrams-check diagram-fonts \
         terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
 
@@ -142,6 +142,11 @@ diagrams: ## Regenerate the diagrams and export SVG + PNG (needs the AWS icon pa
 
 diagrams-check: ## Confirm the committed diagrams match their spec (needs the AWS icon package)
 	@$(PY) tools/build_diagrams.py --check
+# Unlike the two above, this needs neither the icon package nor the draw.io CLI: it reads the
+# committed .drawio and .svg only. So it belongs in `all`, where the two above cannot go.
+diagram-fonts: ## Diagram labels must clear the readability floor (effective size and fontSize)
+	@$(PY) tools/check_diagram_fonts.py --selftest >/dev/null
+	@$(PY) tools/check_diagram_fonts.py
 
 # There is deliberately no `slides` target. The LT deck and its generator both live under
 # `.private/`, which is gitignored, because the generator contains the deck's text. A target
@@ -244,7 +249,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors audit secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts test ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)

@@ -134,6 +134,26 @@ else
   printf 'GEN1_FS_ID not set; skipping the step-down. If it was raised, it is still billing.\n'
 fi
 
+# Backups outlive the file system, and FSx makes one per volume on delete unless the volume says
+# otherwise. `SkipFinalBackup: true` in the templates prevents new ones; this step exists for stacks
+# created before that, and because an automatic daily backup can also have fired mid-run.
+#
+# They are named by volume rather than tagged, so the filter is the volume name prefix. Anything not
+# matching it belongs to somebody else in this account and is left alone.
+log "step 6.5 of 7: FSx backups, which survive the file system and bill for storage"
+backup_ids="$(aws fsx describe-backups --region "$REGION" \
+  --query "Backups[?starts_with(Volume.Name, '${PREFIX}')].BackupId" --output text 2>/dev/null)"
+if [[ -z "$backup_ids" ]]; then
+  printf 'no backups named %s*\n' "$PREFIX"
+else
+  for b in $backup_ids; do
+    printf 'deleting backup %s\n' "$b"
+    aws fsx delete-backup --region "$REGION" --backup-id "$b" --query Lifecycle --output text \
+      || warn "delete-backup failed for $b -- it is still billing"
+  done
+  sleep 20
+fi
+
 # The part that makes this a teardown rather than a delete attempt.
 log "verify"
 left_fsx="$(aws fsx describe-file-systems --region "$REGION" \
@@ -154,6 +174,9 @@ left_ec2="$(aws ec2 describe-instances --region "$REGION" \
 left_ad="$(aws ds describe-directories --region "$REGION" \
   --query 'DirectoryDescriptions[].DirectoryId' --output text 2>/dev/null)"
 
+left_backups="$(aws fsx describe-backups --region "$REGION" \
+  --query "Backups[?starts_with(Volume.Name, '${PREFIX}')].BackupId" --output text 2>/dev/null)"
+[[ -n "$left_backups" ]] && warn "FSx backups still present (they bill for storage): $left_backups"
 [[ -n "$left_fsx" ]] && warn "FSx for ONTAP still tagged for deletion: $left_fsx"
 [[ -n "$left_svm" ]] && warn "storage virtual machines still tagged for deletion: $left_svm"
 [[ -n "$left_ec2" ]] && warn "EC2 still tagged for deletion: $left_ec2"

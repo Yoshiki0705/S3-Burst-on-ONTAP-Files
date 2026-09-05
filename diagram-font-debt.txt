@@ -1,0 +1,25 @@
+# Diagrams below the readability floor. Read by tools/check_diagram_fonts.py.
+#
+# This file may only shrink. An unlisted violation fails the gate, and so does a listed file
+# that now meets the floor -- which is what forces a line out when a diagram is fixed. Adding a
+# line is possible but never quiet: it lands in the diff beside the diagram that needed it.
+#
+# All of these predate the gate. Authored at fontSize 11 and 12 on canvases between 1180 and
+# 1550px, so a reader's 880px column receives them at roughly 6.5 to 9px.
+#
+# Fixing them needs one decision that is not a layout decision: whether each figure's in-image
+# notes box moves into the surrounding prose. Kept in the figure, its longest line dictates the
+# canvas width, and a wider canvas raises the required font again (1488px -> 24). Moved out, what
+# remains is relayout: fold labels to two lines, narrow the canvas toward 880px, stack vertically.
+#
+# Standard: ~/.kiro/steering/global-document-readability.md
+docs/_assets/diagrams/s3burst-architecture-overview-en.drawio
+docs/_assets/diagrams/s3burst-architecture-overview.drawio
+docs/_assets/diagrams/s3burst-cross-cloud-connectivity-en.drawio
+docs/_assets/diagrams/s3burst-cross-cloud-connectivity.drawio
+docs/_assets/diagrams/s3burst-protocol-test-matrix-en.drawio
+docs/_assets/diagrams/s3burst-protocol-test-matrix.drawio
+docs/_assets/diagrams/s3burst-single-site-options-en.drawio
+docs/_assets/diagrams/s3burst-single-site-options.drawio
+docs/_assets/diagrams/s3burst-throughput-bottlenecks-en.drawio
+docs/_assets/diagrams/s3burst-throughput-bottlenecks.drawio

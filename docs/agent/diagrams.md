@@ -105,3 +105,50 @@ edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeCol
 
 The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,
 a minimal Python script that generates the XML is enough — see `docs/_assets/diagrams/`.
+
+## Label size — the floor is what a reader sees, not the attribute
+
+`make diagram-fonts` enforces this and is part of `make all`. The numbers live in
+`tools/check_diagram_fonts.py`; the standard shared with the sibling repositories is
+`~/.kiro/steering/global-document-readability.md`.
+
+A label is displayed at the size it has **after** the image is scaled down to fit the column it sits
+in, so a wider canvas makes every label smaller. Two floors, both required:
+
+| Floor | Value | What it stops |
+|---|---|---|
+| Effective size — `fontSize × min(1, 880 / rendered width)` | **≥ 14px** | A label legible in the editor and not on the page |
+| Source `fontSize` | **≥ 16px** | Meeting the first floor by shrinking the canvas rather than growing the text |
+
+880px is the reader's column on GitHub, dev.to and hatenablog. The rendered width comes from the
+exported SVG when one exists, not from `pageWidth`: draw.io crops to content and adds `--border`, so
+the two differ.
+
+| Canvas width | Required `fontSize` |
+|---|---|
+| ≤ 880px | 16 |
+| 1180px | 19 |
+| 1400px | 23 |
+| 1550px | 25 |
+
+**Widening the canvas raises the floor**, so empty canvas is not free. When a compliant label stops
+fitting, work down this list — shrinking the font is not on it.
+
+1. Fold the label to two lines (two-line maximum; never break mid-word).
+2. Move the notes box out of the figure and into body prose as a table. Figure annotations are the
+   densest text in any diagram and the least suited to being an image: prose is searchable,
+   translatable and reachable by a screen reader, and it stops the same measured figure being kept
+   in step by hand in two places.
+3. Narrow the canvas toward 880px and stack elements vertically. Height does not compete for width.
+4. Split the figure.
+5. Abstract — collapse individual resources into the role they play.
+
+### Existing debt
+
+The figures listed in `diagram-font-debt.txt` predate the gate and do not meet the floor. **The file
+may only shrink**: an unlisted violation fails, and so does a listed file that now meets the floor,
+so fixing a diagram forces its line out.
+
+Fixing them needs one decision that is not a layout decision — whether each figure's in-image notes
+box moves into the surrounding prose. Kept in the figure, its longest line dictates the canvas width,
+and a wider canvas raises the required font again. Moved out, what remains is relayout.

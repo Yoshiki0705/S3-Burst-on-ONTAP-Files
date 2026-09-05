@@ -72,6 +72,12 @@ jobs:
       - name: Check internal links
         run: python3 tools/check_links.py
 
+      - name: Check diagram label size
+        # The selftest runs first: a gate that has never been seen to fail is not evidence that it
+        # can still detect anything.
+        run: |
+          python3 tools/check_diagram_fonts.py --selftest
+          python3 tools/check_diagram_fonts.py
       - name: Check derived counts
         run: python3 tools/check_derived_counts.py
       - name: Check pattern status words
