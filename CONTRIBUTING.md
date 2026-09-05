@@ -103,6 +103,33 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 設計した人には、どの主張が動いたかが要るためです。下げたほうがより重要で、「もう依拠しないで
 ください」という通知になります。
 
+#### 「できない」と書く前に開くページ
+
+**この 1 節は実際の失敗から来ています。** 「FlexCache の Cache ボリュームは階層化できない」の
+出典が見つからないと書き、公開記事の訂正一覧に載せました。**出典はありました。**
+`FlexCache FabricPool tiering not supported` のような語で検索し、返ってきたサイジングと概要の
+ページを読んで打ち切っており、**その製品の「対応・非対応の一覧」ページを開いていませんでした。**
+
+**検索語を工夫する前に、種類に応じて次を開きます。** どれも索引ページで、答えは表の 1 行です。
+
+| 書こうとしている主張 | 先に開くページ |
+|---|---|
+| ONTAP の機能が Origin / Cache で使えるか | [FlexCache の対応・非対応一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html) |
+| ONTAP のコマンドが存在するか | [ONTAP CLI コマンドリファレンス](https://docs.netapp.com/us-en/ontap-cli/) |
+| S3 API のどの操作が通るか | [Access point compatibility](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) |
+| AWS サービスの上限と引き上げ可否 | そのサービスの Quotas ページ（例: [EFS quotas](https://docs.aws.amazon.com/efs/latest/ug/limits.html)） |
+| CloudFormation にそのプロパティがあるか | そのリソースのプロパティリファレンス |
+| ONTAP の容量・性能の内訳 | [NetApp KB](https://kb.netapp.com/) を「一覧」で引く |
+
+**「出典が見つからない」と書くときは、開いたページを併記します。** 何を見て見つからなかったかが
+無いと、読者は「存在しない」と読みます。**存在しないことと、見つけられなかったことは違います。**
+
+> **この規則は検査に入れていません。入れようとして、入らないことを測りました。**
+> 能力の否定と数値上限を出典の有無で見る検査は **167 件**、単位つき数値に絞ると **868 件**
+> 当たります。測定記録は数値が密で、出典は行の近傍ではなく表のキャプションや測定条件の節に
+> あるためです。窓を広げれば通りますが、それは検査を無意味にするだけです。
+> 経緯は[検査に入っている規約](docs/agent/policy-in-code.md)にあります。
+
 ### 比較を書くとき
 
 各方式の**適用外条件を同じ粒度で**書きます。この構成自身の適用外条件も同じ列に書きます。
