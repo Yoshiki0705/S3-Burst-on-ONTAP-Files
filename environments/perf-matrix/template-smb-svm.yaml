@@ -109,10 +109,8 @@ Resources:
           # None, for the same reason as the NFS volume: data moving to the capacity pool part-way
           # through a run would change what the read is being served from.
           Name: NONE
-        # Set explicitly for the same reason as the NFS volume: the documented default for a volume
-        # delete could not be found, backups survive the file system and bill, and a teardown that
-        # looks only for live resources does not see them.
-        SkipFinalBackup: true
+        # No SkipFinalBackup here either: it belongs to the DeleteVolume API, not to this resource.
+        # The final backup is removed by teardown.sh after the fact. See the NFS volume for why.
         SnapshotPolicy: none
       Tags:
         - {Key: Name, Value: !Sub "${NamePrefix}-smb-vol"}

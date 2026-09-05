@@ -78,7 +78,7 @@ cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is
 	@if ! command -v cfn-lint >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
-		if ! found=$$(find patterns environments \( -name template.yaml -o -path '*/examples/*.yaml' \) -print); then \
+		if ! found=$$(find patterns environments \( -name 'template*.yaml' -o -path '*/examples/*.yaml' \) -print); then \
 			echo "cfn: the scan of patterns/ and environments/ failed, so this is not a report"; \
 			echo "     that there are no templates. Its own error is above."; \
 			exit 1; \
