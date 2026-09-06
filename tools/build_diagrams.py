@@ -289,6 +289,36 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "上限: ディスク経路\n(領域が重ならないほど近づく)",
         "en": "Ceiling: disk path\n(approached as regions diverge)",
     },
+    # The host-count run. No figure carries a measured number: a number needs the date, the
+    # version, the object size and the concurrency beside it to mean anything, and a label has room
+    # for none of that. The tables in the verification record hold the figures.
+    "hc_clients": {
+        "ja": "SMB クライアント 8 台\n(1 台あたり 64 スレッド固定)",
+        "en": "8 SMB clients\n(64 threads each, held constant)",
+    },
+    "hc_host_first": {"ja": "1 台目", "en": "host 1"},
+    "hc_host_second": {"ja": "2 台目", "en": "host 2"},
+    "hc_host_last": {"ja": "8 台目", "en": "host 8"},
+    "hc_more": {"ja": "…", "en": "…"},
+    # The two variants are the whole point of the figure: everything below them is identical, so a
+    # difference in the total is a difference in which regions were read and nothing else.
+    "hc_shared": {
+        "ja": "同一ファイル\n全台が同じ範囲を読む",
+        "en": "Same file\nevery host reads the same range",
+    },
+    "hc_disjoint": {
+        "ja": "重ならない領域\n各台が 1/N の範囲を読む",
+        "en": "Disjoint ranges\neach host reads 1/N of the file",
+    },
+    "hc_share": {
+        "ja": "CIFS 共有 1 本 (SMB 3.1.1)\nMultichannel 4 チャネル",
+        "en": "One CIFS share (SMB 3.1.1)\nMultichannel, 4 channels",
+    },
+    "hc_svm": {"ja": "SMB SVM", "en": "SMB SVM"},
+    "hc_port": {
+        "ja": "1 ノードの物理ポート 1 本\n(クライアント合計と突き合わせる)",
+        "en": "One physical port on one node\n(corroborates the client sum)",
+    },
     "aws_cloud": {
         "ja": "AWS Cloud (Origin Region)",
         "en": "AWS Cloud (Origin Region)",
@@ -1622,6 +1652,65 @@ def _two_ceilings() -> Diagram:
     )
 
 
+def _host_count() -> Diagram:
+    """What the SMB host-count run holds constant, and the one thing it varies.
+
+    The run returned two totals that differ by 2.5x at eight hosts, and the reason is not visible
+    in either number: everything from the share downwards is the same, and only the range each host
+    reads changes. Drawn as one path with the two variants side by side above it, so the shared
+    portion is what the eye follows and the divergence is the only fork.
+
+    The physical port is on the figure because the client sum is not evidence on its own -- one read
+    on the server can satisfy several clients, so a sum can count bytes that never left. Naming the
+    port here is what makes the corroboration part of the method rather than a footnote.
+
+    Vertical on an 880px canvas at font_size=16, and no measured number anywhere: a figure has no
+    room for the environment a number needs to mean anything.
+    """
+    centre = 440
+    return Diagram(
+        name="s3burst-host-count",
+        diagram_id="s3burst-host-count",
+        width=880,
+        height=700,
+        font_size=16,
+        frames=(
+            Frame("hc_group", "hc_clients", 40, 40, 800, 150),
+            # 64 for a two-line label, matching the frames in _two_ceilings. At 84 the bottom of
+            # each box was empty, which reads as a container waiting for contents.
+            Frame("hc_var_shared", "hc_shared", 40, 240, 380, 64, label_only=True),
+            Frame("hc_var_disjoint", "hc_disjoint", 460, 240, 380, 64, label_only=True),
+            Frame("hc_cifs", "hc_share", 280, 370, 320, 64, label_only=True),
+            Frame("hc_eth", "hc_port", 280, 600, 320, 64, label_only=True),
+        ),
+        nodes=(
+            Node("hc_h1", "client", "hc_host_first", *centred("client", 160, 110)),
+            Node("hc_h2", "client", "hc_host_second", *centred("client", 320, 110)),
+            Node("hc_h8", "client", "hc_host_last", *centred("client", 720, 110)),
+            Node("hc_fsx", "fsx_ontap", "hc_svm", *centred("fsx_ontap", centre, 500)),
+        ),
+        texts=(TextBox("hc_gap", "hc_more", 480, 92, 120, 36),),
+        edges=(
+            Edge("hc_e_shared", "hc_group", "hc_var_shared"),
+            Edge("hc_e_disjoint", "hc_group", "hc_var_disjoint"),
+            Edge("hc_e_shared_share", "hc_var_shared", "hc_cifs"),
+            Edge("hc_e_disjoint_share", "hc_var_disjoint", "hc_cifs"),
+            Edge("hc_e_share_svm", "hc_cifs", "hc_fsx"),
+            # Around the icon's label rather than through it. An icon carries its label underneath,
+            # so an edge leaving the bottom edge crosses the text -- which is what the first export
+            # did, with the arrow running through "SMB SVM". Leaving to the right and dropping into
+            # the frame off-centre keeps both readable.
+            Edge(
+                "hc_e_svm_port",
+                "hc_fsx",
+                "hc_eth",
+                exit_at=(1.0, 0.5),
+                entry_at=(0.8, 0.0),
+            ),
+        ),
+    )
+
+
 DIAGRAMS = (
     _overview(),
     _single_site(),
@@ -1629,6 +1718,7 @@ DIAGRAMS = (
     _bottlenecks(),
     _protocol_matrix(),
     _two_ceilings(),
+    _host_count(),
 )
 
 
