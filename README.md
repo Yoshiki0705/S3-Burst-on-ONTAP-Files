@@ -131,6 +131,9 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | S3 Files の実測値と落とし穴を見る | [S3 Files 実測記録](docs/ja/verification/s3files-measured.md) | 10 分 |
 | スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |
 | プロトコル別に測れる組み合わせを知る | [プロトコル別の可否](docs/ja/verification/protocol-matrix-efs-vs-ontap.md) | 5 分 |
+| NFS / SMB / EFS の実測値を見る | [プロトコル別測定の結果](docs/ja/verification/perf-matrix-results.md) | 20 分 |
+| SMB の台数を増やしたときの伸びを見る | [SMB の台数試験](docs/ja/verification/perf-matrix-results.md#smb-の台数試験1--4--8-台) | 5 分 |
+| SMB の書き込みが持続するか見る | [SMB の書き込みの持続](docs/ja/verification/perf-matrix-results.md#smb-の書き込みの持続15-分) | 5 分 |
 | 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
 | SMB でマウントする前に読む | [SMB でマウントできる名前と、識別子を読む場所](docs/ja/reference/limits/smb-share-and-identifier-reading.md) | 5 分 |
 | SMB の性能を測る前に読む | [SMB Multichannel が既定で無効であることと、有効化が既に張られた接続に届かないこと](docs/ja/reference/limits/smb-multichannel-enablement.md) | 5 分 |
