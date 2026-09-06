@@ -1,0 +1,86 @@
+**********************************************************************
+* The long SMB write. One question: does the write rate hold, or decay?
+*
+* NOT YET EXECUTED. The NFS counterpart ran on 2026-09-05 and held:
+* 2,063.00 MB/s over 900 seconds, 10-second intervals between 1,749 and
+* 2,128 with no downward trend, about 1.77 TiB written against 256 GB of
+* in-memory cache and no data reduction. Results in
+* docs/ja/verification/perf-matrix-results.md.
+*
+* WHY THIS RUN EXISTS ON THE SMB SIDE TOO
+*
+* The SMB figure that prompted the NFS run was taken over 300 seconds:
+*
+*   SMB 3.1.1, 4 channels, 300 s window   1,698 MB/s
+*
+* 300 seconds is longer than the 120 the NFS figure came from and still not
+* long enough to answer the sizing question -- whether a workload writing
+* for an hour sees that rate, or sees it briefly and then settles once the
+* storage has to destage what it accepted.
+*
+* The NFS result narrows this but does not answer it. Both protocols land
+* on the same file system, so a rate that held for 900 seconds over NFS
+* says the storage can sustain it; it does not say the SMB path delivers
+* it. The SMB path differs in where concurrency comes from: four negotiated
+* channels rather than sixteen client-requested connections.
+*
+* WHAT NOT TO DO WITH THE SHORT FIGURE
+*
+* Do not quote 1,698 MB/s as this file system's SMB write throughput. It
+* was measured over 300 seconds and this run exists because that is not
+* long enough to know what it means.
+*
+* AND WHAT NOT TO DO WITH THE RESULT OF THIS ONE
+*
+* Whatever this returns, do not compare it against the published
+* second-generation write figure as though one number were wrong. The
+* documentation states a general rule -- writes at one third of throughput
+* capacity, so 2,048 MBps at 6,144 -- and separately carries 6,144 as an
+* exception whose Single-AZ write figure is 1,024 MBps. The NFS measurement
+* matched the general rule within 5.6% and not the exception table. Which
+* is correct is not decided here. **Do not cite either result as "twice the
+* published figure".**
+*
+*   cd C:\bench
+*   C:\bench\vdbench50407\vdbench.bat -f vdbench-windows-smb-sustained-write.txt -o C:\bench\out-sustained
+*
+* BEFORE STARTING: automatic daily backups have to be off on the file
+* system, and they are in template-fsxn-gen2.yaml
+* (AutomaticBackupRetentionDays: 0). An overwrite-heavy run met the 15:00
+* UTC backup once: the snapshot held the pre-overwrite blocks, the volume
+* went 88% -> 100% full, and the write rate fell 2,200 -> 267 MB/s before
+* failing. Checking `snapshot-policy` and the snapshot count beforehand
+* does not catch it, because the snapshot does not exist yet.
+**********************************************************************
+* One host. This asks whether a rate holds over time, which does not need
+* more than one client -- and adding clients would change the question.
+hd=default,shell=vdbench,jvms=16
+hd=hd1,system=localhost
+**********************************************************************
+* 600 GB, overwritten repeatedly rather than extended. `size=` is the file,
+* not the volume: at 2,000 MB/s a 900-second run moves about 1.7 TiB, so
+* the file is rewritten roughly three times. Overwrite rather than append
+* is deliberate -- appending would measure allocation as well.
+*
+* `openflag=directio` (Windows). The NFS side uses `o_direct`. Say which on
+* each side, or part of any difference is the client's cache.
+*
+* Both SVMs share the file system's throughput capacity. Run this while the
+* NFS side is idle, and record that it was.
+**********************************************************************
+sd=default,openflag=directio,size=600g
+sd=sd1-1,host=hd1,lun=Z:\file1
+**********************************************************************
+* 1 MiB sequential write, unthrottled, 900 seconds after 60 of warmup.
+*
+* interval=10 rather than 1: the question is the trend across fifteen
+* minutes, and per-second rows make the series harder to read without
+* adding anything. The 10-second minimum and maximum are what show whether
+* a decay is a trend or a dip.
+*
+* threads=512 matches the NFS run and auto_vdbench's default, so the
+* concurrency is not another difference. Record it -- it is part of the
+* result.
+**********************************************************************
+wd=wd_seq_write_1024k,sd=sd1-1,seekpct=.0,xfersize=1024k,rdpct=0
+rd=sustained-write-1024k,wd=wd_seq_write_1024k,iorate=max,warmup=60,elapsed=900,interval=10,threads=512
