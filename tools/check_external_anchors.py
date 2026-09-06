@@ -27,22 +27,58 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CHECKOUT = ROOT.parent / "fsxn-adoption-playbook"
+# Both names, because a working directory is named by whoever cloned it. The repository is
+# FSx-for-ONTAP-Adoption-Playbook and was renamed from fsxn-adoption-playbook, so a clone made
+# before the rename still carries the old name and a fresh one carries the new. Holding only the
+# old name meant a fresh clone had no checkout, and this check reported a skip as a pass.
+CHECKOUT_NAMES = ("FSx-for-ONTAP-Adoption-Playbook", "fsxn-adoption-playbook")
+DEFAULT_CHECKOUT = ROOT.parent / CHECKOUT_NAMES[0]
 CONTRACT = Path("docs/agent/external-anchor-contract.txt")
 REPO_URL = "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/"
+RAW_CONTRACT = (
+    "https://raw.githubusercontent.com/Yoshiki0705/"
+    "FSx-for-ONTAP-Adoption-Playbook/main/docs/agent/external-anchor-contract.txt"
+)
 CITATION = re.compile(re.escape(REPO_URL) + r"(docs/[^)#\s]+)(?:#([^)\s]+))?")
 SCAN_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml"}
 
 
 def checkout() -> Path | None:
-    path = Path(os.environ.get("SIBLING_PLAYBOOK", DEFAULT_CHECKOUT)).expanduser()
-    return path if (path / CONTRACT).is_file() else None
+    explicit = os.environ.get("SIBLING_PLAYBOOK")
+    candidates = (
+        [Path(explicit).expanduser()]
+        if explicit
+        else [ROOT.parent / name for name in CHECKOUT_NAMES]
+    )
+    for path in candidates:
+        if (path / CONTRACT).is_file():
+            return path
+    return None
 
 
-def contract(base: Path) -> dict[str, set[str]]:
+def fetch_contract() -> dict[str, set[str]]:
+    """Read the contract from the published repository.
+
+    The local checkout is whatever is on disk, which can be behind what the sibling published --
+    so a citation can resolve here and land at the top of a renamed section for a reader. Fetching
+    checks the same thing against what is actually served. Needs the network, so it belongs beside
+    the other network job rather than in `make all`.
+    """
+    import urllib.request
+
+    with urllib.request.urlopen(RAW_CONTRACT, timeout=30) as response:
+        if response.status != 200:
+            raise SystemExit(
+                f"external-anchors: {RAW_CONTRACT} returned {response.status}"
+            )
+        body = response.read().decode("utf-8")
+    return parse_contract(body)
+
+
+def parse_contract(body: str) -> dict[str, set[str]]:
     """Path to anchors, as the sibling repository publishes them."""
     entries: dict[str, set[str]] = {}
-    for line in (base / CONTRACT).read_text(encoding="utf-8").splitlines():
+    for line in body.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -51,6 +87,10 @@ def contract(base: Path) -> dict[str, set[str]]:
         if anchor:
             entries[path].add(anchor)
     return entries
+
+
+def contract(base: Path) -> dict[str, set[str]]:
+    return parse_contract((base / CONTRACT).read_text(encoding="utf-8"))
 
 
 def citations() -> list[tuple[str, str, str | None]]:
@@ -68,15 +108,21 @@ def citations() -> list[tuple[str, str, str | None]]:
 
 
 def main() -> int:
-    base = checkout()
-    if base is None:
-        print(
-            "external-anchors: no sibling checkout found - skipping "
-            f"(expected {DEFAULT_CHECKOUT}, or set SIBLING_PLAYBOOK)"
-        )
-        return 0
-
-    published = contract(base)
+    if "--fetch" in sys.argv:
+        published, source_name = fetch_contract(), "the published repository"
+    else:
+        base = checkout()
+        if base is None:
+            # Still not an error: a contributor without the sibling clone should not be blocked by a
+            # check about someone else's headings. But the skip has to read as a skip, and the
+            # scheduled --fetch run is what stops a permanent skip from standing in for a check.
+            print(
+                "external-anchors: SKIPPED, no sibling checkout found "
+                f"(looked beside this repository for {' or '.join(CHECKOUT_NAMES)}, or set "
+                "SIBLING_PLAYBOOK). The scheduled link-rot workflow runs this with --fetch."
+            )
+            return 0
+        published, source_name = contract(base), base.name
     found = citations()
     if not found:
         print("external-anchors: no citation into the sibling repository")
@@ -105,7 +151,7 @@ def main() -> int:
     anchored = sum(1 for _, _, anchor in found if anchor)
     print(
         f"external-anchors: {anchored} anchored citation(s) resolve against the published contract "
-        f"({base.name})"
+        f"({source_name})"
     )
     return 0
 

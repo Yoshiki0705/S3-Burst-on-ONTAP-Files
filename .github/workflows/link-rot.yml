@@ -54,6 +54,15 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/check_links.py --external 2>&1 | tee /tmp/link-report.txt
+
+      # The same check runs in `make all`, where it reads a sibling checkout beside this repository
+      # and skips when there is none -- which is every CI runner, so it had never actually run
+      # there. Here it fetches the contract the sibling publishes, so what is verified is what a
+      # reader is served rather than whatever happens to be on one machine's disk.
+      - name: Verify cited anchors against the published contract
+        run: |
+          set -o pipefail
+          python3 tools/check_external_anchors.py --fetch 2>&1 | tee -a /tmp/link-report.txt
       - name: Report unreachable links
         if: failure()
         env:
