@@ -51,6 +51,10 @@ NOT_IN_ALL = {
     # contributors to ignore red. Scheduled weekly in `interconnect-regions.yml` instead, and the CI
     # parity assertions below expect it to appear in a workflow rather than in `all`.
     "interconnect-regions",
+    # Prints an inventory for another repository's index. It asserts nothing about this tree, so in
+    # the aggregate it would be output nobody reads. Run on request when the Hub refreshes its
+    # resource map -- see docs/ja/reference/comparison/ and the Hub's cross-repo-index.md.
+    "sources-export",
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate
     # Takes a pull request number and queries the API. It answers a question about a commit that
