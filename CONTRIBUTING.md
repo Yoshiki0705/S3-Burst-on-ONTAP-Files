@@ -285,6 +285,34 @@ make new-pattern AXIS=collect SLUG=s3ap-ingest
 削除できない検証リソースは長期の請求になり、同居する他のリソースも動かせなくします。
 背景と手順は [AGENTS.md](AGENTS.md) にあります。
 
+### エージェントで作業する前に配線するもの
+
+**[`scripts/guard_irreversible_ops.py`](scripts/guard_irreversible_ops.py) を PreToolUse に
+配線してください。** 追跡ファイルなのでこのリポジトリを clone すれば入っていますが、
+**配線は各自の `.kiro/hooks/` で、そこは gitignored です。** つまり配線したかどうかは
+他人から見えません。だからこの節に書いてあります。
+
+```json
+{ "version": "v1", "hooks": [{
+  "name": "Irreversible Storage Operations Guard",
+  "trigger": "PreToolUse",
+  "matcher": "^(execute_bash|shell|use_aws|aws)$",
+  "action": { "type": "command",
+              "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/guard_irreversible_ops.py\"" },
+  "timeout": 15 }] }
+```
+
+**配線したら `python3 scripts/guard_irreversible_ops.py --selftest` を通してください。**
+block（exit 2）だけでなく **allow が通ることも確認します。** 通常の作業まで止めるガードは
+外されるので、allow 側の確認が同じだけ重要です。現在 29 件（block 15 / ask 3 / allow 11）。
+
+> **`$HOME` 側のコピーを指さないでください。** 実測した例があります。この環境では
+> `~/.kiro/hooks/scripts/` に配線されていた版が追跡版より 237 行短く、
+> **オブジェクト単位の COMPLIANCE 保持（`put-object-retention`）を素通ししていました。**
+> 追跡版は止めます。**配線先が見えないと、古い版が黙って効き続けます。**
+
+**環境を作る前に配線してください。** この種の誤りは環境を作る作業の中で起きます。
+
 ## Issue と Pull Request
 
 Issue のタイトル: `<動詞> <対象>`。再現手順、期待、実際を書いてください。

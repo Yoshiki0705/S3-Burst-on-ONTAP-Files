@@ -27,6 +27,20 @@ from what was known.
   for directory depth, `4 段の引用符`. That distinction is why the rule is a list of literal strings
   rather than a test for coinage in general, which does not exist. Two headings were renamed, so
   their anchors moved and the inbound links moved with them.
+- **A guard against unilaterally enabling immutability (WORM) features**, copied verbatim from
+  `FSx-for-ONTAP-Adoption-Playbook` on that repository's advice: stdlib-only, project-independent, and
+  the single file is the whole of the supported use. **No divergence** — behaviour changes belong
+  upstream, where the incident that produced it is recorded. It blocks mutating calls on SnapLock,
+  S3 Object Lock, Glacier and Backup vault lock, EBS snapshot lock and `PERMANENTLY_DISABLED`, and
+  lets read-only inspection through, because refusing to let an agent *look* pushes it toward guessing.
+  **The wiring is what needed writing down.** `.kiro/` is gitignored, so whether a contributor wired
+  it is invisible; `CONTRIBUTING.md` now carries the hook JSON and the instruction to run
+  `--selftest` and check the **allow** side, not only the block side. A guard that stops ordinary work
+  gets removed.
+  Measured while wiring it: the copy already wired under `$HOME` here was 237 lines shorter than the
+  tracked one and **let per-object COMPLIANCE retention through**. That is the same class of failure
+  the upstream repository reported, found on this machine by comparing the two rather than by reading
+  either.
 - **`make ja-headings` enforces the noun-phrase rule for Japanese section headings**, and **22
   headings across six documents were renamed to comply.** The rule had existed in prose only, and
   every one of those headings passed every other gate. The check skips what it should: `#` and
