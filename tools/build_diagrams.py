@@ -548,6 +548,10 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "取り込み",
         "en": "import",
     },
+    "sync_both_ways": {
+        "ja": "取り込み / 書き戻し",
+        "en": "import / write-back",
+    },
     "sync_export": {
         "ja": "書き戻し",
         "en": "write-back",
@@ -762,6 +766,14 @@ LABELS: dict[str, dict[str, str]] = {
     "private_path_preview": {
         "ja": "private 接続（Preview）",
         "en": "private connectivity (Preview)",
+    },
+    # Inside the managed frame rather than on an edge from Azure. Azure sits to the right of both
+    # ways in, so an edge from it to this frame can only run backwards -- 485px back across the
+    # figure, crossing OCI's riser on the way. The fact it carried is kept here, where it is read
+    # with the frame it belongs to.
+    "managed_azure_preview": {
+        "ja": "Azure は Preview（2026-08 時点）。GCP と OCI は GA",
+        "en": "Azure is at Preview (as of 2026-08); GCP and OCI are GA",
     },
     "partner_way": {
         "ja": "2 パートナー経由 — ロケーションの重なりで決まる",
@@ -978,6 +990,12 @@ class Edge:
     # the label under an icon -- the one place nothing else may go. Given here rather than nudged
     # afterwards, because then the clearances can be stated in a comment and checked against it.
     points: tuple[tuple[int, int], ...] = ()
+    # Moves the label off the midpoint, in pixels. Needed where two edges leave one icon a few
+    # tens of pixels apart: draw.io puts both labels at the midpoint of their own run, and at that
+    # separation the two texts land on top of each other -- the fork in _two_ceilings rendered as
+    # "キャッキャッシュに無い". Written as `<mxPoint as="offset">`, which the waypoint count in
+    # `check()` does not match, so the two stay independent.
+    label_offset: tuple[int, int] = (0, 0)
 
     def style(self, size: int = BODY_FONT_SIZE) -> str:
         style = resized(EDGE_STYLE, size)
@@ -1084,27 +1102,29 @@ def _overview() -> Diagram:
         name="s3burst-architecture-overview",
         diagram_id="s3burst-overview",
         width=900,
-        height=840,
+        height=1080,
         font_size=16,
         groups=(
             Group("aws_cloud", "aws_cloud", 40, 60, 560, 250),
             Group(
                 "edge_group",
                 "cache_site",
-                350,
-                350,
-                530,
+                340,
+                580,
+                540,
                 440,
                 gr_icon="group_corporate_data_center",
                 stroke="#147EBA",
             ),
         ),
         frames=(
-            Frame("cache_platform", "cache_platform", 380, 390, 250, 360),
-            # The link is its own band now, so the frame no longer has to squeeze into a gap between
-            # two group boundaries. It keeps naming all three cases: a single icon on this link
-            # would read as a requirement.
-            Frame("link_layer", "connect_layer", 40, 350, 270, 190),
+            Frame("cache_platform", "cache_platform", 365, 620, 250, 360),
+            # Directly under the origin volume, and the cache site directly under that: three bands
+            # in one column. Placed to the *left* of the origin, as it was, the FlexCache edge had
+            # to leave rightwards, drop, and then travel 465px back the other way before turning
+            # down again -- right, down, left, down, in the one figure that has to show which
+            # direction the data moves.
+            Frame("link_layer", "connect_layer", 355, 350, 270, 190),
         ),
         nodes=(
             Node("s3client", "users", "s3_client_stacked", 90, 150),
@@ -1114,53 +1134,48 @@ def _overview() -> Diagram:
                 "cache_fsx",
                 "fsx_ontap",
                 "cache_vol_fsx_stacked",
-                *centred("fsx_ontap", 505, 470),
+                *centred("fsx_ontap", 490, 700),
             ),
             Node(
                 "cache_ontap",
                 "ontap_9",
                 "cache_volume_ontap",
-                *centred("ontap_9", 505, 655),
+                *centred("ontap_9", 490, 885),
             ),
             Node(
                 "nfs_client",
                 "client",
                 "file_client_stacked",
-                *centred("client", 760, 570),
+                *centred("client", 770, 800),
             ),
         ),
         texts=(
-            TextBox("cache_or", "either_of", 470, 575, 70, 20),
-            TextBox("link_1", "link_same_region", 55, 390, 240, 20),
-            TextBox("link_2", "link_cross_region", 55, 425, 240, 40),
-            TextBox("link_3", "link_onprem", 55, 480, 240, 40),
+            TextBox("cache_or", "either_of", 455, 805, 70, 20),
+            TextBox("link_1", "link_same_region", 370, 390, 240, 20),
+            TextBox("link_2", "link_cross_region", 370, 425, 240, 40),
+            TextBox("link_3", "link_onprem", 370, 480, 240, 40),
         ),
         edges=(
             Edge("e1", "s3client", "s3ap", "put_object"),
             Edge("e2", "s3ap", "origin_vol"),
-            # Out to a riser at x=640, clear of every label on the top band, then along y=332 --
-            # below the origin group, which ends at 310, and above the link frame, which starts at
-            # 350, so the label centred on it straddles neither border. Split in two so the
-            # connectivity frame sits on the path instead of alongside it. The FlexCache label stays
-            # on the first leg, because FlexCache is what crosses the link -- the frame says what the
-            # link is made of, not what runs over it.
+            # Straight down, both of them. The FlexCache label stays on the first leg, because
+            # FlexCache is what crosses the link -- the frame says what the link is made of, not
+            # what runs over it.
             Edge(
                 "e3",
                 "origin_vol",
                 "link_layer",
                 "flexcache_pull",
-                (1, 0.5),
-                (0.5, 0),
-                points=((640, 174), (640, 332), (175, 332)),
+                (0.5, 1.0),
+                (0.5, 0.0),
             ),
             Edge(
                 "e3b",
                 "link_layer",
                 "cache_platform",
                 "",
-                (1, 0.5),
-                (0, 0.2),
-                points=((345, 445), (345, 462)),
+                (0.5, 1.0),
+                (0.5, 0.0),
             ),
             Edge("e4", "cache_platform", "nfs_client", "nfs_smb"),
         ),
@@ -1237,8 +1252,11 @@ def _single_site() -> Diagram:
             Edge("a2", "a_ap", "a_vol"),
             Edge("a3", "a_vol", "a_file", "nfs_smb_rw"),
             Edge("b1", "b_client", "b_bucket", "put_object"),
-            Edge("b2", "b_bucket", "b_files", "sync_import", (1, 0.25), (0, 0.25)),
-            Edge("b4", "b_files", "b_bucket", "sync_export", (0, 0.75), (1, 0.75)),
+            # One leg with an arrowhead at each end, not two legs. Both directions are real, and
+            # drawn as a pair the write-back was the only edge in the figure pointing back the way
+            # the figure came -- which is what a reader has to disentangle before they can tell
+            # which arrow carries what. The same choice as panels B and C of _bottlenecks.
+            Edge("b2", "b_bucket", "b_files", "sync_both_ways", both_ways=True),
             Edge("b3", "b_files", "b_file", "nfs41_protocol"),
         ),
     )
@@ -1313,17 +1331,19 @@ def _cross_cloud() -> Diagram:
                 "direct_connect",
                 *centred("direct_connect", 725, 585),
             ),
-            Node(
-                "fsx_n",
-                "fsx_ontap",
-                "fsx_here",
-                *centred("fsx_ontap", 260, 930),
-            ),
+            # The access point on the left, the file system it fronts on the right -- the order the
+            # other figures use, and the order that lets the edge between them advance.
             Node(
                 "s3ap_n",
                 "s3_access_point",
                 "s3ap_here",
-                *centred("s3_access_point", 620, 930),
+                *centred("s3_access_point", 260, 930),
+            ),
+            Node(
+                "fsx_n",
+                "fsx_ontap",
+                "fsx_here",
+                *centred("fsx_ontap", 620, 930),
             ),
         ),
         texts=(
@@ -1336,6 +1356,7 @@ def _cross_cloud() -> Diagram:
             TextBox("gcp_net", "gcp_vpc", 55, 295, 240, 20),
             TextBox("oci_net", "oci_vcn", 365, 295, 240, 20),
             TextBox("azure_net", "azure_vnet", 675, 295, 240, 20),
+            TextBox("managed_note", "managed_azure_preview", 55, 690, 400, 46),
             TextBox("fabric", "provider_fabric", 555, 670, 340, 50),
             # A banner across the top rather than a label wedged between the connectivity column and
             # the AWS boundary. Placed there it overlapped the two edges entering the VPC: a TextBox
@@ -1346,30 +1367,17 @@ def _cross_cloud() -> Diagram:
         edges=(
             # Which way each cloud can use today. Google Cloud and OCI have a managed service at GA.
             Edge("x4", "gcp", "managed", "private_path", (0.5, 1), (0.31, 0)),
+            # Down the overlap between the two frames, not out and back along y=410. The managed
+            # frame ends at 470 and OCI starts at 350, so an exit inside that band drops vertically.
             Edge(
                 "x5",
                 "oci",
                 "managed",
                 "private_path",
-                (0.5, 1),
-                (0.674, 0),
-                points=((485, 410), (330, 410)),
+                (0.35, 1),
+                (0.95, 0),
             ),
             Edge("x6", "azure", "partner", "private_path", (0.5, 1), (0.66, 0)),
-            # Down its own lane at y=440 and in from above. Routed left to itself it would run
-            # straight up the middle of the old column: through the partner frame, over the Direct
-            # Connect icon, and with its label on top of the fabric caption. The picture then said
-            # Azure's managed path runs through the partner route, which is the one thing this
-            # figure is careful not to say. It crosses OCI's riser once, at (330, 470).
-            Edge(
-                "x6b",
-                "azure",
-                "managed",
-                "private_path_preview",
-                (0.2, 1),
-                (0.44, 0),
-                points=((714, 470), (230, 470)),
-            ),
             Edge("x7", "managed", "aws_vpc_f", None, (0.5, 1), (0.22, 0)),
             Edge("x8", "partner", "aws_vpc_f", None, (0.5, 1), (0.79, 0)),
             Edge("x9", "s3ap_n", "fsx_n"),
@@ -1448,14 +1456,18 @@ def _bottlenecks() -> Diagram:
                 "origin_vol_stacked",
                 *centred("fsx_ontap", 665, row_a1),
             ),
+            # Under the origin it pulls from, not back at the left margin. On the left, the
+            # FlexCache edge had to run out to a riser at x=840 and then 640px back the other way
+            # before turning down -- and the direction data moves is the one thing this panel is
+            # for.
             Node(
                 "a_cache",
                 "fsx_ontap",
                 "cache_vol_short",
-                *centred("fsx_ontap", 200, row_a2),
+                *centred("fsx_ontap", 665, row_a2),
             ),
             Node(
-                "a_file", "client", "nfs_client_short", *centred("client", 520, row_a2)
+                "a_file", "client", "nfs_client_short", *centred("client", 830, row_a2)
             ),
             Node("b_client", "users", "s3_client_n", *centred("users", 150, row_b)),
             Node("b_s3", "s3", "amazon_s3_node", *centred("s3", 460, row_b)),
@@ -1481,19 +1493,22 @@ def _bottlenecks() -> Diagram:
             # it is drawn both ways. The NFS / SMB side is the read fan-out, so it is one way.
             Edge("q1", "a_client", "a_ap", "s3_api_rw", both_ways=True),
             Edge("q2", "a_ap", "a_origin", both_ways=True),
-            # One way on purpose: the cache pulls from the origin. Out to a riser clear of every
-            # label on the row above, then back along y=252 -- below the origin label, which ends at
-            # 239, and above the cache icon, which starts at 262.
+            # One way on purpose: the cache pulls from the origin. Straight down now that the
+            # cache sits underneath it.
             Edge(
                 "q3",
                 "a_origin",
                 "a_cache",
                 "flexcache_edge",
-                (1, 0.5),
-                (0.5, 0),
-                points=((840, row_a1), (840, 252), (200, 252)),
+                (0.5, 1.0),
+                (0.5, 0.0),
+                # Beside the run rather than on it: centred, it landed immediately under the
+                # origin's two-line label and read as a third line of it.
+                label_offset=(70, 30),
             ),
-            Edge("q4", "a_cache", "a_file", "nfs_smb_read"),
+            # "nfs_smb", not "nfs_smb_read". The panel title already says the direction and the
+            # arrowhead says it again, and at this pitch the longer text ran onto the cache icon.
+            Edge("q4", "a_cache", "a_file", "nfs_smb"),
             # B and C move data both ways over one protocol from one client, so both ends carry an
             # arrowhead rather than a second client icon standing in for the read.
             Edge("q5", "b_client", "b_s3", "s3_api_rw", both_ways=True),
@@ -1532,12 +1547,12 @@ def _protocol_matrix() -> Diagram:
         name="s3burst-protocol-test-matrix",
         diagram_id="s3burst-protocol-matrix",
         width=940,
-        height=990,
+        height=1040,
         font_size=16,
         groups=(
             Group("panel_a2", "panel_read_paths", 40, 60, 880, 270),
             Group("panel_d", "panel_efs", 40, 350, 880, 220),
-            Group("panel_e", "panel_ontap_protocols", 40, 590, 880, 300),
+            Group("panel_e", "panel_ontap_protocols", 40, 590, 880, 350),
         ),
         nodes=(
             Node("m_s3c", "users", "s3_client_stacked", *centred("users", 140, row_a)),
@@ -1560,11 +1575,14 @@ def _protocol_matrix() -> Diagram:
             Node("d_efs", "efs", "efs_node", *centred("efs", 400, row_d)),
             Node("e_linux", "client", "linux_client", *centred("client", 140, 660)),
             Node("e_win", "client", "windows_client", *centred("client", 140, 790)),
+            # Below both clients rather than between them. Between them, the lower client's leg
+            # had to run upwards to reach it, so panel E was the one place in the figure where two
+            # arrows on the same fan pointed opposite ways.
             Node(
                 "e_ontap",
                 "fsx_ontap",
                 "cache_vol_fsx_stacked",
-                *centred("fsx_ontap", 400, 720),
+                *centred("fsx_ontap", 400, 830),
             ),
         ),
         texts=(
@@ -1574,16 +1592,18 @@ def _protocol_matrix() -> Diagram:
             TextBox("t_write_a1", "write_then_a1", 60, 268, 400, 46),
             TextBox("t_a2", "read_a2", 500, 280, 400, 24),
             TextBox("t_efs_p", "efs_protocols", 510, 395, 390, 120),
-            TextBox("t_ontap_p", "ontap_protocols", 540, 650, 360, 90),
+            TextBox("t_ontap_p", "ontap_protocols", 540, 760, 360, 90),
             # Below panel E rather than inside it: it is about D and E together, and a caption about
             # two panels sitting inside one of them reads as belonging to that one.
-            TextBox("t_comparable", "comparable_only", 60, 905, 560, 46),
+            TextBox("t_comparable", "comparable_only", 60, 955, 560, 46),
         ),
         edges=(
             Edge("m1", "m_s3c", "m_ap", "s3_api_rw", both_ways=True),
             Edge("m2", "m_ap", "m_origin", both_ways=True),
-            # A-2 leaves the same volume the S3 API wrote to. One way: this leg is the read.
-            Edge("m3", "m_origin", "m_file", "nfs_smb_read"),
+            # A-2 leaves the same volume the S3 API wrote to. One way: this leg is the read, which
+            # caption 3 under it also says -- so the label is the protocol only. Spelled out, it
+            # was wider than the gap and ran onto the file system icon.
+            Edge("m3", "m_origin", "m_file", "nfs_smb"),
             Edge("d1", "d_linux", "d_efs", both_ways=True),
             # Fixed entry points. Left to itself draw.io lands both of these on the same point and
             # routes the second one back around, which reads as a link between the two clients.
@@ -1633,19 +1653,39 @@ def _two_ceilings() -> Diagram:
         frames=(
             # Sized to the two-line label. A frame taller than its text reads as an empty container
             # waiting to be filled, which is a claim about the architecture rather than about layout.
-            Frame("tc_cache", "tc_cache_layer", 80, 270, 320, 64, label_only=True),
-            Frame("tc_disk", "tc_ssd", 480, 270, 320, 64, label_only=True),
+            # The inner edge of each box sits under the client icon's own edge, so both arms of
+            # the fork drop almost vertically onto a corner instead of running out sideways. A
+            # fork is not an inconsistent direction, but an arm that travels 200px to the left
+            # before turning down reads as one.
+            Frame("tc_cache", "tc_cache_layer", 90, 270, 330, 64, label_only=True),
+            Frame("tc_disk", "tc_ssd", 460, 270, 330, 64, label_only=True),
             Frame(
-                "tc_cap_cache", "tc_ceiling_cache", 80, 400, 320, 64, label_only=True
+                "tc_cap_cache", "tc_ceiling_cache", 90, 400, 330, 64, label_only=True
             ),
-            Frame("tc_cap_disk", "tc_ceiling_disk", 480, 400, 320, 64, label_only=True),
+            Frame("tc_cap_disk", "tc_ceiling_disk", 460, 400, 330, 64, label_only=True),
         ),
         nodes=(
             Node("tc_users", "client", "tc_client", *centred("client", centre, 90)),
         ),
         edges=(
-            Edge("tc_e_hit", "tc_users", "tc_cache", "tc_hit"),
-            Edge("tc_e_miss", "tc_users", "tc_disk", "tc_miss"),
+            Edge(
+                "tc_e_hit",
+                "tc_users",
+                "tc_cache",
+                "tc_hit",
+                exit_at=(0.0, 1.0),
+                entry_at=(1.0, 0.0),
+                label_offset=(-110, 0),
+            ),
+            Edge(
+                "tc_e_miss",
+                "tc_users",
+                "tc_disk",
+                "tc_miss",
+                exit_at=(1.0, 1.0),
+                entry_at=(0.0, 0.0),
+                label_offset=(110, 0),
+            ),
             Edge("tc_e_cache_cap", "tc_cache", "tc_cap_cache"),
             Edge("tc_e_disk_cap", "tc_disk", "tc_cap_disk"),
         ),
@@ -1678,8 +1718,11 @@ def _host_count() -> Diagram:
             Frame("hc_group", "hc_clients", 40, 40, 800, 150),
             # 64 for a two-line label, matching the frames in _two_ceilings. At 84 the bottom of
             # each box was empty, which reads as a container waiting for contents.
-            Frame("hc_var_shared", "hc_shared", 40, 240, 380, 64, label_only=True),
-            Frame("hc_var_disjoint", "hc_disjoint", 460, 240, 380, 64, label_only=True),
+            # Centred on the quarter points of the frame above, so each arm of the fork leaves at
+            # the quarter point it lands on and drops straight down rather than travelling
+            # sideways first.
+            Frame("hc_var_shared", "hc_shared", 50, 240, 380, 64, label_only=True),
+            Frame("hc_var_disjoint", "hc_disjoint", 450, 240, 380, 64, label_only=True),
             Frame("hc_cifs", "hc_share", 280, 370, 320, 64, label_only=True),
             Frame("hc_eth", "hc_port", 280, 600, 320, 64, label_only=True),
         ),
@@ -1691,10 +1734,37 @@ def _host_count() -> Diagram:
         ),
         texts=(TextBox("hc_gap", "hc_more", 480, 92, 120, 36),),
         edges=(
-            Edge("hc_e_shared", "hc_group", "hc_var_shared"),
-            Edge("hc_e_disjoint", "hc_group", "hc_var_disjoint"),
-            Edge("hc_e_shared_share", "hc_var_shared", "hc_cifs"),
-            Edge("hc_e_disjoint_share", "hc_var_disjoint", "hc_cifs"),
+            Edge(
+                "hc_e_shared",
+                "hc_group",
+                "hc_var_shared",
+                exit_at=(0.25, 1.0),
+                entry_at=(0.5, 0.0),
+            ),
+            Edge(
+                "hc_e_disjoint",
+                "hc_group",
+                "hc_var_disjoint",
+                exit_at=(0.75, 1.0),
+                entry_at=(0.5, 0.0),
+            ),
+            # Both variants converge on the one share, and the right-hand one reaches it by
+            # leaving its own left edge and entering the share's right -- which advances
+            # rightwards, where a centre-to-centre run would have gone 200px back the other way.
+            Edge(
+                "hc_e_shared_share",
+                "hc_var_shared",
+                "hc_cifs",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.0, 0.0),
+            ),
+            Edge(
+                "hc_e_disjoint_share",
+                "hc_var_disjoint",
+                "hc_cifs",
+                exit_at=(0.0, 1.0),
+                entry_at=(1.0, 0.0),
+            ),
             Edge("hc_e_share_svm", "hc_cifs", "hc_fsx"),
             # Around the icon's label rather than through it. An icon carries its label underneath,
             # so an edge leaving the bottom edge crosses the text -- which is what the first export
@@ -1879,13 +1949,17 @@ def render(diagram: Diagram, lang: str, uris: dict[str, str]) -> str:
             f'style={quoteattr(edge.style(diagram.font_size))} edge="1" source={quoteattr(edge.source)} '
             f'target={quoteattr(edge.target)} parent="1">'
         )
-        if edge.points:
+        if edge.points or edge.label_offset != (0, 0):
             lines.append('          <mxGeometry relative="1" as="geometry">')
-            lines.append('            <Array as="points">')
-            lines += [
-                f'              <mxPoint x="{x}" y="{y}" />' for x, y in edge.points
-            ]
-            lines.append("            </Array>")
+            if edge.points:
+                lines.append('            <Array as="points">')
+                lines += [
+                    f'              <mxPoint x="{x}" y="{y}" />' for x, y in edge.points
+                ]
+                lines.append("            </Array>")
+            if edge.label_offset != (0, 0):
+                dx, dy = edge.label_offset
+                lines.append(f'            <mxPoint as="offset" x="{dx}" y="{dy}" />')
             lines.append("          </mxGeometry>")
         else:
             lines.append('          <mxGeometry relative="1" as="geometry" />')

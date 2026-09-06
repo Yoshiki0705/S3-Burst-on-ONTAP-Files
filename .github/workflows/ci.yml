@@ -98,11 +98,15 @@ jobs:
       # This gate lived only in `make all` until a stale debt line proved what that costs: a diagram
       # crossed the readability floor as a side effect of an unrelated content change, and the line
       # claiming it was still in debt survived every pull request in between.
-      - name: Check diagram label sizes
+      # The flow gate runs beside it for the same reason: a figure whose arrows change heading
+      # has no reading order, and that is not visible in the source either.
+      - name: Check diagram label sizes and reading direction
         run: |
           set -euo pipefail
           python3 tools/check_diagram_fonts.py --selftest >/dev/null
           python3 tools/check_diagram_fonts.py
+          python3 tools/check_diagram_flow.py --selftest >/dev/null
+          python3 tools/check_diagram_flow.py
 
       - name: Lint CloudFormation templates
         run: |
