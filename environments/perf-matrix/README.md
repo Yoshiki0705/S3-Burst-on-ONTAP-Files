@@ -387,6 +387,37 @@ Get-NetTCPConnection -RemoteAddress <svm-data-lif> | Measure-Object   # 裏取�
 **NIC 1 枚でも 4 本張れた。** RSS 対応 NIC が 1 枚あれば足りる。ただし
 **`max_connections_per_session` を 32 にしても `MaxChannels` は 4 だった。**
 
+### 6.5 マウントの前に通す検査
+
+**`./runbook.sh smb-preflight` を、最初のマウントを試す前に走らせる。**
+
+SMB でマウントできる名前は共有だけで、**ボリュームの junction path は共有名ではない。**
+CIFS サーバーを作ると `c$` と `ipc$` しか作られず、どちらもデータ用ではない。
+`c$` は SVM ルート固定で ACL が `BUILTIN\administrator` なので、マップには Domain Admins が
+必要になり、**権限評価の一部を迂回するため結果の代表性が落ちる。** データ用の共有を作る。
+
+```bash
+# 共有を作る（REST。CLI でも vserver cifs share create でよい）
+curl -s -k -X POST -u "fsxadmin:$PW" -H 'Content-Type: application/json' \
+  -d '{"name":"bench","path":"/<volume-junction>","svm":{"name":"<svm-name>"}}' \
+  "https://<management-ip>/api/protocols/cifs/shares"
+./runbook.sh smb-preflight
+```
+
+**`<svm-name>` はボリューム名から導出しない。** この環境では SVM がハイフン区切り、
+ボリュームが下線区切りである。`aws fsx describe-storage-virtual-machines` の `Name` を読む。
+
+**そしてマップに使うドメインアカウントは、ディレクトリに作る必要がある。** シークレットが
+残っていてもアカウントは残らない。ディレクトリを作り直したら作り直す。
+
+| クライアントのエラー | 実際の原因 |
+|---|---|
+| `The specified network password is not correct.` | **アカウントがドメインに無い。**パスワードは合っている |
+| `The network name cannot be found.` | **共有が無い。**パスや DNS の問題ではない |
+
+機構と出典は
+[SMB でマウントできる名前と、識別子を読む場所](../../docs/ja/reference/limits/smb-share-and-identifier-reading.md)。
+
 ### 7. NFS 転送サイズの既定値
 
 ```bash

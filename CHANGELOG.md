@@ -39,6 +39,20 @@ from what was known.
   not a record of the balance.
   Volume latency is provided as total time and total operations with Sum as the only valid statistic,
   so dividing yields the period average by construction and p99 has to be measured client-side.
+- **`./runbook.sh smb-preflight` reads what an SMB mount needs, because three inferred names cost a
+  run.** On 2026-09-06 the SMB measurement stalled three times and every one was the same mistake: a
+  name taken from adjacent data instead of from the API that owns it. The volume's junction path was
+  used as a share name (SMB addresses a **share**, a separate ONTAP object; only the hidden `c$` and
+  `ipc$` exist by default, and `c$` is the SVM root with an ACL of `BUILTIN\administrator`). The SVM
+  name was spelled with underscores because the volume names are — it is hyphenated. The bench account
+  was assumed to exist because its secret did.
+  **Two of the three report something else entirely at the client**, which is why this is a script and
+  not a checklist: a missing account surfaces as `The specified network password is not correct.` and a
+  missing share as `The network name cannot be found.`. Confirmed by feeding the check each of the
+  three real mistakes: it fails on all three and names the cause, and passes on the working state.
+  Mechanism, sources and the error-to-cause table are in
+  `docs/ja/reference/limits/smb-share-and-identifier-reading.md`, and the deeper rule is stated there
+  too — **an identifier is read, never derived from a sibling name.**
 - **A guard against unilaterally enabling immutability (WORM) features**, copied verbatim from
   `FSx-for-ONTAP-Adoption-Playbook` on that repository's advice: stdlib-only, project-independent, and
   the single file is the whole of the supported use. **No divergence** — behaviour changes belong
