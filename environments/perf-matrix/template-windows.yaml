@@ -33,9 +33,15 @@ AWSTemplateFormatVersion: "2010-09-09"
 # VDBENCH and a Java runtime are not installed here. VDBENCH is fetched from Oracle under a licence
 # that has to be accepted by a person, so it is a manual step on the instance, recorded in the README.
 # =================================================================================================
+# Fn::ForEach needs this declared globally. Without it cfn-lint reports the loop key as an invalid
+# resource name (E3001) rather than as a missing transform, which reads like a naming problem.
+Transform: AWS::LanguageExtensions
+
 Description: >-
-  DEPLOYED AND TORN DOWN 2026-09-05. Windows measurement client for the SMB cases, joined to AWS Managed Microsoft AD
-  through the AWS-JoinDirectoryServiceDomain document and reachable over AWS Systems Manager.
+  TORN DOWN 2026-09-05; the ladder below has never been deployed.
+  Windows measurement clients for the SMB cases: one c5n.9xlarge for single-host figures and eight
+  c5n.2xlarge for the host-count ladder, all joined to AWS Managed Microsoft AD through the
+  AWS-JoinDirectoryServiceDomain document and reachable over AWS Systems Manager.
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -106,6 +112,14 @@ Parameters:
     Description: >-
       Matches the Linux single-host client. Its bandwidth is a guaranteed figure, which is what lets a
       plateau be read as the storage ceiling rather than the client's.
+  LadderInstanceType:
+    Type: String
+    Default: c5n.2xlarge
+    Description: >-
+      The host-count ladder. Same instance type as the Linux ladder so the two ladders differ by
+      protocol and nothing else. Windows costs 1.68x the Linux rate for the same shape ($0.912
+      against $0.544), which is the reason the ladder is not simply left running.
+
   LatestWindowsAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
@@ -286,6 +300,57 @@ Resources:
         - {Key: Role, Value: smb-single-host}
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
+  # The host-count ladder for SMB. The Linux ladder exists in template-clients.yaml; this is its
+  # counterpart, and the two are deliberately the same instance type and the same per-host load so
+  # that the only difference between the ladders is the protocol.
+  #
+  # Windows rather than Linux cifs, and that is not a preference. The single-host SMB numbers already
+  # recorded were measured with the Windows SMB client, and Multichannel is a feature of it: the
+  # observed four channels came from a Windows client on an RSS-capable NIC. Measuring the ladder over
+  # cifs would produce numbers that cannot be placed in the same column as the ones already taken.
+  #
+  # All eight are created, and the run starts a subset. Per-host load is held fixed and only the host
+  # count varies -- holding the thread total and dividing it changes two things at every point.
+  Fn::ForEach::WindowsLadder:
+    - Index
+    - ["1", "2", "3", "4", "5", "6", "7", "8"]
+    - WindowsLadder${Index}:
+        Type: AWS::EC2::Instance
+        Properties:
+          InstanceType: !Ref LadderInstanceType
+          ImageId: !Ref LatestWindowsAmiId
+          SubnetId: !Ref SubnetId
+          SecurityGroupIds: [!Ref ClientSecurityGroupId]
+          IamInstanceProfile: !Ref InstanceProfile
+          BlockDeviceMappings:
+            - DeviceName: /dev/sda1
+              Ebs:
+                # Smaller and slower than the single host's root volume on purpose: a ladder point
+                # reads from the share rather than generating data locally, so the root volume is not
+                # in the path being measured.
+                VolumeSize: 100
+                VolumeType: gp3
+                Encrypted: true
+                DeleteOnTermination: true
+          UserData:
+            Fn::Base64: !Sub
+              - |
+                <powershell>
+                $adapter = Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1
+                Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ${DnsList}
+                "DNS set to ${DnsList} at $(Get-Date -Format o)" |
+                  Out-File -FilePath C:\perfmatrix-bootstrap.log -Encoding utf8 -Append
+                New-Item -Path C:\bench -ItemType Directory -Force | Out-Null
+                </powershell>
+              - DnsList: !Join [",", !Ref DirectoryDnsIpAddresses]
+          Tags:
+            - {Key: Name, Value: !Sub "${NamePrefix}-client-windows-ladder-${Index}"}
+            # A different Role value from the Linux ladder's `host-count`, so a discovery script
+            # cannot pick up both ladders and average across protocols without noticing.
+            - {Key: Role, Value: smb-host-count}
+            - {Key: LadderIndex, Value: !Ref Index}
+            - {Key: DeleteAfterMeasurement, Value: "true"}
+
   # A separate resource, not the instance's SsmAssociations property, and the AWS-managed document, not
   # a custom one. Both of the alternatives are rejected at deploy time -- see the header.
   # No DependsOn pointing at the endpoint: it is conditional, and DependsOn cannot be made conditional.
@@ -297,8 +362,20 @@ Resources:
     Properties:
       Name: AWS-JoinDirectoryServiceDomain
       Targets:
+        # Every Windows host, listed rather than discovered by tag: a tag-targeted association picks
+        # up instances that appear later, and an instance joining the domain at an unknown time is
+        # indistinguishable from one that failed to join.
         - Key: InstanceIds
-          Values: [!Ref WindowsClient]
+          Values:
+            - !Ref WindowsClient
+            - !Ref WindowsLadder1
+            - !Ref WindowsLadder2
+            - !Ref WindowsLadder3
+            - !Ref WindowsLadder4
+            - !Ref WindowsLadder5
+            - !Ref WindowsLadder6
+            - !Ref WindowsLadder7
+            - !Ref WindowsLadder8
       Parameters:
         directoryId: [!Ref DirectoryId]
         directoryName: [!Ref DirectoryName]
@@ -312,6 +389,22 @@ Outputs:
     Description: >-
       Connect with 'aws ssm start-session --target <this>'. It appearing here is not evidence it
       joined the domain; `runbook.sh windows-status` reads that.
+  WindowsLadderInstanceIds:
+    Value: !Join
+      - ","
+      - - !Ref WindowsLadder1
+        - !Ref WindowsLadder2
+        - !Ref WindowsLadder3
+        - !Ref WindowsLadder4
+        - !Ref WindowsLadder5
+        - !Ref WindowsLadder6
+        - !Ref WindowsLadder7
+        - !Ref WindowsLadder8
+    Description: >-
+      In ladder order. Being listed here is not evidence that a host joined the domain or that
+      VDBENCH is installed on it; `runbook.sh windows-status` reads the first and the run script the
+      second.
+
   DomainJoinAssociationId:
     Value: !Ref DomainJoinAssociation
     Description: >-
@@ -327,4 +420,9 @@ Outputs:
       account is in Domain Admins and will work; a non-privileged account is the more representative
       choice and should be created in the directory if the result is meant to reflect one.
   HourlyCostNote:
-    Value: "About $2.448/hour while running. This one does stop when the instance is stopped."
+    Value: >-
+      The single host is about $4.104/hour and each ladder host about $0.912/hour while running, so
+      all nine together are about $11.40/hour. They do stop when the instances are stopped.
+      Windows carries a licence, so these are not the Linux rates: an earlier revision of this file
+      quoted $2.448 here, which is the Linux c5n.9xlarge price, understating the Windows host by
+      1.68x. Rates are On-Demand, ap-northeast-1, from the Price List API, effective 2026-09-01.
