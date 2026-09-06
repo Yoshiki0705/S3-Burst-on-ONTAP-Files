@@ -37,10 +37,12 @@ that do not render and misses ones that do. The direction rule removes most of t
 that all advance the same way have far fewer opportunities to meet.
 
 Nothing here is specific to one repository: paths are discovered rather than configured, so this file
-is copied between repositories as-is with **one line** adjusted -- the suppression on the parse call
-in `_parse()`. A repository whose ruff selects `S` needs `# noqa: S314` there; one that selects
-`RUF100` without `S` rejects the same comment as unused. The two cannot both be satisfied by one
-line, so the divergence is isolated to that function rather than left to spread.
+is copied between repositories as-is. Two things then differ, both of them known. The suppression on
+the parse call in `_parse()`: a repository whose ruff selects `S` needs `# noqa: S314` there, and one
+that selects `RUF100` without `S` rejects the same comment as unused, so the divergence is isolated to
+that one function rather than left to spread. And the line wrapping, because each repository's ruff
+carries its own line length and reformats the copy on arrival -- so the copies are the same logic and
+not the same bytes, and a diff between two of them is expected to show re-wrapped statements.
 
 There is no debt file. This gate was wired only after every figure in the repository passed it, so
 there is nothing to carry, and a gate with no exemption list cannot grow one quietly.
