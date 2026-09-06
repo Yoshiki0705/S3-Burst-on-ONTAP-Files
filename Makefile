@@ -8,7 +8,7 @@ PY ?= python3
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors test all new-pattern \
-        diagrams diagrams-check diagram-fonts \
+        diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
 
@@ -148,6 +148,10 @@ diagram-fonts: ## Diagram labels must clear the readability floor (effective siz
 	@$(PY) tools/check_diagram_fonts.py --selftest >/dev/null
 	@$(PY) tools/check_diagram_fonts.py
 
+diagram-flow: ## Diagrams must read rightwards and downwards, with labels under their icons
+	@$(PY) tools/check_diagram_flow.py --selftest >/dev/null
+	@$(PY) tools/check_diagram_flow.py
+
 # There is deliberately no `slides` target. The LT deck and its generator both live under
 # `.private/`, which is gitignored, because the generator contains the deck's text. A target
 # pointing at a gitignored path is a broken target in a fresh clone.
@@ -255,7 +259,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
