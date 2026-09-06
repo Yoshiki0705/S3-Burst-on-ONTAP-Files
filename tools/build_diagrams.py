@@ -462,21 +462,32 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon S3 Bucket (source of truth)",
         "en": "Amazon S3 Bucket (source of truth)",
     },
+    # 以下 2 つは _single_site 専用。同じ文字列を 2 行に折ったもの。共有キーのほうを折らないのは、
+    # 共有キーを使う図が公開済みブログ記事から main ブランチの URL で参照されており、折ると
+    # 公開記事の図が差し替わるため。幅を詰めていない図で見た目を変える利益はない。
+    "s3_client_stacked": {
+        "ja": "S3 Client\n(App / Pipeline)",
+        "en": "S3 Client\n(App / Pipeline)",
+    },
+    "s3_bucket_stacked": {
+        "ja": "Amazon S3 Bucket\n(source of truth)",
+        "en": "Amazon S3 Bucket\n(source of truth)",
+    },
     "s3_files": {"ja": "Amazon S3 Files", "en": "Amazon S3 Files"},
     "fsx_ontap_volume": {
-        "ja": "Amazon FSx for NetApp ONTAP (source of truth)",
-        "en": "Amazon FSx for NetApp ONTAP (source of truth)",
+        "ja": "Amazon FSx for NetApp ONTAP\n(source of truth)",
+        "en": "Amazon FSx for NetApp ONTAP\n(source of truth)",
     },
     "file_client_any": {
-        "ja": "NFS v3 / v4.x, SMB Client",
-        "en": "NFS v3 / v4.x, SMB Client",
+        "ja": "NFS v3 / v4.x,\nSMB Client",
+        "en": "NFS v3 / v4.x,\nSMB Client",
     },
     # The compute list that belongs here — Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS — cannot
     # be abbreviated in a diagram label and does not fit in two lines unabbreviated, so it lives in
     # the table beside the figure instead.
     "file_client_nfs41": {
-        "ja": "NFS v4.1 / v4.2 Client",
-        "en": "NFS v4.1 / v4.2 Client",
+        "ja": "NFS v4.1 / v4.2\nClient",
+        "en": "NFS v4.1 / v4.2\nClient",
     },
     # The edge carries the protocol only; the client node label carries the rest.
     "nfs41_protocol": {
@@ -486,16 +497,16 @@ LABELS: dict[str, dict[str, str]] = {
     # Both directions are drawn because only one of them is fast. A single "auto-sync" arrow reads as
     # if the whole thing settles in seconds, which is true of the import and not of the export.
     "sync_import": {
-        "ja": "取り込み ※3",
-        "en": "import *3",
+        "ja": "取り込み",
+        "en": "import",
     },
     "sync_export": {
-        "ja": "書き戻し ※4",
-        "en": "write-back *4",
+        "ja": "書き戻し",
+        "en": "write-back",
     },
     "nfs_smb_rw": {
-        "ja": "NFS / SMB（読み書き）※2",
-        "en": "NFS / SMB (read / write) *2",
+        "ja": "NFS / SMB（読み書き）",
+        "en": "NFS / SMB (read / write)",
     },
     # --- throughput bottlenecks (Part 2) ---------------------------------------------------------
     # --- protocol test matrix -------------------------------------------------------------------
@@ -746,88 +757,6 @@ LABELS: dict[str, dict[str, str]] = {
                     "NFS only; SMB was not measured",
                     "2026-09-01 and 09-02, ap-northeast-1, ONTAP 9.18.1P3D1, SINGLE_AZ_1, "
                     "1024 GiB of SSD, client c5n.9xlarge (c5n.2xlarge × 8 for the host-count test)",
-                ),
-            ),
-        ),
-    },
-    "single_site_note": {
-        "ja": note_body(
-            "補足",
-            (
-                (
-                    "※1",
-                    "どちらも 1 拠点で完結し、FlexCache によるファンアウトは不要",
-                    "この構成が対象とするのは、利用側が別の場所にあって動かせない場合",
-                ),
-                (
-                    "※2",
-                    "A は両方向ミリ秒（この構成での実測）",
-                    "S3 → NFS は p50 9 ms、NFS → S3 AP は p50 44 ms。同一ボリューム、64 B、"
-                    "actimeo=0、n=30。既定マウントではクライアント側キャッシュが支配的",
-                ),
-                (
-                    "※3",
-                    "B の取り込みは通常数秒（AWS ドキュメント記載。以下 ※4 も同じ）",
-                    "対象は高性能ストレージに現在データがあるファイルのみ。"
-                    "期限切れで追い出されたファイルは次のアクセスまで更新されない",
-                ),
-                (
-                    "※4",
-                    "B の書き戻しは「書き込みが約 60 秒止まってから」",
-                    "待ち時間ではなく無活動時間。30 秒ごとに 5 分追記する例ではエクスポート開始は "
-                    "6 分目で、追記が続く間はバケットに出ない",
-                ),
-                (
-                    "※5",
-                    "正本の置き場所の違い",
-                    "A は FSx for ONTAP のボリューム。B は S3 バケットのままで、"
-                    "両側が同じファイルを変更するとバケットが優先し、ファイル側は lost and found へ",
-                ),
-                (
-                    "※6",
-                    "B の利用側は AWS 上のコンピュートに限られる",
-                    "Amazon EC2、AWS Lambda、Amazon EKS、Amazon ECS。マウントヘルパーが必要",
-                ),
-            ),
-        ),
-        "en": note_body(
-            "Notes",
-            (
-                (
-                    "*1",
-                    "Both complete within one site; no FlexCache fan-out",
-                    "This architecture is for consumers that sit elsewhere and cannot be moved",
-                ),
-                (
-                    "*2",
-                    "A settles in milliseconds both ways (measured on this architecture)",
-                    "S3 to NFS p50 9 ms; NFS to S3 Access Point p50 44 ms. Same volume, 64 B, "
-                    "actimeo=0, n=30. On a default mount the client cache dominates",
-                ),
-                (
-                    "*3",
-                    "B imports in seconds, typically (AWS documentation, as is *4)",
-                    "Only for files whose data is currently in the performance tier. A file evicted "
-                    "on expiry is not updated until it is next accessed",
-                ),
-                (
-                    "*4",
-                    "B writes back only after roughly 60 seconds of write inactivity",
-                    "Not a delay but an idle period. For an application appending every 30 seconds "
-                    "for five minutes, the export starts in the sixth minute; nothing reaches the "
-                    "bucket while the appending continues",
-                ),
-                (
-                    "*5",
-                    "The source of truth sits in different places",
-                    "A: the FSx for ONTAP volume. B: the S3 bucket, unchanged — and if both sides "
-                    "change one file the bucket wins, with the file-system copy moved to lost and "
-                    "found",
-                ),
-                (
-                    "*6",
-                    "B requires consumers on AWS compute",
-                    "Amazon EC2, AWS Lambda, Amazon EKS, Amazon ECS, with a mount helper",
                 ),
             ),
         ),
@@ -1227,39 +1156,62 @@ def _single_site() -> Diagram:
     same-site case with "the S3 Access Point alone is enough; no fan-out" — it is an exit from the
     architecture, not a configuration of it, and the panels are laid out so a reader compares the
     two single-site options rather than reading either as a reduced form of the main diagram.
+
+    **The two panels stay in one figure for that reason.** Splitting them would remove the
+    comparison the figure exists to make, so the readability floor is met by narrowing instead: the
+    canvas came down from 1180 to 960 and the four long labels are folded to two lines, which is
+    what freed the width the larger font needs. A label on one line at this size is roughly twice
+    as wide as the same label on two.
+
+    The notes box is gone. Its seventeen items are in the table beside the figure in `README.md`
+    and `docs/en/README.md`, where they can be searched, selected and translated; inside the image
+    they were the first thing to become illegible and had to be kept in step with the prose by hand.
     """
     row_a, row_b = 175, 445
     return Diagram(
         name="s3burst-single-site-options",
         diagram_id="s3burst-single-site",
-        width=1180,
-        height=825,
+        # 960, not 1180. Every 100px of canvas is a further reduction applied to every label once
+        # the image is fitted to a reader's column, so the width is set by the widest row and
+        # nothing else.
+        width=960,
+        height=600,
+        font_size=16,
         groups=(
-            Group("panel_a", "panel_s3ap", 40, 60, 1100, 230),
-            Group("panel_b", "panel_s3files", 40, 330, 1100, 230),
+            Group("panel_a", "panel_s3ap", 40, 60, 880, 230),
+            Group("panel_b", "panel_s3files", 40, 330, 880, 230),
         ),
         nodes=(
-            Node("a_client", "users", "s3_client", *centred("users", 160, row_a)),
+            Node(
+                "a_client", "users", "s3_client_stacked", *centred("users", 165, row_a)
+            ),
             Node(
                 "a_ap",
                 "s3_access_point",
                 "s3_access_point",
-                *centred("s3_access_point", 400, row_a),
+                *centred("s3_access_point", 345, row_a),
             ),
             Node(
                 "a_vol",
                 "fsx_ontap",
                 "fsx_ontap_volume",
-                *centred("fsx_ontap", 680, row_a),
+                *centred("fsx_ontap", 560, row_a),
             ),
-            Node("a_file", "client", "file_client_any", *centred("client", 980, row_a)),
-            Node("b_client", "users", "s3_client", *centred("users", 160, row_b)),
+            # Furthest right so the gap before it holds the read-path label, which is the widest
+            # edge label in the figure and is wider still in English.
+            Node("a_file", "client", "file_client_any", *centred("client", 845, row_a)),
             Node(
-                "b_bucket", "s3_bucket", "s3_bucket", *centred("s3_bucket", 400, row_b)
+                "b_client", "users", "s3_client_stacked", *centred("users", 165, row_b)
             ),
-            Node("b_files", "s3", "s3_files", *centred("s3", 680, row_b)),
             Node(
-                "b_file", "client", "file_client_nfs41", *centred("client", 980, row_b)
+                "b_bucket",
+                "s3_bucket",
+                "s3_bucket_stacked",
+                *centred("s3_bucket", 345, row_b),
+            ),
+            Node("b_files", "s3", "s3_files", *centred("s3", 560, row_b)),
+            Node(
+                "b_file", "client", "file_client_nfs41", *centred("client", 845, row_b)
             ),
         ),
         edges=(
@@ -1271,7 +1223,6 @@ def _single_site() -> Diagram:
             Edge("b4", "b_files", "b_bucket", "sync_export", (0, 0.75), (1, 0.75)),
             Edge("b3", "b_files", "b_file", "nfs41_protocol"),
         ),
-        notes=(Note("note", "single_site_note", 40, 590, 1100, 205),),
     )
 
 
