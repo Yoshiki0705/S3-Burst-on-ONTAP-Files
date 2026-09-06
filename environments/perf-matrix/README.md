@@ -38,6 +38,20 @@ Elastic の 1/20 の読み取り上限しか持たないのに、この表で最
 ので、「削除タグの付いたものが残っていないか」という確認では**見つからない。** 削除確認は
 リージョン内のディレクトリを全件列挙して読む形にしてある。
 
+**そして検証行そのものがタグの範囲でしか成立していない。** 「nothing tagged for deletion
+remains」は文字どおりの意味で、**タグの付いていない残骸は範囲の外にある。** 2026-09-06 の撤去後、
+検証行が出た状態で `USER_INITIATED` のバックアップ 3 件が残っていた。前日の測定で作られたもので、
+**ファイルシステムが消えているので `FileSystem.FileSystemId` は `None` を返し、タグも無い。**
+
+```bash
+# 検証行が出たあとに、これも読む。タグを条件にしない
+aws fsx describe-backups --query 'Backups[].[BackupId,CreationTime,FileSystem.FileSystemId]' --output text
+```
+
+バックアップの削除は**取り消せない**ので、自動では消していない。読んで、要らないと判断してから
+`aws fsx delete-backup --backup-id <id>` を打つ。**検査の走査範囲は結果の一部である**という一般則は
+[規約がコードにあるとき](../../docs/agent/policy-in-code.md)にある。
+
 ## 既存の AD が使えない理由
 
 **この環境は AD を新設する。** 既存 SVM 2 つは `MEAS.FSXN.LOCAL` に参加した記録を持つが、**その
