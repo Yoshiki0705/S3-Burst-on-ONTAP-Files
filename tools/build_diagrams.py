@@ -636,15 +636,21 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon FSx for NetApp ONTAP (Origin)",
         "en": "Amazon FSx for NetApp ONTAP (Origin)",
     },
+    # _bottlenecks 専用。origin_vol_short を折ったもの。共有キーのほうを折らないのは、
+    # protocol-matrix 図が同じキーを使っており、幅を詰めていない図の見た目を変える利益がないため。
+    "origin_vol_stacked": {
+        "ja": "Amazon FSx for NetApp ONTAP\n(Origin)",
+        "en": "Amazon FSx for NetApp ONTAP\n(Origin)",
+    },
     "cache_vol_short": {
-        "ja": "Amazon FSx for NetApp ONTAP (Cache)",
-        "en": "Amazon FSx for NetApp ONTAP (Cache)",
+        "ja": "Amazon FSx for NetApp ONTAP\n(Cache)",
+        "en": "Amazon FSx for NetApp ONTAP\n(Cache)",
     },
     "efs_proxy_box": {"ja": "efs-proxy", "en": "efs-proxy"},
     "nfs_client_short": {"ja": "NFS / SMB Client", "en": "NFS / SMB Client"},
     "nfs_client_rw": {
-        "ja": "NFS Client (App / Pipeline)",
-        "en": "NFS Client (App / Pipeline)",
+        "ja": "NFS Client\n(App / Pipeline)",
+        "en": "NFS Client\n(App / Pipeline)",
     },
     "s3_client_rw": {
         "ja": "S3 Client (App / Pipeline)",
@@ -663,104 +669,17 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "ボトルネック: efs-proxy の CPU（クライアント上）",
         "en": "Bottleneck: efs-proxy CPU, on the client",
     },
+    # One line on purpose. Folded to two, the second line landed under the enclosing frame's own
+    # title and the two read as one block. `rw` is dropped rather than wrapped: the mount options
+    # are in the verification note, and this figure is about where the path plateaus.
     "loopback_mount": {
-        "ja": "NFS mount (127.0.0.1), rw",
-        "en": "NFS mount (127.0.0.1), rw",
+        "ja": "NFS mount (127.0.0.1)",
+        "en": "NFS mount (127.0.0.1)",
     },
     "s3_api": {"ja": "S3 API", "en": "S3 API"},
     "flexcache_edge": {"ja": "FlexCache", "en": "FlexCache"},
     "nfs_smb_read": {"ja": "NFS / SMB（読み取り）", "en": "NFS / SMB (read)"},
     "s3_api_rw": {"ja": "S3 API（読み書き）", "en": "S3 API (read / write)"},
-    "bottleneck_note": {
-        "ja": note_body(
-            "補足 — 実測値と、当たっていた上限の種類",
-            (
-                (
-                    "※1",
-                    "A は指定値で頭打ち。クライアントを増やしても合計は増えない",
-                    "2048 MBps 指定時の書き込み 415 MB/s（415.1 / 415.7。非圧縮、8 MiB、並列 64）。"
-                    "このとき効いていたのは HA ペアの書き込み上限 750 MBps で、その 55%。"
-                    "クライアント 4 台で合計 1.01 倍",
-                ),
-                (
-                    "※2",
-                    "A の Cache は Origin とは別のファイルシステムで、自分のスループット"
-                    "キャパシティを持つ",
-                    "両側 128 MBps 指定で、Cache 常駐の読み取りが Origin 直読みの 2.31 倍"
-                    "（882.7 / 907.1 対 383.3 MB/s）。初回は充填を伴うため 306.8 MB/s",
-                ),
-                (
-                    "※3",
-                    "B はクライアント側が頭打ちの位置。台数に比例して合計が伸びる",
-                    "1 台 581.5 MB/s から 8 台 4783.2 MB/s まで書き込みが 8.23 倍、"
-                    "1 台あたりは落ちない。8 台合計 38.3 Gbps で比例のまま",
-                ),
-                (
-                    "※4",
-                    "C は NFS クライアントが同一ホストの efs-proxy に接続する",
-                    "8 ストリームで読み取り約 450 MB/s。16 ストリームでも読み取りは伸びず、"
-                    "そのとき CPU は efs-proxy に 67.3 + 18.1 + 14.9%（8 vCPU）",
-                ),
-                (
-                    "※5",
-                    "C で nconnect が増やすのは NFS クライアントと efs-proxy の間の接続本数",
-                    "頭打ちの位置は efs-proxy 自身の CPU なので、対応していても届かない。"
-                    "経路の efs-proxy --tls は転送中の暗号化が既定であることの代価",
-                ),
-                (
-                    "※6",
-                    "測定は NFS のみ。SMB は未測定",
-                    "2026-09-01 および 09-02、ap-northeast-1、ONTAP 9.18.1P3D1、SINGLE_AZ_1、"
-                    "SSD 1024 GiB、クライアントは c5n.9xlarge（台数を振る試験は c5n.2xlarge × 8）",
-                ),
-            ),
-        ),
-        "en": note_body(
-            "Notes — measured values, and which kind of ceiling each one hit",
-            (
-                (
-                    "*1",
-                    "A plateaus at the value you specified; adding clients does not raise the total",
-                    "415 MB/s writes with 2048 MBps specified (415.1 / 415.7; incompressible, 8 MiB, "
-                    "concurrency 64). What bound was the 750 MBps HA-pair write ceiling, and that is "
-                    "55% of it. Four clients gave 1.01x in total",
-                ),
-                (
-                    "*2",
-                    "The cache in A is a separate file system with its own throughput capacity",
-                    "With 128 MBps specified on both sides, a resident cache read runs at 2.31x a "
-                    "direct origin read (882.7 / 907.1 against 383.3 MB/s). The first read fills the "
-                    "cache and comes back at 306.8 MB/s",
-                ),
-                (
-                    "*3",
-                    "B plateaus on the client side, and the total grows with host count",
-                    "Writes rise 8.23x from 581.5 MB/s on one host to 4783.2 MB/s on eight, with "
-                    "per-host throughput flat. Still proportional at 38.3 Gbps across eight hosts",
-                ),
-                (
-                    "*4",
-                    "In C the NFS client connects to an efs-proxy on the same host",
-                    "Reads reach about 450 MB/s at eight streams and go no further at sixteen, where "
-                    "CPU sits on efs-proxy at 67.3 + 18.1 + 14.9% of an 8 vCPU host",
-                ),
-                (
-                    "*5",
-                    "What nconnect would raise in C is the count of connections between the NFS "
-                    "client and efs-proxy",
-                    "The plateau is efs-proxy's own CPU, so support for it would not reach the "
-                    "plateau. The efs-proxy --tls in the path is the cost of encryption in transit "
-                    "being the default",
-                ),
-                (
-                    "*6",
-                    "NFS only; SMB was not measured",
-                    "2026-09-01 and 09-02, ap-northeast-1, ONTAP 9.18.1P3D1, SINGLE_AZ_1, "
-                    "1024 GiB of SSD, client c5n.9xlarge (c5n.2xlarge × 8 for the host-count test)",
-                ),
-            ),
-        ),
-    },
     # --- cross-cloud connectivity diagram --------------------------------------------------------
     # This figure stops at the network. The FlexCache direction it does not draw as available is the
     # whole reason the figure exists: a reader who sees three clouds converging on FSx for ONTAP will
@@ -997,6 +916,11 @@ class Edge:
     # the same protocol. Reaching for a second icon instead would say the read arrives from
     # somewhere else, which is true of this architecture's NFS / SMB side and of nothing else here.
     both_ways: bool = False
+    # Explicit waypoints, for a leg that has to leave the row it starts on. Left to itself an
+    # orthogonal edge takes the shortest path, and between two rows the shortest path runs through
+    # the label under an icon -- the one place nothing else may go. Given here rather than nudged
+    # afterwards, because then the clearances can be stated in a comment and checked against it.
+    points: tuple[tuple[int, int], ...] = ()
 
     def style(self, size: int = BODY_FONT_SIZE) -> str:
         style = resized(EDGE_STYLE, size)
@@ -1351,63 +1275,90 @@ def _bottlenecks() -> Diagram:
 
     efs-proxy gets a plain box, not an icon. There is no AWS asset for it, and borrowing another
     mark would attribute it to whoever's mark was borrowed.
+
+    **Panel A is two rows.** Five columns of these labels need about 1290px at this size, and a
+    canvas that wide brings every label back under the floor. Splitting the origin and the cache
+    across rows spends height instead, which nothing here competes for, and it puts the FlexCache
+    pull on its own segment rather than in a row of four arrows. The riser runs out to the right of
+    every label before it turns, because the space below an icon belongs to that icon's label.
+
+    The notes box is gone. Its numbers were checked off one at a time against
+    `docs/ja/verification/throughput-iops-concurrency.md`, which is where the conditions and the
+    later corrections live; all of them were already there except that the measurements are NFS
+    only, which is now a bullet in that record's "読み取れないこと". Keeping a second copy inside the
+    image meant keeping two copies in step by hand, and the copy in the image had already drifted:
+    it stated an ONTAP version that the record says `DescribeFileSystems` returned as null for this
+    purpose-built file system.
+
+    That record has no English translation, so an English reader of this figure gets the panels and
+    the bottleneck under each one, and no numbers. That is the intended reading either way -- the
+    figure says where each path plateaus, not how fast it is.
     """
-    row_a, row_b, row_c = 175, 420, 665
+    row_a1, row_a2, row_b, row_c = 155, 310, 545, 760
     return Diagram(
         name="s3burst-throughput-bottlenecks",
         diagram_id="s3burst-bottlenecks",
-        width=1180,
-        height=1035,
+        # 960 rather than 1180: the width is set by the widest row and nothing else, and every
+        # extra 100px is a further reduction applied to every label in the figure.
+        width=960,
+        height=960,
+        font_size=16,
         groups=(
-            Group("panel_a", "panel_this_arch", 40, 60, 1100, 230),
-            Group("panel_b", "panel_amazon_s3", 40, 305, 1100, 230),
-            Group("panel_c", "panel_s3_files_path", 40, 550, 1100, 230),
+            # 各パネルの高さは、最下段のアイコンではなく **その下のラベル 2 行** と、さらに下に
+            # 置くボトルネックのキャプションで決まる。アイコン基準で切ると両方に重なる。
+            Group("panel_a", "panel_this_arch", 40, 60, 880, 390),
+            Group("panel_b", "panel_amazon_s3", 40, 480, 880, 160),
+            Group("panel_c", "panel_s3_files_path", 40, 670, 880, 250),
         ),
         frames=(
             # The client and the proxy sit on one host. Drawn as a container so the loopback mount
             # inside it is unmistakable.
-            Frame("c_host", "client_host", 80, 585, 420, 145),
+            # Height hugs the client's two label lines. Cut wider than the content, the dashed
+            # bottom edge runs close enough to the bottleneck caption to read as its underline.
+            Frame("c_host", "client_host", 70, 710, 440, 140),
         ),
         nodes=(
-            Node("a_client", "users", "s3_client", *centred("users", 140, row_a)),
+            Node(
+                "a_client", "users", "s3_client_stacked", *centred("users", 150, row_a1)
+            ),
             Node(
                 "a_ap",
                 "s3_access_point",
                 "s3_access_point",
-                *centred("s3_access_point", 330, row_a),
+                *centred("s3_access_point", 385, row_a1),
             ),
             Node(
                 "a_origin",
                 "fsx_ontap",
-                "origin_vol_short",
-                *centred("fsx_ontap", 550, row_a),
+                "origin_vol_stacked",
+                *centred("fsx_ontap", 665, row_a1),
             ),
             Node(
                 "a_cache",
                 "fsx_ontap",
                 "cache_vol_short",
-                *centred("fsx_ontap", 800, row_a),
+                *centred("fsx_ontap", 200, row_a2),
             ),
             Node(
-                "a_file", "client", "nfs_client_short", *centred("client", 1030, row_a)
+                "a_file", "client", "nfs_client_short", *centred("client", 520, row_a2)
             ),
-            Node("b_client", "users", "s3_client_n", *centred("users", 140, row_b)),
-            Node("b_s3", "s3", "amazon_s3_node", *centred("s3", 550, row_b)),
-            Node("c_client", "users", "nfs_client_rw", *centred("users", 140, row_c)),
-            Node("c_files", "s3", "s3_files", *centred("s3", 640, row_c)),
+            Node("b_client", "users", "s3_client_n", *centred("users", 150, row_b)),
+            Node("b_s3", "s3", "amazon_s3_node", *centred("s3", 460, row_b)),
+            Node("c_client", "users", "nfs_client_rw", *centred("users", 145, row_c)),
+            Node("c_files", "s3", "s3_files", *centred("s3", 610, row_c)),
             Node(
                 "c_bucket",
                 "s3_bucket",
-                "s3_bucket",
-                *centred("s3_bucket", 880, row_c),
+                "s3_bucket_stacked",
+                *centred("s3_bucket", 830, row_c),
             ),
         ),
         texts=(
-            TextBox("a_bn", "bn_this_arch", 380, 250, 620, 20),
-            TextBox("b_bn", "bn_amazon_s3", 200, 495, 700, 20),
-            TextBox("c_bn", "bn_s3_files", 200, 742, 480, 20),
+            TextBox("a_bn", "bn_this_arch", 150, 410, 620, 20),
+            TextBox("b_bn", "bn_amazon_s3", 110, 610, 700, 20),
+            TextBox("c_bn", "bn_s3_files", 110, 880, 480, 20),
             # A plain box, since no AWS asset exists for this process.
-            TextBox("c_proxy", "efs_proxy_box", 375, 645, 110, 40),
+            TextBox("c_proxy", "efs_proxy_box", 395, 740, 110, 40),
         ),
         edges=(
             # A's two client legs are not symmetric, and that asymmetry is the architecture. The
@@ -1415,8 +1366,18 @@ def _bottlenecks() -> Diagram:
             # it is drawn both ways. The NFS / SMB side is the read fan-out, so it is one way.
             Edge("q1", "a_client", "a_ap", "s3_api_rw", both_ways=True),
             Edge("q2", "a_ap", "a_origin", both_ways=True),
-            # One way on purpose: the cache pulls from the origin.
-            Edge("q3", "a_origin", "a_cache", "flexcache_edge"),
+            # One way on purpose: the cache pulls from the origin. Out to a riser clear of every
+            # label on the row above, then back along y=252 -- below the origin label, which ends at
+            # 239, and above the cache icon, which starts at 262.
+            Edge(
+                "q3",
+                "a_origin",
+                "a_cache",
+                "flexcache_edge",
+                (1, 0.5),
+                (0.5, 0),
+                points=((840, row_a1), (840, 252), (200, 252)),
+            ),
             Edge("q4", "a_cache", "a_file", "nfs_smb_read"),
             # B and C move data both ways over one protocol from one client, so both ends carry an
             # arrowhead rather than a second client icon standing in for the read.
@@ -1427,7 +1388,6 @@ def _bottlenecks() -> Diagram:
             Edge("q7", "c_proxy", "c_files", both_ways=True),
             Edge("q8", "c_files", "c_bucket", both_ways=True),
         ),
-        notes=(Note("note", "bottleneck_note", 40, 800, 1100, 215),),
     )
 
 
@@ -1738,7 +1698,16 @@ def render(diagram: Diagram, lang: str, uris: dict[str, str]) -> str:
             f'style={quoteattr(edge.style(diagram.font_size))} edge="1" source={quoteattr(edge.source)} '
             f'target={quoteattr(edge.target)} parent="1">'
         )
-        lines.append('          <mxGeometry relative="1" as="geometry" />')
+        if edge.points:
+            lines.append('          <mxGeometry relative="1" as="geometry">')
+            lines.append('            <Array as="points">')
+            lines += [
+                f'              <mxPoint x="{x}" y="{y}" />' for x, y in edge.points
+            ]
+            lines.append("            </Array>")
+            lines.append("          </mxGeometry>")
+        else:
+            lines.append('          <mxGeometry relative="1" as="geometry" />')
         lines.append("        </mxCell>")
     for note in diagram.notes:
         vertex(
@@ -1890,7 +1859,20 @@ def main() -> int:
     for diagram in DIAGRAMS:
         for lang in LANGS:
             path = DIAGRAM_DIR / diagram.filename(lang)
-            path.write_text(render(diagram, lang, uris), encoding="utf-8")
+            xml = render(diagram, lang, uris)
+            # Assert the waypoints reached the file, not that the spec listed them. In a sibling
+            # repository this field existed on the dataclass and was never emitted, so every
+            # waypoint in every figure was discarded while draw.io routed each edge itself -- right
+            # wherever its own choice happened to match, and straight through the middle of a
+            # transparent box where it did not. `--check` cannot catch that: it compares the written
+            # file against the same renderer that dropped them.
+            wanted = sum(len(edge.points) for edge in diagram.edges)
+            got = xml.count("<mxPoint x=")
+            if wanted != got:
+                raise SystemExit(
+                    f"build_diagrams: {path.name} carries {got} waypoint(s), spec has {wanted}"
+                )
+            path.write_text(xml, encoding="utf-8")
             print(f"  wrote     {path.relative_to(ROOT)}")
             if args.export:
                 export(diagram, lang)

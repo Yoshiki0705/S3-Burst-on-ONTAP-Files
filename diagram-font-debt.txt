@@ -11,6 +11,19 @@
 # notes box moves into the surrounding prose. Kept in the figure, its longest line dictates the
 # canvas width, and a wider canvas raises the required font again (1488px -> 24). Moved out, what
 # remains is relayout: fold labels to two lines, narrow the canvas toward 880px, stack vertically.
+# That is what single-site-options and throughput-bottlenecks did, which is why they are no longer
+# listed. Neither needed splitting.
+#
+# Why each of the six is still here:
+#
+#   architecture-overview, cross-cloud-connectivity -- a published article embeds these by a URL
+#   that resolves against a branch, not a pinned commit, so regenerating them changes what is
+#   already published. Blocked on the article bodies being updated to pinned URLs first, not on
+#   layout. Procedure: .private/PENDING-image-url-pinning.md
+#
+#   protocol-test-matrix -- deliberately left. Nothing references it, so a fix reaches no reader.
+#   Revisit if a document starts embedding it, and treat it as a redesign at that point rather
+#   than a font bump: it carries no measured number, so its panels can be a table instead.
 #
 # Standard: ~/.kiro/steering/global-document-readability.md
 docs/_assets/diagrams/s3burst-architecture-overview-en.drawio
@@ -19,5 +32,3 @@ docs/_assets/diagrams/s3burst-cross-cloud-connectivity-en.drawio
 docs/_assets/diagrams/s3burst-cross-cloud-connectivity.drawio
 docs/_assets/diagrams/s3burst-protocol-test-matrix-en.drawio
 docs/_assets/diagrams/s3burst-protocol-test-matrix.drawio
-docs/_assets/diagrams/s3burst-throughput-bottlenecks-en.drawio
-docs/_assets/diagrams/s3burst-throughput-bottlenecks.drawio
