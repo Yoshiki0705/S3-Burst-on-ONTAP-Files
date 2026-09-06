@@ -27,6 +27,18 @@ from what was known.
   for directory depth, `4 段の引用符`. That distinction is why the rule is a list of literal strings
   rather than a test for coinage in general, which does not exist. Two headings were renamed, so
   their anchors moved and the inbound links moved with them.
+- **Burst-credit balance is now a required item in the measurement record, and latency percentiles
+  are attributed to the side that can produce them.** Both are cited from
+  `FSx-for-ONTAP-Adoption-Playbook`, which owns the judgement here: a run whose credit balance was not
+  recorded does not reproduce, because a short run on a full balance measures burst and the same run on
+  an exhausted one measures baseline. The balance is readable as `FileServerDiskThroughputBalance` and
+  `FileServerDiskIopsBalance`, sent at a 5-minute interval unlike the other metrics.
+  **This was missing from the list here**, which enumerated the conditions of a measurement and not the
+  state of the file system underneath it. The 128 MBps balance is still unmeasured on this side; the
+  reads landing at 297–317 MB/s warm and cold are consistent with a burst ceiling, and consistency is
+  not a record of the balance.
+  Volume latency is provided as total time and total operations with Sum as the only valid statistic,
+  so dividing yields the period average by construction and p99 has to be measured client-side.
 - **A guard against unilaterally enabling immutability (WORM) features**, copied verbatim from
   `FSx-for-ONTAP-Adoption-Playbook` on that repository's advice: stdlib-only, project-independent, and
   the single file is the whole of the supported use. **No divergence** — behaviour changes belong
