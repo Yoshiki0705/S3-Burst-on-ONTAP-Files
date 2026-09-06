@@ -143,12 +143,25 @@ fitting, work down this list — shrinking the font is not on it.
 4. Split the figure.
 5. Abstract — collapse individual resources into the role they play.
 
-### Existing debt
+### No figure carries a notes box
 
-The figures listed in `diagram-font-debt.txt` predate the gate and do not meet the floor. **The file
-may only shrink**: an unlisted violation fails, and so does a listed file that now meets the floor,
-so fixing a diagram forces its line out.
+`diagram-font-debt.txt` is gone. It held the six figures that predated the gate, and step 2 of the
+list above has now been applied to all of them, so every figure is built at `font_size=16` on a
+canvas between 878 and 960px.
 
-Fixing them needs one decision that is not a layout decision — whether each figure's in-image notes
-box moves into the surrounding prose. Kept in the figure, its longest line dictates the canvas width,
-and a wider canvas raises the required font again. Moved out, what remains is relayout.
+The gate still reads that filename, and a new violation can be parked there rather than fixing the
+figure in the same change. **The file may only shrink**: an unlisted violation fails, and so does a
+listed file that now meets the floor, which is what forces a line out when a diagram is repaired.
+Re-creating it is a decision to be made in the open, not a quiet fallback.
+
+Two things are worth keeping in mind, because both were the reason the boxes looked cheap:
+
+- **A note fixed the canvas width at its own longest line.** The overview's box needed 1450px, which
+  set the figure at 1550px, which a reader's column scales to 0.57 — so the annotation was taking
+  legibility from every label in the figure to buy its own.
+- **Moving a note out is not transcription.** Each item is checked against the prose one at a time.
+  Across the six figures, all but two were already stated at more length in the verification records
+  or the article body. The two that were not are the `NFS → S3 AP p50 44 ms` figure, added to the
+  article, and that every measurement is over NFS and none over SMB, now a bullet in
+  `docs/ja/verification/throughput-iops-concurrency.md`. Copying twenty items into a document that
+  already holds eighteen of them creates the second copy the box was criticised for.

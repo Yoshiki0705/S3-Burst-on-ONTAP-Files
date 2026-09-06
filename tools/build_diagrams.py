@@ -465,6 +465,24 @@ LABELS: dict[str, dict[str, str]] = {
     # 以下 2 つは _single_site 専用。同じ文字列を 2 行に折ったもの。共有キーのほうを折らないのは、
     # 共有キーを使う図が公開済みブログ記事から main ブランチの URL で参照されており、折ると
     # 公開記事の図が差し替わるため。幅を詰めていない図で見た目を変える利益はない。
+    # _overview と _protocol_matrix 専用の折返し。共有キーを折ると、幅を詰めていない図の
+    # 見た目まで変わる。
+    "s3_ap_stacked": {
+        "ja": "Amazon S3\nAccess Point",
+        "en": "Amazon S3\nAccess Point",
+    },
+    "origin_vol_two_line": {
+        "ja": "Amazon FSx for\nNetApp ONTAP (Origin)",
+        "en": "Amazon FSx for\nNetApp ONTAP (Origin)",
+    },
+    "file_client_stacked": {
+        "ja": "NFS / SMB Client\n(HiL, EDA, VFX)",
+        "en": "NFS / SMB Client\n(HiL, EDA, VFX)",
+    },
+    "cache_vol_fsx_stacked": {
+        "ja": "Amazon FSx for\nNetApp ONTAP",
+        "en": "Amazon FSx for\nNetApp ONTAP",
+    },
     "s3_client_stacked": {
         "ja": "S3 Client\n(App / Pipeline)",
         "en": "S3 Client\n(App / Pipeline)",
@@ -522,9 +540,11 @@ LABELS: dict[str, dict[str, str]] = {
     "efs_node": {"ja": "Amazon EFS", "en": "Amazon EFS"},
     "linux_client": {"ja": "Linux Client", "en": "Linux Client"},
     "windows_client": {"ja": "Windows Client", "en": "Windows Client"},
+    # Folded at the arrow. Unfolded, the English line is about 595px and it was one of the three
+    # captions that fixed this figure's width at 1180.
     "write_then_a1": {
-        "ja": "① S3 API で 1 回だけ書く　→　② A-1: 同じ経路で読む",
-        "en": "1. Write once over the S3 API  ->  2. A-1: read back over the same path",
+        "ja": "① S3 API で 1 回だけ書く\u3000→<br>② A-1: 同じ経路で読む",
+        "en": "1. Write once over the S3 API  -><br>2. A-1: read back over the same path",
     },
     "read_a2": {
         "ja": "③ A-2: 同じデータを NFS / SMB で読む",
@@ -532,9 +552,9 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "efs_protocols": {
         "ja": "対応: NFSv4.0 / NFSv4.1<br><b>非対応: SMB・NFSv3・NFSv4.2・nconnect</b>"
-        "<br>Windows を実行する EC2 からのマウントも<b>非対応</b>",
+        "<br>Windows を実行する EC2 からの<br>マウントも<b>非対応</b>",
         "en": "Supported: NFSv4.0 / NFSv4.1<br><b>Not supported: SMB, NFSv3, NFSv4.2, nconnect</b>"
-        "<br>Mounting from an EC2 instance running Windows is <b>not supported</b> either",
+        "<br>Mounting from an EC2 instance running Windows<br>is <b>not supported</b> either",
     },
     "ontap_protocols": {
         "ja": "対応: SMB (2.0 / 3.0 / 3.1.1)<br>NFSv3 / v4.0 / v4.1 / v4.2"
@@ -543,8 +563,8 @@ LABELS: dict[str, dict[str, str]] = {
         "<br>nconnect up to 16 connections",
     },
     "comparable_only": {
-        "ja": "D と E を同じ列に並べられるのは NFSv4.0 と NFSv4.1 だけ",
-        "en": "Only NFSv4.0 and NFSv4.1 can be put in the same column for D and E",
+        "ja": "D と E を同じ列に並べられるのは<br>NFSv4.0 と NFSv4.1 だけ",
+        "en": "Only NFSv4.0 and NFSv4.1 can be put<br>in the same column for D and E",
     },
     "matrix_note": {
         "ja": note_body(
@@ -723,8 +743,8 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "direct_connect": {"ja": "AWS Direct Connect", "en": "AWS Direct Connect"},
     "provider_fabric": {
-        "ja": "相互接続プロバイダのファブリック",
-        "en": "Interconnection provider's fabric",
+        "ja": "相互接続プロバイダの<br>ファブリック",
+        "en": "Interconnection provider's<br>fabric",
     },
     "aws_cloud_consuming": {
         "ja": "AWS Cloud",
@@ -741,13 +761,20 @@ LABELS: dict[str, dict[str, str]] = {
     # the three origins would cross the connectivity frames, and one arrow standing for all three
     # would attach a single verdict to platforms that have two different ones. A barrier says where
     # the evidence stops without implying a route that has been tried.
+    # Wrapped explicitly. A TextBox does not wrap on export, so the longest line here is the
+    # figure's width, and in English this one line is about 1530px -- which is what held the
+    # canvas at 1400 and every label at 7.2px in a reader's column.
     "unconfirmed_boundary": {
-        "ja": "この図が示すのはネットワーク層だけ — "
-        "他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成"
-        "（FlexCache）は未確認、または機構として対象外",
-        "en": "This figure covers the network layer only - another cloud's file storage as the "
-        "origin with FSx for ONTAP as the cache (FlexCache) is unconfirmed, or out of scope as a "
-        "mechanism",
+        "ja": (
+            "この図が示すのはネットワーク層だけ。<br>"
+            "他クラウドのファイルストレージを Origin とし、FSx for ONTAP を Cache にする構成<br>"
+            "（FlexCache）は未確認、または機構として対象外"
+        ),
+        "en": (
+            "This figure covers the network layer only.<br>"
+            "Another cloud's file storage as the origin with FSx for ONTAP as the cache<br>"
+            "(FlexCache) is unconfirmed, or out of scope as a mechanism"
+        ),
     },
     "cross_cloud_note": {
         "ja": note_body(
@@ -1004,72 +1031,109 @@ def _overview() -> Diagram:
 
     The cache side is drawn as two products inside one frame rather than as a single icon. AWS
     documents the cache as either FSx for ONTAP or on-premises ONTAP, and a lone FSx for ONTAP icon
-    reads as a requirement — which would send a reader with an existing on-premises cluster looking
+    reads as a requirement -- which would send a reader with an existing on-premises cluster looking
     for a second file system they do not need. The FlexCache edge lands on the frame so it arrives at
     the choice rather than at whichever option is drawn first.
+
+    **Two bands, not one row.** The chain is six elements wide and two of them are frames rather
+    than icons, which at this label size needs about 1550px in a row -- and a 1550px canvas is
+    scaled to 0.57 in a reader's column, so the labels arrive at 6.5px. The origin region keeps the
+    top band and everything past the link moves to the second, which spends height that nothing here
+    competes for. The riser leaves to the right of every label on the top band before it turns,
+    because the space below an icon belongs to that icon's label.
+
+    The notes box is gone. Its six items were checked off one at a time: the reflection latency and
+    the FlexCache increment are in the article body and in
+    `docs/ja/verification/cross-protocol-directions.md`; the supported cache platforms and the
+    unverified on-premises path are in `docs/ja/verification-status.md`, which is the single source
+    for how far each claim has been taken; and the connectivity cases are the three lines the frame
+    in this figure already carries. Kept in the image, the longest of those lines was what fixed the
+    canvas at 1450px wide.
     """
     return Diagram(
         name="s3burst-architecture-overview",
         diagram_id="s3burst-overview",
-        width=1550,
-        height=665,
+        width=900,
+        height=840,
+        font_size=16,
         groups=(
-            Group("aws_cloud", "aws_cloud", 50, 50, 560, 350),
-            # Moved right by 120 to open the gap the connectivity frame sits in. At the previous
-            # position the two boundaries were 110 px apart, which fits an icon but not a frame
-            # naming three cases -- and naming them is the point, since a single icon on this link
-            # reads as a requirement.
+            Group("aws_cloud", "aws_cloud", 40, 60, 560, 250),
             Group(
                 "edge_group",
                 "cache_site",
-                920,
-                50,
-                560,
                 350,
+                350,
+                530,
+                440,
                 gr_icon="group_corporate_data_center",
                 stroke="#147EBA",
             ),
         ),
         frames=(
-            Frame("cache_platform", "cache_platform", 960, 85, 220, 270),
-            # Sits between the two boundaries, on the FlexCache edge rather than beside it.
-            Frame("link_layer", "connect_layer", 700, 128, 206, 150),
+            Frame("cache_platform", "cache_platform", 380, 390, 250, 360),
+            # The link is its own band now, so the frame no longer has to squeeze into a gap between
+            # two group boundaries. It keeps naming all three cases: a single icon on this link
+            # would read as a requirement.
+            Frame("link_layer", "connect_layer", 40, 350, 270, 190),
         ),
         nodes=(
-            Node("s3client", "users", "s3_client", 100, 180),
-            Node("s3ap", "s3_access_point", "s3_access_point", 270, 180),
-            Node("origin_vol", "fsx_ontap", "origin_volume", 420, 164),
+            Node("s3client", "users", "s3_client_stacked", 90, 150),
+            Node("s3ap", "s3_access_point", "s3_ap_stacked", 250, 150),
+            Node("origin_vol", "fsx_ontap", "origin_vol_two_line", 450, 134),
             Node(
                 "cache_fsx",
                 "fsx_ontap",
-                "cache_volume_fsx",
-                *centred("fsx_ontap", 1070, 155),
+                "cache_vol_fsx_stacked",
+                *centred("fsx_ontap", 505, 470),
             ),
             Node(
                 "cache_ontap",
                 "ontap_9",
                 "cache_volume_ontap",
-                *centred("ontap_9", 1070, 285),
+                *centred("ontap_9", 505, 655),
             ),
-            Node("nfs_client", "client", "file_client", *centred("client", 1360, 205)),
+            Node(
+                "nfs_client",
+                "client",
+                "file_client_stacked",
+                *centred("client", 760, 570),
+            ),
         ),
         texts=(
-            TextBox("cache_or", "either_of", 1020, 215, 100, 20),
-            TextBox("link_1", "link_same_region", 708, 158, 190, 20),
-            TextBox("link_2", "link_cross_region", 708, 190, 190, 32),
-            TextBox("link_3", "link_onprem", 708, 234, 190, 32),
+            TextBox("cache_or", "either_of", 470, 575, 70, 20),
+            TextBox("link_1", "link_same_region", 55, 390, 240, 20),
+            TextBox("link_2", "link_cross_region", 55, 425, 240, 40),
+            TextBox("link_3", "link_onprem", 55, 480, 240, 40),
         ),
         edges=(
             Edge("e1", "s3client", "s3ap", "put_object"),
             Edge("e2", "s3ap", "origin_vol"),
-            # Split in two so the connectivity frame sits on the path instead of alongside it. The
-            # FlexCache label stays on the first leg, because FlexCache is what crosses the link --
-            # the frame says what the link is made of, not what runs over it.
-            Edge("e3", "origin_vol", "link_layer", "flexcache_pull"),
-            Edge("e3b", "link_layer", "cache_platform"),
+            # Out to a riser at x=640, clear of every label on the top band, then along y=332 --
+            # below the origin group, which ends at 310, and above the link frame, which starts at
+            # 350, so the label centred on it straddles neither border. Split in two so the
+            # connectivity frame sits on the path instead of alongside it. The FlexCache label stays
+            # on the first leg, because FlexCache is what crosses the link -- the frame says what the
+            # link is made of, not what runs over it.
+            Edge(
+                "e3",
+                "origin_vol",
+                "link_layer",
+                "flexcache_pull",
+                (1, 0.5),
+                (0.5, 0),
+                points=((640, 174), (640, 332), (175, 332)),
+            ),
+            Edge(
+                "e3b",
+                "link_layer",
+                "cache_platform",
+                "",
+                (1, 0.5),
+                (0, 0.2),
+                points=((345, 445), (345, 462)),
+            ),
             Edge("e4", "cache_platform", "nfs_client", "nfs_smb"),
         ),
-        notes=(Note("note", "overview_note", 50, 440, 1450, 215),),
     )
 
 
@@ -1153,112 +1217,133 @@ def _single_site() -> Diagram:
 def _cross_cloud() -> Diagram:
     """Private connectivity from three other clouds to AWS, stopping where the evidence stops.
 
-    The layout carries the argument. Left to right is the network path, and it ends at Amazon VPC.
-    FSx for ONTAP sits inside the AWS boundary but the edge reaching it is dashed and labelled,
-    because the FlexCache direction from another cloud's file storage is not in AWS's supported
-    configurations. Drawing it solid would turn a network diagram into an architecture proposal.
+    **Three bands, not four columns.** The figure used to read left to right -- source cloud, its
+    network, the way in, the AWS boundary -- which needs about 1400px, and a 1400px canvas is scaled
+    to 0.63 in a reader's column, so every label arrived at 7.2px. Height is the cheap axis, so the
+    three source clouds share the top band, the two ways in share the second, and AWS is the third.
+    The network name moved inside each cloud's own frame: it was a column of its own with one short
+    label per row, which is 200px of width to say something containment already says.
 
-    The two ways of building the connection are stacked as separate frames rather than as
-    alternatives on one line, because what decides whether each is available is a different thing --
-    Region pairs for the managed service, overlapping locations for the partner route -- and putting
-    them on one line invites reading the second as an extension of the first's coverage.
+    The two ways of building the connection are still separate frames rather than alternatives on
+    one line, because what decides whether each is available is a different thing -- Region pairs for
+    the managed service, overlapping locations for the partner route -- and putting them on one line
+    invites reading the second as an extension of the first's coverage.
+
+    Azure keeps two edges. A managed service at Preview since 2026-08, and the partner route it had
+    before that. Dropping the partner route would say a Preview is a substitute for a GA path, and
+    dropping the Preview edge would keep saying Azure is outside way 1, which it no longer is. The
+    lifecycle rides on the edge rather than on the frame, because the frame holds three CSPs at two
+    different lifecycles and a frame-level label would flatten them into one.
+
+    The notes box is gone. What it carried -- which pairs are GA, which are Preview, and what is not
+    a FlexCache path -- is in `docs/ja/reference/comparison/` and in the article body, and the
+    boundary claim is the banner this figure still opens with. In the image, the longest of its lines
+    fixed the canvas at 1300px wide.
     """
     return Diagram(
         name="s3burst-cross-cloud-connectivity",
         diagram_id="s3burst-cross-cloud",
-        width=1400,
-        height=900,
-        groups=(Group("aws_cloud_r", "aws_cloud_consuming", 1060, 50, 290, 520),),
+        width=970,
+        height=1120,
+        font_size=16,
+        groups=(Group("aws_cloud_r", "aws_cloud_consuming", 40, 820, 890, 260),),
         frames=(
-            # Ordered so that the two clouds with a managed service at GA sit next to each other and
-            # their edges reach the upper frame without crossing Azure's edge to the lower one. The
-            # order is a consequence of the connectivity status, not alphabetical.
-            Frame("gcp", "gcp_cloud", 50, 50, 250, 150),
-            Frame("oci", "oci_cloud", 50, 235, 250, 150),
-            Frame("azure", "azure_cloud", 50, 420, 250, 150),
-            Frame("managed", "managed_way", 620, 50, 330, 230),
-            Frame("partner", "partner_way", 620, 320, 330, 250),
-            Frame("aws_vpc_f", "aws_vpc", 1085, 100, 240, 440),
+            # Left to right by connectivity status, not alphabetically: the two clouds with a
+            # managed service at GA sit together, so their edges reach the upper frame without
+            # crossing Azure's edge to the lower one.
+            Frame("gcp", "gcp_cloud", 40, 120, 270, 240),
+            Frame("oci", "oci_cloud", 350, 120, 270, 240),
+            Frame("azure", "azure_cloud", 660, 120, 270, 240),
+            Frame("managed", "managed_way", 40, 500, 430, 250),
+            Frame("partner", "partner_way", 510, 500, 430, 250),
+            Frame("aws_vpc_f", "aws_vpc", 70, 870, 830, 170),
         ),
         nodes=(
             Node(
                 "gcnv_n",
                 "gcnv_storage_category",
                 "gcnv",
-                *centred("gcnv_storage_category", 175, 110),
+                *centred("gcnv_storage_category", 175, 205),
             ),
             Node(
                 "anf_n",
                 "azure_netapp_files",
                 "anf",
-                *centred("azure_netapp_files", 175, 480),
+                *centred("azure_netapp_files", 795, 205),
             ),
             Node(
                 "ic_n",
                 "aws_interconnect",
                 "aws_interconnect_mc",
-                *centred("aws_interconnect", 785, 145),
+                *centred("aws_interconnect", 255, 610),
             ),
             Node(
                 "dx_n",
                 "direct_connect",
                 "direct_connect",
-                *centred("direct_connect", 785, 400),
+                *centred("direct_connect", 725, 585),
             ),
             Node(
                 "fsx_n",
                 "fsx_ontap",
                 "fsx_here",
-                *centred("fsx_ontap", 1205, 200),
+                *centred("fsx_ontap", 260, 930),
             ),
             Node(
                 "s3ap_n",
                 "s3_access_point",
                 "s3ap_here",
-                *centred("s3_access_point", 1205, 420),
+                *centred("s3_access_point", 620, 930),
             ),
         ),
         texts=(
-            TextBox("oci_fs", "oci_file_storage", 90, 295, 170, 30),
-            TextBox("gcp_net", "gcp_vpc", 340, 110, 200, 20),
-            TextBox("oci_net", "oci_vcn", 340, 295, 200, 20),
-            TextBox("azure_net", "azure_vnet", 340, 480, 200, 20),
-            TextBox("fabric", "provider_fabric", 645, 480, 280, 40),
+            # Oracle publishes no icon set this repository can draw from, so the service is named in
+            # a box. A stand-in from another vendor's set would attribute Oracle's service to
+            # whoever's mark was borrowed.
+            TextBox("oci_fs", "oci_file_storage", 380, 190, 210, 30),
+            # Each cloud's network, inside that cloud's frame. As a column of its own it cost 200px
+            # of width to state what the frame already scopes.
+            TextBox("gcp_net", "gcp_vpc", 55, 295, 240, 20),
+            TextBox("oci_net", "oci_vcn", 365, 295, 240, 20),
+            TextBox("azure_net", "azure_vnet", 675, 295, 240, 20),
+            TextBox("fabric", "provider_fabric", 555, 670, 340, 50),
             # A banner across the top rather than a label wedged between the connectivity column and
             # the AWS boundary. Placed there it overlapped the two edges entering the VPC: a TextBox
-            # does not clip, so its text overflowed the 95 px box and crossed the arrowheads. It is
-            # also the first thing read, which is where a limit belongs.
-            TextBox("boundary", "unconfirmed_boundary", 50, 8, 1300, 30),
+            # does not clip, so its text overflowed its box and crossed the arrowheads. It is also
+            # the first thing read, which is where a limit belongs.
+            TextBox("boundary", "unconfirmed_boundary", 40, 8, 890, 90),
         ),
         edges=(
-            Edge("x1", "gcnv_n", "gcp_net"),
-            Edge("x2", "anf_n", "azure_net"),
-            Edge("x3", "oci_fs", "oci_net"),
             # Which way each cloud can use today. Google Cloud and OCI have a managed service at GA.
-            # Azure has both: a managed service at Preview since 2026-08, and the partner route it
-            # had before that. Two edges rather than one, because dropping the partner route once
-            # Preview arrived would have said a Preview is a substitute for a GA path, and dropping
-            # the Preview edge would have kept saying Azure is outside way 1, which it no longer is.
-            Edge("x4", "gcp_net", "managed", "private_path"),
-            Edge("x5", "oci_net", "managed", "private_path"),
-            Edge("x6", "azure_net", "partner", "private_path"),
-            # Enters the managed frame on its left edge, not its bottom. Left to itself, draw.io
-            # routes this one straight up the middle of the column: through the partner frame, over
-            # the Direct Connect icon, and with its label landing on top of the fabric caption. The
-            # picture then says Azure's managed path runs through the partner route, which is the one
-            # thing this figure is careful not to say.
+            Edge("x4", "gcp", "managed", "private_path", (0.5, 1), (0.31, 0)),
+            Edge(
+                "x5",
+                "oci",
+                "managed",
+                "private_path",
+                (0.5, 1),
+                (0.674, 0),
+                points=((485, 410), (330, 410)),
+            ),
+            Edge("x6", "azure", "partner", "private_path", (0.5, 1), (0.66, 0)),
+            # Down its own lane at y=440 and in from above. Routed left to itself it would run
+            # straight up the middle of the old column: through the partner frame, over the Direct
+            # Connect icon, and with its label on top of the fabric caption. The picture then said
+            # Azure's managed path runs through the partner route, which is the one thing this
+            # figure is careful not to say. It crosses OCI's riser once, at (330, 470).
             Edge(
                 "x6b",
-                "azure_net",
+                "azure",
                 "managed",
                 "private_path_preview",
-                entry_at=(0.0, 0.85),
+                (0.2, 1),
+                (0.44, 0),
+                points=((714, 470), (230, 470)),
             ),
-            Edge("x7", "managed", "aws_vpc_f"),
-            Edge("x8", "partner", "aws_vpc_f"),
+            Edge("x7", "managed", "aws_vpc_f", None, (0.5, 1), (0.22, 0)),
+            Edge("x8", "partner", "aws_vpc_f", None, (0.5, 1), (0.79, 0)),
             Edge("x9", "s3ap_n", "fsx_n"),
         ),
-        notes=(Note("note", "cross_cloud_note", 50, 620, 1300, 260),),
     )
 
 
@@ -1403,59 +1488,66 @@ def _protocol_matrix() -> Diagram:
     reason it has none.
 
     No number appears anywhere in this figure. Nothing in it has been measured.
+
+    880px panels rather than 1100. The width was set by three captions and the notes box, none of
+    which is a node, and at 1180 the whole figure arrived in a reader's column at 8.5px. The
+    captions are folded and the notes box is gone: every item it carried -- that A-1 and A-2 must
+    run against the same written data, that the existing S3 figures are not comparable to the NFS
+    ones, that D's blanks are unsupported rather than slow, and which tool measures which side -- is
+    in `docs/ja/verification/throughput-protocol-matrix-plan.md`, which the note already pointed at
+    for the procedure.
     """
-    row_a, row_d, row_e = 185, 455, 700
+    row_a, row_d = 185, 455
     return Diagram(
         name="s3burst-protocol-test-matrix",
         diagram_id="s3burst-protocol-matrix",
-        width=1180,
-        height=1075,
+        width=940,
+        height=990,
+        font_size=16,
         groups=(
-            Group("panel_a2", "panel_read_paths", 40, 60, 1100, 250),
-            Group("panel_d", "panel_efs", 40, 325, 1100, 210),
-            Group("panel_e", "panel_ontap_protocols", 40, 550, 1100, 260),
+            Group("panel_a2", "panel_read_paths", 40, 60, 880, 270),
+            Group("panel_d", "panel_efs", 40, 350, 880, 220),
+            Group("panel_e", "panel_ontap_protocols", 40, 590, 880, 300),
         ),
         nodes=(
-            Node("m_s3c", "users", "s3_client", *centred("users", 150, row_a)),
+            Node("m_s3c", "users", "s3_client_stacked", *centred("users", 140, row_a)),
             Node(
                 "m_ap",
                 "s3_access_point",
-                "s3_access_point",
-                *centred("s3_access_point", 360, row_a),
+                "s3_ap_stacked",
+                *centred("s3_access_point", 380, row_a),
             ),
             Node(
                 "m_origin",
                 "fsx_ontap",
-                "origin_vol_short",
+                "origin_vol_two_line",
                 *centred("fsx_ontap", 600, row_a),
             ),
             Node(
-                "m_file", "client", "nfs_client_short", *centred("client", 900, row_a)
+                "m_file", "client", "nfs_client_short", *centred("client", 840, row_a)
             ),
-            Node("d_linux", "client", "linux_client", *centred("client", 200, row_d)),
-            Node("d_efs", "efs", "efs_node", *centred("efs", 520, row_d)),
-            Node(
-                "e_linux", "client", "linux_client", *centred("client", 200, row_e - 60)
-            ),
-            Node(
-                "e_win", "client", "windows_client", *centred("client", 200, row_e + 60)
-            ),
+            Node("d_linux", "client", "linux_client", *centred("client", 140, row_d)),
+            Node("d_efs", "efs", "efs_node", *centred("efs", 400, row_d)),
+            Node("e_linux", "client", "linux_client", *centred("client", 140, 660)),
+            Node("e_win", "client", "windows_client", *centred("client", 140, 790)),
             Node(
                 "e_ontap",
                 "fsx_ontap",
-                "cache_volume_fsx",
-                *centred("fsx_ontap", 520, row_e),
+                "cache_vol_fsx_stacked",
+                *centred("fsx_ontap", 400, 720),
             ),
         ),
         texts=(
             # Inside the panel, not on its border. Two captions rather than three: the write and
             # the A-1 read are the same leg travelled twice, so splitting them across two x
             # positions would say they are different links.
-            TextBox("t_write_a1", "write_then_a1", 130, 262, 520, 20),
-            TextBox("t_a2", "read_a2", 660, 262, 440, 20),
-            TextBox("t_efs_p", "efs_protocols", 640, 410, 460, 90),
-            TextBox("t_ontap_p", "ontap_protocols", 640, 640, 460, 90),
-            TextBox("t_comparable", "comparable_only", 600, 770, 520, 20),
+            TextBox("t_write_a1", "write_then_a1", 60, 268, 400, 46),
+            TextBox("t_a2", "read_a2", 500, 280, 400, 24),
+            TextBox("t_efs_p", "efs_protocols", 510, 395, 390, 120),
+            TextBox("t_ontap_p", "ontap_protocols", 540, 650, 360, 90),
+            # Below panel E rather than inside it: it is about D and E together, and a caption about
+            # two panels sitting inside one of them reads as belonging to that one.
+            TextBox("t_comparable", "comparable_only", 60, 905, 560, 46),
         ),
         edges=(
             Edge("m1", "m_s3c", "m_ap", "s3_api_rw", both_ways=True),
@@ -1482,7 +1574,6 @@ def _protocol_matrix() -> Diagram:
                 entry_at=(0.0, 0.75),
             ),
         ),
-        notes=(Note("note", "matrix_note", 40, 830, 1100, 205),),
     )
 
 
