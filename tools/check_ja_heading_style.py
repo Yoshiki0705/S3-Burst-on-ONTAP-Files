@@ -83,14 +83,23 @@ def violations(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def tracked_markdown(root: Path) -> list[Path]:
+    """Tracked files *and* new ones not committed yet.
+
+    `git ls-files` alone lists what is already tracked, so a brand-new document passed this check
+    locally and failed in CI on the very commit that added it. **A gate whose scan excludes the file
+    being written reports on the past.** `--others --exclude-standard` adds untracked files while
+    still honouring .gitignore, which keeps `.private/` out.
+    """
     out = subprocess.run(
-        ["git", "ls-files", "*.md"],
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.md"],
         cwd=root,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.split()
-    return [root / name for name in out]
+    # dict.fromkeys de-duplicates while keeping order; a tracked-but-deleted path is dropped rather
+    # than raising when it is read.
+    return [p for p in (root / name for name in dict.fromkeys(out)) if p.is_file()]
 
 
 def main() -> int:

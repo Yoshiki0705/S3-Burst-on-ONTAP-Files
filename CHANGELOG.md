@@ -39,6 +39,12 @@ from what was known.
   not a record of the balance.
   Volume latency is provided as total time and total operations with Sum as the only valid statistic,
   so dividing yields the period average by construction and p99 has to be measured client-side.
+- **`make ja-headings` now scans files that are not committed yet.** It listed only tracked files, so
+  the document that introduced the SMB preflight passed locally and failed in CI on the commit that
+  added it. **A gate whose scan excludes the file being written reports on the past** — the third
+  scope-truncation failure in one session, after `| head` hid an existing parameter file and after a
+  narrow grep hid a documented mount command. `--others --exclude-standard` adds untracked files and
+  still honours .gitignore, so `.private/` stays out; both are asserted.
 - **`./runbook.sh smb-preflight` reads what an SMB mount needs, because three inferred names cost a
   run.** On 2026-09-06 the SMB measurement stalled three times and every one was the same mistake: a
   name taken from adjacent data instead of from the API that owns it. The volume's junction path was

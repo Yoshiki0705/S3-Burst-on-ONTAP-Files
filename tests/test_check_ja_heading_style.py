@@ -71,3 +71,27 @@ def test_the_repository_is_clean() -> None:
         for path in files
     }
     assert not {k: v for k, v in offenders.items() if v}
+
+
+def test_the_scan_includes_files_not_committed_yet() -> None:
+    """A new document has to be in scope before it is committed.
+
+    It was not: this check listed only tracked files, so the document that introduced it passed
+    locally and failed in CI on the commit that added it. A gate whose scan excludes the file being
+    written reports on the past.
+    """
+    root = Path(__file__).resolve().parent.parent
+    probe = root / "docs" / "ja" / "_heading_scope_probe.md"
+    probe.write_text("# t\n\n## 上限が 2 つに分かれる\n", encoding="utf-8")
+    try:
+        scanned = {p.name for p in ch.tracked_markdown(root)}
+        assert probe.name in scanned, "an untracked Markdown file was not scanned"
+    finally:
+        probe.unlink()
+
+
+def test_the_scan_honours_gitignore() -> None:
+    # .private/ holds copies of published articles and working notes. Widening the scan must not
+    # pull them in, or the gate starts reporting on text this repository does not publish.
+    root = Path(__file__).resolve().parent.parent
+    assert not [p for p in ch.tracked_markdown(root) if ".private" in str(p)]
