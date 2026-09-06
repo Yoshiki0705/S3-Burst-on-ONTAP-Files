@@ -95,6 +95,15 @@ jobs:
       - name: Check agent context budget
         run: python3 tools/check_agent_context_budget.py
 
+      # This gate lived only in `make all` until a stale debt line proved what that costs: a diagram
+      # crossed the readability floor as a side effect of an unrelated content change, and the line
+      # claiming it was still in debt survived every pull request in between.
+      - name: Check diagram label sizes
+        run: |
+          set -euo pipefail
+          python3 tools/check_diagram_fonts.py --selftest >/dev/null
+          python3 tools/check_diagram_fonts.py
+
       - name: Lint CloudFormation templates
         run: |
           set -euo pipefail
