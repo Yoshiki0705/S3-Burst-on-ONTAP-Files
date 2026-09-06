@@ -298,8 +298,8 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "Cache Site (On-premises / Remote Region)",
     },
     "s3_client": {
-        "ja": "S3 Client\n(App / Pipeline)",
-        "en": "S3 Client\n(App / Pipeline)",
+        "ja": "S3 Client (App / Pipeline)",
+        "en": "S3 Client (App / Pipeline)",
     },
     "s3_access_point": {
         "ja": "Amazon S3 Access Point",
@@ -459,6 +459,17 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "B. S3 bucket + S3 Files",
     },
     "s3_bucket": {
+        "ja": "Amazon S3 Bucket (source of truth)",
+        "en": "Amazon S3 Bucket (source of truth)",
+    },
+    # 以下 2 つは _single_site 専用。同じ文字列を 2 行に折ったもの。共有キーのほうを折らないのは、
+    # 共有キーを使う図が公開済みブログ記事から main ブランチの URL で参照されており、折ると
+    # 公開記事の図が差し替わるため。幅を詰めていない図で見た目を変える利益はない。
+    "s3_client_stacked": {
+        "ja": "S3 Client\n(App / Pipeline)",
+        "en": "S3 Client\n(App / Pipeline)",
+    },
+    "s3_bucket_stacked": {
         "ja": "Amazon S3 Bucket\n(source of truth)",
         "en": "Amazon S3 Bucket\n(source of truth)",
     },
@@ -1171,7 +1182,9 @@ def _single_site() -> Diagram:
             Group("panel_b", "panel_s3files", 40, 330, 880, 230),
         ),
         nodes=(
-            Node("a_client", "users", "s3_client", *centred("users", 165, row_a)),
+            Node(
+                "a_client", "users", "s3_client_stacked", *centred("users", 165, row_a)
+            ),
             Node(
                 "a_ap",
                 "s3_access_point",
@@ -1187,9 +1200,14 @@ def _single_site() -> Diagram:
             # Furthest right so the gap before it holds the read-path label, which is the widest
             # edge label in the figure and is wider still in English.
             Node("a_file", "client", "file_client_any", *centred("client", 845, row_a)),
-            Node("b_client", "users", "s3_client", *centred("users", 165, row_b)),
             Node(
-                "b_bucket", "s3_bucket", "s3_bucket", *centred("s3_bucket", 345, row_b)
+                "b_client", "users", "s3_client_stacked", *centred("users", 165, row_b)
+            ),
+            Node(
+                "b_bucket",
+                "s3_bucket",
+                "s3_bucket_stacked",
+                *centred("s3_bucket", 345, row_b),
             ),
             Node("b_files", "s3", "s3_files", *centred("s3", 560, row_b)),
             Node(
