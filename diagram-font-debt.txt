@@ -19,7 +19,5 @@ docs/_assets/diagrams/s3burst-cross-cloud-connectivity-en.drawio
 docs/_assets/diagrams/s3burst-cross-cloud-connectivity.drawio
 docs/_assets/diagrams/s3burst-protocol-test-matrix-en.drawio
 docs/_assets/diagrams/s3burst-protocol-test-matrix.drawio
-docs/_assets/diagrams/s3burst-single-site-options-en.drawio
-docs/_assets/diagrams/s3burst-single-site-options.drawio
 docs/_assets/diagrams/s3burst-throughput-bottlenecks-en.drawio
 docs/_assets/diagrams/s3burst-throughput-bottlenecks.drawio

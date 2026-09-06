@@ -88,6 +88,9 @@ claim, so they are not put in one table.
 
 - **Collecting over the S3 API with read-only consumers**, the import side is what matters. A is
   p50 9 ms on the same volume (64 B, `actimeo=0`, n=30); B is seconds, typically.
+- **A was measured in the other direction too.** Writing on the file side and reading through the
+  S3 Access Point was p50 44 ms under the same conditions -- slower than the import side, but both
+  stay within milliseconds.
 - **Have the consumers write back and B's roughly 60 seconds becomes the freshness everything
   downstream sees.** It is not a delay but an idle period: nothing reaches the bucket while the
   appending continues.
