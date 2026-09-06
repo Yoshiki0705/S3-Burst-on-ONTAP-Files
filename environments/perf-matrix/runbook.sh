@@ -33,6 +33,7 @@
 # =================================================================================================
 set -euo pipefail
 
+PY_BIN="${PY_BIN:-python3}"
 REGION="${AWS_REGION:-ap-northeast-1}"
 PREFIX="${NAME_PREFIX:-perfmatrix}"
 STACK_CLIENTS="${PREFIX}-clients"
@@ -644,6 +645,28 @@ NOTE
   read -r reply; [[ "$reply" == "y" ]] || die "stopping: measure the cache off, or record that it was on"
 }
 
+
+# Read the four things an SMB mount needs before trying to mount. Three of them were inferred from
+# adjacent data on 2026-09-06 and all three were wrong, and two of the three surface as error
+# messages that point somewhere else entirely -- a missing account reads as a wrong password.
+# Mechanism and sources: docs/ja/reference/limits/smb-share-and-identifier-reading.md
+smb_preflight() {
+  local svm_name="${SMB_SVM_NAME:-${PREFIX}-smb-svm}"
+  local share="${SMB_SHARE_NAME:-bench}"
+  local account="${SMB_BENCH_ACCOUNT:-benchuser}"
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  local linux; linux="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  local win; win="$(stack_output "$STACK_WINDOWS" WindowsInstanceId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no gen2 file system; run './runbook.sh gen2' first"
+  [[ -n "$linux" && "$linux" != "None" ]] || die "no Linux client; the ONTAP read runs from inside the VPC"
+  [[ -n "$win" && "$win" != "None" ]] || die "no Windows client; the account lookup runs on a joined host"
+  log "smb-preflight: svm=$svm_name share=$share account=$account"
+  "$PY_BIN" "$HERE/../../scripts/smb_preflight.py" \
+    --file-system-id "$fs_id" --svm-name "$svm_name" --share "$share" --account "$account" \
+    --client-instance-id "$linux" --windows-instance-id "$win" \
+    --region "$REGION" --fsxadmin-secret-arn "$FSXADMIN_SECRET_ARN"
+}
+
 # What is billing right now, so the answer is never "I thought it was stopped".
 # shellcheck disable=SC2016  # the backticks are JMESPath, not command substitution
 costs() {
@@ -680,6 +703,7 @@ usage() {
 Usage: runbook.sh <phase>
 
 Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> windows-status
+       -> smb-preflight (before any mount)
        -> preflight -> efs elastic -> measure -> efs provisioned -> measure -> drop it -> teardown
 
   ad                     Create AWS Managed Microsoft AD (15-30 min, ~$0.146/hour). Do this first.
@@ -690,6 +714,9 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   join-svm               Join that SVM to the directory, and poll until it is CREATED
   windows                Create the Windows client and its domain-join association (~$2.448/hour)
   windows-status         Read whether the instance arrived and whether the join ran
+  smb-preflight          Read the SVM name, the data share, its junction path and the domain
+                         account. Run it before mounting: two of these fail with messages that
+                         point elsewhere
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
   nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
@@ -720,6 +747,7 @@ case "${1:-}" in
   drop-efs-provisioned) drop_efs_provisioned ;;
   gen2)                 deploy_gen2 ;;
   smb-svm)              deploy_smb_svm ;;
+  smb-preflight)        smb_preflight ;;
   join-svm)             join_svm ;;
   windows)              deploy_windows ;;
   windows-status)       windows_status ;;
