@@ -92,3 +92,36 @@ see whether anyone read it, and presence was never the thing that failed.**
 The general rule: **before adding a check, run it and read the findings.** A detector that fires
 hundreds of times on a tree the maintainers consider clean is not measuring the rule it was written
 for, and merging it teaches everyone to pass it rather than to follow the rule.
+
+## When a step fails, four reads before the next attempt
+
+An error message names a symptom. It does not name a cause, and on this stack it routinely points
+somewhere else: a domain account that does not exist reports `The specified network password is not
+correct.`, and a CIFS share that does not exist reports `The network name cannot be found.` One
+session lost three attempts to that pair, and all three were the same mistake — a name inferred from
+adjacent data instead of read from the API that owns it.
+
+So on any failure, in this order, before changing the command:
+
+1. **List the causes that produce this exact message.** More than one usually does. If only one comes
+   to mind, that is the assumption, not the diagnosis.
+2. **Read this repository's record for the step.** The runbook, the environment README, the parameter
+   file. The mount command that failed had been documented for a month.
+3. **Read the authoritative source for every identifier in the command.** A name is read, never
+   derived from a sibling: in one environment the SVMs are hyphenated and the volumes use
+   underscores, so deriving either from the other fails. Having an id is not knowing a name.
+4. **Check the vendor documentation for the mechanism**, not for the error string. That is where "SMB
+   addresses a share, and only hidden administrative shares exist by default" was, and it made two of
+   the three failures obvious at once.
+
+Then act. **Never retry the same command to see whether it fails the same way** — it will, and the
+second failure is not evidence.
+
+**Read the whole section, not the lines that matched.** `grep | head` hid an existing parameter file
+in the same session, and a narrow pattern hid the documented mount command. A truncated scan produces
+a confident answer about what is not there. Where a check does the scanning, its scope is part of its
+result: `make ja-headings` listed only tracked files, so a new document passed locally and failed in
+CI on the commit that added it.
+
+Worked example, with sources and the error-to-cause table:
+[SMB でマウントできる名前と、識別子を読む場所](../ja/reference/limits/smb-share-and-identifier-reading.md).
