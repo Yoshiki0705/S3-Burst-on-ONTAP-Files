@@ -1,0 +1,84 @@
+**********************************************************************
+* The SMB host-count run. One question only: does the total stop climbing?
+*
+* NOT YET EXECUTED. The NFS counterpart ran on 2026-09-05 and refuted the
+* reading it was built to test: one LIF on one port carried 102 Gbps, so
+* the plateau was not a LIF ceiling. Results and that refutation are in
+* docs/ja/verification/perf-matrix-results.md. Read them before reusing a
+* number from the NFS side to predict this one.
+*
+* WHY THIS FILE EXISTS SEPARATELY FROM THE NFS LADDER
+*
+* The NFS ladder is driven over `nconnect`, a client mount option. SMB has
+* no nconnect. Its analogue is Multichannel, which is negotiated rather
+* than requested, and on this environment it settled at four channels:
+* `CurrentChannels` and `MaxChannels` both read 4 with the server's
+* `max_connections_per_session` at 32. **Why it stops at 4 is unconfirmed**
+* -- product limit, or this NIC, this OS, this configuration. So the two
+* ladders are not the same experiment with the protocol swapped: the NFS
+* side varies a number the client sets, and this side does not get to set
+* one. Record the channel count per host at each point.
+*
+*   cd C:\bench
+*   C:\bench\vdbench50407\vdbench.bat -f vdbench-windows-smb-ladder.txt -o C:\bench\out-ladder
+*
+* Started on every host at a shared wall-clock epoch, so the steady windows
+* overlap and the per-host figures can be summed. No SSH mesh: each host
+* waits for the epoch the orchestrator passes.
+**********************************************************************
+* Per-host load is held constant and the host count varies. Fixing the
+* total thread count and dividing it by the host count would make each
+* point differ in two ways at once, and a plateau would have two candidate
+* causes again.
+*
+* 64 threads on 8 vCPU, the same per-host load as the NFS ladder, so a
+* difference between the two ladders is the protocol and not the offered
+* load. It is well above what one c5n.2xlarge can absorb, which is what
+* makes the per-host share a measurement of the server's allocation rather
+* than of the client's appetite.
+**********************************************************************
+hd=default,shell=vdbench,jvms=8
+hd=hd1,system=localhost
+**********************************************************************
+* Every host reads the same file, deliberately: it lets the second-
+* generation file system's in-memory read cache serve part of the load,
+* which takes SSD out of the picture and leaves the network path as the
+* thing being measured. 600 GB is more than twice the 256 GB cache, so it
+* does not become a cache-only measurement.
+*
+* Read-only, so one file shared across hosts introduces no write
+* contention.
+*
+* A mapped drive rather than a UNC path, for the reason the head-to-head
+* file gives: a drive letter makes the credential explicit at map time, and
+* the account is part of the result. Map as a non-privileged domain
+* account -- a member of Domain Admins bypasses part of the permission
+* evaluation.
+*
+* `openflag=directio`, which is the Windows spelling. The NFS side uses
+* `o_direct`. There is no single flag meaning "bypass the client cache" on
+* both platforms, so the report has to say which was used on each side or
+* part of the gap between the two is the client's cache.
+*
+* NTFS security style on this volume against UNIX on the NFS volume. That
+* selects which permission model ONTAP consults, not how fast it serves,
+* but it belongs next to the figure.
+*
+* Both SVMs share the file system's throughput capacity. Run this while the
+* NFS side is idle, and record that it was.
+**********************************************************************
+sd=default,openflag=directio,size=600g
+sd=sd1-1,host=hd1,lun=Z:\file1
+**********************************************************************
+* 1 MiB sequential read, unthrottled. The shape the single-host SMB ceiling
+* was established with (574.24 MB/s on one channel, 2,227.61 on four), so
+* the ladder is comparable with it.
+*
+* 180 seconds of steady state after 60 of warmup, matching the NFS ladder.
+* seekpct=.0 -- sequential, wrapping at the end of the file. NOT seekpct=eof:
+* with eof the run ends when the file is reached rather than when `elapsed`
+* is up, and the NFS points came back with windows of different lengths, so
+* the host count was no longer the only thing differing between them.
+**********************************************************************
+wd=wd_seq_read_1024k,sd=sd1-1,xfersize=1024k,seekpct=.0,rdpct=100
+rd=ladder-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,elapsed=180,warmup=60,interval=1,threads=64

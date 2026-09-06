@@ -1,0 +1,103 @@
+**********************************************************************
+* The SMB shapes with the cache-hit ratio controlled.
+*
+* NOT YET EXECUTED. The NFS counterpart did not finish: the volume filled
+* and the run was abandoned. The cause was documented behaviour and the
+* omission was ours -- automatic daily backups were on, the backup snapshot
+* held the pre-overwrite blocks, and the volume went 88% -> 100% full.
+* That is closed in template-fsxn-gen2.yaml (AutomaticBackupRetentionDays: 0),
+* but read the account in docs/ja/verification/perf-matrix-results.md before
+* running this, because the same shape of mistake has more than one cause.
+*
+* WHY CONTROLLING THE RATIO IS THE ONLY HANDLE
+*
+* On the same file system, at the same connection count, the NFS ladder
+* moved 5.5x depending on whether the hosts read overlapping regions:
+* 11,916.29 MB/s sharing one file against 2,173.37 MB/s on disjoint ones.
+* SSD IOPS are consumed only for data in neither the in-memory nor the NVMe
+* cache, so how much comes back from cache decides which ceiling applies.
+*
+* There is no documented way to disable the in-memory cache or to set its
+* size (**unconfirmed** -- no statement found, which is not the same as no
+* such control existing). So the ratio is controlled from the workload
+* side, by choosing which region each shape reads.
+*
+*   cd C:\bench
+*   C:\bench\vdbench50407\vdbench.bat -f vdbench-windows-smb-cachecontrolled.txt -o C:\bench\out-cc
+**********************************************************************
+* Every shape reads its own region of one large file, and no two shapes
+* share a region. A shape therefore starts with the cache holding the
+* *previous* shape's region, which is disjoint from its own, so it begins
+* close to cold without any cache-flush step.
+*
+* Two constraints set the region size:
+*
+*   1. A region has to be larger than the cache. In-memory read cache here
+*      is 256 GB = 238 GiB. At 371 GiB per region, a shape that wrapped
+*      inside its own region would still not find all of it resident.
+*   2. A region has to be larger than what its window can consume, or the
+*      shape wraps and starts reading what it just pulled in.
+*
+* Ranges on one file rather than one file per region. Pointing several SDs
+* at separate files makes VDBENCH format each of them: with eight SDs that
+* was 5,197 GiB of formatting before any measurement started. `range=` on a
+* single file avoids it and keeps the regions provably disjoint.
+*
+* Region 1 -- the head of the file -- is measured first, and the fill leaves
+* the cache holding the *tail*, so the first shape does not start warm.
+**********************************************************************
+hd=default,shell=vdbench,jvms=16
+hd=hd1,system=localhost
+**********************************************************************
+* 2,600 GB, which is 7 regions of about 371 GiB. The volume has to hold it
+* with headroom: at 100% full, writes fall by roughly a factor of eight
+* before failing, and the run reports that as a measurement.
+*
+* `openflag=directio` (Windows). The NFS side uses `o_direct`.
+*
+* Both SVMs share the file system's throughput capacity. Run this while the
+* NFS side is idle, and record that it was.
+**********************************************************************
+sd=default,openflag=directio,size=2600g,host=hd1
+* The fill writes the whole file once. Sequential to the end, then stop.
+sd=sd_fill,lun=Z:\file1
+sd=sd1,lun=Z:\file1,range=(0,14.2857)
+sd=sd2,lun=Z:\file1,range=(14.2857,28.5714)
+sd=sd3,lun=Z:\file1,range=(28.5714,42.8571)
+sd=sd4,lun=Z:\file1,range=(42.8571,57.1429)
+sd=sd5,lun=Z:\file1,range=(57.1429,71.4286)
+sd=sd6,lun=Z:\file1,range=(71.4286,85.7143)
+sd=sd7,lun=Z:\file1,range=(85.7143,100)
+**********************************************************************
+* One shape per region, in the same order as the NFS file so the two are
+* read side by side.
+**********************************************************************
+wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+wd=wd1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=100
+wd=wd2,sd=sd2,seekpct=.0,xfersize=64k,rdpct=100
+wd=wd3,sd=sd3,seekpct=.0,xfersize=1024k,rdpct=0
+wd=wd4,sd=sd4,seekpct=.0,xfersize=64k,rdpct=0
+wd=wd5,sd=sd5,seekpct=100,xfersize=4k,rdpct=100
+wd=wd6,sd=sd6,seekpct=100,xfersize=4k,rdpct=0
+wd=wd7,sd=sd7,seekpct=100,xfersize=64k,rdpct=100
+**********************************************************************
+* The fill is a phase of the run, not a preparation step to be skipped: the
+* regions have to contain data before a read of one means anything.
+*
+* elapsed=2700 is a ceiling, not a target -- seekpct=eof ends it at the end
+* of the file. At around 2,000 MB/s a 2,600 GB fill takes about 22 minutes,
+* which at $23.03/hour is roughly $8.50 of file system time before the first
+* measured number. That is the price of controlling the ratio and it belongs
+* in the cost record.
+*
+* interval=30 during the fill: nothing about it is being measured, and
+* per-second rows for 22 minutes bury the shapes that follow.
+**********************************************************************
+rd=cc-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=2700,interval=30,threads=512
+rd=cc-seq-read-1024k,wd=wd1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-read-64k,wd=wd2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-write-1024k,wd=wd3,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-seq-write-64k,wd=wd4,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-read-4k,wd=wd5,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-write-4k,wd=wd6,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=cc-rand-read-64k,wd=wd7,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
