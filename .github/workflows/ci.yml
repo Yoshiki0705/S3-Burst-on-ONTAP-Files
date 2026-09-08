@@ -62,6 +62,10 @@ jobs:
       # from its own side.
       - name: Check cited sibling-repository anchors
         run: python3 tools/check_external_anchors.py
+      # Skips here for the same reason, plus a second one while this is new: the sibling has not
+      # published the probe contract yet. Both show up as the same skip message, which says so.
+      - name: Check claims a sibling repository cites
+        run: python3 tools/check_incoming_probes.py
 
       - name: Audit public output
         run: python3 tools/audit_public_output.py
