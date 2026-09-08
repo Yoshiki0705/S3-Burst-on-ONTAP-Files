@@ -282,13 +282,40 @@ evidence for the other. This architecture uses neither. The distinction is set o
 
 ## Related repositories
 
-| Repository | Scope |
-|---|---|
-| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | Serverless processing patterns for S3 Access Points. Individual patterns stay there |
-| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | Lifecycle and topic-oriented knowledge base for adopting FSx for ONTAP |
-
 This repository covers **the architecture itself**: collect and serve described as one design, with
-platform differences and unverified areas stated in tables.
+platform differences and unverified areas stated in tables. **It is not the entry point for
+FSx for ONTAP as a whole.** What to read before choosing an architecture, and what is needed either
+side of this one, lives in other repositories.
+
+**Read first — before choosing an architecture**
+
+| Repository | What is settled before you arrive here |
+|---|---|
+| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | The lifecycle from evaluation to operations, and topics such as data protection, performance, cost and multi-protocol identity. **Each finding states how far its evidence goes.** Whether to adopt FSx for ONTAP at all, and how to migrate, belong there |
+| [VMware-Migration-EC2-ONTAP](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP) | Migration routes from VMware ESXi to Amazon EC2 with FSx for ONTAP, verified on real hardware. The entry point when an existing ONTAP operating model is carried into AWS |
+| [BLEA-FSx-for-ONTAP-Usecase](https://github.com/Yoshiki0705/BLEA-FSx-for-ONTAP-Usecase) | FSx for ONTAP on top of a guardrailed baseline, structured as a guest system use case |
+
+**Downstream of collect — after the data arrives over the S3 API**
+
+| Repository | What it adds |
+|---|---|
+| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | Serverless processing patterns starting from an S3 Access Point: event-driven pipelines, capacity guardrails, secrets rotation. **Individual patterns stay there** |
+| [FSx-for-ONTAP-Lakehouse-Integrations](https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations) | Reaching the collected data from data lake and lakehouse platforms |
+| [FSx-for-ONTAP-Agentic-Access-Aware-RAG](https://github.com/Yoshiki0705/FSx-for-ONTAP-Agentic-Access-Aware-RAG) | The same data behind RAG, **with the file-side access controls reflected in what a search returns**. AWS CDK sample |
+| [ONTAP-Edge-to-Cloud-AI](https://github.com/Yoshiki0705/ONTAP-Edge-to-Cloud-AI) | When collection starts at edge devices: aggregating scattered data before handing it to AI and analytics |
+
+**After it is built — operations and protection**
+
+| Repository | What it answers |
+|---|---|
+| [FSx-for-ONTAP-Observability-integrations](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations) | Shipping audit logs to external observability platforms, **without standing up EC2** — S3 Access Points and AWS Lambda. **This repository has no monitoring design.** After measuring performance, read on there |
+| [FSx-for-ONTAP-Cyber-Resilience-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns) | Protecting the source of truth: ONTAP-side detection, FPolicy event-driven response, third-party file security integrations, storage-native data protection |
+
+**The division of labour with the Playbook is an agreement, not a convention.** The measurements and
+the environment that produces them are held here; the judgement built on them is held there. The
+Playbook cites claims from here with their conditions, and **both sides carry a check that fails when
+a cited string disappears** (`make incoming-probes`). Putting the same measurement in two places
+means the copy that stops being updated outlives the one that was corrected.
 
 ## Disclaimer
 
