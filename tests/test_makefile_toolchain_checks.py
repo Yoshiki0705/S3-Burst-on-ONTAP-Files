@@ -36,7 +36,15 @@ REQUIREMENTS = ROOT / "requirements-dev.txt"
 
 # Both recipes carry their own copy of this shell, so every behavioural case is parametrised over
 # the two of them. A fix applied to one and not the other is the drift this catches.
-TOOLS = [("python", "RUFF", "ruff"), ("zizmor", "ZIZMOR", "zizmor")]
+TOOLS = [
+    ("python", "RUFF", "ruff"),
+    ("zizmor", "ZIZMOR", "zizmor"),
+    # Added after the pin existed without the comparison: a local cfn-lint 1.52.1 passed `make cfn`
+    # while requirements-dev.txt pinned 1.56.0, which is the drift the other two already warned
+    # about. Parametrising over all three is what stops the next pinned tool from being added
+    # without its check.
+    ("cfn", "CFN_LINT", "cfn-lint"),
+]
 
 
 def _pinned(tool: str) -> str:

@@ -73,8 +73,10 @@ ROLES = (FAIL_ROLE, WARN_ROLE)
 # while the output still says everything passed.
 UNKNOWN_ROLE_FAILS = True
 
-# **Flip this to True when the sibling publishes the contract**, which it had not when this was
-# written (agreed on S3-Burst-on-ONTAP-Files#121; the sibling's change is its #172).
+# **True since the sibling published the contract on its default branch** (agreed on
+# S3-Burst-on-ONTAP-Files#121; the sibling's change was its #172). Confirmed by fetching the raw URL,
+# not by reading a local checkout -- a checkout can hold the file on an unmerged branch, which is what
+# it did while this was False.
 #
 # It decides what a 404 from --fetch means, and the two meanings are opposite. Not published yet: a
 # skip is correct. Published and then removed or renamed: the registration this repository depends on
@@ -82,7 +84,7 @@ UNKNOWN_ROLE_FAILS = True
 # from the response, and deriving it from a local checkout does not work either -- CI has no
 # checkout, so every 404 would read as "not published yet" on exactly the runner where this is the
 # only thing that runs. So it is an explicit switch, and the flip is a deliberate act.
-CONTRACT_PUBLISHED = False
+CONTRACT_PUBLISHED = True
 
 # Zero rows for this repository, from a contract that parsed, is not "nothing to check" -- it means
 # the repository name or the field order moved. Thirty-two rows were registered when this was
