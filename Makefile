@@ -7,7 +7,8 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
-        pattern-status iac-security drift external-anchors incoming-probes citation-coverage \
+        pattern-status iac-security drift external-anchors incoming-probes outgoing-probes \
+        citation-coverage \
         test all new-pattern \
         diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
@@ -272,6 +273,8 @@ external-anchors: ## Verify cited sibling-repository anchors (skipped without a 
 	@$(PY) tools/check_external_anchors.py
 incoming-probes: ## Claims a sibling repository cites must survive a rewording (skipped without its contract)
 	@$(PY) tools/check_incoming_probes.py
+outgoing-probes: ## Claims this repository cites in a sibling must survive (skipped without its checkout)
+	@$(PY) tools/check_outgoing_probes.py
 citation-coverage: ## Report which evidence documents the Hub has never cited (not in make all)
 	@$(PY) tools/report_citation_coverage.py
 
@@ -287,7 +290,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)

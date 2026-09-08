@@ -1,0 +1,63 @@
+# Probe strings this repository registers against sibling repositories.
+#
+# Format: <repo>\t<cited path>\t<role>\t<probe>, sorted. One line per cited string. The probe is the
+# last field and is taken whole, so it may contain anything except a tab. `#` starts a comment only at
+# the beginning of a line -- a probe may contain one.
+#
+# The citing file on our side is deliberately absent: what the owner of a string needs is the set of
+# strings not to reword silently, not our file layout. Matching the format
+# FSx-for-ONTAP-Adoption-Playbook publishes, so a reader written for one works for both.
+#
+# Verified by `make outgoing-probes`, which reads each cited repository and fails when a registered
+# string is gone. Hand-maintained rather than generated: a probe is a *chosen* claim-bearing substring,
+# and there is nothing to derive it from.
+#
+# role:
+#   retraction  Expected to survive. Its absence means the claim moved or was retracted, and a claim
+#               here has lost its evidence. Worth failing on.
+#   reread      Quotes a minimum or maximum over a measured set, so adding a measurement rewrites the
+#               string while the finding stands. Firing is "read this section again", not a
+#               retraction. None registered yet -- no citation here rests on a range.
+#
+# TWO LIMITS, BOTH MEASURED BY THE OWNER OF THE STRINGS BELOW (their #401), AND NEITHER IS A DEFECT:
+#
+#   1. A probe passes when the string survives **anywhere in the file**, not where the claim is. Their
+#      negative test changed one of two occurrences of a figure and the gate stayed green; only
+#      changing both failed it. So a probe registered against a string that appears twice is weaker
+#      than one registered against a unique string. `AP 経由の操作は**遮断されない**` below occurs
+#      twice in its file and is registered anyway, because the alternative single-occurrence phrasings
+#      of that claim span a line break.
+#   2. A surviving string only says the sentence still exists. A claim **retracted but kept as
+#      history** -- which this repository does deliberately, so a reader can see what was corrected --
+#      keeps every probe against it green. **Registration is a floor, not a substitute for reading.**
+#
+# Line breaks matter for the same reason: a probe spanning one never matches. In the English errata the
+# protocol list is split across two lines, so the registration below uses the single-line form further
+# down the same file.
+#
+# ---------------------------------------------------------------------------------------------------
+# FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns
+#
+# Thirteen links from here reach six files there, but only one of those files carries a claim this
+# repository restates rather than points at: the FPolicy errata. It is the sole evidence for a
+# **verified** row in docs/ja/verification-status.md ("S3 Access Point 経由の操作が FPolicy 通知を
+# 発火するか"), and two design consequences built on it -- the monitoring row in
+# docs/ja/support-matrix.md and a paragraph in docs/ja/reference/limits/s3ap-design-guide.md.
+#
+# Four claims, registered in both languages because the English pages here cite the English errata.
+# The fourth is the mechanism: without it the other three read as an observation rather than as
+# something with a cause, and it is the one most likely to change, since a later ONTAP release adding
+# `s3` as an FPolicy event protocol would make all four false at once. That would be good news, and
+# **it would arrive here as a failing gate rather than as a notification** -- which is the point.
+#
+# The other five cited files are starting points and see-also pointers with no claim transcribed from
+# them, so nothing is registered against them. Registering a probe there would ask their owner to
+# freeze wording this repository does not depend on.
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	An FPolicy event accepts only `cifs`, `nfsv3` or `nfsv4`; `s3` returns HTTP 400
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	Operations on that path are **not blocked**
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	The ONTAP native audit log (`vserver audit`) does
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	raise no FPolicy notification
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	AP 経由の操作は**遮断されない**
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	FPolicy 通知を**発火しない**
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	ONTAP ネイティブ監査ログ（`vserver audit`）なら載る
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`s3` は HTTP 400 で拒否されます
