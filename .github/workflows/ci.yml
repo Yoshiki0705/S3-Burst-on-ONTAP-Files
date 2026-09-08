@@ -66,6 +66,11 @@ jobs:
       # published the probe contract yet. Both show up as the same skip message, which says so.
       - name: Check claims a sibling repository cites
         run: python3 tools/check_incoming_probes.py
+      # The other direction: claims this repository cites in a sibling. Skips per repository without a
+      # checkout, so on a runner it reports only that the contract parses. The scheduled --fetch run
+      # is what actually resolves the strings.
+      - name: Check claims this repository cites in a sibling
+        run: python3 tools/check_outgoing_probes.py
 
       - name: Audit public output
         run: python3 tools/audit_public_output.py
