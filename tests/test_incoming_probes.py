@@ -179,17 +179,43 @@ def test_a_moved_file_fails_even_when_the_text_survives(
 # --- the switch that stops a skip standing in for a pass --------------------------------------
 
 
-def test_the_published_switch_is_still_false_and_says_how_to_flip_it() -> None:
-    """When the sibling publishes, this test is the reminder that a 404 changes meaning.
+def test_a_404_means_removal_now_that_the_contract_is_published(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The switch changes what a 404 means, so it is asserted in whichever position it is in.
 
-    While CONTRACT_PUBLISHED is False a 404 from --fetch is read as "not published yet" and skips.
-    Left False after the contract lands, a removal would read as that same skip forever.
+    While CONTRACT_PUBLISHED was False a 404 read as "not published yet" and skipped. Now that the
+    sibling publishes on its default branch, the same response means the registration this repository
+    is checked against was removed or renamed -- and a skip would report that as a clean run forever.
     """
-    source = (ROOT / "tools" / "check_incoming_probes.py").read_text(encoding="utf-8")
+    import urllib.error
+
+    def refuse(*_args, **_kwargs):
+        raise urllib.error.HTTPError(mod.RAW_CONTRACT, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", refuse)
+
     if mod.CONTRACT_PUBLISHED:
-        pytest.skip("contract published; the 404 path now fails, which is the point")
-    assert "CONTRACT_PUBLISHED = False" in source
-    assert "Flip this to True when the sibling publishes" in source
+        with pytest.raises(SystemExit) as raised:
+            mod.fetch_contract()
+        assert "removal or a rename" in str(raised.value)
+    else:
+        probes, problems = mod.fetch_contract()
+        assert probes is None and not problems
+
+
+def test_a_non_404_failure_is_never_read_as_absence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 500 or a 403 is not "not published yet" in either position of the switch."""
+    import urllib.error
+
+    def refuse(*_args, **_kwargs):
+        raise urllib.error.HTTPError(mod.RAW_CONTRACT, 500, "Server Error", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", refuse)
+    with pytest.raises(SystemExit):
+        mod.fetch_contract()
 
 
 def test_zero_rows_for_this_repository_is_not_a_pass() -> None:

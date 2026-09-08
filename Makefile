@@ -24,6 +24,11 @@ lint: markdown python cfn sg-descriptions terraform ## Markdown, Python, CloudFo
 # that reimplements the same logic cannot reach it -- see tests/test_makefile_toolchain_checks.py.
 RUFF ?= ruff
 RUFF_PINNED := $(shell sed -n 's/^ruff==//p' requirements-dev.txt)
+# cfn-lint is pinned in requirements-dev.txt and CI installs from that file, but this recipe compared
+# no versions until a local 1.52.1 passed against a pinned 1.56.0. `python` and `zizmor` had warned
+# about exactly that for their own tools; the pin without the comparison is the silent case.
+CFN_LINT ?= cfn-lint
+CFN_LINT_PINNED := $(shell sed -n 's/^cfn-lint==//p' requirements-dev.txt)
 
 # The version is read without a pipe. `$(RUFF) --version | awk '{print $$2}'` reports the status of
 # awk, which succeeds on empty input, so a binary that is installed but cannot run produced an empty
@@ -76,9 +81,27 @@ markdown: ## Run markdownlint if available (skipped when not installed)
 # that reads like a template and is linted by nothing is the shape that rots: it is copied, and the
 # copy is the first thing anybody validates.
 cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is not installed)
-	@if ! command -v cfn-lint >/dev/null 2>&1; then \
+	@if ! command -v $(CFN_LINT) >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
+		if ! raw=$$($(CFN_LINT) --version); then \
+			echo "error: $(CFN_LINT) is present but does not run - '--version' exited non-zero."; \
+			echo "       Its own error is above. This is a broken install, not a version"; \
+			echo "       mismatch, so pinning will not fix it:"; \
+			echo "       pip install --force-reinstall -r requirements-dev.txt"; \
+			exit 1; \
+		fi; \
+		if [ -z "$$raw" ]; then \
+			echo "error: $(CFN_LINT) ran but reported no version, so the pin cannot be checked."; \
+			exit 1; \
+		fi; \
+		installed=$${raw##* }; \
+		if [ "$$installed" != "$(CFN_LINT_PINNED)" ]; then \
+			echo "warning: cfn-lint $$installed installed, this repository pins $(CFN_LINT_PINNED)."; \
+			echo "         Rule sets differ between versions, so a local pass does not"; \
+			echo "         mean CI passes. Install the pinned version:"; \
+			echo "         pip install -r requirements-dev.txt"; \
+		fi; \
 		if ! found=$$(find patterns environments \( -name 'template*.yaml' -o -path '*/examples/*.yaml' \) -print); then \
 			echo "cfn: the scan of patterns/ and environments/ failed, so this is not a report"; \
 			echo "     that there are no templates. Its own error is above."; \
@@ -90,7 +113,7 @@ cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is
 			echo "     not that there is nothing to lint."; \
 			exit 1; \
 		fi; \
-		cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
+		$(CFN_LINT) --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
 	fi
 
 sg-descriptions: ## Security group rule descriptions must use only characters EC2 accepts
