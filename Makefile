@@ -7,7 +7,8 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
-        pattern-status iac-security drift external-anchors incoming-probes test all new-pattern \
+        pattern-status iac-security drift external-anchors incoming-probes citation-coverage \
+        test all new-pattern \
         diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
@@ -248,6 +249,8 @@ external-anchors: ## Verify cited sibling-repository anchors (skipped without a 
 	@$(PY) tools/check_external_anchors.py
 incoming-probes: ## Claims a sibling repository cites must survive a rewording (skipped without its contract)
 	@$(PY) tools/check_incoming_probes.py
+citation-coverage: ## Report which evidence documents the Hub has never cited (not in make all)
+	@$(PY) tools/report_citation_coverage.py
 
 pattern-status: ## Verify every pattern README opens with a defined status word
 	@$(PY) tools/check_pattern_status.py
