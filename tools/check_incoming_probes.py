@@ -168,7 +168,7 @@ def fetch_contract() -> tuple[list[Probe] | None, list[str]]:
     import urllib.request
 
     try:
-        with urllib.request.urlopen(RAW_CONTRACT, timeout=30) as response:  # noqa: S310
+        with urllib.request.urlopen(RAW_CONTRACT, timeout=30) as response:
             if response.status != 200:
                 raise SystemExit(
                     f"incoming-probes: {RAW_CONTRACT} returned {response.status}"
