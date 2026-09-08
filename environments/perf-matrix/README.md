@@ -8,6 +8,13 @@ Amazon EFS と Amazon FSx for NetApp ONTAP を同じサブネットの同じク�
 - 測る前の考慮点は[性能検証の考慮点](../../docs/ja/reference/performance-testing-guide.md)
 - 費用は[検証パターンごとの費用構造](../../docs/ja/reference/comparison/finops-performance-test-patterns.md)
 
+**ブロックプロトコル（iSCSI / NVMe/TCP）はこのディレクトリではまだ何も作らない。** 必要な差分
+（セキュリティグループの 3 ポート、ブロック用ボリューム、LUN / igroup / namespace / subsystem を作る
+runbook フェーズ、raw device の取り違えを防ぐ検査、撤去順序）は
+[ブロックプロトコルの測定計画](../../docs/ja/verification/block-protocol-matrix-plan.md#環境テンプレートに対する差分)に
+**提案として**まとめてある。**この README の手順に混ぜていないのは、実装されていないものを
+手順として読ませないためである。**
+
 ## 先に読む — 費用と、止まらない課金
 
 **通常の状態で時間あたり約 $37、EFS Provisioned を立てている間は約 $67 課金される。** 内訳は次の
