@@ -275,6 +275,34 @@ deploy_gen2() {
     die "$iops provisioned SSD IOPS needs at least $(( (iops + 49) / 50 )) GiB of SSD; ${ssd_gib} GiB allows ${max_iops}. Raise GEN2_STORAGE_GIB or lower GEN2_SSD_IOPS."
   fi
   printf 'SSD %s GiB allows up to %s provisioned IOPS; requesting %s\n' "$ssd_gib" "$max_iops" "$iops"
+  # SSD capacity is not the only ceiling, and this check was missing the other one. The published
+  # specification for second-generation Single-AZ gives an SSD drive IOPS baseline per throughput
+  # capacity, and states that the achievable ceiling is set by throughput capacity even when more is
+  # provisioned. So a deploy can be accepted, billed, and unable to reach what was bought.
+  #
+  # A warning rather than a refusal: holding IOPS constant across a series while throughput capacity
+  # moves is a legitimate design, and it is what pattern G does. It just has to be a decision rather
+  # than a surprise on the invoice.
+  local reachable_iops
+  case "$tp" in
+    384)   reachable_iops=12500 ;;
+    768)   reachable_iops=25000 ;;
+    1536)  reachable_iops=50000 ;;
+    3072)  reachable_iops=100000 ;;
+    6144)  reachable_iops=200000 ;;
+    # Unreachable while GEN2_THROUGHPUT is validated to the three values above, but the arithmetic
+    # below must be defined for whatever gets added next.
+    *)     reachable_iops="$max_iops" ;;
+  esac
+  if (( iops > reachable_iops )); then
+    printf 'WARNING: at %s MBps the SSD IOPS baseline is %s, so %s of the %s requested cannot be\n' \
+      "$tp" "$reachable_iops" "$(( iops - reachable_iops ))" "$iops"
+    printf '         reached at this throughput capacity. Unreachable IOPS above the included\n'
+    # shellcheck disable=SC2016  # $0.0204 is a price, not an expansion
+    printf '         3-per-GiB allowance still bill at $0.0204 per IOPS-month: about $%s per month.\n' \
+      "$($PY_BIN -c "print(f'{max(0, $iops - max($reachable_iops, 3 * $ssd_gib)) * 0.0204:,.0f}')")"
+    printf '         https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html\n'
+  fi
   # Empty unless the directory exists. When set, the template adds SMB ingress and the outbound rule
   # without which an AD join cannot complete.
   local sg_ad=""

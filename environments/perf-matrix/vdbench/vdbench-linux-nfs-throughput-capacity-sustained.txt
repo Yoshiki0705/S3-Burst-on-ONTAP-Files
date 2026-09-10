@@ -1,0 +1,64 @@
+**********************************************************************
+* Pattern G, the sustained half: does the figure a five-minute window reports still hold after
+* thirty minutes.
+*
+* WHY THIS FILE EXISTS SEPARATELY
+*
+* The published specification for second-generation Single-AZ file systems gives disk throughput as
+* a baseline and a burst, and burst exists only below 3,072 MBps:
+*
+*   throughput capacity   disk baseline   disk burst   in-memory cache   NVMe cache
+*   384                   384             3,125        16 GB             none
+*   768                   768             3,125        32 GB             none
+*   1,536                 1,536           3,125        64 GB             none
+*   3,072                 3,072           none         128 GB            none
+*   6,144                 6,144           none         256 GB            1,900 GB
+*
+* The short-window run on the 1,536 configuration read 2,880 MB/s -- 94 per cent of the 3,125 MB/s
+* disk burst and 1.9 times the 1,536 MB/s baseline -- and held it flat for the five minutes the two
+* repeats took. **No burst duration is published.** So the short-window figure cannot be used for
+* sizing until it is known whether it decays, and the configurations that have no burst cannot be
+* compared with it until that is known either.
+*
+* Run this where burst is documented (1,536) and at the top of the range (6,144) to confirm its
+* absence. It is not needed at 3,072 for the same reason it is not needed at 6,144, but running it
+* there costs half an hour and removes an inference.
+*
+* WHAT IT DOES NOT NEED TO DO
+*
+* No disjoint regions and no wrap avoidance. Those exist in the short-window file because a region
+* that fits in cache turns a reread into a cache read. Here the whole 1,800 GiB file is the target
+* and the cache is 64 GB, 128 GB or 256 GB depending on the configuration, so a read that wraps to
+* the head still reaches disk. The one exception is the NVMe cache at 6,144: 1,900 GB is most of the
+* file, so `runbook.sh nvme-cache off` has to have been run and read back first.
+*
+* HOW TO READ THE RESULT
+*
+* interval=10 over 1,800 seconds gives 180 points. The question is not the mean -- it is whether
+* there is a step, and where. Report the first and last 300 seconds separately as well as the whole
+* window. A flat series says the burst allowance outlasts half an hour at this rate; a step says
+* where it ran out, and the level after the step is the number to size on.
+*
+* PRECONDITIONS: as vdbench-linux-nfs-throughput-capacity.txt, plus that file's own run having
+* completed, since this one reuses the file it filled.
+*
+* USAGE
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-throughput-capacity-sustained.txt -o /opt/bench/out-gs-<throughput>
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+* The whole file, not a region. size= must match what the other file created, or vdbench decides the
+* file is too small and inserts a format.
+sd=default,openflag=o_direct,size=1800g,host=hd1
+sd=sd_all,lun=/mnt/bench/target/file1
+
+wd=wd_sus_read,sd=sd_all,seekpct=.0,xfersize=1024k,rdpct=100
+wd=wd_sus_write,sd=sd_all,seekpct=.0,xfersize=1024k,rdpct=0
+
+* warmup=0 on purpose. A warmup discards the start of the window, and the start is where a burst
+* allowance is still full -- which is the part this run exists to see.
+rd=gs-seq-read-1024k,wd=wd_sus_read,iorate=max,warmup=0,elapsed=1800,interval=10,threads=512
+rd=gs-seq-write-1024k,wd=wd_sus_write,iorate=max,warmup=0,elapsed=1800,interval=10,threads=512

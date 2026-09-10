@@ -1,0 +1,93 @@
+**********************************************************************
+* Pattern G-2: does buying SSD IOPS above the free tier change what a small-block random shape
+* gets, at a fixed throughput capacity.
+*
+* Run twice, against two file systems created fresh at 1,536 MBps with 8,192 GiB of SSD and nothing
+* different but the IOPS setting:
+*
+*   free tier      24,576   (3 IOPS per GiB of SSD, included)
+*   provisioned   200,000   ($0.0204 per IOPS-month above the free tier)
+*
+* Not by modifying one file system. A second-generation file system will not accept another
+* throughput or IOPS change for six hours after one.
+*
+* WHY 1 MiB CANNOT ANSWER THIS
+*
+* The G-1 parameter file measures 1 MiB sequential, which at 2,882 MB/s needs about 2,882 IOPS.
+* Both settings above are an order of magnitude clear of that, so 1 MiB reports the same number
+* either way and answers nothing. `DiskIopsUtilization` sat at 17.6 per cent through the whole G-1
+* run. **The shape has to be one where IOPS is the thing in the way**, which is 4 KiB random.
+*
+* WHAT THE PUBLISHED SPECIFICATION ALREADY SETTLES
+*
+* The 1,536 MBps row of the second-generation Single-AZ table gives SSD drive IOPS as 50,000
+* baseline and 65,000 burst, and the same page states that the achievable SSD IOPS ceiling is set by
+* throughput capacity even when more is provisioned. So 200,000 is not reachable here and the
+* interesting question is narrower than "does more IOPS help":
+*
+*   - 24,576 is below the 50,000 baseline, so it should bind at about itself
+*   - 200,000 is above it, so it should bind at 50,000 baseline or 65,000 burst
+*
+* **The expected gain from paying for 8.1 times the IOPS is therefore at most 2.6 times.** That is
+* the number to confirm or refute, and either outcome is the answer. A refutation would mean the
+* ceiling in the table is not what binds, which matters more than a confirmation.
+*
+* IOPS HAS A BURST ALLOWANCE TOO, SO THE WINDOW MATTERS
+*
+* Baseline 50,000 against burst 65,000 is the same structure that made the 1 MiB read report
+* 2,882 MB/s for 27 minutes and 1,439 MB/s after. `FileServerDiskIopsBalance` is the metric to read
+* alongside this run, exactly as `FileServerDiskThroughputBalance` was for G-1. The sustained RDs
+* below exist for that reason: **a 150-second window on the provisioned file system would report a
+* burst figure and there would be no way to tell from the client side.**
+*
+* SIZES
+*
+* 400 GiB of file against an in-memory read cache of 64 GB at this throughput capacity. Random 4 KiB
+* over 400 GiB does not need the elaborate disjoint-region geometry the sequential file needs -- a
+* random walk over a working set six times the cache does not warm it usefully -- but it does need
+* the file to be larger than the cache, and it needs the whole file written before it is read.
+*
+* PRECONDITIONS: as vdbench-linux-nfs-throughput-capacity.txt. Storage efficiency disabled and
+* space_savings.total = 0 matter more here, not less: 4 KiB reads of reducible data never reach SSD
+* and the measurement would report the cache with the IOPS setting apparently irrelevant.
+*
+*   truncate -s 400G /mnt/bench/target/file1
+*
+* Create the file first, for the reason the G-1 file gives at length: three SDs name it, and a
+* missing file makes VDBENCH insert its own format once per SD at queue depth 2.
+*
+* USAGE
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-provisioned-iops.txt -o /opt/bench/out-g2-<iops>
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+sd=default,openflag=o_direct,size=400g,host=hd1
+sd=sd_fill,lun=/mnt/bench/target/file1
+sd=sd_rand,lun=/mnt/bench/target/file1
+
+* The fill is 1 MiB sequential because its only job is to put non-reducible data everywhere. Its
+* rate is not part of this result.
+wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+
+* 4 KiB random. Read and write separately: the write path goes through NVRAM and the read path does
+* not, and one mixed number would hide which of them the IOPS setting moved.
+wd=wd_r4k,sd=sd_rand,seekpct=100,xfersize=4k,rdpct=100
+wd=wd_w4k,sd=sd_rand,seekpct=100,xfersize=4k,rdpct=0
+* 64 KiB random as a second point. At 50,000 IOPS this is 3,200 MB/s, above the 1,536 MB/s disk
+* baseline, so throughput binds first here and IOPS should not move it. Included to show where the
+* IOPS setting stops mattering.
+wd=wd_r64k,sd=sd_rand,seekpct=100,xfersize=64k,rdpct=100
+
+rd=g2-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=1800,interval=30,threads=512
+
+* Short windows first, so the pair short-against-sustained can be read on one file system.
+rd=g2-rand-read-4k,wd=wd_r4k,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=g2-rand-write-4k,wd=wd_w4k,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=g2-rand-read-64k,wd=wd_r64k,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+
+* 900 seconds with no warmup, for the same reason G-1 needed 1,800: the start of the window is where
+* the allowance is still full, and that is the part being looked for.
+rd=g2-sustain-read-4k,wd=wd_r4k,iorate=max,warmup=0,elapsed=900,interval=10,threads=512
