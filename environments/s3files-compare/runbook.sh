@@ -190,6 +190,8 @@ EOF
 
 # ----------------------------------------------------------------------------------------- measure
 measure() {
+  # shellcheck source=/dev/null  # a state file this script wrote at deploy time; there is no
+  # fixed path to follow, and its contents are ids rather than code.
   source "$STATE"
   local script
   script=$(mktemp /tmp/rb-measure-XXXX.sh)
@@ -218,6 +220,8 @@ EOF
 
 # ----------------------------------------------------------------------------------------- metrics
 metrics() {
+  # shellcheck source=/dev/null  # a state file this script wrote at deploy time; there is no
+  # fixed path to follow, and its contents are ids rather than code.
   source "$STATE"
   echo "namespace AWS/S3/Files, dimension FileSystemId=${FS}"
   echo "billable byte counters (Sum), then the service's own sync lag:"
@@ -256,6 +260,8 @@ gone() {
 
 destroy() {
   [[ -f "$STATE" ]] || die "no $STATE"
+  # shellcheck source=/dev/null  # a state file this script wrote at deploy time; there is no
+  # fixed path to follow, and its contents are ids rather than code.
   source "$STATE"
   # Order is not interchangeable, and four separate constraints enforce it. Three were expected; the
   # fourth was found by running this and having it report a resource left behind:

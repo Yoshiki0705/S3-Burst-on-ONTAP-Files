@@ -7,7 +7,7 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
-        pattern-status iac-security drift external-anchors incoming-probes outgoing-probes \
+        pattern-status iac-security drift external-anchors incoming-probes outgoing-probes shell \
         citation-coverage \
         test all new-pattern \
         diagrams diagrams-check diagram-fonts diagram-flow \
@@ -18,7 +18,7 @@ help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-lint: markdown python cfn sg-descriptions terraform ## Markdown, Python, CloudFormation and Terraform
+lint: markdown python cfn sg-descriptions terraform shell ## Markdown, Python, CloudFormation, Terraform and shell
 
 # `RUFF` and `ZIZMOR` are overridable so that the recipes below can be driven against a stub
 # binary. The defect they guard against lives in the recipe's shell, not in any Python, so a test
@@ -117,6 +117,19 @@ cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is
 		$(CFN_LINT) --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
 	fi
 
+shell: ## Parse and lint every tracked shell script (shellcheck skipped when absent)
+	@found=$$(git ls-files '*.sh'); \
+	if [ -z "$$found" ]; then \
+		echo "shell: no .sh tracked, which is not what this repository looks like -- this scan"; \
+		echo "       stopped matching rather than finding nothing."; \
+		exit 1; \
+	fi; \
+	for f in $$found; do bash -n "$$f" || exit 1; done; \
+	if command -v shellcheck >/dev/null 2>&1; then \
+		shellcheck -S warning $$found && echo "shell: $$(echo $$found | wc -w | tr -d ' ') script(s) parse and lint clean"; \
+	else \
+		echo "shell: $$(echo $$found | wc -w | tr -d ' ') script(s) parse; shellcheck not installed (brew install shellcheck)"; \
+	fi
 sg-descriptions: ## Security group rule descriptions must use only characters EC2 accepts
 	@$(PY) tools/check_sg_rule_descriptions.py
 

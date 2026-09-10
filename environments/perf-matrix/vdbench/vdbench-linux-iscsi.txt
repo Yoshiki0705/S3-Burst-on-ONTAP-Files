@@ -1,0 +1,56 @@
+**********************************************************************
+* NEVER EXECUTED. Pattern F-1. Plan in docs/ja/verification/block-protocol-matrix-plan.md.
+*
+* The iSCSI side of the block pair, run against a raw device:
+*
+*   cd /opt/bench
+*   vdbench -f /path/to/vdbench-linux-iscsi.txt -o /opt/bench/report-iscsi
+*
+* A diff against vdbench-linux-nvmetcp.txt is the complete list of differences
+* between the two runs, and there is exactly one: the `lun=` line. That is one
+* fewer than the NFS/SMB pair managed -- same host, same OS, same openflag -- so
+* iSCSI against NVMe/TCP is the cleanest comparison in this whole matrix, and it
+* is the reason priority 2 of the request is worth more than priority 1.
+*
+**********************************************************************
+* WRITING TO A RAW DEVICE DESTROYS WHAT IS ON IT, AND THE ROOT VOLUME IS ONE.
+*
+* The client's root EBS volume appears as /dev/nvme0n1. AWS's own example output
+* shows `Amazon Elastic Block Store` at nvme0n1 next to `NetApp ONTAP Controller`
+* at nvme2n1. **Device indices move with attach order.** So the name below is a
+* dm-multipath friendly name derived from the LUN's serial-hex, created by
+* `runbook.sh block-provision iscsi`, and `runbench.sh block-preflight` refuses
+* to proceed until it has confirmed that this path resolves to the ONTAP LUN.
+*
+* Getting this wrong costs a client rebuild, not a re-run.
+**********************************************************************
+
+* One host. Its 50 Gbps is a guaranteed figure, which is what allows a plateau to
+* be read as the storage ceiling rather than the client's.
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* No size=.
+*
+* The file-side SDs carry size=600g because VDBENCH creates the file. A raw
+* device already has a length, and giving one that disagrees with it either reads
+* past the end or measures a smaller working set than the name suggests. Whether
+* VDBENCH reads the device length by itself is UNCONFIRMED here, so the preflight
+* runs this file once and compares what VDBENCH reports against the LUN size
+* before any figure is recorded.
+*
+* openflag=o_direct as on the NFS side. On a raw device there is no page cache to
+* bypass, but the flag is kept so the two sides differ in the target and not in
+* the flags.
+*
+* The LUN is 600 GiB, the same figure and the same reason as the file side: more
+* than twice the 256 GB in-memory cache, with the NVMe layer disabled separately.
+* **It must be written once before any read is measured** -- unwritten blocks of a
+* thin-provisioned LUN return zeros without reaching disk, which makes a read
+* measurement measure nothing. `runbook.sh block-fill` does that pass.
+**********************************************************************
+sd=default,openflag=o_direct
+sd=sd1-1,host=hd1,lun=/dev/mapper/perfmatrix-blk
+
+include=workloads-common.txt
