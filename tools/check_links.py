@@ -203,6 +203,28 @@ PUBLISHED_REPOS = frozenset(
         # Local directory `fsxn-observability-integrations`. Six links in this repository named the
         # directory instead, and every one of them would have been a 404.
         "FSx-for-ONTAP-Observability-integrations",
+        # Added when the README's sibling table went from two repositories to nine, so that a reader
+        # who lands here can reach the ones either side of this architecture. Each name below was read
+        # from the GitHub API rather than from a working directory, and **every one of the five
+        # diverges from its local directory name** -- which is the whole reason this list exists:
+        #
+        #   fsxn-cyber-resilience-patterns  -> FSx-for-ONTAP-Cyber-Resilience-Patterns
+        #   fsxn-lakehouse-integrations     -> FSx-for-ONTAP-Lakehouse-Integrations
+        #   RAG-FSxN-CDK, agentic-rag       -> FSx-for-ONTAP-Agentic-Access-Aware-RAG
+        #   edge-to-cloud-ai                -> ONTAP-Edge-to-Cloud-AI
+        #   blea-fsxn-usecase               -> BLEA-FSx-for-ONTAP-Usecase
+        #
+        # Two of those directories point at one repository, and one repository has two directories, so
+        # deriving a name from the filesystem would have been wrong in both directions.
+        "FSx-for-ONTAP-Cyber-Resilience-Patterns",
+        "FSx-for-ONTAP-Lakehouse-Integrations",
+        "FSx-for-ONTAP-Agentic-Access-Aware-RAG",
+        "ONTAP-Edge-to-Cloud-AI",
+        "BLEA-FSx-for-ONTAP-Usecase",
+        # Only the case differs from its directory (`vmware-migration-ec2-ontap`), which the
+        # case-insensitive comparison above would have let through anyway. Listed for completeness:
+        # an absent name reads as "not published" rather than as "not yet recorded".
+        "VMware-Migration-EC2-ONTAP",
     }
 )
 PUBLISHED_LOWER = frozenset(name.lower() for name in PUBLISHED_REPOS)

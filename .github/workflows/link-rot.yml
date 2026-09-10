@@ -63,6 +63,21 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/check_external_anchors.py --fetch 2>&1 | tee -a /tmp/link-report.txt
+      # The other direction: strings the sibling probes for in this repository. Same reasoning --
+      # `make all` reads a local checkout and skips on every runner, so the fetch is what makes it
+      # run at all. It also catches the case a local checkout cannot: the sibling changing its
+      # registration without this repository pulling.
+      - name: Verify cited claims against the published probe contract
+        run: |
+          set -o pipefail
+          python3 tools/check_incoming_probes.py --fetch 2>&1 | tee -a /tmp/link-report.txt
+      # And the strings this repository cites in a sibling. `make all` skips these without a local
+      # checkout, which is every runner, so this is the run that resolves them -- against what the
+      # sibling serves rather than against one machine's disk.
+      - name: Verify the claims this repository cites in a sibling
+        run: |
+          set -o pipefail
+          python3 tools/check_outgoing_probes.py --fetch 2>&1 | tee -a /tmp/link-report.txt
       - name: Report unreachable links
         if: failure()
         env:

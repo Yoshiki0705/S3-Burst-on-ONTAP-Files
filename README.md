@@ -134,6 +134,8 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | NFS / SMB / EFS の実測値を見る | [プロトコル別測定の結果](docs/ja/verification/perf-matrix-results.md) | 20 分 |
 | SMB の台数を増やしたときの伸びを見る | [SMB の台数試験](docs/ja/verification/perf-matrix-results.md#smb-の台数試験1--4--8-台) | 5 分 |
 | SMB の書き込みが持続するか見る | [SMB の書き込みの持続](docs/ja/verification/perf-matrix-results.md#smb-の書き込みの持続15-分) | 5 分 |
+| 初期サイジングを測る計画を読む | [初期サイジングの測定計画](docs/ja/verification/initial-sizing-measurement-plan.md) | 15 分 |
+| iSCSI / NVMe/TCP を測る計画を読む | [ブロックプロトコルの測定計画](docs/ja/verification/block-protocol-matrix-plan.md) | 15 分 |
 | 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
 | SMB でマウントする前に読む | [SMB でマウントできる名前と、識別子を読む場所](docs/ja/reference/limits/smb-share-and-identifier-reading.md) | 5 分 |
 | SMB の性能を測る前に読む | [SMB Multichannel が既定で無効であることと、有効化が既に張られた接続に届かないこと](docs/ja/reference/limits/smb-multichannel-enablement.md) | 5 分 |
@@ -282,13 +284,38 @@ FSx for ONTAP という条件で検証済みですが、**主経路であるオ�
 
 ## 関連リポジトリ
 
-| リポジトリ | 概要 |
-|---|---|
-| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | S3 Access Point のサーバーレス処理パターン集。個別パターンはそちらに残ります |
-| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | FSx for ONTAP 導入のライフサイクル / テーマ別知見集 |
-
 このリポジトリは**構成そのもの**を扱います。収集と配布を 1 本の設計として記述し、
-プラットフォーム差と未検証箇所を表で明示することが役割です。
+プラットフォーム差と未検証箇所を表で明示することが役割です。**FSx for ONTAP 全体の入口ではありません。**
+判断の前に読むもの、この構成の前後で必要になるものは別のリポジトリにあります。
+
+**先に読む — 構成を決める前**
+
+| リポジトリ | ここに来る前に答えが出ること |
+|---|---|
+| [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) | 評価から運用までのライフサイクルと、データ保護・性能・コスト・マルチプロトコル ID などのテーマ別知見。**知見ごとの根拠の段階が明示されています。** そもそも FSx for ONTAP を採るのか、どう移行するのかはここ |
+| [VMware-Migration-EC2-ONTAP](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP) | VMware ESXi から Amazon EC2 + FSx for ONTAP への移行経路の実機検証。既存の ONTAP 運用モデルを AWS へ引き継ぐ場合の入口 |
+| [BLEA-FSx-for-ONTAP-Usecase](https://github.com/Yoshiki0705/BLEA-FSx-for-ONTAP-Usecase) | ガードレールを敷いた土台の上に FSx for ONTAP を載せる形。ゲストシステムのユースケースとして構成されています |
+
+**収集側の下流 — S3 API で集めたあと**
+
+| リポジトリ | 何を足せるか |
+|---|---|
+| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | S3 Access Point を起点にしたサーバーレスの処理パターン。イベント駆動のパイプライン、容量のガードレール、シークレットのローテーション。**個別パターンはそちらに残ります** |
+| [FSx-for-ONTAP-Lakehouse-Integrations](https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations) | 集めたデータをデータレイク / レイクハウス基盤から扱う経路 |
+| [FSx-for-ONTAP-Agentic-Access-Aware-RAG](https://github.com/Yoshiki0705/FSx-for-ONTAP-Agentic-Access-Aware-RAG) | 同じデータを RAG から扱う形。**ファイル側のアクセス制御を検索結果に反映させる構成**で、AWS CDK のサンプルがあります |
+| [ONTAP-Edge-to-Cloud-AI](https://github.com/Yoshiki0705/ONTAP-Edge-to-Cloud-AI) | 収集元がエッジ機器の場合。分散したデータを集約してから AI / 分析へ渡す経路 |
+
+**組んだあと — 運用と保護**
+
+| リポジトリ | 何を答えるか |
+|---|---|
+| [FSx-for-ONTAP-Observability-integrations](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations) | 監査ログを外部の可観測性基盤へ送る経路。**EC2 を置かない形**で、S3 Access Point と AWS Lambda を使います。**このリポジトリには監視の設計がありません。** 性能を測ったあとに続けて読む先はここ |
+| [FSx-for-ONTAP-Cyber-Resilience-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns) | 正本データの保護。ONTAP 側の検知機構、FPolicy によるイベント駆動の対応、サードパーティのファイルセキュリティ連携、ストレージネイティブのデータ保護 |
+
+**このリポジトリと Playbook の分担は取り決めがあります。** 測定と、それを生む環境はこちらが持ち、
+判断とガイダンスは Playbook が持ちます。Playbook はこちらの主張を条件付きで引用し、**引用した文字列が
+消えたことを検出する仕組みを双方に置いています**（`make incoming-probes`）。同じ測定値を 2 か所に置くと、
+更新が止まった側が訂正された側より長く生き残るためです。
 
 ## 免責
 

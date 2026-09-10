@@ -39,7 +39,7 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label: {default: Placement (must match the other targets and the clients)}
-        Parameters: [VpcId, SubnetId, ClientSecurityGroupId, AdSecurityGroupId]
+        Parameters: [VpcId, SubnetId, ClientSecurityGroupId, AdSecurityGroupId, EnableBlockProtocols]
       - Label: {default: Performance}
         Parameters: [ThroughputCapacityPerHAPair, StorageCapacityGiB, ProvisionedSsdIops]
       - Label: {default: Volume}
@@ -116,6 +116,15 @@ Parameters:
       account IDs to a secret scanner. runbook.sh computes it, where arithmetic exists. Size it to
       hold more than twice the 256 GB in-memory cache, which is what a read has to exceed once the
       NVMe read cache is disabled -- 900 GiB is what the runbook passes.
+  EnableBlockProtocols:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Adds the iSCSI and NVMe/TCP ingress rules and a second volume for a LUN or namespace
+      (pattern F). **The LUN, igroup, namespace and subsystem cannot be created from here** -- none of
+      them exists in the FSx API or in AWS::FSx::Volume, so they are runbook phases against the ONTAP
+      REST API. This parameter only opens the path and provides the volume they go in.
   NamePrefix:
     Type: String
     Default: perfmatrix
@@ -129,6 +138,7 @@ Parameters:
 
 Conditions:
   HasAd: !Not [!Equals [!Ref AdSecurityGroupId, ""]]
+  HasBlock: !Equals [!Ref EnableBlockProtocols, "true"]
 
 Resources:
   FileSystemSecurityGroup:
@@ -206,6 +216,51 @@ Resources:
       Description: >-
         SMB from the measurement clients. Port 139 is not opened: SMB 2.0 and later do not use NetBIOS
         session service, and every dialect being measured here is 2.0 or later.
+
+  # The block path (pattern F), added only when EnableBlockProtocols is true. Separate resources
+  # rather than more entries in the ingress list above, so a deployment that does not measure block
+  # produces exactly the rules it did before this was added -- the same reason SMB is separate.
+  #
+  # **NEVER DEPLOYED.** These three rules and the volume below have been linted and never applied.
+  #
+  # No egress is added: block needs none. The 127.0.0.1/32 placeholder above stays.
+  IscsiFromClients:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasBlock
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3260
+      ToPort: 3260
+      SourceSecurityGroupId: !Ref ClientSecurityGroupId
+      Description: >-
+        iSCSI from the measurement clients. Reaches iscsi_1 and iscsi_2 on both nodes, which is why
+        a one-session figure is not a one-flow figure: see the block plan.
+
+  NvmeTcpFromClients:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasBlock
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 4420
+      ToPort: 4420
+      SourceSecurityGroupId: !Ref ClientSecurityGroupId
+      Description: >-
+        NVMe/TCP data. Uses the same iSCSI LIFs as iSCSI; second generation only, six or fewer HA pairs
+
+  NvmeTcpDiscoveryFromClients:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasBlock
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8009
+      ToPort: 8009
+      SourceSecurityGroupId: !Ref ClientSecurityGroupId
+      Description: >-
+        NVMe/TCP discovery. Separate port from the data path, and a discovery that cannot reach it
+        fails before any namespace is seen
 
   # Without this the join fails, and it fails in a way that reads as a permissions problem. An
   # AD-joined SVM contacts its controllers for Kerberos, LDAP and the win-to-unix name-mapping lookup
@@ -315,6 +370,36 @@ Resources:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-vol"}
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
+  # The volume a LUN or an NVMe namespace goes in. Deliberately separate from the NFS volume: a LUN
+  # sharing a volume with the NFS test file would make one measurement move the other's layout.
+  #
+  # Settings copied from the NFS volume rather than chosen again, so the two differ only in what is
+  # written into them. No JunctionPath: a LUN is not reached through a junction.
+  #
+  # AWS recommends a volume at least 5% larger than the LUN, so the runbook sizes a 600 GiB LUN into
+  # the 900 GiB this passes. 600 GiB is the same figure the file side used, and for the same reason --
+  # more than twice the 256 GB in-memory cache.
+  #
+  # **NEVER DEPLOYED.**
+  BlockVolume:
+    Type: AWS::FSx::Volume
+    Condition: HasBlock
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Sub "${NamePrefix}_blk_vol"
+      VolumeType: ONTAP
+      OntapConfiguration:
+        StorageVirtualMachineId: !Ref StorageVirtualMachine
+        SecurityStyle: UNIX
+        StorageEfficiencyEnabled: false
+        SizeInBytes: !Ref VolumeSizeBytes
+        TieringPolicy:
+          Name: NONE
+        SnapshotPolicy: none
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-blk-vol"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
 Outputs:
   FileSystemId:
     Value: !Ref FileSystem
@@ -352,6 +437,20 @@ Outputs:
       'system node external-cache modify -node * -is-enabled false' over the ONTAP CLI, then confirm
       with 'system node external-cache show'. Without this, a read under 1,900 GB is served from cache
       and the SSD IOPS setting has no effect on it.
+  BlockVolumeName:
+    Condition: HasBlock
+    Value: !Sub "${NamePrefix}_blk_vol"
+    Description: >-
+      The volume the runbook creates a LUN or namespace inside. **Nothing here creates either** --
+      `lun create`, `lun igroup create`, `vserver nvme namespace create` and
+      `vserver nvme subsystem create` are ONTAP CLI or REST only.
+  BlockIdentityWarning:
+    Condition: HasBlock
+    Value: >-
+      Resolve the block device by LUN serial or 'nvme netapp ontapdevices', never by device index.
+      The client root EBS volume appears as /dev/nvme0n1, and VDBENCH writes to whatever lun= names.
+    Description: >-
+      The one mistake in this pattern that costs a client rebuild rather than a re-run.
   HourlyCostNote:
     Value: !Sub
       - "About $${Hourly} per hour while this stack exists. Delete it when the E pattern is done."

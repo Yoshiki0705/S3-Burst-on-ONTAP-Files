@@ -55,6 +55,11 @@ NOT_IN_ALL = {
     # the aggregate it would be output nobody reads. Run on request when the Hub refreshes its
     # resource map -- see docs/ja/reference/comparison/ and the Hub's cross-repo-index.md.
     "sources-export",
+    # Reports which evidence documents the Hub has never cited. An uncited finding is not a defect --
+    # a claim at 未検証 has nothing to build guidance on yet -- so there is no failing condition to
+    # put in the aggregate. `incoming-probes` is the gate over the same contract; this is the view of
+    # what the contract does *not* cover, read when deciding what to hand over next.
+    "citation-coverage",
     "new-pattern",  # takes arguments
     "commit-gate",  # takes arguments; enforced by the PreToolUse hook, not by the aggregate
     # Takes a pull request number and queries the API. It answers a question about a commit that

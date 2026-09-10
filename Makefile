@@ -7,7 +7,9 @@ PY ?= python3
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export \
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
-        pattern-status iac-security drift external-anchors test all new-pattern \
+        pattern-status iac-security drift external-anchors incoming-probes outgoing-probes shell \
+        citation-coverage \
+        test all new-pattern \
         diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
@@ -16,13 +18,18 @@ help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-lint: markdown python cfn sg-descriptions terraform ## Markdown, Python, CloudFormation and Terraform
+lint: markdown python cfn sg-descriptions terraform shell ## Markdown, Python, CloudFormation, Terraform and shell
 
 # `RUFF` and `ZIZMOR` are overridable so that the recipes below can be driven against a stub
 # binary. The defect they guard against lives in the recipe's shell, not in any Python, so a test
 # that reimplements the same logic cannot reach it -- see tests/test_makefile_toolchain_checks.py.
 RUFF ?= ruff
 RUFF_PINNED := $(shell sed -n 's/^ruff==//p' requirements-dev.txt)
+# cfn-lint is pinned in requirements-dev.txt and CI installs from that file, but this recipe compared
+# no versions until a local 1.52.1 passed against a pinned 1.56.0. `python` and `zizmor` had warned
+# about exactly that for their own tools; the pin without the comparison is the silent case.
+CFN_LINT ?= cfn-lint
+CFN_LINT_PINNED := $(shell sed -n 's/^cfn-lint==//p' requirements-dev.txt)
 
 # The version is read without a pipe. `$(RUFF) --version | awk '{print $$2}'` reports the status of
 # awk, which succeeds on empty input, so a binary that is installed but cannot run produced an empty
@@ -75,9 +82,27 @@ markdown: ## Run markdownlint if available (skipped when not installed)
 # that reads like a template and is linted by nothing is the shape that rots: it is copied, and the
 # copy is the first thing anybody validates.
 cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is not installed)
-	@if ! command -v cfn-lint >/dev/null 2>&1; then \
+	@if ! command -v $(CFN_LINT) >/dev/null 2>&1; then \
 		echo "cfn-lint not installed - skipping (pip install -r requirements-dev.txt)"; \
 	else \
+		if ! raw=$$($(CFN_LINT) --version); then \
+			echo "error: $(CFN_LINT) is present but does not run - '--version' exited non-zero."; \
+			echo "       Its own error is above. This is a broken install, not a version"; \
+			echo "       mismatch, so pinning will not fix it:"; \
+			echo "       pip install --force-reinstall -r requirements-dev.txt"; \
+			exit 1; \
+		fi; \
+		if [ -z "$$raw" ]; then \
+			echo "error: $(CFN_LINT) ran but reported no version, so the pin cannot be checked."; \
+			exit 1; \
+		fi; \
+		installed=$${raw##* }; \
+		if [ "$$installed" != "$(CFN_LINT_PINNED)" ]; then \
+			echo "warning: cfn-lint $$installed installed, this repository pins $(CFN_LINT_PINNED)."; \
+			echo "         Rule sets differ between versions, so a local pass does not"; \
+			echo "         mean CI passes. Install the pinned version:"; \
+			echo "         pip install -r requirements-dev.txt"; \
+		fi; \
 		if ! found=$$(find patterns environments \( -name 'template*.yaml' -o -path '*/examples/*.yaml' \) -print); then \
 			echo "cfn: the scan of patterns/ and environments/ failed, so this is not a report"; \
 			echo "     that there are no templates. Its own error is above."; \
@@ -89,9 +114,22 @@ cfn: ## Lint every CloudFormation template and example (skipped when cfn-lint is
 			echo "     not that there is nothing to lint."; \
 			exit 1; \
 		fi; \
-		cfn-lint --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
+		$(CFN_LINT) --non-zero-exit-code error $$found && echo "cfn: templates clean"; \
 	fi
 
+shell: ## Parse and lint every tracked shell script (shellcheck skipped when absent)
+	@found=$$(git ls-files '*.sh'); \
+	if [ -z "$$found" ]; then \
+		echo "shell: no .sh tracked, which is not what this repository looks like -- this scan"; \
+		echo "       stopped matching rather than finding nothing."; \
+		exit 1; \
+	fi; \
+	for f in $$found; do bash -n "$$f" || exit 1; done; \
+	if command -v shellcheck >/dev/null 2>&1; then \
+		shellcheck -S warning $$found && echo "shell: $$(echo $$found | wc -w | tr -d ' ') script(s) parse and lint clean"; \
+	else \
+		echo "shell: $$(echo $$found | wc -w | tr -d ' ') script(s) parse; shellcheck not installed (brew install shellcheck)"; \
+	fi
 sg-descriptions: ## Security group rule descriptions must use only characters EC2 accepts
 	@$(PY) tools/check_sg_rule_descriptions.py
 
@@ -246,6 +284,12 @@ drift: ## Compare the contents of translated tables, not just their headings
 
 external-anchors: ## Verify cited sibling-repository anchors (skipped without a local checkout)
 	@$(PY) tools/check_external_anchors.py
+incoming-probes: ## Claims a sibling repository cites must survive a rewording (skipped without its contract)
+	@$(PY) tools/check_incoming_probes.py
+outgoing-probes: ## Claims this repository cites in a sibling must survive (skipped without its checkout)
+	@$(PY) tools/check_outgoing_probes.py
+citation-coverage: ## Report which evidence documents the Hub has never cited (not in make all)
+	@$(PY) tools/report_citation_coverage.py
 
 pattern-status: ## Verify every pattern README opens with a defined status word
 	@$(PY) tools/check_pattern_status.py
@@ -259,7 +303,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
