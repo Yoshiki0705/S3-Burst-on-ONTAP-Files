@@ -930,6 +930,7 @@ NVMe/TCP は `iscsi_1` / `iscsi_2` を使い、**この 2 本は別ノードの�
 | ドキュメント | 内容 |
 |---|---|
 | [測定計画](throughput-protocol-matrix-plan.md) | 測定パターンと必要な環境 |
+| [初期サイジングの測定計画](initial-sizing-measurement-plan.md) | パターン G。指定値を振るときの固定条件と、クールダウンの段取り |
 | [ブロックプロトコルの測定計画](block-protocol-matrix-plan.md) | iSCSI / NVMe/TCP（パターン F）。この記録へ足すときの表の分け方も含む |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [測定環境](../../../environments/perf-matrix/README.md) | テンプレート、実行順序、削除手順 |

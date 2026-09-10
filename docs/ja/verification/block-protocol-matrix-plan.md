@@ -528,6 +528,7 @@ $11.51/時 になり総額はほぼ半分だが、**既存のファイル側の�
 | ドキュメント | 内容 |
 |---|---|
 | [プロトコル別スループットの測定計画](throughput-protocol-matrix-plan.md) | ファイルプロトコル側の計画（A / D / E / E1 / E2） |
+| [初期サイジングの測定計画](initial-sizing-measurement-plan.md) | パターン G。同じ環境を使う場合、**G が先で F が後**（理由は下） |
 | [プロトコル別測定の結果](perf-matrix-results.md) | 並べる相手になる実測値と、その条件 |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [測定環境](../../../environments/perf-matrix/README.md) | テンプレート、実行順序、削除手順 |
