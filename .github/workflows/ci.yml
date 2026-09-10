@@ -55,6 +55,15 @@ jobs:
         run: python3 tools/check_cross_language_links.py
       # Heading structure is compared by the step above; this compares what is inside the tables.
       # A claim was changed in Japanese and not in English once, and no gate noticed.
+      # bash -n plus shellcheck. This repository ships several hundred lines of operational shell and
+      # had no check over any of it.
+      #
+      # It would not have caught the two defects that prompted it -- a call to an undefined function,
+      # and phases defined after the dispatch that reads them -- because neither is a parse error and
+      # both are runtime. `tests/test_runbook_dispatch.py` covers that class; this covers quoting and
+      # expansion, which is the class nobody finds by reading.
+      - name: Parse and lint shell scripts
+        run: make shell
       - name: Check translated tables for content drift
         run: python3 tools/check_translation_drift.py
       # Skips here: verifying a cited anchor needs the sibling repository checked out, which CI does
