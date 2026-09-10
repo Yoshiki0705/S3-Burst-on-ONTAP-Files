@@ -134,6 +134,7 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | NFS / SMB / EFS の実測値を見る | [プロトコル別測定の結果](docs/ja/verification/perf-matrix-results.md) | 20 分 |
 | SMB の台数を増やしたときの伸びを見る | [SMB の台数試験](docs/ja/verification/perf-matrix-results.md#smb-の台数試験1--4--8-台) | 5 分 |
 | SMB の書き込みが持続するか見る | [SMB の書き込みの持続](docs/ja/verification/perf-matrix-results.md#smb-の書き込みの持続15-分) | 5 分 |
+| 初期サイジングを測る計画を読む | [初期サイジングの測定計画](docs/ja/verification/initial-sizing-measurement-plan.md) | 15 分 |
 | iSCSI / NVMe/TCP を測る計画を読む | [ブロックプロトコルの測定計画](docs/ja/verification/block-protocol-matrix-plan.md) | 15 分 |
 | 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
 | SMB でマウントする前に読む | [SMB でマウントできる名前と、識別子を読む場所](docs/ja/reference/limits/smb-share-and-identifier-reading.md) | 5 分 |

@@ -1,0 +1,53 @@
+**********************************************************************
+* NEVER EXECUTED. Pattern F-2. Plan in docs/ja/verification/block-protocol-matrix-plan.md.
+*
+* The NVMe/TCP side of the block pair:
+*
+*   cd /opt/bench
+*   vdbench -f /path/to/vdbench-linux-nvmetcp.txt -o /opt/bench/report-nvmetcp
+*
+* A diff against vdbench-linux-iscsi.txt is the complete list of differences
+* between the two runs, and it is one line: `lun=`. Everything that decides the
+* workload is in workloads-common.txt, which the file-side pair includes too, so a
+* block figure and a file figure came out of the same workload definitions even
+* though they cannot share a table.
+*
+* NVMe/TCP is second-generation only, six or fewer HA pairs, so there is no E1
+* equivalent for it -- the generation comparison cannot include this protocol.
+**********************************************************************
+* THE PATH BELOW IS A PLACEHOLDER AND MUST NOT BE TAKEN ON TRUST.
+*
+* `nvme list` output is ordered by discovery, and the client's root EBS volume is
+* an NVMe device too -- it appears as /dev/nvme0n1 in AWS's own example, with the
+* ONTAP namespace at nvme2n1. **Writing to the wrong node destroys the client.**
+*
+* So `runbook.sh block-provision nvme` resolves the namespace with
+* `nvme netapp ontapdevices`, which maps a namespace path to its device, and
+* rewrites this line. `runbook.sh block-preflight` refuses to proceed until the
+* path here is the ONTAP namespace.
+**********************************************************************
+
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* Multipathing is not the same mechanism as on the iSCSI side, and it is part of
+* the measurement rather than a detail of the setup.
+*
+* iSCSI uses dm-multipath. NVMe/TCP uses ANA, and the two paths are **not
+* symmetric**: the node holding the namespace reports `optimized` and the other
+* reports `non-optimized`, with an iopolicy of round-robin across them. So the
+* load is not split the way dm-multipath splits it.
+*
+* **That asymmetry is a candidate explanation for any difference F-2 finds**, which
+* is why the preflight records `iopolicy` and both paths' ANA states, and why the
+* result carries them. Without them a protocol difference and a path-distribution
+* difference are indistinguishable.
+*
+* No size=, and the fill pass applies here too -- an unwritten namespace returns
+* zeros without reaching disk. Same reasoning as the iSCSI file.
+**********************************************************************
+sd=default,openflag=o_direct
+sd=sd1-1,host=hd1,lun=/dev/nvme2n1
+
+include=workloads-common.txt
