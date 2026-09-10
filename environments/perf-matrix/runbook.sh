@@ -246,6 +246,17 @@ deploy_gen2() {
 
   [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
   [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN to a Secrets Manager secret with a 'password' key"
+  # Varied by pattern G, which is the whole of that measurement, so it cannot stay a literal. The
+  # three values are the only ones SINGLE_AZ_2 accepts, and the template's AllowedValues rejects the
+  # rest before a 25-minute create finds out.
+  local tp="${GEN2_THROUGHPUT:-6144}"
+  case "$tp" in
+    1536|3072|6144) ;;
+    *) die "GEN2_THROUGHPUT must be 1536, 3072 or 6144 (the values SINGLE_AZ_2 accepts); got '$tp'" ;;
+  esac
+  # Opens the iSCSI and NVMe/TCP path and adds the volume a LUN or namespace goes in. Off unless asked,
+  # so a run that does not measure block produces the rules it produced before that existed.
+  local block="${GEN2_BLOCK:-false}"
   local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
   # The template takes bytes and CloudFormation cannot multiply, so the conversion happens here.
   # 900 GiB holds more than twice the 256 GB in-memory cache, which is what the read has to exceed.
@@ -276,7 +287,13 @@ deploy_gen2() {
   else
     printf 'no directory stack; deploying NFS-only (no SMB ingress, no AD egress)\n'
   fi
-  log "gen2 FSx for ONTAP: $STACK_GEN2 (6144 MBps, ${ssd_gib} GiB SSD, ${vol_gib} GiB volume, about \$23.03/hour)"
+  # Derived rather than stated. The hourly figure was a literal next to a literal throughput value,
+  # so every configuration printed the cost of the most expensive one.
+  local per_hour
+  per_hour="$($PY_BIN -c "
+tp=$tp; ssd=$ssd_gib; prov=$iops
+print(f'{(tp*2.013 + ssd*0.15 + max(0, prov - 3*ssd)*0.0204)/730:.2f}')")"
+  log "gen2 FSx for ONTAP: $STACK_GEN2 (${tp} MBps, ${ssd_gib} GiB SSD, ${iops} IOPS, ${vol_gib} GiB volume, about \$${per_hour}/hour at list price)"
   aws cloudformation deploy \
     --region "$REGION" \
     --stack-name "$STACK_GEN2" \
@@ -284,7 +301,8 @@ deploy_gen2() {
     --parameter-overrides \
       "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" \
       "AdSecurityGroupId=$sg_ad" \
-      "ThroughputCapacityPerHAPair=6144" "ProvisionedSsdIops=$iops" \
+      "ThroughputCapacityPerHAPair=$tp" "ProvisionedSsdIops=$iops" \
+      "EnableBlockProtocols=$block" \
       "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset \
@@ -810,7 +828,8 @@ Environment:
   for gen1   GEN1_FS_ID
   for tools  STAGING_BUCKET -- the clients have no route to PyPI or GitHub, so VDBENCH,
              auto_vdbench and the Python wheels come in over S3
-  optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB GEN2_SSD_IOPS AD_DOMAIN_NAME
+  optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB GEN2_SSD_IOPS
+             GEN2_THROUGHPUT (1536|3072|6144, default 6144) GEN2_BLOCK (true opens iSCSI/NVMe-TCP) AD_DOMAIN_NAME
              AD_SHORT_NAME AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE
 }
