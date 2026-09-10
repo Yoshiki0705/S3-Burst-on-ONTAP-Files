@@ -564,6 +564,13 @@ with open(sys.argv[1], "w", encoding="utf-8") as handle:
     json.dump(payload, handle)
 PY
 
+  ssm_send_and_wait "$instance" "$payload"
+}
+
+# The send-and-poll half, factored out so `run_on_client` is not a second copy of it. Two copies of
+# the same shell drifting apart is what the toolchain test one directory over exists to catch.
+ssm_send_and_wait() {
+  local instance="$1" payload="$2"
   local cmd_id
   cmd_id="$(aws ssm send-command --region "$REGION" --instance-ids "$instance" \
     --document-name AWS-RunShellScript --timeout-seconds 600 \
@@ -579,6 +586,24 @@ PY
   aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" --instance-id "$instance" \
     --query 'StandardOutputContent' --output text
   [[ "$state" == "Success" ]] || die "the command did not succeed (status: $state)"
+}
+
+# A client command with no ONTAP credentials in it. `ontap_rest_on_client` prepends a Secrets Manager
+# fetch because the ONTAP password must not reach the Systems Manager command history. A plain client
+# command needs neither the fetch nor that exposure, so it gets its own entry point rather than
+# passing an empty secret through the other one.
+run_on_client() {
+  local instance="$1" script="$2"
+  local payload; payload="$(mktemp)"
+  # shellcheck disable=SC2064  # expand now, so the trap names this file
+  trap "rm -f '$payload'" RETURN
+  SCRIPT="$script" $PY_BIN - "$payload" <<'PY'
+import json, os, sys
+payload = {"Parameters": {"commands": ["set -uo pipefail", os.environ["SCRIPT"]]}}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump(payload, handle)
+PY
+  ssm_send_and_wait "$instance" "$payload"
 }
 
 # **The default that makes FSx for ONTAP look slow.** ONTAP ships tcp-max-xfer-size at 65536, and it is
@@ -718,6 +743,14 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
                          account. Run it before mounting: two of these fail with messages that
                          point elsewhere
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
+
+  Block protocols (pattern F). NEVER EXECUTED -- read each phase's output, not its exit status:
+  block-packages         Install the iSCSI and NVMe/TCP clients; print the IQN and the NQN
+  block-provision iscsi <IQN>  Create the LUN, the igroup and the mapping; print serial-hex
+  block-provision nvme <NQN>   Create the namespace and the subsystem; map the host
+  block-sessions single|default|multi [n]  Log in, then COUNT the connections opened
+  block-preflight        The gate. Check 1 protects the client, not the result
+  block-fill <paramfile> Write the device once; an unwritten thin LUN reads as zeros
   nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
   preflight              Print the support matrix and gate on the NVMe read cache being disabled
@@ -739,6 +772,229 @@ Environment:
 USAGE
 }
 
+# =================================================================================================
+# Block protocols (pattern F). **EVERY PHASE BELOW HAS NEVER BEEN EXECUTED.**
+#
+# They are written before a measurement window rather than during one, because the window is paid for
+# and the alternative is writing the LUN provisioning and the device-identity preflight under time
+# pressure -- which is when the preflight is the step that gets skipped.
+#
+# Linted, not run. Treat the first execution as part of the measurement: read each phase's output
+# rather than its exit status, the way `nvme-cache off` is read.
+#
+# Why these are runbook phases and not CloudFormation: `lun create`, `lun igroup create`,
+# `lun mapping create`, `vserver nvme namespace create` and `vserver nvme subsystem create` have no
+# equivalent in the FSx API or in AWS::FSx::Volume. The template opens the ports and provides the
+# volume; everything inside the volume is ONTAP's.
+# =================================================================================================
+
+BLOCK_LUN_GIB="${BLOCK_LUN_GIB:-600}"
+BLOCK_LUN_NAME="${BLOCK_LUN_NAME:-${PREFIX}_lun}"
+BLOCK_IGROUP="${BLOCK_IGROUP:-${PREFIX}_igroup}"
+BLOCK_NS_NAME="${BLOCK_NS_NAME:-${PREFIX}_ns}"
+BLOCK_SUBSYSTEM="${BLOCK_SUBSYSTEM:-${PREFIX}_subsys}"
+BLOCK_FRIENDLY="${BLOCK_FRIENDLY:-${PREFIX}-blk}"
+
+# Shared preamble for the block phases: the client, the management endpoint and the SVM name, each
+# read rather than assumed. The SVM name is not derived from the volume name -- in this environment the
+# SVM is hyphen-separated and the volume is underscore-separated, which has already been a wrong guess.
+block_context() {
+  BLOCK_FS_ID="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$BLOCK_FS_ID" && "$BLOCK_FS_ID" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN"
+  BLOCK_INSTANCE="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  [[ -n "$BLOCK_INSTANCE" && "$BLOCK_INSTANCE" != "None" ]] || die "no client; run './runbook.sh clients' first"
+  BLOCK_VOL="$(stack_output "$STACK_GEN2" BlockVolumeName)"
+  [[ -n "$BLOCK_VOL" && "$BLOCK_VOL" != "None" ]] \
+    || die "no BlockVolumeName; deploy gen2 with EnableBlockProtocols=true"
+  BLOCK_SVM="$(aws fsx describe-storage-virtual-machines --region "$REGION" \
+    --filters "Name=file-system-id,Values=$BLOCK_FS_ID" \
+    --query 'StorageVirtualMachines[0].Name' --output text)"
+  [[ -n "$BLOCK_SVM" && "$BLOCK_SVM" != "None" ]] || die "could not read the SVM name"
+  BLOCK_MGMT="management.${BLOCK_FS_ID}.fsx.${REGION}.amazonaws.com"
+}
+
+# The client packages. Amazon Linux 2023's repositories are reachable over the S3 gateway endpoint even
+# though PyPI and GitHub are not, so this needs no staging bucket.
+#
+# **AWS's NVMe/TCP procedure is written for RHEL 9.3 and these clients are AL2023.** Whether
+# `nvme-cli` and the `nvme_tcp` module are both available here is UNCONFIRMED, and it is the one thing
+# that can make F-2 unmeasurable. It costs nothing to find out, so this phase runs before the file
+# system exists.
+block_packages() {
+  block_context
+  log "installing the iSCSI and NVMe/TCP clients on $BLOCK_INSTANCE"
+  run_on_client "$BLOCK_INSTANCE" '
+dnf install -y iscsi-initiator-utils device-mapper-multipath nvme-cli
+mpathconf --enable --with_multipathd y
+sed -i "s/^node.session.timeo.replacement_timeout = .*/node.session.timeo.replacement_timeout = 5/" /etc/iscsi/iscsid.conf
+systemctl enable --now iscsid multipathd
+modprobe nvme-tcp && echo nvme-tcp > /etc/modules-load.d/nvme-tcp.conf
+echo "--- what the initiator and host are called ---"
+cat /etc/iscsi/initiatorname.iscsi
+cat /etc/nvme/hostnqn
+echo "--- module and multipath state ---"
+lsmod | grep -E "^nvme_tcp|^dm_multipath" || echo "MISSING: a module did not load"
+cat /sys/module/nvme_core/parameters/multipath'
+  printf '\nRead the IQN and the NQN above; the provisioning phases need them.\n'
+  printf 'A MISSING line means F-2 cannot be measured on this AMI. That is a finding, not a blocker to work around.\n'
+}
+
+# iSCSI: LUN, igroup, mapping. Returns the serial-hex, which is what the friendly device name is built
+# from -- **the device index is never used**, because the client's root EBS volume is /dev/nvme0n1 and
+# indices move with attach order.
+block_provision_iscsi() {
+  block_context
+  local iqn="${1:-}"
+  [[ -n "$iqn" ]] || die "usage: runbook.sh block-provision iscsi <client-IQN>  (from 'block-packages')"
+  log "creating LUN ${BLOCK_LUN_NAME} (${BLOCK_LUN_GIB} GiB) in ${BLOCK_VOL} on ${BLOCK_SVM}"
+  local api="https://${BLOCK_MGMT}/api/private/cli"
+  ontap_rest_on_client "$BLOCK_INSTANCE" "
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_LUN_NAME}\",\"size\":\"${BLOCK_LUN_GIB}GB\",\"ostype\":\"linux\",\"space-allocation\":\"enabled\"}' \
+  '${api}/lun' | python3 -m json.tool
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"igroup\":\"${BLOCK_IGROUP}\",\"protocol\":\"iscsi\",\"ostype\":\"linux\",\"initiator\":[\"${iqn}\"]}' \
+  '${api}/lun/igroup' | python3 -m json.tool
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_LUN_NAME}\",\"igroup\":\"${BLOCK_IGROUP}\"}' \
+  '${api}/lun/mapping' | python3 -m json.tool
+echo '--- serial-hex, state and mapped: the friendly name is built from the serial ---'
+curl -s -k -u \"fsxadmin:\$PW\" \
+  '${api}/lun?path=/vol/${BLOCK_VOL}/${BLOCK_LUN_NAME}&fields=serial-hex,state,mapped' | python3 -m json.tool"
+  printf '\nTake serial-hex from above and add it to /etc/multipath.conf as alias %s, then run block-preflight.\n' "$BLOCK_FRIENDLY"
+}
+
+# NVMe/TCP: namespace, subsystem, mapping, host. The namespace and the LUN are separate objects in the
+# same volume, so F-1 and F-2 read the same volume without sharing a target.
+block_provision_nvme() {
+  block_context
+  local nqn="${1:-}"
+  [[ -n "$nqn" ]] || die "usage: runbook.sh block-provision nvme <client-NQN>  (from 'block-packages')"
+  log "creating namespace ${BLOCK_NS_NAME} and subsystem ${BLOCK_SUBSYSTEM} on ${BLOCK_SVM}"
+  local api="https://${BLOCK_MGMT}/api/private/cli"
+  ontap_rest_on_client "$BLOCK_INSTANCE" "
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_NS_NAME}\",\"size\":\"${BLOCK_LUN_GIB}GB\",\"ostype\":\"linux\"}' \
+  '${api}/vserver/nvme/namespace' | python3 -m json.tool
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"ostype\":\"linux\"}' \
+  '${api}/vserver/nvme/subsystem' | python3 -m json.tool
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_NS_NAME}\"}' \
+  '${api}/vserver/nvme/subsystem/map' | python3 -m json.tool
+curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
+  -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"host-nqn\":\"${nqn}\"}' \
+  '${api}/vserver/nvme/subsystem/host' | python3 -m json.tool
+echo '--- the block LIFs. Both are used, by both protocols ---'
+curl -s -k -u \"fsxadmin:\$PW\" \
+  '${api}/network/interface?vserver=${BLOCK_SVM}&fields=address,current-node,current-port,service-policy' | python3 -m json.tool"
+}
+
+# Sessions. **The point of this phase is that the requested count and the opened count are different
+# numbers**, which `nconnect` and SMB Multichannel have each already demonstrated here.
+#
+# `single` is the only form comparable with the file-side one-connection rows: nr_sessions is per
+# node and a login without a portal reaches both nodes, so the default of "one session" opens two
+# connections.
+block_sessions() {
+  block_context
+  local mode="${1:-}" count="${2:-8}"
+  case "$mode" in
+    single|default|multi) ;;
+    *) die "usage: runbook.sh block-sessions [single|default|multi] [count]" ;;
+  esac
+  log "iSCSI sessions: $mode"
+  run_on_client "$BLOCK_INSTANCE" "
+set -x
+iscsiadm --mode node --logoutall=all || true
+target=\$(iscsiadm --mode discovery --op update --type sendtargets --portal \$(getent hosts iscsi.${BLOCK_SVM} | awk '{print \$1}' | head -1) | awk '{print \$2}' | head -1)
+echo \"target=\$target\"
+case '$mode' in
+  single)
+    # One portal only. This is the single-flow point and the only one comparable with the file rows.
+    portal=\$(iscsiadm --mode node -T \"\$target\" | awk -F, '{print \$1}' | head -1)
+    iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
+    iscsiadm --mode node -T \"\$target\" -p \"\$portal\" --login
+    ;;
+  default)
+    iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
+    iscsiadm --mode node -T \"\$target\" --login
+    ;;
+  multi)
+    iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v $count
+    iscsiadm --mode node -T \"\$target\" --login
+    ;;
+esac
+set +x
+echo '--- COUNT THE CONNECTIONS. The requested value is not the answer ---'
+ss -tn state established '( dport = :3260 )' | tail -n +2 | wc -l
+ss -tn state established '( dport = :3260 )'
+echo '--- multipath: active and enabled counts must match ---'
+multipath -ll || true"
+  printf '\nRecord the counted connections next to the requested value. They are two fields, not one.\n'
+}
+
+# The gate. Nothing is measured until this passes, and the first check is the one that protects the
+# client rather than the result.
+block_preflight() {
+  block_context
+  log "block preflight on $BLOCK_INSTANCE"
+  run_on_client "$BLOCK_INSTANCE" "
+fail=0
+echo '=== 1. the device the parameter file names must be the ONTAP one ==='
+for path in /dev/mapper/${BLOCK_FRIENDLY} \$(nvme netapp ontapdevices -o column 2>/dev/null | awk '/^\\/dev/{print \$1}'); do
+  [ -e \"\$path\" ] || continue
+  echo \"\$path\"
+  lsblk -no NAME,SIZE,MODEL \"\$path\" 2>/dev/null || true
+done
+if lsblk -no MODEL /dev/mapper/${BLOCK_FRIENDLY} 2>/dev/null | grep -qi 'Elastic Block Store'; then
+  echo 'FAIL: that path is the root EBS volume. Writing to it destroys the client.'; fail=1
+fi
+echo '=== 2. iSCSI multipath: equal numbers of active and enabled ==='
+multipath -ll 2>/dev/null | grep -cE 'status=active' || true
+multipath -ll 2>/dev/null | grep -cE 'status=enabled' || true
+echo '=== 3. NVMe multipath, iopolicy and ANA states ==='
+cat /sys/module/nvme_core/parameters/multipath 2>/dev/null || echo 'MISSING'
+cat /sys/class/nvme-subsystem/nvme-subsys*/iopolicy 2>/dev/null || true
+nvme list-subsys 2>/dev/null | grep -E 'optimized|live' || true
+echo '=== 4. the connections that are actually open ==='
+printf 'iscsi 3260: '; ss -tn state established '( dport = :3260 )' | tail -n +2 | wc -l
+printf 'nvme  4420: '; ss -tn state established '( dport = :4420 )' | tail -n +2 | wc -l
+exit \$fail"
+  cat <<'NOTE'
+
+Read all four. This phase reports; it does not decide for you.
+
+  1. A FAIL here is the only failure in this environment that costs a client rebuild.
+  2. Unequal active/enabled counts mean dm-multipath has not merged the sessions.
+  3. NVMe paths are asymmetric by design -- one optimized, one non-optimized. Record both;
+     the asymmetry is a candidate explanation for any iSCSI/NVMe difference.
+  4. Compare against what was requested. They have differed before, silently.
+
+Then run block-fill before any read is measured: unwritten blocks of a thin LUN return zeros
+without reaching disk, which measures nothing.
+NOTE
+}
+
+# The fill pass. A raw device takes a normal write run rather than VDBENCH's SD_format, so the
+# queue-depth-2 limit that held the file-side fill to 165 MB/s does not apply here. **That is a
+# prediction; record what the fill actually achieved.**
+block_fill() {
+  block_context
+  local param="${1:-}"
+  [[ -n "$param" ]] || die "usage: runbook.sh block-fill <vdbench parameter file>"
+  log "filling the block device once, using $param"
+  printf 'This writes the whole device. Confirm block-preflight check 1 passed first.\n'
+  run_on_client "$BLOCK_INSTANCE" "
+cd /opt/bench
+vdbench -f '$param' -o /opt/bench/report-fill \
+  seekpct=.0 rdpct=0 xfersize=1024k threads=512 iorate=max elapsed=0 warmup=0 || true
+grep -E 'avg_|Data errors' /opt/bench/report-fill/totals.html 2>/dev/null || true"
+  printf '\nRecord the fill rate. The file side managed 165 MB/s through SD_format and 315 with formatxfersize;\n'
+  printf 'if a raw write is not faster than that, the queue depth was not the cause and the plan says so.\n'
+}
+
 case "${1:-}" in
   ad)                   deploy_ad ;;
   ad-ports)             ad_ports ;;
@@ -753,6 +1009,15 @@ case "${1:-}" in
   windows-status)       windows_status ;;
   raise-gen1)           raise_gen1 ;;
   nvme-cache)           nvme_cache "${2:-show}" ;;
+  block-packages)       block_packages ;;
+  block-provision)      case "${2:-}" in
+                          iscsi) block_provision_iscsi "${3:-}" ;;
+                          nvme)  block_provision_nvme  "${3:-}" ;;
+                          *)     die "usage: runbook.sh block-provision [iscsi|nvme] <IQN or NQN>" ;;
+                        esac ;;
+  block-sessions)       block_sessions "${2:-}" "${3:-8}" ;;
+  block-preflight)      block_preflight ;;
+  block-fill)           block_fill "${2:-}" ;;
   nfs-xfer-size)        nfs_xfer_size "${2:-show}" ;;
   preflight)            preflight ;;
   costs)                costs ;;
