@@ -60,6 +60,9 @@ stack_output() {
 # --- clients -------------------------------------------------------------------------------------
 
 deploy_clients() {
+  # cheap to create, but pointless without the instrument. `tooling` reads the bucket rather than the variable, and dies on a gap.
+  tooling
+
   [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
   log "clients: $STACK_CLIENTS"
   aws cloudformation deploy \
@@ -238,6 +241,9 @@ drop_efs_provisioned() {
 }
 
 deploy_gen2() {
+  # the most expensive resource here. `tooling` reads the bucket rather than the variable, and dies on a gap.
+  tooling
+
   [[ -n "${VPC_ID:-}" && -n "${SUBNET_ID:-}" ]] || die "set VPC_ID and SUBNET_ID"
   [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN to a Secrets Manager secret with a 'password' key"
   local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
@@ -648,6 +654,42 @@ NOTE
 }
 
 # The gate that matters. A disk-path read taken with the NVMe cache enabled is a cache measurement.
+# The instrument, before anything that bills.
+#
+# **VDBENCH cannot be fetched by automation.** It needs an Oracle sign-in and a licence acceptance, so
+# it arrives by hand or not at all. That makes it the one prerequisite whose absence cannot be fixed
+# in the moment it is discovered -- and it used to be discovered after the file system existed.
+#
+# Checked by reading the bucket rather than by trusting the variable: STAGING_BUCKET being set says
+# where the tooling would be, not that it is there.
+tooling() {
+  [[ -n "${STAGING_BUCKET:-}" ]] || die "set STAGING_BUCKET; the clients have no route to PyPI, GitHub or Oracle"
+  aws s3api head-bucket --bucket "$STAGING_BUCKET" >/dev/null 2>&1 \
+    || die "cannot read s3://$STAGING_BUCKET -- wrong name, wrong account, or no permission"
+  local listing missing=0
+  listing="$(aws s3 ls "s3://$STAGING_BUCKET/" --recursive)" \
+    || die "listing s3://$STAGING_BUCKET failed, so this is not a report that it is empty"
+  log "staged tooling in s3://$STAGING_BUCKET"
+  # One line per artefact, and each says how to produce it. A missing wheel is a five-minute fix; a
+  # missing VDBENCH is a licence acceptance.
+  if ! grep -qE 'tooling/vdbench[0-9]*\.zip' <<<"$listing"; then
+    printf 'MISSING tooling/vdbench<version>.zip\n'
+    printf '        Oracle sign-in and licence acceptance required. Download by hand, then:\n'
+    printf '        aws s3 cp vdbench50407.zip s3://%s/tooling/\n' "$STAGING_BUCKET"
+    missing=1
+  fi
+  if ! grep -q 'tooling/auto_vdbench.tar.gz' <<<"$listing"; then
+    printf 'MISSING tooling/auto_vdbench.tar.gz  (git clone + tar; see the README step 2)\n'
+    missing=1
+  fi
+  if ! grep -q 'wheels/' <<<"$listing"; then
+    printf 'MISSING wheels/  (pip download for cp311 manylinux; plotly==5.24.1 and kaleido==0.2.1 pinned)\n'
+    missing=1
+  fi
+  [[ "$missing" -eq 0 ]] || die "the instrument is incomplete; nothing billable is worth creating yet"
+  printf 'All three present. VDBENCH is the one that cannot be re-fetched in the moment, so this is the gate.\n'
+}
+
 preflight() {
   log "preflight"
   python3 "$HERE/../../scripts/protocol_matrix_harness.py" --dry-run
@@ -753,6 +795,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   block-fill <paramfile> Write the device once; an unwritten thin LUN reads as zeros
   nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
+  tooling                Read the staging bucket. VDBENCH cannot be automated, so this comes first
   preflight              Print the support matrix and gate on the NVMe read cache being disabled
   efs elastic            Create the EFS target in elastic mode ($0.07/GB accessed, no hourly charge)
   efs provisioned        Create a second EFS in provisioned mode at 1024 MiBps (~$9/hour)
@@ -1019,6 +1062,7 @@ case "${1:-}" in
   block-preflight)      block_preflight ;;
   block-fill)           block_fill "${2:-}" ;;
   nfs-xfer-size)        nfs_xfer_size "${2:-show}" ;;
+  tooling)              tooling ;;
   preflight)            preflight ;;
   costs)                costs ;;
   teardown)             exec "$HERE/teardown.sh" ;;
