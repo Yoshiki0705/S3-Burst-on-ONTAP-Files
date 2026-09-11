@@ -132,6 +132,7 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |
 | プロトコル別に測れる組み合わせを知る | [プロトコル別の可否](docs/ja/verification/protocol-matrix-efs-vs-ontap.md) | 5 分 |
 | NFS / SMB / EFS の実測値を見る | [プロトコル別測定の結果](docs/ja/verification/perf-matrix-results.md) | 20 分 |
+| **指定値がスループットの上限かを確かめる** | [指定値・バースト・ベースラインの実測](docs/ja/verification/throughput-capacity-burst-and-baseline.md) | 10 分 |
 | SMB の台数を増やしたときの伸びを見る | [SMB の台数試験](docs/ja/verification/perf-matrix-results.md#smb-の台数試験1--4--8-台) | 5 分 |
 | SMB の書き込みが持続するか見る | [SMB の書き込みの持続](docs/ja/verification/perf-matrix-results.md#smb-の書き込みの持続15-分) | 5 分 |
 | 初期サイジングを測る計画を読む | [初期サイジングの測定計画](docs/ja/verification/initial-sizing-measurement-plan.md) | 15 分 |

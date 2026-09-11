@@ -1,0 +1,135 @@
+**********************************************************************
+* Pattern G: does throughput capacity move the ceiling, and by how much.
+*
+* Run once per throughput capacity setting -- 1,536 then 3,072 then 6,144 MBps -- against a
+* file system created fresh at that setting. Not by modifying one file system: a second-generation
+* file system will not accept another throughput or IOPS change for six hours after one, so a
+* modify-in-place series spans two days and bills through the waits.
+*
+* WHAT IS HELD AND WHAT MOVES
+*
+* Moves:  ThroughputCapacityPerHAPair -- 1536 | 3072 | 6144
+* Held:   SSD capacity 8,192 GiB, provisioned IOPS 200,000, volume 2,200 GiB, file 1,800 GiB,
+*         region geometry, mount options, shape, window, thread count, instrument
+*
+* SSD is held at 8,192 GiB on purpose, and 8,192 is not an arbitrary "large enough". Disk read
+* ceiling on this generation scales at about 768 MBps per TiB of SSD, so 8 TiB puts it at
+* 6,144 MB/s -- level with the highest throughput capacity setting and above the other two.
+* Throughput capacity is therefore the binding constraint at 1,536 and at 3,072, and the two
+* ceilings coincide at 6,144.
+*
+* At 4,096 GiB the disk ceiling would be 3,072 MB/s, so the 3,072 and 6,144 configurations would
+* report the same number and the series would read as "throughput capacity does not matter". That
+* is the reading this geometry exists to prevent.
+*
+* A consequence to state with the result rather than discover in it: because the two ceilings
+* coincide at 6,144, cache temperature can move that configuration's read figure and cannot move
+* the other two. The design below starts every read cold, so if the 6,144 pair disagrees with
+* itself the disagreement is the finding.
+*
+* TWO REGIONS, AND WHY 900 GiB
+*
+* One file, two disjoint 900 GiB regions. Region 1 is the head, region 2 the tail.
+*
+*   1. A region must be larger than what one window can consume, or the read wraps back to its own
+*      start and rereads what it just read -- from cache. At 6,144 MB/s a 30 + 120 window consumes
+*      858 GiB, inside 900 GiB. The other two settings consume 214 GiB and 429 GiB.
+*   2. A region must be larger than the in-memory read cache, so a shape that did wrap would still
+*      not find all of it resident. That cache is 256 GB on the 6,144 configuration and smaller
+*      below it; 900 GiB clears the largest case.
+*
+* The window is 30 + 120, not the 60 + 300 of workloads-common.txt. **That is a deviation and it is
+* deliberate.** 60 + 300 at 6,144 MB/s consumes 1,717 GiB, so it wraps inside any region this
+* volume can hold, and a wrapped read is the specific failure that made the first shared-file pass
+* vary by 45 per cent. 30 + 120 matches vdbench-linux-nfs-cachecontrolled.txt, so this series is
+* comparable to the disk-path table rather than to the wrapped shared-file rows.
+*
+* ORDER, WHICH IS NOT ARBITRARY
+*
+*   1. fill      whole file, head to tail. Leaves the cache holding the *tail*.
+*   2. read r1   the head. Cold, because the fill left the tail resident.
+*   3. read r2   the tail. Cold, because step 2 read 214-858 GiB through a cache of at most
+*                238 GiB and displaced everything the fill left there.
+*   4. write r1  writes come after both reads. A write pass leaves its region resident, so doing
+*                either write first would hand a read a warm start.
+*   5. write r2
+*
+* Steps 2 and 3 are the same shape measured twice on equivalent but disjoint data, both cold. Their
+* spread is the reproducibility figure for this configuration -- report the pair and the spread, not
+* the higher of the two. Steps 4 and 5 likewise.
+*
+* PRECONDITIONS, all read back before starting
+*
+*   - volume 2,200 GiB, snapshot policy `none`, no snapshots on the data volume
+*   - storage efficiency state `disabled` and space_savings.total = 0. Without this the fill pattern
+*     is reducible and the reads never reach SSD
+*   - NVMe read cache disabled, or absent. On the 1,536 configuration
+*     `system/node/external-cache` returned no records at all, which is not the same as returning
+*     `is_enabled: false` -- record which of the two was seen at each setting, because a cache layer
+*     that appears only above some throughput capacity is a second variable moving with the first
+*   - nconnect=16 in the *effective* mount options, and the count of established connections to
+*     port 2049 read from `ss` rather than assumed from the flag
+*   - tcp-max-xfer-size 1048576 on the SVM. The ONTAP default of 65536 is a server-side ceiling and
+*     a client asking for 1 MiB gets 64 KiB with a successful mount
+*
+* CREATE THE FILE BEFORE STARTING, OR VDBENCH FORMATS IT THREE TIMES
+*
+*   truncate -s 1800G /mnt/bench/target/file1
+*
+* Three SDs name the same file, and if it is absent or short VDBENCH inserts its own RD=SD_format
+* before RD 1 -- once per SD. Measured here: the three ran concurrently at queue depth 6 and about
+* 1,210 MB/s until the file reached full size, then the remaining pass dropped to queue depth 2 and
+* **456 MB/s against a 1,536 MB/s ceiling**, mean 1,107 MB/s over 2,634 seconds. It writes 128 KiB
+* blocks at two threads, which is neither the shape nor the concurrency being measured.
+*
+* A file that already exists at exactly the `size=` value skips the format entirely. `truncate`
+* leaves it sparse, which would matter if anything read it before RD 1 -- nothing does, and g-fill
+* rewrites every block at 1 MiB and 512 threads, which is the measurement's own write path.
+*
+* USAGE
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nfs-throughput-capacity.txt -o /opt/bench/out-g-<throughput>
+*
+* The fill is RD 1 and is not a measurement, though its rate is recorded. 1,800 GiB takes about
+* 26 minutes at the 1,226 MB/s measured on the 1,536 configuration.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* One file, two disjoint regions, plus sd_fill spanning the whole file.
+*
+* `lun=` cannot go on sd=default -- VDBENCH rejects it with "You may not specify the 'lun='
+* parameter for sd=default" -- so every SD names the file itself.
+**********************************************************************
+sd=default,openflag=o_direct,size=1800g,host=hd1
+
+sd=sd_fill,lun=/mnt/bench/target/file1
+sd=sd1,lun=/mnt/bench/target/file1,range=(0,50)
+sd=sd2,lun=/mnt/bench/target/file1,range=(50,100)
+
+**********************************************************************
+* Shapes. 1 MiB sequential only: this series asks where the throughput ceiling is, and 1 MiB is the
+* transfer size at which neither SSD IOPS nor per-request overhead is the thing in the way -- at
+* 6,144 MB/s it needs about 6,144 IOPS against 200,000 provisioned.
+*
+* seekpct=eof on the fill, and only on the fill. It ends when the file has been written once. A
+* time-bounded fill either stops short, leaving a sparse tail that reads back as zeros without
+* going to disk, or runs past the end and wraps to the head, leaving the head resident and handing
+* region 1 a warm start. Both look like a normal fill in the log.
+**********************************************************************
+wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+wd=wd_r1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=100
+wd=wd_r2,sd=sd2,seekpct=.0,xfersize=1024k,rdpct=100
+wd=wd_w1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=0
+wd=wd_w2,sd=sd2,seekpct=.0,xfersize=1024k,rdpct=0
+
+* elapsed on the fill is a cap, not the duration: seekpct=eof ends the run. 1,932 GB at a
+* pessimistic 700 MB/s is 2,760 seconds, so 3,600 does not cut a slow fill short.
+rd=g-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=3600,interval=30,threads=512
+
+rd=g-seq-read-1024k-a,wd=wd_r1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=g-seq-read-1024k-b,wd=wd_r2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=g-seq-write-1024k-a,wd=wd_w1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
+rd=g-seq-write-1024k-b,wd=wd_w2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512

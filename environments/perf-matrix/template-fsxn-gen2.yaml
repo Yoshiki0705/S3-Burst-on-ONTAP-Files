@@ -452,6 +452,16 @@ Outputs:
     Description: >-
       The one mistake in this pattern that costs a client rebuild rather than a re-run.
   HourlyCostNote:
+    # The parameters this stack was given, not a figure. CloudFormation cannot multiply, so a literal
+    # here is a literal for one configuration: this output claimed 6,144 MBps and 4,096 GiB of SSD
+    # while the stack was running at 1,536 MBps and 8,192 GiB. `runbook.sh gen2` derives the hourly
+    # figure and logs it at deploy time; this output states what to derive it from.
     Value: !Sub
-      - "About $${Hourly} per hour while this stack exists. Delete it when the E pattern is done."
-      - Hourly: "23.03 at 6144 MBps with 200,000 provisioned IOPS and 4,096 GiB of SSD"
+      - "Billing while this stack exists: ${T} MBps throughput capacity, ${S} GiB SSD, ${I}
+        provisioned SSD IOPS (the first 3 per GiB are included). At list price in ap-northeast-1,
+        throughput is $2.013 per MBps-month, SSD $0.15 per GB-month and IOPS above the included
+        allowance $0.0204 per IOPS-month. Deleting is not instant and bills until it finishes: a
+        2,200 GiB volume holding 1.8 TiB took 63 minutes."
+      - T: !Ref ThroughputCapacityPerHAPair
+        S: !Ref StorageCapacityGiB
+        I: !Ref ProvisionedSsdIops
