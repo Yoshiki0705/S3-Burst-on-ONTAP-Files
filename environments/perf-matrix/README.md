@@ -52,12 +52,34 @@ remains」は文字どおりの意味で、**タグの付いていない残骸�
 
 ```bash
 # 検証行が出たあとに、これも読む。タグを条件にしない
-aws fsx describe-backups --query 'Backups[].[BackupId,CreationTime,FileSystem.FileSystemId]' --output text
+# FileSystem.FileSystemId は None になるので、どのボリュームから来たかは Volume.Name で判る
+aws fsx describe-backups \
+  --query 'Backups[].[BackupId,CreationTime,Volume.Name,Volume.OntapConfiguration.SizeInBytes]' \
+  --output text
 ```
 
 バックアップの削除は**取り消せない**ので、自動では消していない。読んで、要らないと判断してから
 `aws fsx delete-backup --backup-id <id>` を打つ。**検査の走査範囲は結果の一部である**という一般則は
 [規約がコードにあるとき](../../docs/agent/policy-in-code.md)にある。
+
+### 残骸が出る理由と削除が遅い理由の同一性
+
+**CloudFormation がボリュームを削除するとき、最終バックアップを取る。** `SkipFinalBackup` は
+`AWS::FSx::Volume` の `OntapConfiguration` が受け付けないプロパティで、**CloudFormation が
+代わりに削除するときに渡す手段が無い**（テンプレート側にも同じ注記がある）。結果として
+**スタックを消すたびに `USER_INITIATED` のバックアップが 1 件増える。**
+
+**2026-09-10 の実測では、1.8 TiB を保持した 2,200 GiB のボリュームの削除に 63 分 24 秒かかった。**
+削除中も課金され、**そのあとバックアップが残って $0.05/GB-月で課金を続ける。** 2 回の
+作成・削除で 2 件残っていた。
+
+**構成を作って測って消す形を採るなら、1 構成ごとに次の 3 つを見る。**
+
+| 見るもの | なぜ |
+|---|---|
+| 削除の所要時間 | 最終バックアップを取るので、保持データ量に比例して伸びる。課金は続く |
+| 削除後のバックアップ一覧 | タグが無く、`FileSystem.FileSystemId` も `None` なので検証行に出ない |
+| **フェーズ間の放置時間** | 時間課金は人が次を判断している間も止まらない。同日の測定で 4 時間 30 分ぶんを無駄に課金した |
 
 ## 既存の AD が使えない理由
 
