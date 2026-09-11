@@ -19,6 +19,37 @@ stage is stated explicitly and nothing unverified is written in the assertive fo
 
 "The documentation says so" and "it works" are different claims. Do not cite the first as the second.
 
+## Pages to open before recording something as unconfirmed
+
+**This verdict has been wrong twice, both times because the search stopped at one page.**
+
+| Verdict | Where it was actually stated | Why the search stopped |
+|---|---|---|
+| Whether a FlexCache cache volume can be tiered (2026-09-06) | [Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html) | Search terms were refined, the sizing and overview pages that came back were read, and that was that. **The feature-support page was never opened** |
+| Whether the S3 access point object size limit still read in GB (2026-09-11) | The Limitations section of [Access point compatibility](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) | A page named `restrictions-limitations` seemed like where limits would be, and its absence there ended the search. **A page name was treated as a table of contents** |
+
+**Same shape both times: one page not having it was taken as evidence that nothing did.**
+
+Before recording a capability, a limit or a support question as unconfirmed, open all of the
+following. **Keep going after the first hit** — the size limit was on the API page while the
+restrictions page carried three different limits.
+
+| Kind | Examples |
+|---|---|
+| Feature support | `supported-unsupported-features`, `... compatibility` |
+| API / operation support | `... object-api-support`. **Read past the table into the Limitations section** |
+| Restrictions and quotas | `restrictions-limitations`, `limits`, `quotas` |
+| Task pages | `using-...`, `managing-...`. A constraint is sometimes only in a note inside a procedure |
+| Teardown | A separate page from creation. Reversibility is documented nowhere else |
+
+**And when writing "not found", name the pages that were opened.** If they cannot be named, it was
+recall rather than research.
+
+> **A vendor saying a documentation fix has been submitted is not publication; carry it as
+> unreflected.** But **check again later.** On 2026-09-11 the GiB wording an article had described as
+> "being corrected" had in fact landed. Carrying something as unreflected is not the same as stopping
+> checking.
+
 ## The scope of the central claim
 
 The central claim of this architecture is when an object written to the origin through the S3 Access
