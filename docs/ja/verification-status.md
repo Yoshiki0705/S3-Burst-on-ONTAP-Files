@@ -66,6 +66,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 
 | 項目 | 段階 | 根拠 |
 |---|---|---|
+| **50 GiB を超えるオブジェクトを S3 Access Point から取得できること** | 検証済み | [上限値](reference/limits/s3-access-point.md#上限がアップロード側にしかないこと)。2026-09-11、ap-northeast-1、第一世代 SINGLE_AZ_1 128 MBps、SSD 1,024 GiB、NFSv3 で作った **50 GiB + 1 バイト（53,687,091,201 バイト）を全体 GET できた（537 秒）。** `HeadObject` は `ContentLength: 53687091201` を返し、Range GET も先頭・末尾とも成功。**同一セッションに 1 GiB のコントロールを置き、経路が生きていることを示した。** アップロード側は 50 GiB が上限で、**この非対称性はドキュメント記載**（[API 対応](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)）。ファイルは疎ファイルなので、**537 秒をディスク読み取りの性能として引用しない。**ONTAP バージョンは記録し忘れた |
 | FSx for ONTAP の S3 Access Point の対応オペレーションと実測サイズ上限 | 検証済み | 姉妹リポジトリ [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) での実測。単一 `PutObject` 5 GiB、オブジェクト全体 50 GiB、上限は `CompleteMultipartUpload` の時点で判定される |
 | Active Directory 参加 SVM では S3 Access Point の全データ操作に AD ドメインコントローラー到達性が必要 | 検証済み | 同リポジトリ。`HeadBucket` は AD 到達不能でも成功するため偽陽性になる |
 | S3 Access Point 経由の presigned URL（`PutObject` / `HeadObject` / `GetObject`） | 検証済み | [検証記録](verification/s3ap-operations.md)。2026-08-19、ap-northeast-1、SINGLE_AZ_1 / 128 MBps、UNIX、AWS 外のクライアントから、n=30 × 4 回。3 つとも成功し、SigV4 と SigV2 の両方で動作。**公式対応表は `Presign — Not supported` と記載しており、測定はそれと逆向き。** 本番ワークロードを依存させない判断は変えない。ONTAP バージョンは特定できず |
