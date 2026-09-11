@@ -42,6 +42,12 @@
 * PRECONDITIONS: as vdbench-linux-nfs-throughput-capacity.txt, plus that file's own run having
 * completed, since this one reuses the file it filled.
 *
+* **Do not start this within about two minutes of a write pass finishing.** A read started one second
+* after the 1,800 GiB fill ran 20 per cent low for 90 seconds while the write-back drained. The other
+* parameter file now has a settle RD for that reason; here the preceding run's own read and write
+* phases provide the gap, so there is nothing to add -- but a run started straight after a bare fill
+* would be measuring the drain.
+*
 * USAGE
 *
 *   cd /opt/bench/parm

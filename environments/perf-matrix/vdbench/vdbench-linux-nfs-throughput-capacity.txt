@@ -47,6 +47,10 @@
 * ORDER, WHICH IS NOT ARBITRARY
 *
 *   1. fill      whole file, head to tail. Leaves the cache holding the *tail*.
+*   1b. settle   180 seconds at one I/O per second. **Measured, not precautionary**: a read started
+*                one second after the fill ran about 20 per cent low for 90 seconds and disagreed
+*                with the same shape on the other region by 39 per cent. The fill's write-back was
+*                still competing with it. 180 seconds is twice the observed 90.
 *   2. read r1   the head. Cold, because the fill left the tail resident.
 *   3. read r2   the tail. Cold, because step 2 read 214-858 GiB through a cache of at most
 *                238 GiB and displaced everything the fill left there.
@@ -120,6 +124,11 @@ sd=sd2,lun=/mnt/bench/target/file1,range=(50,100)
 * region 1 a warm start. Both look like a normal fill in the log.
 **********************************************************************
 wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+* The settle workload reads at random across the whole file rather than sequentially inside region 1,
+* so its 180 transfers do not warm the place the first measured read begins. 180 MiB against a cache
+* of 64 GB or more is noise either way, but pointing it at the measured region would have made the
+* settle a warm-up of exactly the thing being measured cold.
+wd=wd_settle,sd=sd_fill,seekpct=100,xfersize=1024k,rdpct=100
 wd=wd_r1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=100
 wd=wd_r2,sd=sd2,seekpct=.0,xfersize=1024k,rdpct=100
 wd=wd_w1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=0
@@ -128,6 +137,12 @@ wd=wd_w2,sd=sd2,seekpct=.0,xfersize=1024k,rdpct=0
 * elapsed on the fill is a cap, not the duration: seekpct=eof ends the run. 1,932 GB at a
 * pessimistic 700 MB/s is 2,760 seconds, so 3,600 does not cut a slow fill short.
 rd=g-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=3600,interval=30,threads=512
+
+* The settle run. iorate=1 and one thread, so it generates no load worth the name -- it exists to put
+* 180 seconds between the fill and the first measured read. An RD rather than a note in the runbook,
+* because a step that has to be remembered between two commands is a step that gets skipped, and its
+* absence is invisible afterwards: the contaminated read looks like a normal read in the log.
+rd=g-settle,wd=wd_settle,iorate=1,warmup=0,elapsed=180,interval=60,threads=1
 
 rd=g-seq-read-1024k-a,wd=wd_r1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
 rd=g-seq-read-1024k-b,wd=wd_r2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
