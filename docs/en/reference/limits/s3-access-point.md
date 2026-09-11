@@ -17,7 +17,7 @@ Figures are stated with their source and stage. The stages are defined in
 | Single `PutObject` | 5 GiB | verified | Measured in the sibling repository. The measured value is the binary prefix (5,368,709,120 bytes). **The published page stating this value has not been located** |
 | One `UploadPart` | 5 GiB | verified | As above |
 | **Whole object, uploading** | 50 GiB | **documented + verified** | The judgement is made at `CompleteMultipartUpload`, so it fails after the whole payload has been transferred. Validate on the client side first |
-| **Whole object, downloading** | **no limit (objects larger than 50 GiB can be retrieved)** | documented | See the asymmetry below |
+| **Whole object, downloading** | **no limit (objects larger than 50 GiB can be retrieved)** | **verified** | 50 GiB + 1 byte fetched whole. See the asymmetry below |
 
 Source: the measurements are records in the sibling repository
 [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns).
@@ -42,9 +42,29 @@ round.**
 Even with collection centred on S3, writing just the large files on the file side is a documented way
 out.
 
-> **This is unmeasured here.** That the documentation says so, and that a file larger than 50 GiB was
-> created over NFS and fetched with `GetObject`, are different claims. **The stage is documented, not
-> verified.**
+**Measured on 2026-09-11. The stage is now verified.**
+
+| Measurement | Result |
+|---|---|
+| `HeadObject` | Returns `ContentLength: 53687091201` (50 GiB + 1 byte), `StorageClass: FSX_ONTAP`, `ServerSideEncryption: aws:fsx` |
+| Range GET, first 1 MiB | Succeeded. `ContentRange: bytes 0-1048575/53687091201` |
+| Range GET, last 1 MiB | Succeeded. `ContentRange: bytes 53686042625-53687091200/53687091201` |
+| **Whole-object GET** | **Succeeded. 53,687,091,201 bytes in 537 seconds** (about 100 MB/s, 78% of the 128 MBps specified) |
+
+**A control was run in the same session.** A 1 GiB file taken through the same steps succeeded in 16
+seconds. **Without showing that the path works, a failure on the large side cannot be told apart from
+a broken path.**
+
+Conditions: 2026-09-11, ap-northeast-1, first-generation SINGLE_AZ_1, **128 MBps**, 1,024 GiB of SSD,
+a 70 GiB UNIX volume, NFSv3 (`rsize=wsize=65536`, read back from `/proc/mounts`), a t3.small client,
+and an access point with `NetworkOrigin=VPC` and `FileSystemIdentityType=UNIX`.
+
+> **The file was sparse**, created with `truncate` (`blocks=0`). **That does not affect the verdict**:
+> the size S3 reports is the apparent size and the GET returns zero blocks. **But do not cite the 537
+> seconds as a disk read figure.** No disk was read.
+>
+> **The ONTAP version was not recorded**, and the environment was gone before that was noticed. Read
+> `/api/cluster?fields=version` right after creation next time.
 
 **Confirmed on 2026-09-11**: the wording uses **GiB**. It previously read "50 GB", the mismatch
 against the binary value was raised with the vendor, and the answer was that a correction was in
