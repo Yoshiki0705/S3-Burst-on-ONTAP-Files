@@ -87,6 +87,31 @@ iscsiadm --mode node -T <target_iqn> --op update -n node.session.nr_sessions -v 
 [EFS の `nconnect` が実効値には現れるのに I/O が停滞した](perf-matrix-results.md#amazon-efs-と-nconnect)。
 記録には `nr_sessions` の指定値と、**両 LIF アドレスへの確立済み TCP の実数**を並べて書く。
 
+### NVMe/TCP 側で「1 セッション」と呼ぶもの
+
+**iSCSI の `nr_sessions` に対応するものが NVMe/TCP に無い。** NVMe/TCP は 1 コントローラあたり
+複数の I/O キューを持ち、**キューごとに TCP 接続を張る。** 既定のキュー数はホストの CPU 数に
+追随するので、`nvme connect` を 1 回実行しただけで **1 接続にはならない。**
+
+**したがって単一フローの点は、キュー数を明示的に 1 に絞って取る。**
+
+| この計画での呼び方 | 手順 | 期待する TCP 本数 | 何と比べられるか |
+|---|---|---|---|
+| **single** | 片方の LIF に `nvme connect --nr-io-queues=1` | **1 + admin queue** | **iSCSI の single、およびファイル側の 1 接続の行** |
+| default | 片方の LIF に `nvme connect`（キュー数を指定しない） | 未知。**数える** | iSCSI の default とは比べられない（下） |
+| multi | 両方の LIF に `nvme connect`（キュー数を指定しない） | 未知。**数える** | iSCSI の multi とも比べられない（下） |
+
+**default と multi を iSCSI の同名と並べてはいけない。** iSCSI の default は「両ポータルに
+1 セッションずつ」で本数が構成から決まるが、NVMe/TCP の default は**ホストの CPU 数で決まる。**
+同じ語を使っているだけで、変えている量が違う。
+
+> **admin queue の分を数に入れるかは、実測して決めない。** `--nr-io-queues=1` で確立済み TCP が
+> 1 本か 2 本かは環境で違いうるので、**両方の数を記録し、比較には I/O を運ぶキューの数を使う。**
+> 「1 セッション」と書くときは、その隣に数えた本数を必ず置く。
+
+**この定義は測定前に決めた。** 出た数値を見てから「1 セッション」の意味を選べる状態にしておくと、
+どの定義でも都合のよい行が作れてしまう。
+
 ## 既存の測定との比較可能性
 
 **揃うものと揃わないものを先に分ける。** 揃わない項目を書かずに同じ表へ入れると、そこが
