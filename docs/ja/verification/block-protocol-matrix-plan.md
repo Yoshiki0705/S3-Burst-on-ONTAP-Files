@@ -89,28 +89,101 @@ iscsiadm --mode node -T <target_iqn> --op update -n node.session.nr_sessions -v 
 
 ### NVMe/TCP 側で「1 セッション」と呼ぶもの
 
-**iSCSI の `nr_sessions` に対応するものが NVMe/TCP に無い。** NVMe/TCP は 1 コントローラあたり
-複数の I/O キューを持ち、**キューごとに TCP 接続を張る。** 既定のキュー数はホストの CPU 数に
-追随するので、`nvme connect` を 1 回実行しただけで **1 接続にはならない。**
+**iSCSI の `nr_sessions` に対応するものが NVMe/TCP に無い。** そして「セッション数」を
+`nvme connect` の引数で決められるという読み方は、**引いた仕様と KB の範囲では成立しない。**
+以下はすべて出典を併記する。この節で出典の無い断定はしない。
 
-**したがって単一フローの点は、キュー数を明示的に 1 に絞って取る。**
+#### キューと TCP 接続の対応関係
 
-| この計画での呼び方 | 手順 | 期待する TCP 本数 | 何と比べられるか |
-|---|---|---|---|
-| **single** | 片方の LIF に `nvme connect --nr-io-queues=1` | **1 + admin queue** | **iSCSI の single、およびファイル側の 1 接続の行** |
-| default | 片方の LIF に `nvme connect`（キュー数を指定しない） | 未知。**数える** | iSCSI の default とは比べられない（下） |
-| multi | 両方の LIF に `nvme connect`（キュー数を指定しない） | 未知。**数える** | iSCSI の multi とも比べられない（下） |
+**NVMe/TCP で「セッション数」に相当する量はキューの数である。** NVMe over TCP は
+[NVMe のキューを TCP 接続へ写す仕様](https://nvmexpress.org/specification/tcp-transport-specification/)
+であり、NVM Express の資料は
+[「Each NVMe queue-pair is mapped to a bidirectional TCP connection」](https://nvmexpress.org/wp-content/uploads/Bringing-NVMe-over-TCP-Up-To-Speed.pdf)
+と書いている。Oracle Linux のブログも
+[キューペアが「maps to its own TCP connection and can be assigned to a separate CPU core」](https://blogs.oracle.com/linux/nvme-over-tcp)
+と同じ対応を書いている。
 
-**default と multi を iSCSI の同名と並べてはいけない。** iSCSI の default は「両ポータルに
-1 セッションずつ」で本数が構成から決まるが、NVMe/TCP の default は**ホストの CPU 数で決まる。**
-同じ語を使っているだけで、変えている量が違う。
+**つまりキュー数を動かすことが、iSCSI でセッション数を動かすことに対応する。**
 
-> **admin queue の分を数に入れるかは、実測して決めない。** `--nr-io-queues=1` で確立済み TCP が
-> 1 本か 2 本かは環境で違いうるので、**両方の数を記録し、比較には I/O を運ぶキューの数を使う。**
+#### 要求したキュー数が通らない経路
+
+**ここが人と AI の両方がハマる場所である。要求値・目標側の割り当て・実効値は 3 つの別の数で、
+一致する保証がどこにも書かれていない。**
+
+| 段 | 何が決めるか | 出典 |
+|---|---|---|
+| ホストの要求 | `nvme connect -i/--nr-io-queues`。man は「Overrides the default number of I/O queues create by the driver」とだけ書き、**既定値も上限も書いていない** | [nvme-connect(1)](https://man.archlinux.org/man/nvme-connect.1.en) |
+| ホストの既定 | キューペア（`io-queue-count`）は**「aligned to host CPU cores」** | [NetApp KB: What are nvme settings regarding io-queue-count and io-queue-depth](https://kb.netapp.com/on-prem/ontap/da/SAN/SAN-KBs/What_are_nvme_settings_regarding_io-queue-count_and_io-queue-depth) |
+| 目標側の継承値 | `-default-io-queue-count` は「IO queue count inherited by hosts」。ただし同じ説明文に**「The actual value used when a connection is established may vary depending on the host and transport protocol used」**と書かれている | [vserver nvme subsystem show (9.16.1)](https://docs.netapp.com/us-en/ontap-cli-9161/vserver-nvme-subsystem-show.html) |
+| 目標側の割り当て | I/O キュー数と深さは**ノード・トランスポート・ホスト優先度の組ごと**に決まる。ONTAP 9.14.1 以降、`high` を与えたホストには多くが割り当てられる。**掲載例の `nvme-tcp` / `regular` は I/O Queue Count が 2、`high` が 4** | [vserver nvme show-host-priority](https://docs.netapp.com/us-en/ontap-cli/vserver-nvme-show-host-priority.html)、[NVMe ホストの優先度の変更](https://docs.netapp.com/us-en/ontap/nvme/change-host-priority-nvme-task.html) |
+| 実際に確立された値 | ホストが読むのは NCQA / NSQA | [NetApp KB: NVME TCP IO Queue count always returns 2 even when set to 15](https://kb.netapp.com/on-prem/ontap/OHW/OHW-KBs/NVME_TCP_IO_Queue_count_always_returns_2_even_when_set_to_15) |
+
+**実例が KB にある。** サブシステムに `-default-io-queue-count 15 -default-io-queue-depth 128` を
+設定し、`nvme subsystem show` は 15 を返したにもかかわらず、ホスト側の
+`nvme get-feature --feature-id 7` は **NCQA / NSQA いずれも 2** を返している（ONTAP 9.10.1）。
+
+> **同じ「2」が、優先度の表の `nvme-tcp` / `regular` の掲載値としても現れる。**
+> ただし**この 2 つが同じ機構かは未確認である**（KB は 9.10.1、ホスト優先度は 9.14.1 以降の機能で、
+> KB は原因を書いていない）。**「優先度が原因」と読まない。** ここで確定しているのは
+> 「設定値と実効値は一致しないことがあり、ホスト側で読む手段がある」ことだけである。
+>
+> **また、この環境で優先度を変えられるかも未確認である。** 現行の CLI リファレンスでは
+> [`vserver nvme subsystem modify`](https://docs.netapp.com/us-en/ontap-cli/vserver-nvme-subsystem-modify.html)
+> にキュー数のパラメータが無く（`-comment` と `-delete-on-unmap` のみ）、優先度は
+> [`vserver nvme subsystem host add -priority`](https://docs.netapp.com/us-en/ontap-cli/vserver-nvme-subsystem-host-add.html)
+> 側にある。**FSx for ONTAP の制限付き CLI でどこまで到達できるかは、触って確かめるまで書かない。**
+
+#### 接続コマンドを AWS の手順に合わせる理由
+
+AWS の Linux 向け手順が示すのは `nvme connect` ではなく **`connect-all`** で、次の形である
+（[Provisioning NVMe storage on Linux](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/provision-nvme-linux.html)）。
+
+```bash
+sudo nvme connect-all -t tcp -w client_IP -a iscsi_1 -l 1800
+```
+
+`-w` はホスト側の traddr、`-l 1800` はコントローラ喪失タイムアウトである。**この 1 回の実行で
+両方の LIF に繋がる。** AWS は「NVMe スタックが代替 LIF `iscsi_2` を自動的に発見した」と書き、
+出力例では**コントローラが 2 つ**（`non-optimized` と `optimized`）、`iopolicy=round-robin`、
+`/sys/module/nvme_core/parameters/multipath` が `Y` になっている。
+
+**したがって既定の点は自作のコマンドではなく AWS の形で取る。** 独自の `nvme connect` を並べると、
+AWS の手順に従った利用者の構成と比較できない数字になる。
+
+**そして AWS はセッションを増やす手順を NVMe 側に書いていない。** 「EC2 単一クライアントの上限
+5 Gbps（約 625 MBps）を超える」ために参照先として挙げているのは
+[EC2 インスタンスのネットワーク帯域幅](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)
+のページだけで、**キュー数やコネクション数の具体的な手順は無い。** ここを埋めるのがこの測定である。
+
+#### この計画で測る 3 点
+
+| 呼び方 | 手順 | 目的 |
+|---|---|---|
+| **single** | 片方の LIF に `nvme connect -t tcp -a <lif> -s 4420 -n <nqn> -w <client_ip> -l 1800 --nr-io-queues=1`（`-w` と `-l` は AWS の形に揃える） | **ファイル側の 1 接続の行と並べられる唯一の形。** `connect-all` は両 LIF に繋ぐので単一フローにならない |
+| default | AWS の形（`connect-all -t tcp -w <client_ip> -a <lif> -l 1800`） | **AWS の手順どおりの構成の数字。** 利用者が最初に得る値 |
+| multi | AWS の形に加えて `--nr-io-queues` をクライアントの vCPU 数まで明示要求（[`connect-all` の `-i` は「ignored for discovery, but will be passed on to the subsequent connect call」](https://man.archlinux.org/man/nvme-connect-all.1.en)） | **要求が通るかを確かめる。** 実効値が 2 に張り付くなら、それが結果である |
+
+**4 つの数を必ず並べて記録する。** どれか 1 つを「セッション数」として単独で書かない。
+
+| 読むもの | コマンド | 何が分かるか |
+|---|---|---|
+| 実効キュー数 | `nvme get-feature /dev/<ns> --feature-id 7 --human-readable` | NCQA / NSQA。**目標側が実際に割り当てた数** |
+| TCP の実数 | `ss -tn state established '( dport = :4420 )'` | **本当に張られた接続。** 指定値ではない |
+| ドライバのキュー数 | `/sys/class/nvme/nvme*/queue_count` | コントローラごとのキュー数 |
+| 経路と状態 | `nvme list-subsys` | コントローラ数、`optimized` / `non-optimized`、ANA |
+
+**default と multi を iSCSI の同名の行と並べてはいけない。** iSCSI の default は「両ポータルに
+1 セッションずつ」で本数が構成から決まる。NVMe/TCP 側で変えているのは**キュー数**で、
+その実効値は上の表のとおりホストと目標の両方が関与する。**同じ語だが、変えている量が違う。**
+
+> **admin queue が TCP を 1 本増やすかは未確認である。** 引いた仕様・man・KB のいずれにも、
+> `--nr-io-queues=1` のときに確立される TCP が 1 本か 2 本かの記述を見つけられなかった。
+> **したがって両方の数を記録し、比較には I/O を運ぶキューの数を使う。**
 > 「1 セッション」と書くときは、その隣に数えた本数を必ず置く。
 
-**この定義は測定前に決めた。** 出た数値を見てから「1 セッション」の意味を選べる状態にしておくと、
-どの定義でも都合のよい行が作れてしまう。
+**この定義は測定前に確定させた。** 出た数値を見てから「1 セッション」の意味を選べる状態にしておくと、
+どの定義でも都合のよい行が作れてしまう。**そして最初に書いた定義は、上の出典を引いた結果
+書き換えた**（「既定はホストの CPU 数で決まる」だけでは足りず、目標側の割り当てが噛む）。
 
 ## 既存の測定との比較可能性
 

@@ -1029,13 +1029,24 @@ multipath -ll || true"
 
 # The gate. Nothing is measured until this passes, and the first check is the one that protects the
 # client rather than the result.
-# The NVMe/TCP counterpart of `block_sessions`. It exists because there is no `nr_sessions` on this
-# side: NVMe/TCP puts one TCP connection behind each I/O queue and the default queue count follows the
-# host's CPU count, so a single `nvme connect` does **not** produce a single flow. The single-flow point
-# is taken by pinning the queue count to 1, which is the only form comparable with the file rows.
+# The NVMe/TCP counterpart of `block_sessions`. There is no `nr_sessions` on this side: the NVMe/TCP
+# transport maps each queue pair to one TCP connection, so the quantity corresponding to an iSCSI
+# session is the queue count. Three separate numbers govern it and none of them is documented to agree
+# with the others -- the host's request (`--nr-io-queues`), the subsystem's inherited value (whose own
+# description says the value actually used "may vary depending on the host and transport protocol
+# used"), and the target's per-node/per-transport/per-priority allocation. A NetApp KB records a
+# subsystem set to 15 while the host read NCQA/NSQA of 2. Sources are cited in
+# docs/ja/verification/block-protocol-matrix-plan.md.
 #
-# The definitions are in the plan, written before the measurement so that the meaning of "one session"
-# could not be chosen after seeing the numbers.
+# Two consequences for this function:
+#   - `default` uses the form AWS documents (`connect-all -t tcp -w <client_ip> -a <lif> -l 1800`),
+#     not a hand-rolled `nvme connect`. That single command reaches both LIFs, so the number it
+#     produces is the one a reader following the AWS procedure gets.
+#   - the single-flow point therefore cannot use `connect-all`; it pins one LIF and one queue, and it
+#     is the only form comparable with the file-side single-connection rows.
+#
+# Report the requested value, the effective NCQA/NSQA, the counted TCP connections, the driver's
+# queue_count and the ANA states. Never a single number called "sessions".
 block_nvme_sessions() {
   block_context
   local mode="${1:-}"
@@ -1056,30 +1067,64 @@ first=\$(echo \"\$ips\" | head -1)
 nqn=\$(nvme discover -t tcp -a \"\$first\" -s 8009 | awk '/^subnqn:/{print \$2}' | grep -v discovery | head -1)
 echo \"subsystem nqn: \$nqn\"
 [ -n \"\$nqn\" ] || { echo 'FAIL: discovery returned no subsystem NQN'; exit 1; }
+# The AWS procedure passes the client's own address as the host traddr (-w). Derive it from the route
+# to the LIF rather than from a variable: a hard-coded address survives a client rebuild silently.
+myip=\$(ip -o route get \"\$first\" | sed -n 's/.* src \\([0-9.]*\\).*/\\1/p' | head -1)
+echo \"host traddr: \$myip\"
+[ -n \"\$myip\" ] || { echo 'FAIL: could not determine the source address toward the LIF'; exit 1; }
+cpus=\$(nproc)
+requested=''
 case '$mode' in
   single)
-    # One LIF, one I/O queue. **This is the single-flow point.**
-    nvme connect -t tcp -a \"\$first\" -s 4420 -n \"\$nqn\" --nr-io-queues=1
+    # One LIF, one I/O queue. **This is the single-flow point**, and the only row comparable with the
+    # file-side single-connection numbers. connect-all cannot be used: it reaches both LIFs.
+    requested=1
+    nvme connect -t tcp -a \"\$first\" -s 4420 -n \"\$nqn\" -w \"\$myip\" -l 1800 --nr-io-queues=1
     ;;
   default)
-    nvme connect -t tcp -a \"\$first\" -s 4420 -n \"\$nqn\"
+    # Exactly the form in the AWS documentation. One command, both LIFs, queue count left to the
+    # host and the target to negotiate.
+    requested='(unset: host default)'
+    nvme connect-all -t tcp -w \"\$myip\" -a \"\$first\" -l 1800
     ;;
   multi)
-    for ip in \$ips; do nvme connect -t tcp -a \"\$ip\" -s 4420 -n \"\$nqn\"; done
+    # Same form, with the queue count requested up to the vCPU count. Whether the request survives
+    # is the measurement; the target may allocate fewer.
+    requested=\$cpus
+    nvme connect-all -t tcp -w \"\$myip\" -a \"\$first\" -l 1800 --nr-io-queues=\"\$cpus\"
     ;;
 esac
 set +x
+echo \"--- requested queue count: \$requested (vCPUs: \$cpus) ---\"
+echo '--- effective queue count. THIS is what the target allocated, not what was asked for ---'
+for n in \$(nvme netapp ontapdevices -o column 2>/dev/null | awk '/^\\/dev/{print \$1}'); do
+  echo \"\$n:\"
+  nvme get-feature \"\$n\" --feature-id 7 --human-readable 2>/dev/null || echo '  (get-feature failed)'
+done
 echo '--- COUNT THE CONNECTIONS. The queue count requested is not the answer ---'
 ss -tn state established '( dport = :4420 )' | tail -n +2 | wc -l
 ss -tn state established '( dport = :4420 )'
 echo '--- controllers, queue counts and ANA states ---'
 nvme list-subsys || true
 for c in /sys/class/nvme/nvme*/queue_count; do [ -e \"\$c\" ] && echo \"\$c = \$(cat \"\$c\")\"; done
+echo '--- multipath and iopolicy, as the AWS procedure verifies them ---'
+cat /sys/module/nvme_core/parameters/multipath 2>/dev/null || echo 'MISSING'
+cat /sys/class/nvme-subsystem/nvme-subsys*/iopolicy 2>/dev/null || true
 echo '--- the device to point the parameter file at ---'
 nvme netapp ontapdevices -o column || true"
-  printf '\nRecord the counted connections and the queue_count next to the mode. They are three fields, not one.\n'
-  printf 'The plan forbids placing NVMe default/multi beside the iSCSI rows of the same name: the quantity\n'
-  printf 'being varied differs (CPU count against portal count).\n'
+  cat <<'NOTE'
+
+Record five fields, never one number called "sessions":
+
+  1. the requested queue count      (what this phase asked for)
+  2. NCQA / NSQA from get-feature   (what the target allocated -- a KB records 15 asked, 2 given)
+  3. the counted TCP connections on :4420
+  4. queue_count per controller
+  5. the ANA state of each controller (one optimized, one non-optimized is expected)
+
+Do not place NVMe default/multi beside the iSCSI rows of the same name. iSCSI varies the portal
+count, which the configuration fixes; here the queue count is negotiated between host and target.
+NOTE
 }
 
 block_preflight() {
