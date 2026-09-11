@@ -14,12 +14,43 @@ Figures are stated with their source and stage. The stages are defined in
 
 | Item | Value | Stage | Note |
 |---|---|---|---|
-| Single `PutObject` | 5 GiB | verified | Measured in the sibling repository. Against the documentation's "5 GB" wording, the measured value is the binary prefix (5,368,709,120 bytes) |
+| Single `PutObject` | 5 GiB | verified | Measured in the sibling repository. The measured value is the binary prefix (5,368,709,120 bytes). **The published page stating this value has not been located** |
 | One `UploadPart` | 5 GiB | verified | As above |
-| Whole object | 50 GiB | verified | As above. The judgement is made at `CompleteMultipartUpload`, so it fails after the whole payload has been transferred. Validate on the client side first |
+| **Whole object, uploading** | 50 GiB | **documented + verified** | The judgement is made at `CompleteMultipartUpload`, so it fails after the whole payload has been transferred. Validate on the client side first |
+| **Whole object, downloading** | **no limit (objects larger than 50 GiB can be retrieved)** | documented | See the asymmetry below |
 
-Source: measurement records in the sibling repository
+Source: the measurements are records in the sibling repository
 [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns).
+The 50 GiB figure is stated in [access point API support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html).
+
+### The limit is on the upload side only
+
+**The published sentence reads:**
+
+> Maximum object size is 50 GiB for uploads, but you can download objects larger than that
+
+**50 GiB caps uploads, not retrievals.** In this architecture collection is over the S3 API and
+consumption is over NFS / SMB, so read plainly it looks irrelevant. **It matters read the other way
+round.**
+
+| Path | An object larger than 50 GiB |
+|---|---|
+| Written over the S3 API | **Cannot be created.** `CompleteMultipartUpload` fails |
+| Written over NFS / SMB, read over the S3 API | **Can be retrieved** |
+
+**So a file larger than 50 GiB can be created on the file side and still read from the S3 side.**
+Even with collection centred on S3, writing just the large files on the file side is a documented way
+out.
+
+> **This is unmeasured here.** That the documentation says so, and that a file larger than 50 GiB was
+> created over NFS and fetched with `GetObject`, are different claims. **The stage is documented, not
+> verified.**
+
+**Confirmed on 2026-09-11**: the wording uses **GiB**. It previously read "50 GB", the mismatch
+against the binary value was raised with the vendor, and the answer was that a correction was in
+progress. **That correction has landed.** The page stating the 5 GiB single-`PutObject` limit,
+however, was not found on the same day. "Not found" is not "does not exist", so that row rests on the
+measurement alone.
 
 ## Names
 
