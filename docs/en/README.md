@@ -142,6 +142,7 @@ nothing to lose if it does not. The steps to confirm it are in the
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
 | Read the measured figures and their conditions | [Verification record](verification/s3ap-nfs-visibility.md) | 10 min |
 | Read the NFS / SMB / EFS throughput figures | [Protocol measurement results](../ja/verification/perf-matrix-results.md) (Japanese) | 20 min |
+| **Check whether the throughput capacity figure is the read ceiling** | [Throughput capacity, burst and baseline](../ja/verification/throughput-capacity-burst-and-baseline.md) (Japanese) | 10 min |
 | Read the plan for measuring iSCSI / NVMe/TCP | [Block protocol measurement plan](../ja/verification/block-protocol-matrix-plan.md) (Japanese) | 15 min |
 | Confirm it on real hardware | [PoC checklist](poc-checklist.md) | 10 min |
 
