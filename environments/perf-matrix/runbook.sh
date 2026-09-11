@@ -837,6 +837,8 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   block-provision iscsi <IQN>  Create the LUN, the igroup and the mapping; print serial-hex
   block-provision nvme <NQN>   Create the namespace and the subsystem; map the host
   block-sessions single|default|multi [n]  Log in, then COUNT the connections opened
+  block-nvme-sessions single|default|multi  NVMe/TCP has no nr_sessions: single pins
+                         --nr-io-queues=1, which is the only comparable form (see the plan)
   block-preflight        The gate. Check 1 protects the client, not the result
   block-fill <paramfile> Write the device once; an unwritten thin LUN reads as zeros
   nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
@@ -1027,6 +1029,59 @@ multipath -ll || true"
 
 # The gate. Nothing is measured until this passes, and the first check is the one that protects the
 # client rather than the result.
+# The NVMe/TCP counterpart of `block_sessions`. It exists because there is no `nr_sessions` on this
+# side: NVMe/TCP puts one TCP connection behind each I/O queue and the default queue count follows the
+# host's CPU count, so a single `nvme connect` does **not** produce a single flow. The single-flow point
+# is taken by pinning the queue count to 1, which is the only form comparable with the file rows.
+#
+# The definitions are in the plan, written before the measurement so that the meaning of "one session"
+# could not be chosen after seeing the numbers.
+block_nvme_sessions() {
+  block_context
+  local mode="${1:-}"
+  case "$mode" in
+    single|default|multi) ;;
+    *) die "usage: runbook.sh block-nvme-sessions [single|default|multi]" ;;
+  esac
+  log "NVMe/TCP sessions: $mode"
+  run_on_client "$BLOCK_INSTANCE" "
+set -x
+nvme disconnect-all || true
+# Both block LIFs answer on the same DNS name, which is how the iSCSI phase finds its portals too.
+ips=\$(getent hosts iscsi.${BLOCK_SVM} | awk '{print \$1}' | sort -u)
+echo \"LIF addresses: \$ips\"
+first=\$(echo \"\$ips\" | head -1)
+# The subsystem NQN comes from discovery rather than from a variable, so a rename on the ONTAP side
+# cannot leave this phase connecting to a name that no longer exists.
+nqn=\$(nvme discover -t tcp -a \"\$first\" -s 8009 | awk '/^subnqn:/{print \$2}' | grep -v discovery | head -1)
+echo \"subsystem nqn: \$nqn\"
+[ -n \"\$nqn\" ] || { echo 'FAIL: discovery returned no subsystem NQN'; exit 1; }
+case '$mode' in
+  single)
+    # One LIF, one I/O queue. **This is the single-flow point.**
+    nvme connect -t tcp -a \"\$first\" -s 4420 -n \"\$nqn\" --nr-io-queues=1
+    ;;
+  default)
+    nvme connect -t tcp -a \"\$first\" -s 4420 -n \"\$nqn\"
+    ;;
+  multi)
+    for ip in \$ips; do nvme connect -t tcp -a \"\$ip\" -s 4420 -n \"\$nqn\"; done
+    ;;
+esac
+set +x
+echo '--- COUNT THE CONNECTIONS. The queue count requested is not the answer ---'
+ss -tn state established '( dport = :4420 )' | tail -n +2 | wc -l
+ss -tn state established '( dport = :4420 )'
+echo '--- controllers, queue counts and ANA states ---'
+nvme list-subsys || true
+for c in /sys/class/nvme/nvme*/queue_count; do [ -e \"\$c\" ] && echo \"\$c = \$(cat \"\$c\")\"; done
+echo '--- the device to point the parameter file at ---'
+nvme netapp ontapdevices -o column || true"
+  printf '\nRecord the counted connections and the queue_count next to the mode. They are three fields, not one.\n'
+  printf 'The plan forbids placing NVMe default/multi beside the iSCSI rows of the same name: the quantity\n'
+  printf 'being varied differs (CPU count against portal count).\n'
+}
+
 block_preflight() {
   block_context
   log "block preflight on $BLOCK_INSTANCE"
@@ -1106,6 +1161,7 @@ case "${1:-}" in
                           *)     die "usage: runbook.sh block-provision [iscsi|nvme] <IQN or NQN>" ;;
                         esac ;;
   block-sessions)       block_sessions "${2:-}" "${3:-8}" ;;
+  block-nvme-sessions)  block_nvme_sessions "${2:-}" ;;
   block-preflight)      block_preflight ;;
   block-fill)           block_fill "${2:-}" ;;
   nfs-xfer-size)        nfs_xfer_size "${2:-show}" ;;
