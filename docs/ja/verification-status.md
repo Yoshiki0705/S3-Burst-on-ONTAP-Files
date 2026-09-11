@@ -16,6 +16,35 @@
 
 「ドキュメントに記載がある」と「実機で動く」は別である。前者を後者として引用しない。
 
+## 「未確認」と判定する前に開くページ
+
+**この判定を 2 回外している。どちらも 1 ページで打ち切ったためである。**
+
+| 判定 | 実際の記載場所 | 打ち切った理由 |
+|---|---|---|
+| FlexCache の Cache ボリュームを階層化できるか（2026-09-06） | [Supported and unsupported features for ONTAP FlexCache volumes](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html) | 検索語を工夫して、返ってきたサイジングと概要のページを読んで終えた。**機能一覧のページを開いていない** |
+| S3 Access Point のオブジェクトサイズ上限がまだ GB 表記かどうか（2026-09-11） | [Access point compatibility](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) の Limitations 節 | 「制限」を探すなら `restrictions-limitations` という名前のページだろうと推定し、そこに無いことで打ち切った。**ページ名を目次として扱った** |
+
+**同型である。1 ページに無いことを「記載が無い」の根拠にしている。**
+
+能力・上限・可否を「未確認」にする前に、次を全部開く。**1 つで見つかっても残りを開く**
+（今回、サイズ上限は API 対応ページにあり、制限ページにも別の制限が 3 項目あった）。
+
+| 種類 | 例 |
+|---|---|
+| 機能一覧 | `supported-unsupported-features`、`... compatibility` |
+| API / オペレーション対応表 | `... object-api-support`。**表の下の Limitations 節まで読む** |
+| 制限・クォータ | `restrictions-limitations`、`limits`、`quotas` |
+| 操作手順 | `using-...`、`managing-...`。手順の注記に制約が書かれていることがある |
+| 撤去手順 | 作成手順とは別ページにある。可逆性はそこにしか書かれていない |
+
+**そして「見つけられなかった」と書くときは、開いたページを併記する。** 併記できないなら、
+それは調査ではなく記憶である。
+
+> **ベンダーが「ドキュメント修正を提出した」と答えた事項は、公開されるまで未反映として扱う。**
+> ただし**反映されたかを後で確認する**。2026-09-11 に確認したところ、記事に「修正中」と書いた
+> オブジェクトサイズの GiB 表記は反映済みだった。**未反映として扱うことと、確認をやめることは別。**
+
 ## 中核の検証範囲
 
 この構成の中核は「S3 Access Point で Origin に書いたオブジェクトが、FlexCache の Cache ボリューム上の
