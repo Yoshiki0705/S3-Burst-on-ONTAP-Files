@@ -1171,7 +1171,16 @@ block_nvme_sessions() {
   log "NVMe/TCP sessions: $mode"
   run_on_client "$BLOCK_INSTANCE" "
 set -x
+# **Stop the AMI from adding controllers of its own.** AL2023 ships nvme-cli with autoconnect units, and
+# after a connect the host had four controllers where the phase created two -- the extra pair carried no
+# host_traddr, so they were not made by this command. A mode whose connection count is set by something
+# else is not a mode. **This is a departure from the AMI default and it is deliberate**: the default
+# behaviour is recorded as a finding, and the measurement needs the count it asked for.
+for unit in nvmf-autoconnect.service nvmefc-boot-connections.service nvmf-connect.target; do
+  systemctl is-enabled \"\$unit\" >/dev/null 2>&1 && { echo \"disabling \$unit\"; systemctl disable --now \"\$unit\" >/dev/null 2>&1 || true; }
+done
 nvme disconnect-all || true
+sleep 3
 # The same endpoint addresses the iSCSI phase uses, read from the FSx API in block_context. AWS's NVMe
 # procedure calls them iscsi_1 and iscsi_2 as well.
 ips='${BLOCK_ISCSI_IPS}'
@@ -1324,17 +1333,33 @@ echo \"device \$dev is \$gib GiB\"
 # Non-zero data, so nothing downstream can serve the fill back from a zero-detection path. Storage
 # efficiency is disabled on this volume, but the fill should not depend on that being true.
 [ -s /tmp/rand1g ] || dd if=/dev/urandom of=/tmp/rand1g bs=1M count=1024 status=none
+# **Eight writers, not one.** A single dd has one write outstanding, so it measures per-I/O latency
+# rather than bandwidth, and the fill takes as long as the slowest path allows: 1,141 s over iSCSI
+# with sixteen sessions, and more than 3,600 s over NVMe/TCP on this AMI, where the kernel has
+# CONFIG_NVME_MULTIPATH unset and therefore cannot steer to the optimized controller. Filling is not a
+# measurement, so there is no reason to leave it serial.
+parallel=8
 start=\$(date +%s)
-i=0
-while [ \"\$i\" -lt \"\$gib\" ]; do
-  dd if=/tmp/rand1g of=\"\$dev\" bs=1M count=1024 seek=\$(( i * 1024 )) oflag=direct status=none || break
-  i=\$(( i + 1 ))
+pids=''
+p=0
+while [ \"\$p\" -lt \"\$parallel\" ]; do
+  (
+    i=\$p
+    while [ \"\$i\" -lt \"\$gib\" ]; do
+      dd if=/tmp/rand1g of=\"\$dev\" bs=1M count=1024 seek=\$(( i * 1024 )) oflag=direct status=none || exit 1
+      i=\$(( i + parallel ))
+    done
+  ) &
+  pids=\"\$pids \$!\"
+  p=\$(( p + 1 ))
 done
+rc=0
+for pid in \$pids; do wait \"\$pid\" || rc=1; done
 end=\$(date +%s)
 elapsed=\$(( end - start ))
 [ \"\$elapsed\" -gt 0 ] || elapsed=1
-echo \"filled \$i GiB of \$gib in \$elapsed s = \$(( i * 1024 / elapsed )) MB/s (dd, not VDBENCH)\"
-[ \"\$i\" -eq \"\$gib\" ] || { echo 'FAIL: the fill did not cover the whole device'; exit 1; }" 3600
+echo \"filled \$gib GiB in \$elapsed s = \$(( gib * 1024 / elapsed )) MB/s across \$parallel writers (dd, not VDBENCH)\"
+[ \"\$rc\" -eq 0 ] || { echo 'FAIL: at least one writer failed; the device is not fully written'; exit 1; }" 3600
   printf '\nThe fill rate above is a dd rate. Do not place it beside the VDBENCH numbers.\n'
 }
 
