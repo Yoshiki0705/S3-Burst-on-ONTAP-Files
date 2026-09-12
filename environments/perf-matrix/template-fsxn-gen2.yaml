@@ -374,7 +374,15 @@ Resources:
   # sharing a volume with the NFS test file would make one measurement move the other's layout.
   #
   # Settings copied from the NFS volume rather than chosen again, so the two differ only in what is
-  # written into them. No JunctionPath: a LUN is not reached through a junction.
+  # written into them.
+  #
+  # **JunctionPath is set even though nothing mounts this volume over NFS.** Omitting it -- on the
+  # reasoning that a LUN is not reached through a junction -- is what this template did first, and the
+  # create failed: `Missing required parameter in OntapConfiguration: "JunctionPath"` (2026-09-12,
+  # ap-northeast-1). The property reference is self-contradictory on this point: the prose says "This
+  # parameter is required" while the `Required:` field on the same property says `No`
+  # (https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-fsx-volume-ontapconfiguration.html).
+  # Believe the API. The junction is harmless -- no export policy sends traffic to it.
   #
   # AWS recommends a volume at least 5% larger than the LUN, so the runbook sizes a 600 GiB LUN into
   # the 900 GiB this passes. 600 GiB is the same figure the file side used, and for the same reason --
@@ -390,6 +398,7 @@ Resources:
       VolumeType: ONTAP
       OntapConfiguration:
         StorageVirtualMachineId: !Ref StorageVirtualMachine
+        JunctionPath: !Sub "/${NamePrefix}_blk_vol"
         SecurityStyle: UNIX
         StorageEfficiencyEnabled: false
         SizeInBytes: !Ref VolumeSizeBytes
