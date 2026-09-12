@@ -284,7 +284,7 @@ drift: ## Compare the contents of translated tables, not just their headings
 
 external-anchors: ## Verify cited sibling-repository anchors (skipped without a local checkout)
 	@$(PY) tools/check_external_anchors.py
-incoming-probes: ## Claims a sibling repository cites must survive a rewording (skipped without its contract)
+incoming-probes: ## Claims any sibling cites must survive a rewording (skipped per sibling without its contract)
 	@$(PY) tools/check_incoming_probes.py
 outgoing-probes: ## Claims this repository cites in a sibling must survive (skipped without its checkout)
 	@$(PY) tools/check_outgoing_probes.py

@@ -179,43 +179,80 @@ def test_a_moved_file_fails_even_when_the_text_survives(
 # --- the switch that stops a skip standing in for a pass --------------------------------------
 
 
-def test_a_404_means_removal_now_that_the_contract_is_published(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("sibling", mod.SIBLINGS, ids=lambda s: s.label)
+def test_a_404_means_removal_once_a_sibling_has_published(
+    sibling, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The switch changes what a 404 means, so it is asserted in whichever position it is in.
+    """The switch changes what a 404 means, and it is now per sibling.
 
-    While CONTRACT_PUBLISHED was False a 404 read as "not published yet" and skipped. Now that the
-    sibling publishes on its default branch, the same response means the registration this repository
-    is checked against was removed or renamed -- and a skip would report that as a clean run forever.
+    While a sibling has not published, a 404 reads as "not published yet" and skips. Once it does
+    publish, the same response means the registration this repository is checked against was removed
+    or renamed -- and a skip would report that as a clean run forever.
     """
     import urllib.error
 
     def refuse(*_args, **_kwargs):
-        raise urllib.error.HTTPError(mod.RAW_CONTRACT, 404, "Not Found", {}, None)
+        raise urllib.error.HTTPError(sibling.raw_contract, 404, "Not Found", {}, None)
 
     monkeypatch.setattr("urllib.request.urlopen", refuse)
 
-    if mod.CONTRACT_PUBLISHED:
+    if sibling.published:
         with pytest.raises(SystemExit) as raised:
-            mod.fetch_contract()
+            mod.fetch_contract(sibling)
         assert "removal or a rename" in str(raised.value)
     else:
-        probes, problems = mod.fetch_contract()
+        probes, problems = mod.fetch_contract(sibling)
         assert probes is None and not problems
 
 
+@pytest.mark.parametrize("sibling", mod.SIBLINGS, ids=lambda s: s.label)
 def test_a_non_404_failure_is_never_read_as_absence(
-    monkeypatch: pytest.MonkeyPatch,
+    sibling, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A 500 or a 403 is not "not published yet" in either position of the switch."""
     import urllib.error
 
     def refuse(*_args, **_kwargs):
-        raise urllib.error.HTTPError(mod.RAW_CONTRACT, 500, "Server Error", {}, None)
+        raise urllib.error.HTTPError(
+            sibling.raw_contract, 500, "Server Error", {}, None
+        )
 
     monkeypatch.setattr("urllib.request.urlopen", refuse)
     with pytest.raises(SystemExit):
-        mod.fetch_contract()
+        mod.fetch_contract(sibling)
+
+
+# --- more than one repository cites this one ----------------------------------------------------
+
+
+def test_every_citing_repository_is_registered() -> None:
+    """Naming one sibling was the gap. Both are named, and each has its own URL and override."""
+    labels = [s.label for s in mod.SIBLINGS]
+    assert "FSx-for-ONTAP-Adoption-Playbook" in labels
+    assert "VMware-Migration-EC2-ONTAP" in labels
+    assert len({s.env_override for s in mod.SIBLINGS}) == len(mod.SIBLINGS)
+    for sibling in mod.SIBLINGS:
+        assert sibling.raw_contract.endswith(mod.CONTRACT.as_posix())
+        assert sibling.label in sibling.raw_contract
+
+
+def test_a_failure_for_one_sibling_does_not_stop_the_others(tmp_path) -> None:
+    """Stopping at the first failure would hide how many citations are affected."""
+    seen: list[str] = []
+
+    def record(sibling, _fetch):
+        seen.append(sibling.label)
+        return (1 if sibling is mod.SIBLINGS[0] else 0), 1, False
+
+    original = mod.check_sibling
+    mod.check_sibling = record  # type: ignore[assignment]
+    try:
+        status = mod.main()
+    finally:
+        mod.check_sibling = original  # type: ignore[assignment]
+
+    assert status == 1
+    assert seen == [s.label for s in mod.SIBLINGS]
 
 
 def test_zero_rows_for_this_repository_is_not_a_pass() -> None:
