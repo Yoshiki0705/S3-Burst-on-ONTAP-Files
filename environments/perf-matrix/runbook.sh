@@ -922,14 +922,29 @@ mpathconf --enable --with_multipathd y
 sed -i "s/^node.session.timeo.replacement_timeout = .*/node.session.timeo.replacement_timeout = 5/" /etc/iscsi/iscsid.conf
 systemctl enable --now iscsid multipathd
 modprobe nvme-tcp && echo nvme-tcp > /etc/modules-load.d/nvme-tcp.conf
+# The AWS procedure reads /etc/nvme/hostnqn as though installing nvme-cli created it. On RHEL 9.3,
+# which that page is written against, it does. **On AL2023 the file is absent after the install**
+# (observed 2026-09-12), so the host NQN the subsystem needs does not exist yet. Generate it.
+mkdir -p /etc/nvme
+[ -s /etc/nvme/hostnqn ] || nvme gen-hostnqn > /etc/nvme/hostnqn
 echo "--- what the initiator and host are called ---"
-cat /etc/iscsi/initiatorname.iscsi
-cat /etc/nvme/hostnqn
+cat /etc/iscsi/initiatorname.iscsi || echo "ABSENT: initiatorname.iscsi"
+cat /etc/nvme/hostnqn || echo "ABSENT: /etc/nvme/hostnqn"
 echo "--- module and multipath state ---"
 lsmod | grep -E "^nvme_tcp|^dm_multipath" || echo "MISSING: a module did not load"
-cat /sys/module/nvme_core/parameters/multipath'
+# Read defensively and name the path. A bare `cat` of an absent file ends the script on a non-zero
+# status, which SSM reports as a failed invocation -- so an informational read decided the phase.
+for p in /sys/module/nvme_core/parameters/multipath /sys/module/nvme_core/parameters/io_timeout; do
+  printf "%s = %s\n" "$p" "$(cat "$p" 2>/dev/null || echo ABSENT)"
+done
+# The exit status now reflects what the next phases actually need, and nothing else.
+rc=0
+[ -s /etc/iscsi/initiatorname.iscsi ] || { echo "FAIL: no IQN"; rc=1; }
+[ -s /etc/nvme/hostnqn ] || { echo "FAIL: no host NQN"; rc=1; }
+exit $rc'
   printf '\nRead the IQN and the NQN above; the provisioning phases need them.\n'
   printf 'A MISSING line means F-2 cannot be measured on this AMI. That is a finding, not a blocker to work around.\n'
+  printf 'ABSENT names a file that was not there. It is reported, not treated as a module failure.\n'
 }
 
 # iSCSI: LUN, igroup, mapping. Returns the serial-hex, which is what the friendly device name is built
