@@ -850,7 +850,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   block-nvme-sessions single|default|multi  NVMe/TCP has no nr_sessions: single pins
                          --nr-io-queues=1, which is the only comparable form (see the plan)
   block-preflight        The gate. Check 1 protects the client, not the result
-  block-fill <paramfile> Write the device once; an unwritten thin LUN reads as zeros
+  block-fill <device>    Write the device once with dd; an unwritten thin LUN reads as zeros
   nfs-xfer-size show|raise  Read or raise tcp-max-xfer-size. **65536 by default, and it caps rsize**
   raise-gen1             Raise the existing first-generation file system to 2048 MBps (~24 min)
   tooling                Read the staging bucket. VDBENCH cannot be automated, so this comes first
@@ -1051,23 +1051,31 @@ first=\$(echo \$ips | awk '{print \$1}')
 target=\$(iscsiadm --mode discovery --op update --type sendtargets --portal \"\$first\" | awk '{print \$2}' | head -1)
 echo \"target=\$target\"
 [ -n \"\$target\" ] || { echo 'FAIL: sendtargets discovery returned no target IQN'; exit 1; }
+# **Take the portal from the API addresses, not from parsed iscsiadm output.** Asking iscsiadm for the
+# node records of one target prints a full record dump whose first line is a comment, so the previous
+# parse handed `# BEGIN RECORD 2.1.4` to --login as a portal and got `No records found` (2026-09-12).
+# The addresses are already known -- block_context read them from the FSx API.
+#
+# **And make the login manual before choosing portals.** Discovery leaves node.startup at automatic on
+# this AMI, so iscsid logs into every portal on its own; a single-portal login would silently become two
+# sessions, which is exactly the distinction the single-flow point exists to make.
+iscsiadm --mode node -T \"\$target\" --op update -n node.startup -v manual
 want=1
 case '$mode' in
   single)
     # One portal only. This is the single-flow point and the only one comparable with the file rows.
-    portal=\$(iscsiadm --mode node -T \"\$target\" | awk -F, '{print \$1}' | head -1)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
-    iscsiadm --mode node -T \"\$target\" -p \"\$portal\" --login
+    iscsiadm --mode node -T \"\$target\" -p \"\$first:3260\" --login
     want=1
     ;;
   default)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
-    iscsiadm --mode node -T \"\$target\" --login
+    for ip in \$ips; do iscsiadm --mode node -T \"\$target\" -p \"\$ip:3260\" --login || true; done
     want=2
     ;;
   multi)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v $count
-    iscsiadm --mode node -T \"\$target\" --login
+    for ip in \$ips; do iscsiadm --mode node -T \"\$target\" -p \"\$ip:3260\" --login || true; done
     want=\$(( 2 * $count ))
     ;;
 esac
@@ -1244,27 +1252,54 @@ without reaching disk, which measures nothing.
 NOTE
 }
 
-# The fill pass. A raw device takes a normal write run rather than VDBENCH's SD_format, so the
-# queue-depth-2 limit that held the file-side fill to 165 MB/s does not apply here. **That is a
-# prediction; record what the fill actually achieved.**
+# The fill pass. Its only job is that no read is served from unwritten blocks of a thin LUN, which
+# return zeros without reaching disk.
+#
+# **This is dd, not VDBENCH, and the rate it reports is a dd rate.** Two attempts were spent on
+# VDBENCH here. Command-line `key=value` arguments are *substitutions* for placeholders in the
+# parameter file, not overrides of its workload definitions, so passing `xfersize=1024k rdpct=0 ...`
+# against a file that has no such placeholders aborts with `Unused parameter substitution`
+# (2026-09-12). Writing a fill definition into the measurement parameter file instead would mean the
+# fill and the measurement could no longer diverge without one silently changing the other. dd keeps
+# them separate and its own failure mode is visible.
+#
+# Do not quote the fill rate next to the measured rates. It is a different tool.
 block_fill() {
   block_context
-  local param="${1:-}"
-  [[ -n "$param" ]] || die "usage: runbook.sh block-fill <vdbench parameter file>"
-  log "filling the block device once, using $param"
+  local device="${1:-}"
+  [[ -n "$device" ]] || die "usage: runbook.sh block-fill <device path>"
+  case "$device" in
+    /dev/mapper/*|/dev/nvme*) ;;
+    *) die "refusing to write to '$device': fill takes the multipath alias or an nvme namespace" ;;
+  esac
+  log "filling $device once, with dd"
   printf 'This writes the whole device. Confirm block-preflight check 1 passed first.\n'
   run_on_client "$BLOCK_INSTANCE" "
-# **The working directory decides whether the parameter file can be read.** vdbench resolves an
-# include directive relative to the directory it runs in, not relative to the file given to -f.
-# Running from /opt/bench made it look for the shared workload file at /opt/bench instead of
-# /opt/bench/parm, and the fill did nothing but report the file as not found (2026-09-12) -- after
-# which every read would have been measured against unwritten blocks.
-cd /opt/bench/parm
-vdbench -f '$param' -o /opt/bench/report-fill \
-  seekpct=.0 rdpct=0 xfersize=1024k threads=512 iorate=max elapsed=0 warmup=0 || true
-grep -E 'avg_|Data errors' /opt/bench/report-fill/totals.html 2>/dev/null || true"
-  printf '\nRecord the fill rate. The file side managed 165 MB/s through SD_format and 315 with formatxfersize;\n'
-  printf 'if a raw write is not faster than that, the queue depth was not the cause and the plan says so.\n'
+dev='$device'
+[ -b \"\$dev\" ] || { echo \"FAIL: \$dev is not a block device\"; exit 1; }
+# Check 1 of the preflight again, at the point of the write. The cost of getting this wrong here is a
+# destroyed client, and it costs one lsblk to refuse.
+if lsblk -no MODEL \"\$dev\" 2>/dev/null | grep -qi 'Elastic Block Store'; then
+  echo 'FAIL: that device is EBS, not ONTAP. Refusing to write.'; exit 1
+fi
+size=\$(blockdev --getsize64 \"\$dev\")
+gib=\$(( size / 1073741824 ))
+echo \"device \$dev is \$gib GiB\"
+# Non-zero data, so nothing downstream can serve the fill back from a zero-detection path. Storage
+# efficiency is disabled on this volume, but the fill should not depend on that being true.
+[ -s /tmp/rand1g ] || dd if=/dev/urandom of=/tmp/rand1g bs=1M count=1024 status=none
+start=\$(date +%s)
+i=0
+while [ \"\$i\" -lt \"\$gib\" ]; do
+  dd if=/tmp/rand1g of=\"\$dev\" bs=1M count=1024 seek=\$(( i * 1024 )) oflag=direct status=none || break
+  i=\$(( i + 1 ))
+done
+end=\$(date +%s)
+elapsed=\$(( end - start ))
+[ \"\$elapsed\" -gt 0 ] || elapsed=1
+echo \"filled \$i GiB of \$gib in \$elapsed s = \$(( i * 1024 / elapsed )) MB/s (dd, not VDBENCH)\"
+[ \"\$i\" -eq \"\$gib\" ] || { echo 'FAIL: the fill did not cover the whole device'; exit 1; }"
+  printf '\nThe fill rate above is a dd rate. Do not place it beside the VDBENCH numbers.\n'
 }
 
 case "${1:-}" in
