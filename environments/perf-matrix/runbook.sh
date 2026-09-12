@@ -621,15 +621,21 @@ PY
 
 # The send-and-poll half, factored out so `run_on_client` is not a second copy of it. Two copies of
 # the same shell drifting apart is what the toolchain test one directory over exists to catch.
+# The wait budget is a parameter because the default is not enough for every phase. Thirty polls of 15
+# seconds is 7.5 minutes, and a phase that writes 600 GiB does not finish inside it: the fill was
+# reported as failed at `status: InProgress` and the environment was torn down over a command that was
+# still running correctly (2026-09-12). **A poll limit is not a failure.**
 ssm_send_and_wait() {
-  local instance="$1" payload="$2"
+  local instance="$1" payload="$2" budget="${3:-450}"
   local cmd_id
   cmd_id="$(aws ssm send-command --region "$REGION" --instance-ids "$instance" \
     --document-name AWS-RunShellScript --timeout-seconds 600 \
     --cli-input-json "file://$payload" \
     --query 'Command.CommandId' --output text)"
-  local i state
-  for i in $(seq 1 30); do
+  local i state polls
+  polls=$(( budget / 15 ))
+  [[ "$polls" -ge 30 ]] || polls=30
+  for i in $(seq 1 "$polls"); do
     state="$(aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" \
       --instance-id "$instance" --query Status --output text)"
     [[ "$state" == "InProgress" || "$state" == "Pending" ]] || break
@@ -655,17 +661,25 @@ ssm_send_and_wait() {
 # command needs neither the fetch nor that exposure, so it gets its own entry point rather than
 # passing an empty secret through the other one.
 run_on_client() {
-  local instance="$1" script="$2"
+  local instance="$1" script="$2" budget="${3:-450}"
   local payload; payload="$(mktemp)"
   # shellcheck disable=SC2064  # expand now, so the trap names this file
   trap "rm -f '$payload'" RETURN
-  SCRIPT="$script" $PY_BIN - "$payload" <<'PY'
+  # executionTimeout travels with the budget. It is the client-side limit on how long the script may
+  # run, and it is separate from how long this side is willing to wait.
+  SCRIPT="$script" BUDGET="$budget" $PY_BIN - "$payload" <<'PY'
 import json, os, sys
-payload = {"Parameters": {"commands": ["set -uo pipefail", os.environ["SCRIPT"]]}}
+budget = max(int(os.environ["BUDGET"]) + 300, 3600)
+payload = {
+    "Parameters": {
+        "commands": ["set -uo pipefail", os.environ["SCRIPT"]],
+        "executionTimeout": [str(budget)],
+    }
+}
 with open(sys.argv[1], "w", encoding="utf-8") as handle:
     json.dump(payload, handle)
 PY
-  ssm_send_and_wait "$instance" "$payload"
+  ssm_send_and_wait "$instance" "$payload" "$budget"
 }
 
 # **The default that makes FSx for ONTAP look slow.** ONTAP ships tcp-max-xfer-size at 65536, and it is
@@ -1298,7 +1312,7 @@ end=\$(date +%s)
 elapsed=\$(( end - start ))
 [ \"\$elapsed\" -gt 0 ] || elapsed=1
 echo \"filled \$i GiB of \$gib in \$elapsed s = \$(( i * 1024 / elapsed )) MB/s (dd, not VDBENCH)\"
-[ \"\$i\" -eq \"\$gib\" ] || { echo 'FAIL: the fill did not cover the whole device'; exit 1; }"
+[ \"\$i\" -eq \"\$gib\" ] || { echo 'FAIL: the fill did not cover the whole device'; exit 1; }" 3600
   printf '\nThe fill rate above is a dd rate. Do not place it beside the VDBENCH numbers.\n'
 }
 
