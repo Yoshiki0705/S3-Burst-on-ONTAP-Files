@@ -364,6 +364,20 @@ ONTAP CLI（`lun create` / `lun igroup create` / `lun mapping create` /
 | `block-preflight` | 下の検査を全部走らせる |
 | `block-fill` | デバイス全体に非圧縮データを 1 回書く（下） |
 
+#### フェーズの実行順序
+
+**alias と fill はログインの後にしか成立しない。** multipath がデバイスを作るのはセッションが
+張られてからで、LUN を作った直後には `/dev/mapper/<alias>` が存在しない。**この順序を間違えて
+1 回撤去した**（2026-09-12。`multipath -ll` が空を返し、alias の検査が `MISSING` で落ちた）。
+
+1. `block-provision iscsi` — LUN、igroup、マッピング
+2. `block-sessions single` — **ここで 1 回ログインする。** multipath がデバイスを作るのはこの後
+3. multipath の alias を書き、`/dev/mapper/<alias>` の存在を確認する
+4. `block-preflight` — 検査 1 がクライアントのルートボリュームを守る
+5. `block-fill` — 1 回だけ全面に書く
+6. モードごとに `block-sessions` → 測定（`block-sessions` は毎回ログアウトしてから張り直すので、
+   alias は `multipath.conf` に残り、モードを変えてもデバイス名は変わらない）
+
 ### デバイスの取り違えによるクライアントのルートボリュームの破壊
 
 **これが最も危険な差分である。** VDBENCH は `lun=` に与えられたデバイスへ**書く**。
