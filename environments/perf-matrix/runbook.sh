@@ -904,6 +904,17 @@ block_context() {
     --query 'StorageVirtualMachines[0].Name' --output text)"
   [[ -n "$BLOCK_SVM" && "$BLOCK_SVM" != "None" ]] || die "could not read the SVM name"
   BLOCK_MGMT="management.${BLOCK_FS_ID}.fsx.${REGION}.amazonaws.com"
+  # The block endpoint is read from the API, not assembled from the SVM name. `iscsi.<svm-name>` does
+  # not resolve -- the phases built that name and got an empty discovery, an empty `target=` and no
+  # login at all (2026-09-12). The API returns both the DNS name and the addresses of the two LIFs;
+  # the addresses are what the session and connect phases need, and AWS's own NVMe procedure passes an
+  # address to `-a` rather than a name. The NVMe/TCP endpoint is the same one: AWS names its addresses
+  # iscsi_1 and iscsi_2 in the NVMe procedure too.
+  BLOCK_ISCSI_IPS="$(aws fsx describe-storage-virtual-machines --region "$REGION" \
+    --filters "Name=file-system-id,Values=$BLOCK_FS_ID" \
+    --query 'StorageVirtualMachines[0].Endpoints.Iscsi.IpAddresses' --output text | tr '\t' ' ')"
+  [[ -n "$BLOCK_ISCSI_IPS" && "$BLOCK_ISCSI_IPS" != "None" ]] \
+    || die "no iSCSI endpoint addresses on the SVM; deploy gen2 with EnableBlockProtocols=true"
 }
 
 # The client packages. Amazon Linux 2023's repositories are reachable over the S3 gateway endpoint even
@@ -1015,8 +1026,14 @@ block_sessions() {
   run_on_client "$BLOCK_INSTANCE" "
 set -x
 iscsiadm --mode node --logoutall=all || true
-target=\$(iscsiadm --mode discovery --op update --type sendtargets --portal \$(getent hosts iscsi.${BLOCK_SVM} | awk '{print \$1}' | head -1) | awk '{print \$2}' | head -1)
+# The LIF addresses come from the FSx API (see block_context), not from a name built out of the SVM
+# name. Discovery against the first one returns both portals.
+ips='${BLOCK_ISCSI_IPS}'
+echo \"LIF addresses: \$ips\"
+first=\$(echo \$ips | awk '{print \$1}')
+target=\$(iscsiadm --mode discovery --op update --type sendtargets --portal \"\$first\" | awk '{print \$2}' | head -1)
 echo \"target=\$target\"
+[ -n \"\$target\" ] || { echo 'FAIL: sendtargets discovery returned no target IQN'; exit 1; }
 case '$mode' in
   single)
     # One portal only. This is the single-flow point and the only one comparable with the file rows.
@@ -1073,10 +1090,11 @@ block_nvme_sessions() {
   run_on_client "$BLOCK_INSTANCE" "
 set -x
 nvme disconnect-all || true
-# Both block LIFs answer on the same DNS name, which is how the iSCSI phase finds its portals too.
-ips=\$(getent hosts iscsi.${BLOCK_SVM} | awk '{print \$1}' | sort -u)
+# The same endpoint addresses the iSCSI phase uses, read from the FSx API in block_context. AWS's NVMe
+# procedure calls them iscsi_1 and iscsi_2 as well.
+ips='${BLOCK_ISCSI_IPS}'
 echo \"LIF addresses: \$ips\"
-first=\$(echo \"\$ips\" | head -1)
+first=\$(echo \$ips | awk '{print \$1}')
 # The subsystem NQN comes from discovery rather than from a variable, so a rename on the ONTAP side
 # cannot leave this phase connecting to a name that no longer exists.
 nqn=\$(nvme discover -t tcp -a \"\$first\" -s 8009 | awk '/^subnqn:/{print \$2}' | grep -v discovery | head -1)
