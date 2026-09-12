@@ -1022,6 +1022,7 @@ block_provision_nvme() {
   [[ -n "$nqn" ]] || die "usage: runbook.sh block-provision nvme <client-NQN>  (from 'block-packages')"
   log "creating namespace ${BLOCK_NS_NAME} and subsystem ${BLOCK_SUBSYSTEM} on ${BLOCK_SVM}"
   local api="https://${BLOCK_MGMT}/api/private/cli"
+  local rest="https://${BLOCK_MGMT}/api"
   ontap_rest_on_client "$BLOCK_INSTANCE" "
 curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
   -d '{\"vserver\":\"${BLOCK_SVM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_NS_NAME}\",\"size\":\"${BLOCK_LUN_GIB}GB\",\"ostype\":\"linux\"}' \
@@ -1029,15 +1030,36 @@ curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
 curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
   -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"ostype\":\"linux\"}' \
   '${api}/vserver/nvme/subsystem' | python3 -m json.tool
+# **The map and the host are 'add' commands, not 'create'.** The private CLI passthrough turns POST
+# into create, so both of these answered with \`invalid operation\` (code 3) while the namespace and the
+# subsystem above succeeded. The failure was quiet: a subsystem with no namespace and no host is simply
+# not discoverable, so the next phase reported \"discovery returned no subsystem NQN\" and the cause was
+# two phases back (2026-09-12).
+#
+# The public REST API has these as operations in their own right, so they are used here.
 curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
-  -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"path\":\"/vol/${BLOCK_VOL}/${BLOCK_NS_NAME}\"}' \
-  '${api}/vserver/nvme/subsystem/map' | python3 -m json.tool
+  -d '{\"svm\":{\"name\":\"${BLOCK_SVM}\"},\"subsystem\":{\"name\":\"${BLOCK_SUBSYSTEM}\"},\"namespace\":{\"name\":\"/vol/${BLOCK_VOL}/${BLOCK_NS_NAME}\"}}' \
+  '${rest}/protocols/nvme/subsystem-maps' | python3 -m json.tool
+uuid=\$(curl -s -k -u \"fsxadmin:\$PW\" \
+  '${rest}/protocols/nvme/subsystems?svm.name=${BLOCK_SVM}&name=${BLOCK_SUBSYSTEM}&fields=uuid' \
+  | python3 -c 'import json,sys; r=json.load(sys.stdin).get(\"records\") or [{}]; print(r[0].get(\"uuid\",\"\"))')
+echo \"subsystem uuid: \$uuid\"
+[ -n \"\$uuid\" ] || { echo 'FAIL: could not read the subsystem UUID'; exit 1; }
 curl -s -k -u \"fsxadmin:\$PW\" -X POST -H 'Content-Type: application/json' \
-  -d '{\"vserver\":\"${BLOCK_SVM}\",\"subsystem\":\"${BLOCK_SUBSYSTEM}\",\"host-nqn\":\"${nqn}\"}' \
-  '${api}/vserver/nvme/subsystem/host' | python3 -m json.tool
+  -d '{\"nqn\":\"${nqn}\"}' \
+  \"${rest}/protocols/nvme/subsystems/\$uuid/hosts\" | python3 -m json.tool
+# **Read the mapping back.** Both of the calls above were silent about failing before, and the phase
+# that needs them is the one after next.
+echo '--- namespace to subsystem mapping ---'
+curl -s -k -u \"fsxadmin:\$PW\" \
+  '${rest}/protocols/nvme/subsystem-maps?svm.name=${BLOCK_SVM}&fields=subsystem.name,namespace.name' \
+  | python3 -m json.tool
+echo '--- hosts on the subsystem ---'
+curl -s -k -u \"fsxadmin:\$PW\" \"${rest}/protocols/nvme/subsystems/\$uuid/hosts\" | python3 -m json.tool
 echo '--- the block LIFs. Both are used, by both protocols ---'
 curl -s -k -u \"fsxadmin:\$PW\" \
-  '${api}/network/interface?vserver=${BLOCK_SVM}&fields=address,current-node,current-port,service-policy' | python3 -m json.tool"
+  '${rest}/network/ip/interfaces?svm.name=${BLOCK_SVM}&fields=ip.address,location.node.name,location.port.name' \
+  | python3 -m json.tool"
 }
 
 # Sessions. **The point of this phase is that the requested count and the opened count are different
