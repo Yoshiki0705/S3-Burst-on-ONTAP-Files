@@ -637,6 +637,16 @@ ssm_send_and_wait() {
   done
   aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" --instance-id "$instance" \
     --query 'StandardOutputContent' --output text
+  # **Print stderr too.** Only stdout was reported before, so a failing command inside a phase left no
+  # trace: an iSCSI login that logged `iscsiadm: No records found` looked like a phase that had simply
+  # counted zero connections, and three of the Pattern F attempts were diagnosed one deployment at a
+  # time because of it. The reason a command failed belongs next to the failure.
+  local err
+  err="$(aws ssm get-command-invocation --region "$REGION" --command-id "$cmd_id" \
+    --instance-id "$instance" --query 'StandardErrorContent' --output text)"
+  if [[ -n "$err" && "$err" != "None" ]]; then
+    printf '\n--- stderr from the client ---\n%s\n' "$err"
+  fi
   [[ "$state" == "Success" ]] || die "the command did not succeed (status: $state)"
 }
 
@@ -948,6 +958,13 @@ lsmod | grep -E "^nvme_tcp|^dm_multipath" || echo "MISSING: a module did not loa
 for p in /sys/module/nvme_core/parameters/multipath /sys/module/nvme_core/parameters/io_timeout; do
   printf "%s = %s\n" "$p" "$(cat "$p" 2>/dev/null || echo ABSENT)"
 done
+# **The AWS procedure verifies native NVMe multipath by reading that first path and expecting Y.** On
+# AL2023 it was ABSENT while io_timeout in the same directory was readable (2026-09-12), so the
+# parameter itself is not exposed rather than the directory being missing. Whether the module was built
+# with multipath support at all is the question that decides it, so ask the module.
+echo "--- is native NVMe multipath compiled in ---"
+modinfo nvme_core 2>/dev/null | grep -i multipath || echo "no multipath parameter in modinfo nvme_core"
+grep -i 'NVME_MULTIPATH' /boot/config-"$(uname -r)" 2>/dev/null || echo "no NVME_MULTIPATH line in the kernel config"
 # The exit status now reflects what the next phases actually need, and nothing else.
 rc=0
 [ -s /etc/iscsi/initiatorname.iscsi ] || { echo "FAIL: no IQN"; rc=1; }
@@ -1034,23 +1051,44 @@ first=\$(echo \$ips | awk '{print \$1}')
 target=\$(iscsiadm --mode discovery --op update --type sendtargets --portal \"\$first\" | awk '{print \$2}' | head -1)
 echo \"target=\$target\"
 [ -n \"\$target\" ] || { echo 'FAIL: sendtargets discovery returned no target IQN'; exit 1; }
+want=1
 case '$mode' in
   single)
     # One portal only. This is the single-flow point and the only one comparable with the file rows.
     portal=\$(iscsiadm --mode node -T \"\$target\" | awk -F, '{print \$1}' | head -1)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
     iscsiadm --mode node -T \"\$target\" -p \"\$portal\" --login
+    want=1
     ;;
   default)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v 1
     iscsiadm --mode node -T \"\$target\" --login
+    want=2
     ;;
   multi)
     iscsiadm --mode node -T \"\$target\" --op update -n node.session.nr_sessions -v $count
     iscsiadm --mode node -T \"\$target\" --login
+    want=\$(( 2 * $count ))
     ;;
 esac
 set +x
+# **The login is asynchronous.** iscsid brings the connection up after --login returns, and on this
+# client it took about 100 seconds: a count taken immediately reported 0 established connections while
+# the journal showed both sessions becoming operational a minute and a half later. Waiting is not
+# assuming -- the number printed below is still the counted one, and it is printed whether or not the
+# wait was satisfied.
+n=0
+for i in \$(seq 1 40); do
+  n=\$(iscsiadm --mode session 2>/dev/null | grep -c '^tcp' || true)
+  n=\${n:-0}
+  [ \"\$n\" -ge \"\$want\" ] && break
+  sleep 5
+done
+echo \"sessions after waiting: \$n (at least \$want expected for $mode)\"
+[ \"\$n\" -ge \"\$want\" ] || echo \"WARN: fewer sessions than expected. The counted value is what the result records.\"
+# multipath merges paths only once the sessions exist, so the reload belongs after the wait.
+multipath -r >/dev/null 2>&1 || true
+sleep 5
 echo '--- COUNT THE CONNECTIONS. The requested value is not the answer ---'
 ss -tn state established '( dport = :3260 )' | tail -n +2 | wc -l
 ss -tn state established '( dport = :3260 )'
@@ -1128,6 +1166,12 @@ case '$mode' in
     ;;
 esac
 set +x
+# The controllers appear after the connect returns, the same way the iSCSI login completes after
+# --login returns. Wait for a namespace to be listed before reading anything about it.
+for i in \$(seq 1 24); do
+  nvme netapp ontapdevices -o column 2>/dev/null | grep -q '^/dev' && break
+  sleep 5
+done
 echo \"--- requested queue count: \$requested (vCPUs: \$cpus) ---\"
 echo '--- effective queue count. THIS is what the target allocated, not what was asked for ---'
 for n in \$(nvme netapp ontapdevices -o column 2>/dev/null | awk '/^\\/dev/{print \$1}'); do
@@ -1210,7 +1254,12 @@ block_fill() {
   log "filling the block device once, using $param"
   printf 'This writes the whole device. Confirm block-preflight check 1 passed first.\n'
   run_on_client "$BLOCK_INSTANCE" "
-cd /opt/bench
+# **The working directory decides whether the parameter file can be read.** vdbench resolves an
+# include directive relative to the directory it runs in, not relative to the file given to -f.
+# Running from /opt/bench made it look for the shared workload file at /opt/bench instead of
+# /opt/bench/parm, and the fill did nothing but report the file as not found (2026-09-12) -- after
+# which every read would have been measured against unwritten blocks.
+cd /opt/bench/parm
 vdbench -f '$param' -o /opt/bench/report-fill \
   seekpct=.0 rdpct=0 xfersize=1024k threads=512 iorate=max elapsed=0 warmup=0 || true
 grep -E 'avg_|Data errors' /opt/bench/report-fill/totals.html 2>/dev/null || true"
