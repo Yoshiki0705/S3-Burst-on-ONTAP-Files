@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Verify the claim-bearing strings a sibling repository probes for in this repository.
 
-Thirty-two claims here are cited by FSx-for-ONTAP-Adoption-Playbook, which registers an exact
-substring per citation and fails its own gate when the substring is gone. That is the intended
-design: a retraction here surfaces there rather than leaving a stale sentence behind. But it puts
-the discovery in the wrong place -- the person who reworded the sentence learns about it from
-another repository's CI, and until it is fixed the Playbook's guidance is published without the
-evidence under it.
+Claims here are cited by sibling repositories, each of which registers an exact substring per
+citation and fails its own gate when the substring is gone. That is the intended design: a
+retraction here surfaces there rather than leaving a stale sentence behind. But it puts the
+discovery in the wrong place -- the person who reworded the sentence learns about it from another
+repository's CI, and until it is fixed that repository's guidance is published without the evidence
+under it.
+
+**Every citing repository is read, not one.** Naming a single sibling was a real gap rather than a
+simplification: a second repository published its registration and this gate did not look at it, so
+the discovery stayed in the wrong place for exactly the claims it was meant to protect.
 
 This checker moves the discovery to the commit that causes it. The sibling publishes the
 registration (`docs/agent/cross-repo-probe-contract.txt`), generated from its own index and checked
@@ -50,18 +54,65 @@ from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Both names, for the same reason check_external_anchors.py holds both: the repository was renamed
-# from fsxn-adoption-playbook, so a clone made before the rename carries the old name. Holding only
-# one meant a checkout went unfound and the skip stood in for a pass.
-CHECKOUT_NAMES = ("FSx-for-ONTAP-Adoption-Playbook", "fsxn-adoption-playbook")
 CONTRACT = Path("docs/agent/cross-repo-probe-contract.txt")
-RAW_CONTRACT = (
-    "https://raw.githubusercontent.com/Yoshiki0705/"
-    "FSx-for-ONTAP-Adoption-Playbook/main/" + CONTRACT.as_posix()
-)
 
 # The name the sibling's registration uses for this repository, in the first field.
 THIS_REPO = "S3-Burst-on-ONTAP-Files"
+
+
+class Sibling(NamedTuple):
+    """A repository that cites claims here and publishes what it cites.
+
+    `checkout_names` holds every name a local clone can carry, for the same reason
+    check_external_anchors.py does: a repository that was renamed leaves older clones under the old
+    name, and holding only one meant a checkout went unfound while the skip stood in for a pass.
+
+    `published` decides what a 404 from --fetch means, and the two meanings are opposite. Not
+    published yet: a skip is correct. Published and then removed or renamed: the registration this
+    repository is checked against is gone, and a skip would report that as a clean run forever. There
+    is no way to tell those apart from the response, so it is an explicit switch per sibling.
+
+    `rows_when_written` is for the message only. Asserting the count would fail the moment a sibling
+    legitimately drops a citation; what has to fail is *zero* rows from a contract that parsed, which
+    means the repository name or the field order moved.
+    """
+
+    label: str
+    checkout_names: tuple[str, ...]
+    env_override: str
+    published: bool
+    rows_when_written: int
+
+    @property
+    def raw_contract(self) -> str:
+        return (
+            "https://raw.githubusercontent.com/Yoshiki0705/"
+            f"{self.label}/main/" + CONTRACT.as_posix()
+        )
+
+
+# **More than one repository cites this one, so more than one contract has to be read.** Naming a
+# single sibling was a real gap: VMware-Migration-EC2-ONTAP published its registration and this gate
+# did not look at it, so a rewording here would have been caught only by that repository's own CI --
+# which is precisely the discovery-in-the-wrong-place problem this checker exists to fix. It built its
+# own outgoing check rather than wait, which is the right call: its protection should not depend on a
+# change landing here.
+SIBLINGS: tuple[Sibling, ...] = (
+    Sibling(
+        label="FSx-for-ONTAP-Adoption-Playbook",
+        checkout_names=("FSx-for-ONTAP-Adoption-Playbook", "fsxn-adoption-playbook"),
+        env_override="SIBLING_PLAYBOOK",
+        published=True,
+        rows_when_written=32,
+    ),
+    Sibling(
+        label="VMware-Migration-EC2-ONTAP",
+        checkout_names=("VMware-Migration-EC2-ONTAP",),
+        env_override="SIBLING_VMWARE",
+        published=True,
+        rows_when_written=5,
+    ),
+)
 
 FAIL_ROLE = "retraction"
 WARN_ROLE = "reread"
@@ -73,22 +124,9 @@ ROLES = (FAIL_ROLE, WARN_ROLE)
 # while the output still says everything passed.
 UNKNOWN_ROLE_FAILS = True
 
-# **True since the sibling published the contract on its default branch** (agreed on
-# S3-Burst-on-ONTAP-Files#121; the sibling's change was its #172). Confirmed by fetching the raw URL,
-# not by reading a local checkout -- a checkout can hold the file on an unmerged branch, which is what
-# it did while this was False.
-#
-# It decides what a 404 from --fetch means, and the two meanings are opposite. Not published yet: a
-# skip is correct. Published and then removed or renamed: the registration this repository depends on
-# is gone, and a skip would report that as a clean run forever. There is no way to tell those apart
-# from the response, and deriving it from a local checkout does not work either -- CI has no
-# checkout, so every 404 would read as "not published yet" on exactly the runner where this is the
-# only thing that runs. So it is an explicit switch, and the flip is a deliberate act.
-CONTRACT_PUBLISHED = True
-
 # Zero rows for this repository, from a contract that parsed, is not "nothing to check" -- it means
-# the repository name or the field order moved. Thirty-two rows were registered when this was
-# written. A scan that finds nothing has to say so rather than report a clean run.
+# the repository name or the field order moved. A scan that finds nothing has to say so rather than
+# report a clean run.
 EXPECT_AT_LEAST_ONE_ROW = True
 
 
@@ -98,12 +136,12 @@ class Probe(NamedTuple):
     text: str
 
 
-def checkout() -> Path | None:
-    explicit = os.environ.get("SIBLING_PLAYBOOK")
+def checkout(sibling: Sibling) -> Path | None:
+    explicit = os.environ.get(sibling.env_override)
     candidates = (
         [Path(explicit).expanduser()]
         if explicit
-        else [ROOT.parent / name for name in CHECKOUT_NAMES]
+        else [ROOT.parent / name for name in sibling.checkout_names]
     )
     for path in candidates:
         if (path / CONTRACT).is_file():
@@ -156,42 +194,43 @@ def contract_from(base: Path) -> tuple[list[Probe], list[str]]:
     return parse_contract((base / CONTRACT).read_text(encoding="utf-8"))
 
 
-def fetch_contract() -> tuple[list[Probe] | None, list[str]]:
-    """Read the contract as published, not as it happens to sit on this disk.
+def fetch_contract(sibling: Sibling) -> tuple[list[Probe] | None, list[str]]:
+    """Read one sibling's contract as published, not as it happens to sit on this disk.
 
     A local checkout can be behind, so a probe can be satisfied here against a registration the
     sibling has already changed. Needs the network, so it belongs with the other network job rather
     than in `make all`.
 
-    Returns `(None, [])` for the one case that is not an error: a 404 while CONTRACT_PUBLISHED is
-    False, meaning the contract does not exist yet.
+    Returns `(None, [])` for the one case that is not an error: a 404 while the sibling is marked as
+    not having published, meaning the contract does not exist yet.
     """
     import urllib.error
     import urllib.request
 
+    url = sibling.raw_contract
     try:
-        with urllib.request.urlopen(RAW_CONTRACT, timeout=30) as response:
+        with urllib.request.urlopen(url, timeout=30) as response:
             if response.status != 200:
-                raise SystemExit(
-                    f"incoming-probes: {RAW_CONTRACT} returned {response.status}"
-                )
+                raise SystemExit(f"incoming-probes: {url} returned {response.status}")
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as error:
-        if error.code == 404 and not CONTRACT_PUBLISHED:
+        if error.code == 404 and not sibling.published:
             return None, []
         raise SystemExit(
-            f"incoming-probes: {RAW_CONTRACT} returned {error.code}. "
+            f"incoming-probes: {url} returned {error.code}. "
             + (
                 "The contract was published, so this is a removal or a rename rather than an "
                 "absence -- the registration this repository is checked against is gone."
-                if CONTRACT_PUBLISHED
+                if sibling.published
                 else "Not a 404, so this is not the expected 'not published yet'."
             )
         ) from error
     return parse_contract(body)
 
 
-def check(probes: list[Probe]) -> tuple[list[str], list[str]]:
+def check(
+    probes: list[Probe], citing: str = "the sibling"
+) -> tuple[list[str], list[str]]:
     """Substring test per probe. Failures for retraction, warnings for reread."""
     failures: list[str] = []
     warnings: list[str] = []
@@ -221,7 +260,7 @@ def check(probes: list[Probe]) -> tuple[list[str], list[str]]:
 
         if probe.role == FAIL_ROLE:
             failures.append(
-                f"{probe.path}: {probe.text!r} is gone. The Playbook cites this claim and its "
+                f"{probe.path}: {probe.text!r} is gone. {citing} cites this claim and its "
                 "gate will report it. If the claim was withdrawn, say so there; if this was a "
                 "rewording, restore the string or agree a replacement first."
             )
@@ -229,38 +268,42 @@ def check(probes: list[Probe]) -> tuple[list[str], list[str]]:
             warnings.append(
                 f"{probe.path}: {probe.text!r} is gone. This probe pins the minimum and maximum "
                 "of a measurement set, so a new measurement is expected to move it. **Not a "
-                "retraction** -- tell the Playbook the range changed and why."
+                f"retraction** -- tell {citing} the range changed and why."
             )
     return failures, warnings
 
 
-def main() -> int:
-    if "--fetch" in sys.argv:
-        fetched, problems = fetch_contract()
+def check_sibling(sibling: Sibling, fetch: bool) -> tuple[int, int, bool]:
+    """Read and check one sibling's registration.
+
+    Returns `(exit_code, probes_checked, skipped)`. A skip is reported per sibling rather than for the
+    run: one sibling being absent locally says nothing about another, and collapsing them would let a
+    present contract go unread because a different one was missing.
+    """
+    if fetch:
+        fetched, problems = fetch_contract(sibling)
         if fetched is None:
             print(
-                "incoming-probes: SKIPPED, the sibling has not published "
-                f"{CONTRACT.as_posix()} yet (404). Flip CONTRACT_PUBLISHED in this file when it "
-                "lands, so that a later 404 reads as a removal rather than as this."
+                f"incoming-probes [{sibling.label}]: SKIPPED, not published yet (404). "
+                "Flip `published` for this sibling when it lands, so that a later 404 reads as a "
+                "removal rather than as this."
             )
-            return 0
-        probes, source = fetched, "the published contract"
+            return 0, 0, True
+        probes, source = fetched, f"{sibling.label}, as published"
     else:
-        base = checkout()
+        base = checkout(sibling)
         if base is None:
-            # A contributor without the sibling clone is not blocked by a check about someone
-            # else's citations. But the skip has to read as a skip, and it names both reasons it
-            # can happen -- the contract is newer than this checker, so "not published yet" and
-            # "no checkout" are different situations with the same symptom today.
+            # A contributor without the clone is not blocked by a check about someone else's
+            # citations. But the skip has to read as a skip, and it names both reasons it can
+            # happen: an absent checkout and an unpublished contract look the same from here.
             print(
-                "incoming-probes: SKIPPED, no sibling probe contract found "
+                f"incoming-probes [{sibling.label}]: SKIPPED, no probe contract found "
                 f"(looked for {CONTRACT.as_posix()} beside this repository under "
-                f"{' or '.join(CHECKOUT_NAMES)}, or set SIBLING_PLAYBOOK). "
-                "Either the checkout is absent or the sibling has not published the contract yet; "
-                "until it exists, a reworded claim here is caught by the Playbook's CI instead of "
-                "by this gate."
+                f"{' or '.join(sibling.checkout_names)}, or set {sibling.env_override}). "
+                "Until it is readable, a reworded claim here is caught by that repository's CI "
+                "instead of by this gate."
             )
-            return 0
+            return 0, 0, True
         probes, problems = contract_from(base)
         source = base.name
 
@@ -268,43 +311,76 @@ def main() -> int:
         for problem in problems:
             print(f"  {problem}", file=sys.stderr)
         print(
-            f"incoming-probes: {len(problems)} unreadable row(s) in the contract "
-            f"({source}). Not treated as a pass: an unparsed row is an unchecked claim.",
+            f"incoming-probes [{sibling.label}]: {len(problems)} unreadable row(s) in the "
+            f"contract ({source}). Not treated as a pass: an unparsed row is an unchecked claim.",
             file=sys.stderr,
         )
-        return 1
+        return 1, 0, False
 
     if not probes and EXPECT_AT_LEAST_ONE_ROW:
         print(
-            f"incoming-probes: the contract ({source}) parsed but holds no row for "
-            f"{THIS_REPO}. Thirty-two were registered when this check was written, so this is a "
-            "changed repository name or field order rather than an empty registration.",
+            f"incoming-probes [{sibling.label}]: the contract ({source}) parsed but holds no row "
+            f"for {THIS_REPO}. {sibling.rows_when_written} were registered when this sibling was "
+            "added, so this is a changed repository name or field order rather than an empty "
+            "registration.",
             file=sys.stderr,
         )
-        return 1
+        return 1, 0, False
 
-    failures, warnings = check(probes)
+    failures, warnings = check(probes, citing=sibling.label)
 
     for warning in warnings:
-        print(f"  reread: {warning}")
+        print(f"  reread [{sibling.label}]: {warning}")
     for failure in failures:
-        print(f"  {failure}", file=sys.stderr)
+        print(f"  [{sibling.label}] {failure}", file=sys.stderr)
 
     if failures:
         print(
-            f"incoming-probes: {len(failures)} cited claim(s) no longer resolve "
-            f"({source})",
+            f"incoming-probes [{sibling.label}]: {len(failures)} cited claim(s) no longer "
+            f"resolve ({source})",
             file=sys.stderr,
         )
-        return 1
+        return 1, len(probes), False
 
     counts = {role: sum(1 for p in probes if p.role == role) for role in ROLES}
     summary = ", ".join(f"{counts[role]} {role}" for role in ROLES)
     tail = f", {len(warnings)} reread probe(s) moved" if warnings else ""
     print(
-        f"incoming-probes: {len(probes)} probe(s) resolve ({summary}) ({source}){tail}"
+        f"incoming-probes [{sibling.label}]: {len(probes)} probe(s) resolve "
+        f"({summary}) ({source}){tail}"
     )
-    return 0
+    return 0, len(probes), False
+
+
+def main() -> int:
+    fetch = "--fetch" in sys.argv
+    status = 0
+    total = 0
+    skipped = 0
+    # Every sibling is read even when an earlier one fails. Stopping at the first would hide how many
+    # citations are affected, which is the number the repository that cites them needs.
+    for sibling in SIBLINGS:
+        code, count, was_skipped = check_sibling(sibling, fetch)
+        status = status or code
+        total += count
+        skipped += 1 if was_skipped else 0
+
+    if skipped == len(SIBLINGS):
+        print(f"incoming-probes: SKIPPED, no contract readable ({skipped} sibling(s))")
+        return status
+
+    # The tail line carries the verdict. Printing only a count made a failing run end on a sentence
+    # that reads like a pass, which is the shape of every gate that reported success while a check
+    # was broken.
+    verdict = (
+        "all resolve" if status == 0 else "**at least one does not resolve, see above**"
+    )
+    print(
+        f"incoming-probes: {total} probe(s) checked across "
+        f"{len(SIBLINGS) - skipped} of {len(SIBLINGS)} sibling(s) -- {verdict}",
+        file=sys.stderr if status else sys.stdout,
+    )
+    return status
 
 
 if __name__ == "__main__":
