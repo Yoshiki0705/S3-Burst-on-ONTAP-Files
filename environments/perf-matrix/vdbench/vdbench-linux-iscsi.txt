@@ -1,5 +1,6 @@
 **********************************************************************
-* NEVER EXECUTED. Pattern F-1. Plan in docs/ja/verification/block-protocol-matrix-plan.md.
+* Pattern F-1. **Executed 2026-09-12.** Plan in docs/ja/verification/block-protocol-matrix-plan.md,
+* results in docs/ja/verification/perf-matrix-results.md#f-1-iscsi-の実測.
 *
 * The iSCSI side of the block pair, run against a raw device:
 *

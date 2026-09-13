@@ -1,5 +1,6 @@
 **********************************************************************
-* NEVER EXECUTED. Pattern F-2. Plan in docs/ja/verification/block-protocol-matrix-plan.md.
+* Pattern F-2. **Executed 2026-09-13.** Plan in docs/ja/verification/block-protocol-matrix-plan.md,
+* results in docs/ja/verification/perf-matrix-results.md#f-2-nvmetcp-の実測.
 *
 * The NVMe/TCP side of the block pair:
 *

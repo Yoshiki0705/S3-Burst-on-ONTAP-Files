@@ -335,7 +335,9 @@ NFS / SMB の対で差が 3 つあったのに対し、ここは 1 つで済む�
 
 ## 環境テンプレートに対する差分
 
-**以下は提案であって、適用済みではない。** 実装するときは、この節をそのまま作業単位として使える。
+**以下は適用済みである（2026-09-12）。** 提案として書いた節をそのまま作業単位として使った。
+**1 か所だけ、提案が実測で否定された** — `JunctionPath` である（下）。
+**実行手順は[ブロック測定の実行手順](block-measurement-runbook.md)にある。**
 
 ### template-fsxn-gen2.yaml
 
@@ -360,7 +362,19 @@ egress を `0.0.0.0/0` で持っているので、**クライアント側の変�
 
 `AWS::FSx::Volume` を 1 つ足す。**NFS 用ボリュームの設定をそのまま複製する**
 （`SecurityStyle: UNIX`、`TieringPolicy: NONE`、`StorageEfficiencyEnabled: false`、
-`SnapshotPolicy: none`）。`JunctionPath` は要らない — LUN はジャンクション経由で読まれない。
+`SnapshotPolicy: none`）。
+
+> **`JunctionPath` は要る。** ここには当初「LUN はジャンクション経由で読まれないので要らない」と
+> 書いていたが、**API が拒否した**（2026-09-12、ap-northeast-1）。
+>
+> ```text
+> Missing required parameter in OntapConfiguration: "JunctionPath"
+> ```
+>
+> [プロパティリファレンス](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-fsx-volume-ontapconfiguration.html)は
+> この点で自己矛盾しており、本文は「This parameter is required」と書きながら同じプロパティの
+> `Required:` 欄は `No` である。**API を信じる。** ジャンクションを付けても害はない —
+> このボリュームへ NFS トラフィックを向けるエクスポートポリシーは無い。
 
 **LUN はここには書けない。** 次の節がその理由である。
 
