@@ -354,8 +354,8 @@ LABELS: dict[str, dict[str, str]] = {
     # AWS's own documentation uses for this configuration, and it is load-bearing: the other ONTAP
     # platforms are unverified here, so the icon must not stand for "any ONTAP".
     "cache_volume_ontap": {
-        "ja": "ONTAP 9（オンプレミス）",
-        "en": "ONTAP 9 (on-premises)",
+        "ja": "ONTAP 9（オンプレミス）\n[未検証]",
+        "en": "ONTAP 9 (on-premises)\n[unverified]",
     },
     "either_of": {"ja": "または", "en": "or"},
     "file_client": {
@@ -512,6 +512,19 @@ LABELS: dict[str, dict[str, str]] = {
     "cache_vol_fsx_stacked": {
         "ja": "Amazon FSx for\nNetApp ONTAP",
         "en": "Amazon FSx for\nNetApp ONTAP",
+    },
+    # Carries the stage, and is therefore separate from cache_vol_fsx_stacked above even though the
+    # product name is the same. That label is also used by the protocol test matrix, where the same
+    # icon stands for the storage under test rather than for one of two cache platforms -- a stage
+    # marker there would be answering a question that figure does not ask.
+    #
+    # The stage is inside the image on purpose. A caption saying which of the two cache platforms
+    # has been exercised is lost the moment the figure is screenshotted or lifted into a slide, and
+    # what survives is a picture in which both options look equally settled. Only one has been
+    # measured, so only one may look like the reference.
+    "cache_vol_fsx_staged": {
+        "ja": "Amazon FSx for\nNetApp ONTAP\n[検証済み]",
+        "en": "Amazon FSx for\nNetApp ONTAP\n[verified]",
     },
     "s3_client_stacked": {
         "ja": "S3 Client\n(App / Pipeline)",
@@ -1133,7 +1146,7 @@ def _overview() -> Diagram:
             Node(
                 "cache_fsx",
                 "fsx_ontap",
-                "cache_vol_fsx_stacked",
+                "cache_vol_fsx_staged",
                 *centred("fsx_ontap", 490, 700),
             ),
             Node(
@@ -1150,7 +1163,10 @@ def _overview() -> Diagram:
             ),
         ),
         texts=(
-            TextBox("cache_or", "either_of", 455, 805, 70, 20),
+            # Sits between the two platform labels, not against the upper one. The FSx label gained
+            # a third line for its stage, and at the original y this word landed hard under it and
+            # read as part of that label rather than as the choice between the two.
+            TextBox("cache_or", "either_of", 455, 822, 70, 20),
             TextBox("link_1", "link_same_region", 370, 390, 240, 20),
             TextBox("link_2", "link_cross_region", 370, 425, 240, 40),
             TextBox("link_3", "link_onprem", 370, 480, 240, 40),
