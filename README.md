@@ -136,6 +136,7 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | やりたいこと | ガイド | 所要時間 |
 |---|---|---|
 | 構成の全体像をつかむ | [構成の形](docs/ja/architecture.md) | 5 分 |
+| **いまの構成が当てはまるか見る** | [いまの構成から読む](docs/ja/reference/decision-trees/from-your-current-setup.md) | 5 分 |
 | 採るべき構成か判断する | [選び方](docs/ja/reference/decision-trees/choosing-this-architecture.md) | 5 分 |
 | 他の方式と比べる | [代替案との比較](docs/ja/reference/comparison/alternatives.md) | 10 分 |
 | Amazon S3 Files と比べる | [S3 Files と本構成の比較検証](docs/ja/verification/s3files-vs-flexcache.md) | 10 分 |
