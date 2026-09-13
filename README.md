@@ -31,12 +31,15 @@ Full English hub: **[docs/en/README.md](docs/en/README.md)**.
 
 ## この構成
 
-![Amazon S3 Access Point から Amazon FSx for NetApp ONTAP の Origin ボリュームへ書き込み、FlexCache でキャッシュ拠点の Cache ボリューム（Amazon FSx for NetApp ONTAP またはオンプレミスの ONTAP 9 のいずれか）へ配り、NFS / SMB クライアントが読む](docs/_assets/images/s3burst-architecture-overview.svg)
+![Amazon S3 Access Point から Amazon FSx for NetApp ONTAP の Origin ボリュームへ書き込み、FlexCache でキャッシュ拠点の Cache ボリューム（Amazon FSx for NetApp ONTAP は検証済み、オンプレミスの ONTAP 9 は未検証、のいずれか）へ配り、NFS / SMB クライアントが読む](docs/_assets/images/s3burst-architecture-overview.svg)
 
 図 1: 収集層と配布層。図と下の表は同じことを述べています。画像が表示されない環境でも
 判断の根拠が残るように、内容は必ず表か本文の側にも置いています。
-図の中の実測値は Cache 側も FSx for ONTAP という条件のものです。図が主経路として描いている
-オンプレミスの Cache は未検証で、範囲は[検証状況](docs/ja/verification-status.md)にあります。
+図の中の実測値は Cache 側も FSx for ONTAP という条件のものです。**どちらの Cache platform が
+どこまで確かめられているかは画像の中に入れてあります** — キャプションに置くと、図をスクリーン
+ショットで持ち出したときにその但し書きだけが落ちて、両方が同じだけ確からしく見えるためです。
+オンプレミスの Cache はこの構成が設計上狙っている置き場ですが未検証で、範囲は
+[検証状況](docs/ja/verification-status.md)にあります。
 
 | 層 | 何を使うか | プロトコル |
 |---|---|---|

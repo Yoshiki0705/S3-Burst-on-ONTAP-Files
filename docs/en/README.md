@@ -27,13 +27,15 @@
 
 ## The architecture
 
-![An Amazon S3 Access Point writes into an Amazon FSx for NetApp ONTAP origin volume, FlexCache distributes to a cache volume at the cache site — either Amazon FSx for NetApp ONTAP or on-premises ONTAP 9 — and NFS / SMB clients read from it](../_assets/images/s3burst-architecture-overview-en.svg)
+![An Amazon S3 Access Point writes into an Amazon FSx for NetApp ONTAP origin volume, FlexCache distributes to a cache volume at the cache site — either Amazon FSx for NetApp ONTAP, which is verified, or on-premises ONTAP 9, which is unverified — and NFS / SMB clients read from it](../_assets/images/s3burst-architecture-overview-en.svg)
 
 Figure 1: the collect and distribute layers. The figure and the table below state the same thing.
 The reasoning is kept in the table or the prose as well, so that it survives anywhere the image
-does not render. The measured figures in it were taken with FSx for ONTAP on the cache side; the
-on-premises cache the figure draws as the main path is unverified, and the scope is in
-[verification status](verification-status.md).
+does not render. The measured figures in it were taken with FSx for ONTAP on the cache side.
+**How far each cache platform has been taken is inside the image**, because a caption is what gets
+lost when a figure is screenshotted into a slide, and what survives is a picture in which both
+options look equally settled. The on-premises cache is where this architecture is meant to land, and
+it is unverified; the scope is in [verification status](verification-status.md).
 
 | Layer | Mechanism | Protocol |
 |---|---|---|
