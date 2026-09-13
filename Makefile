@@ -9,7 +9,7 @@ PY ?= python3
         audit secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors incoming-probes outgoing-probes shell \
         citation-coverage \
-        test all new-pattern \
+        test all new-pattern commit-subjects \
         diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
         commit-gate ready pr-verify clean
@@ -256,6 +256,9 @@ zizmor: ## Audit the workflow files for CI security problems
 		echo "  install the pinned version: pip install -r requirements-dev.txt"; \
 	fi
 
+commit-subjects: ## Commit subjects on this branch follow the convention (run after committing, before pushing)
+	@$(PY) tools/check_commit_subjects.py
+
 links: ## Check internal link resolution
 	@$(PY) tools/check_links.py
 
@@ -303,7 +306,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test commit-subjects ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)

@@ -64,11 +64,15 @@ def run(title: str, author: str = "Yoshiki0705") -> subprocess.CompletedProcess:
 
 
 def test_the_script_was_extracted() -> None:
-    """If the regex stops matching, every test below would silently exercise an empty script."""
+    """If the regex stops matching, every test below would silently exercise an empty script.
+
+    `pattern=` used to be the marker. It is gone by design -- the rule moved into
+    tools/check_commit_subjects.py -- so the marker is now the call to it.
+    """
     body = script()
-    assert "pattern=" in body
+    assert "tools/check_commit_subjects.py" in body
     assert "PR_AUTHOR" in body
-    assert len(body.splitlines()) > 10
+    assert len(body.splitlines()) > 3
 
 
 # --- humans -------------------------------------------------------------------------------------
@@ -100,13 +104,13 @@ def test_a_conventional_title_passes(title: str) -> None:
 def test_a_non_conventional_title_fails_for_a_human(title: str) -> None:
     proc = run(title)
     assert proc.returncode == 1
-    assert "conventional commits" in proc.stdout
+    assert "conventional commits" in proc.stdout + proc.stderr
 
 
 def test_an_overlong_title_fails() -> None:
     proc = run("docs: " + "x" * 80)
     assert proc.returncode == 1
-    assert "under 70" in proc.stdout
+    assert "under 70" in proc.stdout + proc.stderr
 
 
 def test_a_title_at_the_limit_passes() -> None:
@@ -123,7 +127,7 @@ def test_a_known_bot_is_exempt(bot: str) -> None:
     """Renovate's onboarding title cannot be renamed before the check runs."""
     proc = run("Configure Renovate", author=bot)
     assert proc.returncode == 0
-    assert "known bot" in proc.stdout
+    assert "known bot" in proc.stdout + proc.stderr
 
 
 @pytest.mark.parametrize("bot", BOTS)
@@ -210,8 +214,8 @@ def test_a_non_conventional_subject_fails() -> None:
     """This is the case that reached `main`: the title was fixed, the commit was not."""
     proc = run_commits(["verify: fetch an object larger than 50 GiB"])
     assert proc.returncode == 1
-    assert "conventional commits" in proc.stdout
-    assert "not from the pull request title" in proc.stdout
+    assert "conventional commits" in proc.stdout + proc.stderr
+    assert "not from the pull request title" in proc.stdout + proc.stderr
 
 
 def test_one_bad_subject_among_good_ones_fails() -> None:
@@ -222,7 +226,7 @@ def test_one_bad_subject_among_good_ones_fails() -> None:
 def test_an_overlong_subject_fails() -> None:
     proc = run_commits(["docs: " + "x" * 80])
     assert proc.returncode == 1
-    assert "under 72" in proc.stdout
+    assert "under 72" in proc.stdout + proc.stderr
 
 
 @pytest.mark.parametrize("bot", BOTS)
@@ -230,11 +234,18 @@ def test_a_known_bot_is_exempt_from_the_subject_rule(bot: str) -> None:
     assert run_commits(["Configure Renovate"], author=bot).returncode == 0
 
 
-def test_both_jobs_use_the_same_type_list() -> None:
-    """Two copies of the allowed types would drift. Assert they are identical."""
-    types = []
+def test_both_jobs_call_the_one_implementation() -> None:
+    """The types and the two limits exist once.
+
+    This used to compare two inline `pattern=` lines and assert they were identical, which is the
+    weaker form of the same requirement: two copies that happen to agree today. Both jobs now call
+    tools/check_commit_subjects.py, so there is nothing to drift.
+    """
     for job in ("title", "commits"):
-        match = re.search(r"pattern='\^\((?P<types>[a-z|]+)\)", script(job))
-        assert match, f"no pattern= line in job {job}"
-        types.append(match.group("types"))
-    assert types[0] == types[1], f"the allowed types differ: {types[0]} vs {types[1]}"
+        assert "tools/check_commit_subjects.py" in script(job), (
+            f"job {job} no longer calls the shared script; an inline copy of the pattern is how the "
+            "title and the subject rules came to disagree"
+        )
+    assert "pattern='^(" not in WORKFLOW.read_text(encoding="utf-8"), (
+        "an inline pattern= line came back; the rule belongs in the script only"
+    )

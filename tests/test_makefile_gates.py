@@ -172,6 +172,9 @@ COVERED_ELSEWHERE = {
     "pinning": "zizmor.yml",
     # `lint` is an aggregate; its members are checked individually below.
     "lint": "its members are asserted individually",
+    # The subject convention has its own workflow, which is where a pull request's commits are
+    # visible. ci.yml runs on push as well, where the range this gate needs does not exist.
+    "commit-subjects": "pr-title-check.yml",
 }
 
 # Gates whose input is deliberately not committed, so CI has nothing to check and adding a step there
