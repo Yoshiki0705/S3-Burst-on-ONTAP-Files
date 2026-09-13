@@ -49,6 +49,14 @@ Metadata:
           - DeployVerificationHost
           - HostInstanceType
           - HostVolumeSizeGiB
+          - AssociatePublicIp
+      - Label:
+          default: Verification host data access (widens the blast radius)
+        Parameters:
+          - HostS3DataAccess
+          - HostS3ResourceArns
+          - HostS3FilesResourceArns
+          - HostEfsResourceArns
       - Label:
           default: Tagging
         Parameters:
@@ -190,11 +198,31 @@ Parameters:
       than hidden: the S3 Access Point is created by a separate stack and an S3 Files bucket by a
       separate runbook, so neither ARN exists when this template is deployed. Narrow it to the two
       ARNs once they do, especially in an account shared with other people's buckets.
-      **This narrows the S3 statement only.** The s3files and elasticfilesystem statements in the
-      same role are Resource "*" and this parameter does not reach them, because the client mount
-      actions of neither API take a resource-level ARN. So HostS3DataAccess=true grants account-wide
-      mount rights on both regardless of what is set here, and in a shared account that is the part
-      to weigh rather than the S3 ARNs.
+      **This narrows the S3 statement only.** The mount rights on S3 Files and on EFS are separate
+      statements with their own parameters, HostS3FilesResourceArns and HostEfsResourceArns. Setting
+      this one does not reach either.
+
+  HostS3FilesResourceArns:
+    Type: CommaDelimitedList
+    Default: "*"
+    Description: >-
+      What the S3 Files mount statement applies to. The default is "*" because the file system is
+      created by a separate runbook and its ARN does not exist when this template is deployed.
+      **It can be narrowed, and in a shared account it should be.** ClientMount, ClientWrite,
+      ClientRootAccess, ListMountTargets and GetFileSystem all take the file-system resource type
+      (see the service authorization reference for s3files), so the value is
+      arn:aws:s3files:<region>:<account>:file-system/<file-system-id>. Left at "*", this grants
+      mount rights on every S3 Files file system in the account.
+
+  HostEfsResourceArns:
+    Type: CommaDelimitedList
+    Default: "*"
+    Description: >-
+      What the EFS mount statement applies to, with the same reasoning as HostS3FilesResourceArns.
+      elasticfilesystem:ClientMount, ClientWrite and ClientRootAccess accept the file system ARN,
+      so the value is arn:aws:elasticfilesystem:<region>:<account>:file-system/<file-system-id>.
+      Left at "*", this grants mount rights on every EFS file system in the account -- including
+      ones belonging to other work in a shared account.
 
   ProjectName:
     Type: String
@@ -529,13 +557,17 @@ Resources:
                     # Describe action of any kind, and cfn-lint is what caught the invented one.
                     - s3files:ListMountTargets
                     - s3files:GetFileSystem
-                  Resource: "*"
+                  # Every action above takes the s3files file-system resource type, so this is
+                  # narrowable. It defaults to "*" only because the file system is created outside
+                  # this template. Earlier revisions said these actions took no resource-level ARN;
+                  # the service authorization reference says otherwise.
+                  Resource: !Ref HostS3FilesResourceArns
                 - Effect: Allow
                   Action:
                     - elasticfilesystem:ClientMount
                     - elasticfilesystem:ClientWrite
                     - elasticfilesystem:ClientRootAccess
-                  Resource: "*"
+                  Resource: !Ref HostEfsResourceArns
                 - Effect: Allow
                   Action: cloudwatch:GetMetricStatistics
                   Resource: "*"

@@ -21,8 +21,11 @@
       "                      up healthy and is simply absent from Session Manager.",
       "",
       "  HostS3DataAccess    true, so the host can drive the S3 API sweep itself. This is the one",
-      "                      that widens the blast radius: narrow HostS3ResourceArns to the two",
-      "                      target ARNs once they exist, especially in a shared account.",
+      "                      that widens the blast radius, and it opens three statements, not one.",
+      "                      Narrow all three once the ARNs exist, especially in a shared account:",
+      "                      HostS3ResourceArns for the buckets, HostS3FilesResourceArns and",
+      "                      HostEfsResourceArns for the mount rights. Left at \"*\", the last two",
+      "                      grant mount rights on every such file system in the account.",
       "",
       "ThroughputCapacityMBps stays at 128 here. That is the step the visibility records were",
       "taken on, so it is the step that compares with them. Raise it afterwards with",
@@ -48,6 +51,8 @@
   { "ParameterKey": "AssociatePublicIp", "ParameterValue": "true" },
   { "ParameterKey": "HostS3DataAccess", "ParameterValue": "true" },
   { "ParameterKey": "HostS3ResourceArns", "ParameterValue": "*" },
+  { "ParameterKey": "HostS3FilesResourceArns", "ParameterValue": "*" },
+  { "ParameterKey": "HostEfsResourceArns", "ParameterValue": "*" },
   { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
   { "ParameterKey": "Environment", "ParameterValue": "verify" }
 ]
