@@ -125,14 +125,15 @@ ONTAP を触ったことがない方向けに、以下で断りなく使う語�
 Origin のセキュリティスタイル（UNIX / NTFS）は S3 Access Point の識別情報の種別と対応し、
 そこはこのリポジトリで確認できています。
 
-**一方、Cache 側がセキュリティスタイルを Origin から継承するかどうかは、この構成の主経路
-（FSx for ONTAP Origin → オンプレミス ONTAP Cache）では未確認です。** 根拠にしているのは
-Azure NetApp Files のキャッシュボリューム要件で、別のプラットフォームの要件です。
-**継承するなら後から変えると配布層の作り直しになりますが、そうと確かめたわけではありません。**
+**Cache 側はセキュリティスタイルを Origin から継承します。実測しました**
+（[継承の検証記録](docs/ja/verification/flexcache-security-style-inheritance.md)、2026-09-13、
+ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す経路がありません** —
+作成時に渡す引数が無く、作成後の変更は ONTAP が明示的に拒否します。
 
-先に決める理由は、非対称性です。成り立っていた場合の手戻りは大きく、成り立っていなかった場合に
-失うものはありません。確認手順は[PoC チェックリスト](docs/ja/poc-checklist.md)、
+**つまり先に決める理由は「念のため」ではなく、あとから直せないことです。** 間違えると配布層の
+作り直しになります。確認手順は[PoC チェックリスト](docs/ja/poc-checklist.md)、
 詳細と出典は[最初に決めること](docs/ja/design-first-decisions.md)にあります。
+**Cache がオンプレミス ONTAP の場合は未検証です**（測ったのは両側 FSx for ONTAP の構成）。
 
 ## はじめ方
 
@@ -153,6 +154,7 @@ Azure NetApp Files のキャッシュボリューム要件で、別のプラッ�
 | 初期サイジングを測る計画を読む | [初期サイジングの測定計画](docs/ja/verification/initial-sizing-measurement-plan.md) | 15 分 |
 | iSCSI / NVMe/TCP を測る計画を読む | [ブロックプロトコルの測定計画](docs/ja/verification/block-protocol-matrix-plan.md) | 15 分 |
 | 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
+| **セキュリティスタイルが Cache に継承されるかを確かめた記録を読む** | [継承の検証記録](docs/ja/verification/flexcache-security-style-inheritance.md) | 10 分 |
 | SMB でマウントする前に読む | [SMB でマウントできる名前と、識別子を読む場所](docs/ja/reference/limits/smb-share-and-identifier-reading.md) | 5 分 |
 | SMB の性能を測る前に読む | [SMB Multichannel が既定で無効であることと、有効化が既に張られた接続に届かないこと](docs/ja/reference/limits/smb-multichannel-enablement.md) | 5 分 |
 | 検証環境の費用を見積もる | [検証パターンごとの費用構造](docs/ja/reference/comparison/finops-performance-test-patterns.md) | 10 分 |

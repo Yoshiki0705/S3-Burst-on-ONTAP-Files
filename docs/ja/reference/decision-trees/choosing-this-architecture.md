@@ -51,8 +51,9 @@ flowchart TD
 
 右の列は、後から変えると作り直しになる項目である。**ただし根拠の強さが違う。**
 `NetworkOrigin` と S3 Access Point の識別情報は、変更 API がないことが AWS のドキュメントで確認できる。
-**Origin のセキュリティスタイルは、Cache が継承するかどうかがこの構成の主経路では未確認で、
-作り直しになるという帰結もそこに依存する**（[最初に決めること](../../design-first-decisions.md)）。
+**Origin のセキュリティスタイルは、Cache が継承することを実測した。** Cache 側に選び直す経路が
+無いので、**作り直しになるという帰結も実測に載っている**
+（[継承の検証記録](../../verification/flexcache-security-style-inheritance.md)）。
 
 ## 関連ドキュメント
 

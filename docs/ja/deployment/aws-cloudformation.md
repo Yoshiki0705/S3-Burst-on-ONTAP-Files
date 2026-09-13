@@ -179,6 +179,19 @@ aws s3api delete-object --bucket "$AP" --key check.txt
 
 1. 配布側を先に削除する（[配布側のデプロイ](onprem-terraform.md)の削除手順）
 2. SVM ピア、クラスタピアを解除する
+
+   > **この手順を飛ばすと 4 で止まります。** SVM ピアが残っている間、FSx for ONTAP は SVM を削除せず、
+   > スタックは `svmLifecycle should be DELETING, but get: MISCONFIGURED` で `DELETE_FAILED`
+   > になります。
+   >
+   > **そして 4 は、2 を実行できる唯一のホストを先に消します。** 管理 LIF はプライベート
+   > アドレスなので、検証ホストが消えると ONTAP に到達する経路がありません。
+   >
+   > 順序を間違えたときの復旧は 3 段階です。**同じサブネットに ONTAP へ到達できるホストを
+   > 立て直し**、ピアを消し、**`aws fsx delete-storage-virtual-machine` で SVM を直接削除して**
+   > からスタック削除を再試行します。**CloudFormation は `MISCONFIGURED` を見て呼び出す前に
+   > 断りますが、FSx for ONTAP の API 自体は同じ状態でも受け付けます。**
+   > 実際に踏んだ記録は[継承の検証記録](../verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠)にあります。
 3. S3 Access Point を外す
 
    ```bash
