@@ -1,0 +1,76 @@
+**********************************************************************
+* NEVER EXECUTED. Pattern F-3, plus the repeatability question F-2 left open.
+* Plan in docs/ja/verification/block-protocol-matrix-plan.md.
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nvmetcp-cachecontrolled.txt -o /opt/bench/report-f3
+*
+* **The working directory matters.** vdbench resolves an include relative to where
+* it runs, not to the file passed to -f, so running this from anywhere but the
+* directory holding it reports the shared workload file as not found.
+**********************************************************************
+* WHY THIS FILE EXISTS SEPARATELY FROM vdbench-linux-nvmetcp.txt
+*
+* It does not include workloads-common.txt. The seven shapes there answer "how much
+* does this protocol carry"; this file answers two different questions, and both need
+* the *same* shape run more than once:
+*
+*   1. **Repeatability.** F-2 measured 1 MiB sequential read twice on connections
+*      that had negotiated the same four I/O queues, and got 2,366.49 MB/s and
+*      1,288.87 MB/s -- 1.84x apart, each stable inside its own 300 s window. Until
+*      that is understood, neither number is quotable alone, and F-3's ratio would
+*      be computed against a baseline that moves. So the same shape runs three times
+*      here, back to back, on one connection.
+*
+*   2. **F-3: two ceilings.** Whether a read served from the in-memory cache and a
+*      read that has to reach disk land on different numbers. On the file side they
+*      did, by 0.18x.
+*
+* Order is deliberate: the three repeats come first. A resident run ahead of them
+* would leave 60 GiB of the device in cache and contaminate the first repeat.
+**********************************************************************
+* THE PATH BELOW IS A PLACEHOLDER AND MUST NOT BE TAKEN ON TRUST.
+*
+* The client's root EBS volume is an NVMe device too, and appears as /dev/nvme0n1 in
+* AWS's own example with the ONTAP namespace at nvme2n1. **Writing to the wrong node
+* destroys the client.** `runbook.sh block-provision nvme` resolves the namespace
+* with `nvme netapp ontapdevices` and rewrites this line; `block-preflight` refuses
+* to proceed until it names the ONTAP namespace.
+*
+* This file only reads, but the path is rewritten by the same mechanism and the same
+* check applies -- a read from the wrong device measures the wrong thing.
+**********************************************************************
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+sd=default,openflag=o_direct
+sd=sd1-1,host=hd1,lun=/dev/nvme2n1
+
+**********************************************************************
+* Residency is controlled with range=, not with a second sd= on the same device.
+*
+* range=(0,10) confines the workload to the first 10% of the namespace. At 600 GiB
+* that is 60 GiB, against 256 GB of in-memory cache -- comfortably resident after
+* the 60 s warmup. wd_full spans the whole 600 GiB, which is 2.3x the cache, so it
+* cannot be held.
+*
+* **The NVMe read cache is disabled for these runs** (`runbook.sh nvme-cache off`,
+* verified false on both nodes). What is being tested is the in-memory cache, not
+* the NVMe tier -- with the tier enabled there would be three ceilings, not two.
+**********************************************************************
+wd=wd_full,sd=sd1-1,rdpct=100,seekpct=0,xfersize=1024k
+wd=wd_hot,sd=sd1-1,rdpct=100,seekpct=0,xfersize=1024k,range=(0,10)
+
+**********************************************************************
+* 60 s warmup + 300 s measured, 512 threads: identical to every other run in this
+* environment, so the numbers can sit beside the F-2 table.
+*
+* The three repeats are byte-identical definitions. If they disagree, the shape is
+* not reproducible on this configuration and F-3's ratio has to be reported with
+* that spread attached rather than as a single number.
+**********************************************************************
+rd=default,iorate=max,threads=512,warmup=60,elapsed=300
+rd=repeat1-nonresident-1024k,wd=wd_full
+rd=repeat2-nonresident-1024k,wd=wd_full
+rd=repeat3-nonresident-1024k,wd=wd_full
+rd=resident-1024k,wd=wd_hot
