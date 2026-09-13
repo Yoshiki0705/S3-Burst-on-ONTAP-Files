@@ -190,6 +190,11 @@ Parameters:
       than hidden: the S3 Access Point is created by a separate stack and an S3 Files bucket by a
       separate runbook, so neither ARN exists when this template is deployed. Narrow it to the two
       ARNs once they do, especially in an account shared with other people's buckets.
+      **This narrows the S3 statement only.** The s3files and elasticfilesystem statements in the
+      same role are Resource "*" and this parameter does not reach them, because the client mount
+      actions of neither API take a resource-level ARN. So HostS3DataAccess=true grants account-wide
+      mount rights on both regardless of what is set here, and in a shared account that is the part
+      to weigh rather than the S3 ARNs.
 
   ProjectName:
     Type: String
@@ -585,13 +590,33 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euo pipefail
-          dnf install -y nfs-utils jq >/dev/null 2>&1 || yum install -y nfs-utils jq >/dev/null 2>&1
+          # **A swallowed install failure produces a host that looks healthy and fails every
+          # measurement later.** A subnet with no route to the package repositories is the ordinary
+          # way to get here, and discarding the status turns that into an import error later whose
+          # name points at the script rather than at the boot. Each failure is recorded and the login
+          # shell says so. Still not fatal: a host that came up is worth keeping to diagnose.
+          FAILED=/var/lib/s3burst-bootstrap.failed
+          rm -f "$FAILED"
+          note_failure() { printf '%s\n' "$1" >> "$FAILED"; }
+          dnf install -y nfs-utils jq >/dev/null 2>&1 \
+            || yum install -y nfs-utils jq >/dev/null 2>&1 \
+            || note_failure 'nfs-utils/jq did not install: no NFS mount and no jq'
 
           # python3.12 explicitly, not the distribution default. On Amazon Linux 2023 that default is
           # 3.9, where datetime.UTC does not exist, so every measurement script here fails on import
           # with a name that gives no hint that the interpreter is the problem.
-          dnf install -y python3.12 python3.12-pip >/dev/null 2>&1 || true
-          python3.12 -m pip install --quiet boto3 >/dev/null 2>&1 || true
+          dnf install -y python3.12 python3.12-pip >/dev/null 2>&1 \
+            || note_failure 'python3.12 did not install: scripts run on 3.9 and fail on import'
+          python3.12 -m pip install --quiet boto3 >/dev/null 2>&1 \
+            || note_failure 'boto3 did not install: any script using the SDK fails'
+          # Printed at login rather than left in a file nobody opens.
+          cat > /etc/profile.d/s3burst-bootstrap.sh <<'PROFILE'
+          if [ -s /var/lib/s3burst-bootstrap.failed ]; then
+            printf '\n*** bootstrap did not complete. Measurements will fail: ***\n'
+            sed 's/^/  - /' /var/lib/s3burst-bootstrap.failed
+            printf 'Usually a subnet with no route to the package repositories.\n\n'
+          fi
+          PROFILE
 
           # Two mount points, because the client cache decides what a reader sees and the difference
           # is large. With Linux defaults (acdirmin=30, acdirmax=60) a file that appears in a
