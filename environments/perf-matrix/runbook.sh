@@ -978,7 +978,21 @@ done
 # with multipath support at all is the question that decides it, so ask the module.
 echo "--- is native NVMe multipath compiled in ---"
 modinfo nvme_core 2>/dev/null | grep -i multipath || echo "no multipath parameter in modinfo nvme_core"
-grep -i 'NVME_MULTIPATH' /boot/config-"$(uname -r)" 2>/dev/null || echo "no NVME_MULTIPATH line in the kernel config"
+grep -i "NVME_MULTIPATH" /boot/config-"$(uname -r)" 2>/dev/null || echo "no NVME_MULTIPATH line in the kernel config"
+# **Pin what that answer belongs to.** template-clients.yaml takes the AMI from an SSM parameter
+# rather than a pinned id, and its own comment says the kernel version is recorded at measurement
+# time instead. The block phases never did, so the finding that this kernel has NVME_MULTIPATH unset
+# could only be attributed to "the AL2023 AMI used that day" -- which is not a version anyone can
+# check against. A one-line read closes that.
+echo "--- what that answer belongs to ---"
+printf "kernel: %s\n" "$(uname -r)"
+printf "os: %s\n" "$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-unknown}")"
+tok=$(curl -s -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+  http://169.254.169.254/latest/api/token 2>/dev/null)
+printf "ami: %s\n" "$(curl -s -H "X-aws-ec2-metadata-token: ${tok}" \
+  http://169.254.169.254/latest/meta-data/ami-id 2>/dev/null || echo unknown)"
+printf "instance-type: %s\n" "$(curl -s -H "X-aws-ec2-metadata-token: ${tok}" \
+  http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo unknown)"
 # The exit status now reflects what the next phases actually need, and nothing else.
 rc=0
 [ -s /etc/iscsi/initiatorname.iscsi ] || { echo "FAIL: no IQN"; rc=1; }

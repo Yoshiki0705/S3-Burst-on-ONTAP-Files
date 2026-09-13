@@ -165,6 +165,24 @@ NEUTRALITY_RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"競合(ツール|製品|他社)|より優れて|優位性|劣[るっ]て"),
         "use right-tool-for-the-job framing; state trade-offs symmetrically",
     ),
+    # **Two words the rules forbid that this check did not look for.** The neutrality rules named
+    # 優位性 and より優れて but not 差別化 or 顧客, so those two were governed by prose alone -- and a
+    # rule only a human enforces is a rule that holds until the first tired reviewer.
+    #
+    # 差別化 is vendor framing directly: it asks what sets a product apart rather than which
+    # conditions suit which option.
+    #
+    # 顧客 is not a forbidden word in itself -- it is the vendor's word for the reader. A document
+    # written for the person doing the work says 読者, 利用者 or 運用者. Where a third party genuinely
+    # has customers of its own, an allow marker carries the reason.
+    (
+        re.compile(r"差別化"),
+        "differentiation is vendor framing; describe which conditions suit which option",
+    ),
+    (
+        re.compile(r"顧客"),
+        "write for the reader (読者 / 利用者 / 運用者) rather than about a vendor's customers",
+    ),
     (
         re.compile(r"\b(?:beats|outperforms)\s+\w", re.IGNORECASE),
         "avoid vendor-versus phrasing",

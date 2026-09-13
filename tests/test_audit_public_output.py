@@ -108,6 +108,30 @@ def test_vendor_versus_framing_is_flagged() -> None:
         assert "neutrality" in categories(line)
 
 
+def test_the_vendors_two_words_for_reader_and_product_are_flagged() -> None:
+    """差別化 and 顧客 were governed by prose only, so nothing caught them.
+
+    差別化 asks what sets a product apart rather than which conditions suit which option. 顧客 is the
+    vendor's word for the reader: a document written for the person doing the work says 読者, 利用者
+    or 運用者. Both are in the rules; neither was in this check until they were added.
+    """
+    for line in (
+        "この構成の差別化ポイントは 3 つある",
+        "顧客の要件に合わせて選ぶ",
+    ):
+        assert "neutrality" in categories(line)
+
+
+def test_the_reader_words_that_replace_them_are_not_flagged() -> None:
+    """The replacement has to pass, or the rule just moves the problem."""
+    for line in (
+        "読者の要件に合わせて選ぶ",
+        "運用者が判断できるように条件を並べる",
+        "どの条件にどの選択肢が向くかを書く",
+    ):
+        assert "neutrality" not in categories(line)
+
+
 def test_declaring_neutrality_is_itself_flagged() -> None:
     """Showing it is the requirement; announcing it is what this repository does not do."""
     for line in (
