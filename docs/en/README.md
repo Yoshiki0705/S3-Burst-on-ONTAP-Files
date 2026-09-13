@@ -109,6 +109,17 @@ operations are spend with nothing coming back. The full set of branches is in
 the cost breakdown in
 [FinOps cost structure](reference/comparison/finops-s3-vs-s3ap.md).
 
+## Four words used from here on
+
+For readers who have not worked with ONTAP, the terms the rest of this page uses without explanation.
+
+| Term | Meaning |
+|---|---|
+| **Origin** | The volume holding the source of truth. The S3 Access Point attaches here. In this architecture it sits on FSx for ONTAP |
+| **Cache** | A FlexCache volume at the place that reads. **Not a replica — it holds only what has actually been read** |
+| **SVM** | The unit that groups volumes with their protocol configuration (NFS / SMB / S3). One file system can hold several |
+| **Security style** | A volume's permission model. **UNIX pairs with NFS, NTFS with SMB**, and as below it is decided before the volume exists |
+
 ## Decisions that come first
 
 **Deciding whether the consuming site uses NFS or SMB before the origin volume exists is the safe

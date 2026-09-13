@@ -105,6 +105,17 @@ A の測定条件は[検証状況](docs/ja/verification-status.md)にありま�
 分岐の全体は[選び方](docs/ja/reference/decision-trees/choosing-this-architecture.md)、
 金額の内訳は[FinOps の費用構造](docs/ja/reference/comparison/finops-s3-vs-s3ap.md)にあります。
 
+## この先に出てくる 4 語
+
+ONTAP を触ったことがない方向けに、以下で断りなく使う語を先に置きます。
+
+| 語 | 意味 |
+|---|---|
+| **Origin** | 正本を置くボリューム。S3 Access Point はここに付けます。この構成では FSx for ONTAP 上にあります |
+| **Cache** | 読む場所に置く FlexCache ボリューム。**Origin の複製ではなく、実際に読まれた分だけを持ちます** |
+| **SVM** | ボリュームとプロトコル設定（NFS / SMB / S3）を束ねる単位。1 つの FSx for ONTAP に複数置けます |
+| **セキュリティスタイル** | ボリュームの権限体系。**UNIX なら NFS、NTFS なら SMB** と対応し、下のとおり作る前に決めます |
+
 ## 最初に決めること
 
 **利用拠点で NFS を使うのか SMB を使うのかは、Origin ボリュームを作る前に決めておくと安全です。**
