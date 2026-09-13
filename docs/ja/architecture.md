@@ -112,8 +112,8 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
   この実測から導かれる設計上の帰結である（[実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#監査ログに記録される主体)。追えないものの一覧は
   [上限値](reference/limits/s3-access-point.md#監査で追えるものと追えないもの)）
 - 読み取りの局所化。必要な範囲だけを利用拠点に持ち込む
-- 収集層を別のプラットフォームに置き換えても、配布層の設計が変わらない
-  （[移植性](portability.md)）
+- 収集層を別のプラットフォームに置き換えても、配布層の設計が変わらない — **これは設計上の意図で
+  あって、他プラットフォームでの成立は[未確認](portability.md)である**
 
 ## この構成が解かないこと
 
