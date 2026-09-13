@@ -1,5 +1,6 @@
 **********************************************************************
-* NEVER EXECUTED. Pattern F-3, plus the repeatability question F-2 left open.
+* Pattern F-3, plus the repeatability question F-2 left open. **Executed 2026-09-13** --
+* results in docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測.
 * Plan in docs/ja/verification/block-protocol-matrix-plan.md.
 *
 *   cd /opt/bench/parm

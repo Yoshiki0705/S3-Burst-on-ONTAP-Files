@@ -221,7 +221,8 @@ Resources:
   # rather than more entries in the ingress list above, so a deployment that does not measure block
   # produces exactly the rules it did before this was added -- the same reason SMB is separate.
   #
-  # **NEVER DEPLOYED.** These three rules and the volume below have been linted and never applied.
+  # **Deployed 2026-09-12 and 2026-09-13**, for patterns F-1, F-2 and F-3. These three rules and the
+  # volume below carried a NEVER DEPLOYED marker until the first create succeeded.
   #
   # No egress is added: block needs none. The 127.0.0.1/32 placeholder above stays.
   IscsiFromClients:
@@ -388,7 +389,7 @@ Resources:
   # the 900 GiB this passes. 600 GiB is the same figure the file side used, and for the same reason --
   # more than twice the 256 GB in-memory cache.
   #
-  # **NEVER DEPLOYED.**
+  # **Deployed 2026-09-12.** The JunctionPath above is why the first attempt failed.
   BlockVolume:
     Type: AWS::FSx::Volume
     Condition: HasBlock

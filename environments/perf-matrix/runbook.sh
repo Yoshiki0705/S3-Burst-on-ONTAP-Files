@@ -856,7 +856,7 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
                          point elsewhere
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
 
-  Block protocols (pattern F). NEVER EXECUTED -- read each phase's output, not its exit status:
+  Block protocols (pattern F). Read each phase's output, not its exit status:
   block-packages         Install the iSCSI and NVMe/TCP clients; print the IQN and the NQN
   block-provision iscsi <IQN>  Create the LUN, the igroup and the mapping; print serial-hex
   block-provision nvme <NQN>   Create the namespace and the subsystem; map the host
@@ -889,14 +889,21 @@ USAGE
 }
 
 # =================================================================================================
-# Block protocols (pattern F). **EVERY PHASE BELOW HAS NEVER BEEN EXECUTED.**
+# Block protocols (pattern F). **Executed on 2026-09-12 and 2026-09-13** for F-1, F-2 and F-3.
 #
-# They are written before a measurement window rather than during one, because the window is paid for
-# and the alternative is writing the LUN provisioning and the device-identity preflight under time
-# pressure -- which is when the preflight is the step that gets skipped.
+# They were written before a measurement window rather than during one, because the window is paid
+# for and the alternative is writing the LUN provisioning and the device-identity preflight under
+# time pressure -- which is when the preflight is the step that gets skipped.
 #
-# Linted, not run. Treat the first execution as part of the measurement: read each phase's output
-# rather than its exit status, the way `nvme-cache off` is read.
+# **Nine attempts were needed before the first measurement.** Every one of them failed on a gate
+# rather than on a number, and each fix is in the phase it belongs to rather than in a note: a
+# required JunctionPath, a host NQN AL2023 does not ship, an alias written before any login, a portal
+# address parsed out of a comment line, discarded stderr, an asynchronous login, an include resolved
+# against the working directory, a sentinel its own help text satisfied, and a poll limit reported as
+# a failure. The reproduction order and every one of those traps is written up for a reader in
+# docs/ja/verification/block-measurement-runbook.md.
+#
+# Still read each phase's output rather than its exit status, the way `nvme-cache off` is read.
 #
 # Why these are runbook phases and not CloudFormation: `lun create`, `lun igroup create`,
 # `lun mapping create`, `vserver nvme namespace create` and `vserver nvme subsystem create` have no
