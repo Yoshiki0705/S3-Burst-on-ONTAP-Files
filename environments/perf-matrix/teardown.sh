@@ -37,30 +37,67 @@ FAILED=0
 log()  { printf '\n=== %s\n' "$*"; }
 warn() { printf 'WARN: %s\n' "$*" >&2; FAILED=1; }
 
+stack_status() {
+  aws cloudformation describe-stacks --region "$REGION" --stack-name "$1" \
+    --query 'Stacks[0].StackStatus' --output text 2>&1 | tail -1
+}
+
+# **DELETE_FAILED is usually a race, not a refusal, and it is worth one more attempt.**
+#
+# The clients stack reached DELETE_FAILED three times during the block measurements, every time on the
+# security group: an ENI was still detaching when CloudFormation tried to delete the group it belongs
+# to. Within a minute the dependency was gone and a second delete succeeded. This function used to
+# warn and return, which left the stack sitting in DELETE_FAILED -- and the next run could not create
+# it, so the failure surfaced as an unrelated error later.
+#
+# Bounded rather than open-ended: a genuine refusal (a resource with a retention policy, a group still
+# in use by something that is not going away) must not turn into a loop that hides it. After the
+# attempts are spent, the state is reported and the caller decides.
 delete_stack() {
-  local name="$1"
+  local name="$1" attempt status
   if ! aws cloudformation describe-stacks --region "$REGION" --stack-name "$name" >/dev/null 2>&1; then
     printf 'not present: %s\n' "$name"; return 0
   fi
   log "deleting stack $name"
-  aws cloudformation delete-stack --region "$REGION" --stack-name "$name" \
-    || { warn "delete-stack failed for $name"; return 1; }
-  aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "$name" \
-    || warn "stack $name did not reach DELETE_COMPLETE; check its events"
+  for attempt in 1 2 3; do
+    aws cloudformation delete-stack --region "$REGION" --stack-name "$name" \
+      || { warn "delete-stack call failed for $name (attempt $attempt)"; }
+    aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "$name" \
+      >/dev/null 2>&1 || true
+    status="$(stack_status "$name")"
+    case "$status" in
+      *'does not exist'*)
+        printf 'deleted: %s\n' "$name"; return 0 ;;
+      DELETE_FAILED)
+        warn "$name is DELETE_FAILED (attempt $attempt of 3); retrying after 60s"
+        sleep 60 ;;
+      *)
+        warn "$name is $status after attempt $attempt; retrying after 60s"
+        sleep 60 ;;
+    esac
+  done
+  status="$(stack_status "$name")"
+  case "$status" in
+    *'does not exist'*) printf 'deleted: %s\n' "$name"; return 0 ;;
+  esac
+  # **Judged by state, not by the delete call returning.** A call that succeeded and a stack that is
+  # gone are different facts, and only the second one stops the billing.
+  warn "$name is still $status after 3 attempts. Read its events; it is still billing."
+  return 1
 }
 
 # Most expensive first. EFS provisioned throughput bills from creation, not from first mount.
-log "step 1 of 7: the hourly-billed storage targets"
+log "step 1 of 9: the hourly-billed storage targets"
 delete_stack "${PREFIX}-efs-prov"
 delete_stack "${PREFIX}-efs"
 
 # The SMB SVM goes while it can still reach a controller: FSx removes a computer object from the
 # domain as part of deleting an AD-joined SVM.
-log "step 2 of 7: the SMB SVM, while the directory still answers"
+log "step 2 of 9: the SMB SVM, while the directory still answers"
 delete_stack "${PREFIX}-smb-svm"
 
 # Domain-joined, but leaving the domain is not a precondition for terminating an instance.
-log "step 3 of 7: the Windows client"
+log "step 3 of 9: the Windows client"
 delete_stack "${PREFIX}-windows"
 
 # **This step is why the two below can be deleted at all.** `runbook.sh ad-ports` added rules to the
@@ -68,7 +105,7 @@ delete_stack "${PREFIX}-windows"
 # refuses to delete a security group while another group's rule still names it. Without this, the two
 # stack deletions below fail on their security groups and the whole teardown stops with the file system
 # still billing.
-log "step 4 of 7: revoke the directory rules that reference the groups about to be deleted"
+log "step 4 of 9: revoke the directory rules that reference the groups about to be deleted"
 if aws cloudformation describe-stacks --region "$REGION" --stack-name "${PREFIX}-ad" >/dev/null 2>&1; then
   dir_id="$(aws cloudformation describe-stacks --region "$REGION" --stack-name "${PREFIX}-ad" \
     --query "Stacks[0].Outputs[?OutputKey=='DirectoryId'].OutputValue" --output text 2>/dev/null)"
@@ -93,17 +130,17 @@ else
   printf 'no directory stack; nothing to revoke\n'
 fi
 
-log "step 5 of 7: the file system, then the clients"
+log "step 5 of 9: the file system, then the clients"
 delete_stack "${PREFIX}-gen2"
 delete_stack "${PREFIX}-clients"
 
 # Last of the created things, for the reason in the header.
-log "step 6 of 8: the directory"
+log "step 6 of 9: the directory"
 delete_stack "${PREFIX}-ad"
 
 # Not a stack: created by hand because the clients have no route to PyPI or GitHub and the tooling had
 # to arrive over S3. It holds VDBENCH, which is licensed, so it does not get left behind.
-log "step 7 of 8: the staging bucket"
+log "step 7 of 9: the staging bucket"
 if [[ -n "${STAGING_BUCKET:-}" ]]; then
   if aws s3api head-bucket --bucket "$STAGING_BUCKET" >/dev/null 2>&1; then
     aws s3 rm "s3://$STAGING_BUCKET" --recursive --only-show-errors \
@@ -117,7 +154,7 @@ else
   printf 'STAGING_BUCKET not set; skipping. If a staging bucket was created, it still holds VDBENCH.\n'
 fi
 
-log "step 8 of 8: step the pre-existing first-generation file system back down"
+log "step 8 of 9: step the pre-existing first-generation file system back down"
 if [[ -n "${GEN1_FS_ID:-}" ]]; then
   # Not deleted: it predates this directory. Stepping the throughput capacity down is what stops the
   # bulk of its cost. SSD capacity cannot be reduced, so that part stays either way.
@@ -134,13 +171,20 @@ else
   printf 'GEN1_FS_ID not set; skipping the step-down. If it was raised, it is still billing.\n'
 fi
 
-# Backups outlive the file system, and FSx makes one per volume on delete unless the volume says
-# otherwise. `SkipFinalBackup: true` in the templates prevents new ones; this step exists for stacks
-# created before that, and because an automatic daily backup can also have fired mid-run.
+# **Backups outlive the file system, and every volume delete makes one. Nothing in the templates
+# prevents it.**
+#
+# This comment used to say `SkipFinalBackup: true` in the templates stopped new ones. It does not
+# exist there and cannot: it is a parameter of the DeleteVolume API, not a property of
+# AWS::FSx::Volume, which is stated in template-fsxn-gen2.yaml and template-smb-svm.yaml. Every
+# teardown during the block measurements left one backup per volume behind, so this step is the only
+# thing that removes them -- not a fallback for older stacks.
+#
+# An automatic daily backup can also have fired mid-run, which is a second source of the same residue.
 #
 # They are named by volume rather than tagged, so the filter is the volume name prefix. Anything not
 # matching it belongs to somebody else in this account and is left alone.
-log "step 6.5 of 7: FSx backups, which survive the file system and bill for storage"
+log "step 9 of 9: FSx backups, which survive the file system and bill for storage"
 backup_ids="$(aws fsx describe-backups --region "$REGION" \
   --query "Backups[?starts_with(Volume.Name, '${PREFIX}')].BackupId" --output text 2>/dev/null)"
 if [[ -z "$backup_ids" ]]; then
