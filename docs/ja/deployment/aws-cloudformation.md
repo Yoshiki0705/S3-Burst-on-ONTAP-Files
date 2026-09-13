@@ -59,6 +59,20 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
+> **共有アカウントで先に見るパラメータ。** `HostS3DataAccess=true` は 3 つのステートメントを
+> 開けます。**既定はすべて `"*"` で、これはファイルシステムやバケットがこのテンプレートの外で
+> 作られるためです。** ARN が決まったら 3 つとも絞ってください。
+>
+> | パラメータ | 絞る値 | `"*"` のまま置いた場合 |
+> |---|---|---|
+> | `HostS3ResourceArns` | バケット / S3 Access Point の ARN | アカウント内の全バケットにオブジェクト操作 |
+> | `HostS3FilesResourceArns` | `arn:aws:s3files:<region>:<account>:file-system/<id>` | アカウント内の全 S3 Files ファイルシステムにマウント権 |
+> | `HostEfsResourceArns` | `arn:aws:elasticfilesystem:<region>:<account>:file-system/<id>` | アカウント内の全 EFS ファイルシステムにマウント権 |
+>
+> **3 つとも絞れます。** マウント系の 2 つは以前「リソースレベル ARN を取らないので絞れない」と
+> 書いていましたが、[認可リファレンス](https://docs.aws.amazon.com/service-authorization/latest/reference/list_s3files.html)は
+> `ClientMount` / `ClientWrite` / `ClientRootAccess` に `file-system` を必須と示しています。
+
 `fsxadmin` のパスワードは Secrets Manager で生成され、テンプレートの外に出ません。
 検証ホストの IAM ロールだけがこのシークレットを読めます。
 

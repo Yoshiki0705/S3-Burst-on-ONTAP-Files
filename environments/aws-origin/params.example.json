@@ -14,6 +14,8 @@
   { "ParameterKey": "AssociatePublicIp", "ParameterValue": "false" },
   { "ParameterKey": "HostS3DataAccess", "ParameterValue": "false" },
   { "ParameterKey": "HostS3ResourceArns", "ParameterValue": "*" },
+  { "ParameterKey": "HostS3FilesResourceArns", "ParameterValue": "*" },
+  { "ParameterKey": "HostEfsResourceArns", "ParameterValue": "*" },
   { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
   { "ParameterKey": "Environment", "ParameterValue": "verify" }
 ]

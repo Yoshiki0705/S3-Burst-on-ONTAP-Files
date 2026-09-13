@@ -358,3 +358,37 @@ def test_the_ontap_password_excludes_all_punctuation() -> None:
     assert length >= 32, (
         f"PasswordLength is {length}; alphanumeric-only needs the length kept up"
     )
+
+
+@pytest.mark.parametrize(
+    ("action", "parameter"),
+    [
+        ("s3files:ClientMount", "HostS3FilesResourceArns"),
+        ("elasticfilesystem:ClientMount", "HostEfsResourceArns"),
+    ],
+)
+def test_the_mount_statements_stay_narrowable(action: str, parameter: str) -> None:
+    """Both mount rights take a file-system ARN, so neither statement may hardcode "*".
+
+    An earlier revision granted these on a literal "*" and explained it with the claim that the
+    client mount actions of neither API accept a resource-level ARN. The service authorization
+    reference contradicts that: s3files:ClientMount, ClientWrite and ClientRootAccess all list
+    file-system as a required resource type, and the EFS equivalents accept the file system ARN.
+    The default is still "*" because the file systems are created outside this template -- what
+    this guards is that the value stays a parameter a reader can narrow, rather than reverting to
+    a constant with a wrong justification attached.
+    """
+    template = aws_template()
+    # Anchor on the Action list entry, not the bare action name: both actions are also named in a
+    # parameter description, and anchoring on the first match landed there instead of the policy.
+    entry = f"- {action}\n"
+    assert template.count(entry) == 1, (
+        f"expected exactly one Action list entry for {action}, found {template.count(entry)}"
+    )
+    statement = template.split(entry, 1)[1].split("- Effect:", 1)[0]
+    assert f"!Ref {parameter}" in statement, (
+        f"the statement granting {action} no longer resolves its Resource from {parameter}"
+    )
+    assert 'Resource: "*"' not in statement, (
+        f'the statement granting {action} hardcodes Resource "*" again'
+    )

@@ -61,6 +61,21 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
+> **The parameters to look at first in a shared account.** `HostS3DataAccess=true` opens three
+> statements. **All three default to `"*"`, because the buckets and file systems are created outside
+> this template.** Narrow all three once their ARNs exist.
+>
+> | Parameter | Narrowed value | Left at `"*"` |
+> |---|---|---|
+> | `HostS3ResourceArns` | The bucket / S3 Access Point ARNs | Object actions on every bucket in the account |
+> | `HostS3FilesResourceArns` | `arn:aws:s3files:<region>:<account>:file-system/<id>` | Mount rights on every S3 Files file system in the account |
+> | `HostEfsResourceArns` | `arn:aws:elasticfilesystem:<region>:<account>:file-system/<id>` | Mount rights on every EFS file system in the account |
+>
+> **All three can be narrowed.** The two mount parameters used to be described as un-narrowable
+> because the client mount actions took no resource-level ARN. The
+> [service authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_s3files.html)
+> lists `file-system` as required for `ClientMount`, `ClientWrite` and `ClientRootAccess`.
+
 The `fsxadmin` password is generated into Secrets Manager and never leaves the template. Only the
 verification host's IAM role can read it.
 
