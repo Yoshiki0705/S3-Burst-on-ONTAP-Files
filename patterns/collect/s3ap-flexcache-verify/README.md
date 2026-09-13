@@ -115,6 +115,19 @@ aws fsx detach-and-delete-s3-access-point --name s3burst-verify-ap
 aws cloudformation delete-stack --stack-name s3burst-verify
 ```
 
+> **Do not touch the origin volume until step 1 has finished.** Releasing the cache is what clears
+> the origin's `flexcache_endpoint_type`, and that runs against the origin at delete time. Taking the
+> origin offline first makes it fail with a warning rather than an error, and the origin is then left
+> flagged as an origin -- which blocks its own deletion and the SVM's. `cleanup-cache` cannot fix it
+> either, because it wants the cache that no longer exists.
+>
+> The way back is to bring the origin online, create a cache from it again, and release that one in
+> the order above; the flag then returns to `none`. Measured on 2026-09-13 —
+> [the inheritance record](../../../docs/ja/verification/flexcache-security-style-inheritance.md)
+> has the error text.
+>
+> **Also delete the final backups.** Every volume deletion leaves one, and they are billed.
+
 ## Security style note
 
 This template offers UNIX and NTFS only. `mixed` is not included because it is

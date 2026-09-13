@@ -176,7 +176,9 @@ AD グループで認可を分けても、監査は AP に紐づく 1 つの識�
 | 書き込みモード | write-around (既定) と write-back (ONTAP 9.15.1 以降) | ドキュメント記載 | [FlexCache での複製](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)。write-around は Origin 確定後に応答、write-back は Cache 確定後に非同期で Origin へ |
 | Cache の階層化 | 不可 | ドキュメント記載 | [対応機能一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)。FabricPool の Origin を Cache できるが、Cache ボリューム自体は階層化されない |
 | Cache のサイジング | Origin の最低 10% を推奨、作成時の既定値も 10% | ドキュメント記載 | [サイジング指針](https://docs.netapp.com/us-en/ontap/flexcache/sizing-concept.html) |
-| セキュリティスタイル | Cache 作成時に Origin から継承される項目として扱われる | 未検証 | 根拠は Azure NetApp Files のキャッシュボリューム要件。この構成の主経路では未確認（[最初に決めること](../../design-first-decisions.md)） |
+| セキュリティスタイル | **Cache 作成時に Origin から継承される。作成時に指定できず、作成後に変更できない** | **検証済み** | [継承の検証記録](../../verification/flexcache-security-style-inheritance.md)。両側 FSx for ONTAP、ONTAP 9.18.1P6。Cache がオンプレミス ONTAP の場合は未検証 |
+| Cache ボリュームの最小サイズ | **50 GB** | **検証済み** | 同記録。50 GB 未満は作成が失敗する（`Volumes of this type must be at least 50GB`） |
+| FabricPool の aggregate 上への Cache 作成 | **`use_tiered_aggregate` を有効にしないと失敗する** | **検証済み** | 同記録。FSx for ONTAP の aggregate は FabricPool 有効なので、既定値のままでは配置先が見つからない |
 
 ## 書かない数値
 

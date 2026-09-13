@@ -389,10 +389,18 @@ Outputs:
       3. Create SVM peer:
          vserver peer create -vserver ${CacheSvmName} -peer-vserver ${OriginSvmName} \
            -peer-cluster <origin_cluster_name> -applications flexcache
-      4. Create FlexCache:
+      4. Create FlexCache. Two arguments here were added on 2026-09-13 after a create failed on
+         each of them in turn, on ONTAP 9.18.1P6: 5 GiB was rejected with "Volumes of this type
+         must be at least 50GB", and without -use-tiered-aggregate the create failed with
+         "Aggregates not matching FabricPool requirements" -- every FSx for ONTAP aggregate is
+         FabricPool-enabled and the default declines to place a cache on one. This step previously
+         read "-size 5g" with no tiering flag. Whether that combination worked on the earlier
+         9.18.1P3D1 was not tested, so treat the sizes as what is known to work rather than as a
+         correction of something known to fail:
          volume flexcache create -vserver ${CacheSvmName} -volume s3burst_verify_fc \
            -origin-vserver ${OriginSvmName} -origin-volume ${OriginVolumeName} \
-           -aggr-list aggr1 -size 5g -junction-path /s3burst_verify_fc
+           -aggr-list aggr1 -size 50g -use-tiered-aggregate true \
+           -junction-path /s3burst_verify_fc
       5. Run measurement script:
          aws ssm start-session --target ${TestHost}
          python3 /opt/s3burst/measure_visibility.py \

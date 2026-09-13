@@ -84,6 +84,12 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # The round that measured the nine outstanding items and corrected five published figures.
         "#残していた-9-件を測ったこの記録の数値を-5-つ訂正します",
     ),
+    # The teardown traps from the security-style inheritance run. The English teardown step warns
+    # that skipping the peer release strands the stack, and this anchor is the eight failures behind
+    # that warning -- including the two that only appear when the order is already wrong. Restating
+    # them in English would put the recovery procedure in two places, and the copy a reader reaches
+    # while their stack is stuck is the one that must not be the stale one.
+    "docs/en/deployment/aws-cloudformation.md": ("#この手順で踏んだ罠",),
 }
 
 
