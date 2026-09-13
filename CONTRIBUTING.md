@@ -339,6 +339,15 @@ chore:    その他
 セッション番号は入れません。
 
 コミットの subject は 72 文字以内、命令形、末尾に句点なし。
+
+> **`make commit-subjects` を、コミットしたあと push する前に実行してください。**
+> 検査は CI にもありますが、**結果が届くのが push の後なので、merge と競合します。**
+> 2026-09-13 に 76 文字の subject が `main` に入りましたが、そのとき検査は赤でした
+> — 落ちていることを読む前に merge したためです。**同じ実装を `make all` も呼ぶので、
+> パターンと文字数の上限が 2 か所に分かれることはありません。**
+>
+> **squash merge でコミットが 1 つのとき、subject はコミット側が使われます。**
+> PR タイトルを直しても `main` に入るのはコミットの subject です。
 活動ではなく結果を書きます（`docs: update architecture.md` ではなく
 `docs: separate the two S3-over-files mechanisms`）。
 本文は「なぜ」から始めます。差分は「何を」を既に示しています。
