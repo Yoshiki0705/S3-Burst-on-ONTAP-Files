@@ -262,7 +262,21 @@ deploy_gen2() {
   # 900 GiB holds more than twice the 256 GB in-memory cache, which is what the read has to exceed.
   local vol_gib="${VOLUME_SIZE_GIB:-900}"
   local vol_bytes=$(( vol_gib * 1024 * 1024 * 1024 ))
-  # 4,096 GiB, and the reason is IOPS rather than capacity. Two 900 GiB volumes only need 2,048, but
+  # The block volume is sized apart from the file volume because it holds **two** 600 GiB objects, the
+  # LUN and the namespace, at the same time. That is the whole point: with both on one volume on one
+  # file system, the iSCSI / NVMe-TCP difference is attributable to the protocol. At 900 GiB they do
+  # not fit, F-1 and F-2 became separate runs on separate file systems, and deploy-to-deploy variance
+  # there reached 2.64x -- larger than the difference being read out of the pair.
+  local blk_gib="${BLOCK_VOLUME_SIZE_GIB:-1800}"
+  local blk_bytes=$(( blk_gib * 1024 * 1024 * 1024 ))
+  # Checked here rather than found by a fill that stops at 100%: the LUN and the namespace both get
+  # written in full, and AWS recommends at least 5% of headroom above them.
+  local lun_gib="${BLOCK_LUN_GIB:-600}"
+  local blk_needed=$(( (lun_gib * 2 * 105 + 99) / 100 ))
+  if [[ "$block" == "true" ]] && (( blk_gib < blk_needed )); then
+    die "the block volume holds a ${lun_gib} GiB LUN and a ${lun_gib} GiB namespace, so it needs at least ${blk_needed} GiB; BLOCK_VOLUME_SIZE_GIB is ${blk_gib}. Raise it, or lower BLOCK_LUN_GIB."
+  fi
+  # 4,096 GiB, and the reason is IOPS rather than capacity. The volumes only need 2,700, but
   # FSx for ONTAP refuses more than 50 provisioned SSD IOPS per GB of SSD -- so 200,000 IOPS needs at
   # least 4,000 GiB. Without the headroom, SSD IOPS binds before the throughput capacity does and the
   # result is an IOPS measurement wearing a throughput label.
@@ -321,7 +335,7 @@ deploy_gen2() {
   per_hour="$($PY_BIN -c "
 tp=$tp; ssd=$ssd_gib; prov=$iops
 print(f'{(tp*2.013 + ssd*0.15 + max(0, prov - 3*ssd)*0.0204)/730:.2f}')")"
-  log "gen2 FSx for ONTAP: $STACK_GEN2 (${tp} MBps, ${ssd_gib} GiB SSD, ${iops} IOPS, ${vol_gib} GiB volume, about \$${per_hour}/hour at list price)"
+  log "gen2 FSx for ONTAP: $STACK_GEN2 (${tp} MBps, ${ssd_gib} GiB SSD, ${iops} IOPS, ${vol_gib} GiB volume, block volume ${blk_gib} GiB, about \$${per_hour}/hour at list price)"
   aws cloudformation deploy \
     --region "$REGION" \
     --stack-name "$STACK_GEN2" \
@@ -332,6 +346,7 @@ print(f'{(tp*2.013 + ssd*0.15 + max(0, prov - 3*ssd)*0.0204)/730:.2f}')")"
       "ThroughputCapacityPerHAPair=$tp" "ProvisionedSsdIops=$iops" \
       "EnableBlockProtocols=$block" \
       "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
+      "BlockVolumeSizeBytes=$blk_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset \
     --disable-rollback
@@ -1037,6 +1052,12 @@ curl -s -k -u \"fsxadmin:\$PW\" \
 
 # NVMe/TCP: namespace, subsystem, mapping, host. The namespace and the LUN are separate objects in the
 # same volume, so F-1 and F-2 read the same volume without sharing a target.
+#
+# **That was written before the volume was large enough for it to be true.** At 900 GiB the two 600 GiB
+# objects did not fit, so the first F-1 / F-2 pair ran on separate file systems and the comparison
+# carried deploy-to-deploy variance measured at up to 2.64x. The block volume is now sized for both
+# (BLOCK_VOLUME_SIZE_GIB, 1,800 GiB), and a volume holding a LUN and a namespace together is a
+# documented configuration: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/misconfigured-volume.html
 block_provision_nvme() {
   block_context
   local nqn="${1:-}"
