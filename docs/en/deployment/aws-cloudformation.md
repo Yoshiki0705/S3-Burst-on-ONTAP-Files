@@ -44,6 +44,31 @@ and [the environments index](../../../environments/README.md) for why.
 
 ## 2. Create the stack
 
+**There are 19 parameters and only two of them have to be edited.** The rest work as they are.
+**One more must not be left at its default, because changing it later means a rebuild.**
+
+| Parameter | What to do | Why |
+|---|---|---|
+| `VpcId` / `SubnetId` | **Replace with your own** | Left as they are, the create fails on IDs that do not exist |
+| `OriginVolumeSecurityStyle` | **Defaults to `UNIX`. Set `NTFS` if the consuming side reads over SMB** | **It cannot be changed afterwards** — the one irreversible choice in [what to decide first](../design-first-decisions.md) |
+| The other 16 | **Leave them** | They are the values the measurements used. Cost follows the estimate below, and rises in proportion with `StorageCapacityGiB` and `ThroughputCapacityMBps` |
+
+**Finding `VpcId` and `SubnetId`:**
+
+```bash
+# List the VPCs in your account, with their Name tag
+aws ec2 describe-vpcs --region ap-northeast-1 \
+  --query 'Vpcs[].[VpcId,CidrBlock,Tags[?Key==`Name`].Value|[0]]' --output table
+
+# List that VPC's subnets. The file system and the verification host go in the same subnet
+aws ec2 describe-subnets --region ap-northeast-1 \
+  --filters Name=vpc-id,Values=<the VpcId you chose> \
+  --query 'Subnets[].[SubnetId,AvailabilityZone,CidrBlock,AvailableIpAddressCount]' --output table
+```
+
+**Look at `AvailableIpAddressCount`.** The file system takes several addresses, so a subnet with few
+free ones fails the create — the first row of [when it does not work](#when-it-does-not-work).
+
 ```bash
 cd environments/aws-origin
 cp params.example.json params.json    # params.json is gitignored
@@ -51,7 +76,7 @@ cp params.example.json params.json    # params.json is gitignored
 # To measure throughput, start from params.throughput.example.json instead. It names c5n.9xlarge
 # rather than t3.small and grants the host the S3 data path, so it costs materially more. The
 # reason behind each difference is in that file's _comment.
-# replace VpcId and SubnetId with your own
+# replace VpcId and SubnetId with the values found above
 
 aws cloudformation deploy \
   --template-file template.yaml \
