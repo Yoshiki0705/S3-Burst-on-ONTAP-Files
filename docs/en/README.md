@@ -144,7 +144,7 @@ nothing to lose if it does not. The steps to confirm it are in the
 reading order** — there is no need to go through all of it.
 
 1. **[Architecture](architecture.md) (5 min)** — what it solves, and what it does not
-2. **[Reading from your current setup](../ja/reference/decision-trees/from-your-current-setup.md) (Japanese) (5 min)** —
+2. **[Reading from the setup you already run](reference/decision-trees/from-your-current-setup.md) (5 min)** —
    whether the shape you already run fits. **Two shapes end in "out of scope", and it says so**
 3. **[What to decide first](design-first-decisions.md) (5 min)** —
    **the one thing to settle before the origin volume exists** (security style). **It cannot be

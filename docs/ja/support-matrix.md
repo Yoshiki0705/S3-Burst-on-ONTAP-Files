@@ -89,7 +89,7 @@ FSx for ONTAP を Origin として使えるかは
 
 | 制約 | 内容 |
 |---|---|
-| セキュリティスタイル | Cache 作成時に Origin から継承される項目として扱われ、Cache 側では設定できない。出典と未確認範囲は[最初に決めること](design-first-decisions.md)を参照 |
+| セキュリティスタイル | **Cache 作成時に Origin から継承される。実測済み**（[継承の検証記録](verification/flexcache-security-style-inheritance.md)、両側 FSx for ONTAP）。**作成時に指定できず、作成後の変更も ONTAP が拒否する。** ファンアウト先プロトコルとの対応関係は未測定で、範囲は[最初に決めること](design-first-decisions.md)を参照 |
 | Origin あたりの Cache 数 | AWS ドキュメントは Origin ボリュームが 10 を超える場合に write-around を推奨している。ファンアウト数を増やしたときの挙動は未検証 |
 | 削除順序 | Cache を残したまま Origin 側を削除しない。ピアリングの削除は Cache と SVM ピアの解除が先 |
 | Cache 側の書き込み | この構成では扱わない。書き込みは Origin 側の S3 Access Point に集約する |
