@@ -180,8 +180,44 @@ def fetch(repo: str, path: str) -> str | None:
         raise SystemExit(f"outgoing-probes: {url} returned {error.code}") from error
 
 
+def out_of_order(text: str) -> list[str]:
+    """Rows that break the sort the header declares.
+
+    Checked here rather than in the shared parser, because the sort is this repository's convention.
+    A sibling's contract goes through the same parser and must not fail for keeping its own order.
+
+    The rule existed only in the header until a sibling read the file and noticed: a re-anchored row
+    had been written back into the position of the row it replaced, and nothing looked. A convention
+    stated in prose and enforced nowhere is a convention that holds until the first edit made in a
+    hurry -- and the reason for this one is practical, not tidiness: two people appending rows to a
+    sorted file conflict in one predictable place instead of wherever each happened to type.
+    """
+    rows = [line for line in text.split("\n") if line and not line.startswith("#")]
+    if rows == sorted(rows):
+        return []
+    for position, (actual, expected) in enumerate(zip(rows, sorted(rows)), start=1):
+        if actual != expected:
+            return [
+                f"{CONTRACT.as_posix()}: row {position} of the data rows breaks the sort the "
+                f"header declares. Found {actual.split(chr(9))[-1]!r} where "
+                f"{expected.split(chr(9))[-1]!r} belongs. Sort the data rows whole, as they are "
+                "tab-separated with the probe last."
+            ]
+    return []  # pragma: no cover - unreachable while the lists differ
+
+
 def main() -> int:
-    probes, problems = parse_contract((ROOT / CONTRACT).read_text(encoding="utf-8"))
+    contract_text = (ROOT / CONTRACT).read_text(encoding="utf-8")
+    problems = out_of_order(contract_text)
+    if problems:
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        print(
+            f"outgoing-probes: {CONTRACT.as_posix()} is not in the order its header declares.",
+            file=sys.stderr,
+        )
+        return 1
+    probes, problems = parse_contract(contract_text)
     if problems:
         for problem in problems:
             print(f"  {problem}", file=sys.stderr)
