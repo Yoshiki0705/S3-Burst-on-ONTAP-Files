@@ -294,3 +294,49 @@ def test_a_weak_citation_still_passes(
     sibling(tmp_path, monkeypatch, "発火しない と 発火しない")
     assert run(monkeypatch, row("docs/errata.md", "retraction", "発火しない")) == 0
     assert "no longer resolve" not in capsys.readouterr().out
+
+
+# --- the order the header declares ----------------------------------------------------------------
+
+
+def test_the_committed_contract_is_in_the_order_its_header_declares() -> None:
+    """The real file, not a fixture. This is the defect a sibling reported by reading it.
+
+    A row re-anchored in #175 was written back into the position of the row it replaced. The header
+    had declared the file sorted since it was created, and nothing checked, so the declaration was
+    the only thing keeping the order -- and it lost.
+    """
+    assert not mod.out_of_order((ROOT / mod.CONTRACT).read_text(encoding="utf-8"))
+
+
+def test_an_out_of_order_row_is_named_with_both_strings() -> None:
+    """Naming only the position would leave the reader diffing by hand to see what moved."""
+    text = "\n".join(
+        [
+            "# comment",
+            row("docs/b.md", "retraction", "second"),
+            row("docs/a.md", "retraction", "first"),
+        ]
+    )
+    problems = mod.out_of_order(text)
+    assert len(problems) == 1
+    assert "row 1" in problems[0]
+    assert "second" in problems[0] and "first" in problems[0]
+
+
+def test_comments_and_blank_lines_do_not_count_toward_the_order() -> None:
+    """The header is prose and sits above the rows; sorting it would be nonsense.
+
+    Blank lines matter too: the file ends with one, and counting it as a row would make every sorted
+    contract look unsorted.
+    """
+    text = "\n".join(
+        [
+            "# z comment that would sort last",
+            "",
+            row("docs/a.md", "retraction", "first"),
+            row("docs/b.md", "retraction", "second"),
+            "",
+        ]
+    )
+    assert not mod.out_of_order(text)
