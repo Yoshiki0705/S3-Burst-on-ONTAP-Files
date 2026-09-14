@@ -11,6 +11,7 @@ the prose instead produces a confident answer that the tool then contradicts.
 | What you are changing | Read |
 |---|---|
 | A GitHub URL, the repository name, an external link | `tools/check_links.py` — `PUBLISHED_REPOS` and the comment above it |
+| A product name, or a line where `FSx` sits inside an identifier | `tools/audit_public_output.py` — `BARE_FSX` and `IDENT_SPANS`。免除は行単位ではなく**出現単位**で、識別子や URL の内側で始まる出現だけが通る。散文側は直すか、理由付きの `allow:naming` を置く |
 | A diagram or an icon | `docs/agent/diagrams.md`, then `tools/build_diagrams.py` |
 | Anything about the two languages or the switcher | `docs/i18n-terms.md`, `tools/check_i18n_parity.py` |
 | A number stated in prose | `tools/check_derived_counts.py` — `COUNT_GLOBS` |

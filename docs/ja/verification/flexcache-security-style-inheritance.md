@@ -84,7 +84,7 @@
 | 4 | Cache を消したのに Origin が「まだ Cache がある」と言って消えない | **Cache を解放する前に Origin を offline にしたため、Cache 削除時の Origin 側 cleanup が失敗した。** `flexcache_endpoint_type` が `origin` のまま残る。**Cache が既に無いので `cleanup-cache` も打てない**（`entry doesn't exist`）。Origin を online に戻し、Cache を作り直して正しい順序で解放すると `none` に戻った |
 | 5 | スタック削除が `DELETE_FAILED`。`svmLifecycle should be DELETING, but get: MISCONFIGURED` | **SVM ピア関係が残っていると FSx for ONTAP は SVM を削除しない。** その理由文は ONTAP CLI の `vserver peer delete` を案内する。**つまり ONTAP に入れる足が要る** |
 | 6 | その足が無い | **同じスタック削除が検証ホストを先に消す。** 管理 LIF はプライベートアドレスなので、ホストが無くなると REST にも CLI にも到達できない。**SVM ピアを消す前にホストが消える順序になっている** |
-| 7 | ピアを消しても FSx の `Lifecycle` が `MISCONFIGURED` のまま | **CloudFormation は削除を呼ぶ前にこの値を見て断る。** 一方 **`aws fsx delete-storage-virtual-machine` は同じ状態でも受け付け、`DELETING` に入った。** API を直接呼んでからスタック削除を再試行すると通る |
+| 7 | ピアを消しても FSx for ONTAP の `Lifecycle` が `MISCONFIGURED` のまま | **CloudFormation は削除を呼ぶ前にこの値を見て断る。** 一方 **`aws fsx delete-storage-virtual-machine` は同じ状態でも受け付け、`DELETING` に入った。** API を直接呼んでからスタック削除を再試行すると通る |
 | 8 | ホスト用セキュリティグループが「依存オブジェクトがある」で消えない | **こちらが手で足した ingress ルールが原因。** 相手のセキュリティグループを参照するルールを別スタック側に作ると、参照されている側が消せない。**手で足したルールは手で消す** |
 
 **4 が撤去順序の実務的な意味です。** 「Origin より先に Cache を消す」だけでは足りず、
