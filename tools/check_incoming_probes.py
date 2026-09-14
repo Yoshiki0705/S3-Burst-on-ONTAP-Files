@@ -53,6 +53,8 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
+import probe_strength
+
 ROOT = Path(__file__).resolve().parent.parent
 
 CONTRACT = Path("docs/agent/cross-repo-probe-contract.txt")
@@ -301,14 +303,21 @@ def check(
             )
             continue
 
-        occurrences = body.count(probe.text)
-        if occurrences > 1:
+        count = probe_strength.occurrences(body, probe.text)
+        if count > 1:
             weak.append(
-                f"{probe.path}: {probe.text!r} occurs {occurrences} times, so rewording one of "
+                f"{probe.path}: {probe.text!r} occurs {count} times, so rewording one of "
                 f"them leaves this gate green and {citing} unwarned. A longer string, or one from "
                 "a sentence that appears once, protects the claim."
             )
-        if occurrences:
+        if probe_strength.heading_only(body, probe.text):
+            weak.append(
+                f"{probe.path}: {probe.text!r} only ever appears as a section heading. A heading "
+                "keeps its title while the section beneath it is replaced with the opposite "
+                f"conclusion, so this gate stays green and {citing} is told nothing. The claim "
+                "worth pinning is usually the line below the heading."
+            )
+        if count:
             continue
 
         if probe.role == FAIL_ROLE:

@@ -111,6 +111,25 @@
 # protocol list is split across two lines, so the registration below uses the single-line form further
 # down the same file.
 #
+# A THIRD LIMIT, FOUND BY A DIFFERENT SIBLING RUNNING A CRITERION THIS REPOSITORY DID NOT HAVE.
+#
+# A probe that only ever matches a section *heading* cannot fire on the thing it was registered for. A
+# heading keeps its title while the section beneath it is replaced with the opposite conclusion, so the
+# claim can be withdrawn with every probe against it green. The replacement is rarely far away: it is
+# usually the sentence directly below the heading, which is where the claim actually is.
+#
+# Independent of the multiplicity limit above, and neither subsumes the other. The heading-only cases
+# against this repository each occur exactly once, so the multiplicity rule was silent on all of them;
+# the multiplicity cases are figures repeated inside one measurement page, so a heading rule is silent
+# on those. `make incoming-probes` and `make outgoing-probes` now report both, and count them.
+#
+# Reported, not failed, in both directions: the claim still resolves, and calling a fragile anchor a
+# withdrawal would send the other side to look for a retraction that did not happen.
+#
+# A fourth kind is not decidable by rule and is left to the reader: a string too generic to be about
+# the claim at all -- a product name, a section label. Length does not decide it. An eight-character
+# measured ratio protects a great deal; a thirteen-character product name protects nothing.
+#
 # ---------------------------------------------------------------------------------------------------
 # FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns
 #
