@@ -305,7 +305,9 @@ make new-pattern AXIS=collect SLUG=s3ap-ingest
 
 **配線したら `python3 scripts/guard_irreversible_ops.py --selftest` を通してください。**
 block（exit 2）だけでなく **allow が通ることも確認します。** 通常の作業まで止めるガードは
-外されるので、allow 側の確認が同じだけ重要です。現在 29 件（block 15 / ask 3 / allow 11）。
+外されるので、allow 側の確認が同じだけ重要です。**件数はここに書きません** —
+`--selftest` が `<通った数>/<全数> cases passed` を出すので、**散文に写すと、ケースを足したときに
+そちらだけが黙って古くなります。**
 
 > **`$HOME` 側のコピーを指さないでください。** 実測した例があります。この環境では
 > `~/.kiro/hooks/scripts/` に配線されていた版が追跡版より 237 行短く、

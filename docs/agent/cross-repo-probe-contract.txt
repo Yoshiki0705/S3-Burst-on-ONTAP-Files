@@ -72,6 +72,22 @@
 #
 # A sibling found this axis first, by noticing their own drafts restated more than their tracked docs.
 #
+# HOW TO ENUMERATE, BECAUSE THE FIRST PASS DID NOT AND STILL CALLED ITSELF AN AUDIT.
+#
+# That pass grepped the drafts for the three sibling repository *names*. It missed three cited
+# documents whose URLs carry the local directory name instead -- and those URLs were 404, because the
+# directory is not what the repository is called on GitHub. Grepping for what a citation ought to look
+# like finds the citations that already look like that.
+#
+# Extract every URL and reduce it, rather than searching for the expected form:
+#
+#   grep -ohE 'https://github\.com/<owner>/[A-Za-z0-9._-]+/blob/[^)" ]+' .private/*.md | sort -u
+#
+# Then check each one resolves, and only then decide about probes. The three that turned up are cited
+# from internal notes rather than from an article draft, so they stay out of scope by the publishing
+# surface rule above -- but their links were wrong either way, which the name-based search could not
+# have told anyone.
+#
 # role:
 #   retraction  Expected to survive. Its absence means the claim moved or was retracted, and a claim
 #               here has lost its evidence. Worth failing on.
