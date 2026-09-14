@@ -52,6 +52,10 @@ LOCAL_NAMES = {
         "FSx-for-ONTAP-Adoption-Playbook",
         "fsxn-adoption-playbook",
     ),
+    "VMware-Migration-EC2-ONTAP": (
+        "VMware-Migration-EC2-ONTAP",
+        "vmware-migration-ec2-ontap",
+    ),
 }
 
 FAIL_ROLE = "retraction"
