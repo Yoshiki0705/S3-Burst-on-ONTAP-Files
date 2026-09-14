@@ -57,7 +57,7 @@ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-covera
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	Operations on that path are **not blocked**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	The ONTAP native audit log (`vserver audit`) does
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	raise no FPolicy notification
-FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	AP 経由の操作は**遮断されない**
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`mandatory` 指定の同期ポリシー + 応答するエンジン | AP 経由の操作は**遮断されない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	FPolicy 通知を**発火しない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	ONTAP ネイティブ監査ログ（`vserver audit`）なら載る
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`s3` は HTTP 400 で拒否されます

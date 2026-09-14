@@ -208,6 +208,7 @@ def main() -> int:
     # the summary: a run that fell back proves less than one that read origin/main, and the output is
     # the only place a reader can tell which happened.
     fell_back: set[str] = set()
+    weak: list[str] = []
     bodies: dict[tuple[str, str], str | None] = {}
     checked = 0
 
@@ -241,7 +242,18 @@ def main() -> int:
                 "lower the claim's stage."
             )
             continue
-        if probe.text in body:
+        # A string that occurs more than once in the cited document protects less than it appears to:
+        # the sibling can reword one occurrence and this stays green, so the citation here goes stale
+        # without anyone being told. Chosen on this side, so unlike the incoming direction the fix is
+        # this repository's -- pick a longer string, from a sentence that appears once.
+        occurrences = body.count(probe.text)
+        if occurrences > 1:
+            weak.append(
+                f"{probe.repo}: {probe.text!r} occurs {occurrences} times in {probe.path}, so "
+                "rewording one occurrence leaves this green while the citation here goes stale. "
+                "Re-anchor on a string that appears once."
+            )
+        if occurrences:
             continue
         message = (
             f"{probe.repo}: {probe.text!r} is gone from {probe.path}. This repository restates "
@@ -251,6 +263,8 @@ def main() -> int:
 
     for warning in warnings:
         print(f"  reread: {warning}")
+    for note in weak:
+        print(f"  weak probe: {note}")
     for failure in failures:
         print(f"  {failure}", file=sys.stderr)
 

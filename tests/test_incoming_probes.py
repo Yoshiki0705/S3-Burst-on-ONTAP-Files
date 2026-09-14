@@ -136,7 +136,7 @@ def test_a_present_probe_neither_fails_nor_warns(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = target(tmp_path, monkeypatch, "前後に文があって 45% 違った という主張")
-    failures, warnings = mod.check(
+    failures, warnings, _weak = mod.check(
         [mod.Probe(path=path, role="retraction", text="45% 違った")]
     )
     assert not failures and not warnings
@@ -146,7 +146,7 @@ def test_a_missing_retraction_probe_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = target(tmp_path, monkeypatch, "reworded beyond recognition")
-    failures, warnings = mod.check(
+    failures, warnings, _weak = mod.check(
         [mod.Probe(path=path, role="retraction", text="45% 違った")]
     )
     assert len(failures) == 1 and not warnings
@@ -157,7 +157,7 @@ def test_a_missing_reread_probe_only_warns(
 ) -> None:
     """A range probe moves when a measurement is added. That is not a retraction."""
     path = target(tmp_path, monkeypatch, "単一接続の 4 行は 500〜618 MB/s に収まる")
-    failures, warnings = mod.check(
+    failures, warnings, _weak = mod.check(
         [mod.Probe(path=path, role="reread", text="500〜592 MB/s に収まる")]
     )
     assert not failures and len(warnings) == 1
@@ -169,7 +169,7 @@ def test_a_moved_file_fails_even_when_the_text_survives(
 ) -> None:
     """The path is part of the registration, so a rename breaks the citation over there."""
     monkeypatch.setattr(mod, "ROOT", tmp_path)
-    failures, _ = mod.check(
+    failures, _, _weak = mod.check(
         [mod.Probe(path="docs/renamed.md", role="retraction", text="45% 違った")]
     )
     assert len(failures) == 1
@@ -333,3 +333,52 @@ def test_the_working_tree_is_the_fallback_and_says_so(tmp_path: Path) -> None:
     assert not problems
     assert [p.text for p in probes] == ["from the checkout"]
     assert "working tree" in source and "unreadable" in source
+
+
+# --- a probe that protects less than it looks like it does ---------------------------------------
+
+
+def test_a_string_occurring_twice_is_reported_as_weak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two occurrences mean rewording one leaves this gate green and the sibling unwarned.
+
+    The check that fires here was being done by hand: three times in one exchange with a sibling, a
+    candidate string had to be counted before it could be registered, and one already-registered
+    string turned out to sit in seven places. Counting it in the run is what stops that depending on
+    somebody remembering.
+    """
+    path = target(
+        tmp_path, monkeypatch, "前半に 0.18 倍 とあり、後半にも 0.18 倍 と書いてある"
+    )
+    failures, warnings, weak = mod.check(
+        [mod.Probe(path=path, role="retraction", text="0.18 倍")]
+    )
+    assert not failures, "the string is present, so this is not a retraction"
+    assert not warnings, "nor is it a reread: nothing moved"
+    assert len(weak) == 1
+    assert "occurs 2 times" in weak[0]
+
+
+def test_a_string_occurring_once_is_not_reported_as_weak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The boundary is two, not one. A single occurrence is the state being aimed for."""
+    path = target(tmp_path, monkeypatch, "0.18 倍 は一度だけ出てくる")
+    _, _, weak = mod.check([mod.Probe(path=path, role="retraction", text="0.18 倍")])
+    assert not weak
+
+
+def test_a_weak_probe_does_not_change_the_exit_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reported, not failed: the string was the sibling's choice and the fix is theirs.
+
+    Failing here would redden this repository for a decision taken in another one, and the two
+    existing weak probes were both registered before this check existed.
+    """
+    path = target(tmp_path, monkeypatch, "0.18 倍 と 0.18 倍")
+    failures, warnings, weak = mod.check(
+        [mod.Probe(path=path, role="retraction", text="0.18 倍")]
+    )
+    assert weak and not failures and not warnings
