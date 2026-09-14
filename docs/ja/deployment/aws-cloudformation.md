@@ -133,7 +133,7 @@ ONTAP のバージョンとSVM の NFS エンドポイントは CloudFormation �
 出力にはそれを読むためのコマンドが入っています。
 
 > **バージョンに関する補足**: 公開する測定値には ONTAP のバージョンを併記する必要がありますが、
-> `AWS::FSx::FileSystem` はバージョンを属性として公開していません。FSx の API も当てになりません
+> `AWS::FSx::FileSystem` はバージョンを属性として公開していません。Amazon FSx の API も当てになりません <!-- allow:naming - サービスファミリーの API 名。FSx for ONTAP の略記ではない -->
 > （既存のファイルシステムでは `DescribeFileSystems` が `FileSystemTypeVersion` を返しませんでした）。
 > 確実な取得元は ONTAP 自身です。このスタックが資格情報と 443 番ポートを用意しているのは
 > そのためでもあります。

@@ -122,7 +122,7 @@ version and the SVM's NFS endpoint are not available as CloudFormation attribute
 carry the commands that read them instead.
 
 > **Version note**: every published measurement has to state the ONTAP version, and
-> `AWS::FSx::FileSystem` exposes no attribute for it. The FSx API is not dependable either — on an
+> `AWS::FSx::FileSystem` exposes no attribute for it. The Amazon FSx API is not dependable either — on an <!-- allow:naming - "Amazon FSx" is the service-family API name, not a shorthand for FSx for ONTAP -->
 > existing file system `DescribeFileSystems` omitted `FileSystemTypeVersion` entirely. The reliable
 > source is ONTAP itself, which is part of why this stack ships the credential and the port to reach
 > it.

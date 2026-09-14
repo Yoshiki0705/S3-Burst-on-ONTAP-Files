@@ -389,7 +389,7 @@ egress を `0.0.0.0/0` で持っているので、**クライアント側の変�
 
 ### LUN・igroup・namespace・subsystem は CloudFormation で作れない
 
-**`AWS::FSx::Volume` に LUN のプロパティは無く、FSx の API にも無い。** AWS の手順はすべて
+**`AWS::FSx::Volume` に LUN のプロパティは無く、Amazon FSx の API にも無い。** AWS の手順はすべて <!-- allow:naming - サービスファミリーの API 名。FSx for ONTAP の略記ではない -->
 ONTAP CLI（`lun create` / `lun igroup create` / `lun mapping create` /
 `vserver nvme namespace create` / `vserver nvme subsystem create`）で書かれている。
 

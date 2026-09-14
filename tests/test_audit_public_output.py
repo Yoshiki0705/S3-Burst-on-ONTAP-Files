@@ -97,6 +97,49 @@ def test_sibling_aws_services_are_not_misread_as_the_bare_form() -> None:
         assert "naming" not in categories(line)
 
 
+def test_an_identifier_does_not_excuse_prose_on_the_same_line() -> None:
+    """The judgement is per occurrence, not per line.
+
+    識別子が 1 つあるだけで行全体を免除していたため、その隣に置かれた散文の
+    "FSx" が 9 か所通っていた。免除は「その出現が識別子の内側にあるか」で決める。
+    """
+    for line in (
+        "`AWS::FSx::FileSystem` exposes no attribute for it. The FSx API is not dependable.",
+        "`AWS::FSx::Volume` に LUN のプロパティは無く、FSx の API にも無い。",
+        "See https://example.invalid/x — the FSx file system is Multi-AZ.",
+        "FSxId: fs-0123456789abcdef0 — the FSx file system is Multi-AZ.",
+        "`aws fsx delete-storage-virtual-machine` は FSx の `Lifecycle` を見ない。",
+    ):
+        assert "naming" in categories(line), line
+
+
+def test_the_identifier_occurrence_itself_stays_exempt() -> None:
+    """免除される側は残す。出現が span の内側で始まるものだけが通る。"""
+    for line in (
+        "https://docs.aws.amazon.com/fsx/latest/APIReference/API_FSxVolume.html",
+        "github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/README.md",
+        "Type: AWS::FSx::Volume",
+        "  FSxAdminPassword:",
+    ):
+        assert "naming" not in categories(line), line
+
+
+def test_the_dropped_contexts_are_ones_the_rule_cannot_match() -> None:
+    """免除一覧から外した 4 つの前提を縛る。
+
+    FSxOntap / FSX_ / fsx- / aws fsx は BARE_FSX 自体が一致しない（後続が単語文字、
+    X が大文字、f が小文字）。免除として並べても何も守らず、同じ行の散文を通す
+    だけだった。ここが赤くなったら、外した判断の根拠が消えている。
+    """
+    for token in (
+        "FSxOntapConfiguration",
+        "FSX_ENDPOINT",
+        "fsx-volume-name",
+        "aws fsx",
+    ):
+        assert not audit.BARE_FSX.search(token), token
+
+
 # --- neutrality --------------------------------------------------------------------------------
 
 

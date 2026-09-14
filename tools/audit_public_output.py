@@ -162,10 +162,39 @@ BARE_FSX = re.compile(
     r"(?!-for-ONTAP)"  # repo / URL slugs
     r"(?![-\w]*\.(?:md|py|ya?ml|json|svg|png|drawio))"  # filenames
 )
-# Contexts where "FSx" is a token, not prose.
-IDENT_CONTEXT = re.compile(
-    r"FSx[A-Za-z0-9_]*\s*[=:]|AWS::FSx|aws\s+fsx|\bfsx-|FSxOntap|FSX_|github\.com|https?://"
+# Spans where "FSx" is part of a token, not prose.
+#
+# 判定は行単位ではなく出現単位で行う。各パターンはトークン全体に一致させること
+# ——「その出現が span の内側で始まるか」で免除を決めるため、部分一致では
+# 位置が意味を持たない。
+#
+# ここに載るのは BARE_FSX が実際に一致しうる形だけ。FSxOntap / FSX_ / fsx- /
+# aws fsx は BARE_FSX が一致しないので（後続が単語文字、X が大文字、f が小文字）、
+# 免除として並べても何も守らず、同じ行の散文を通すだけだった。
+# tests/test_audit_public_output.py がこの前提を縛っている。
+IDENT_SPANS = (
+    re.compile(r"https?://\S+"),
+    re.compile(r"\bgithub\.com/\S+"),
+    re.compile(r"AWS::FSx\w*(?:::\w+)*"),
+    re.compile(r"FSx[A-Za-z0-9_]*\s*[=:]"),
 )
+
+
+def bare_fsx_matches(line: str) -> list[re.Match[str]]:
+    """Prose bare-"FSx" occurrences on one line, judged per occurrence.
+
+    行に識別子や URL が 1 つあるだけで行全体を免除すると、隣に置かれた散文の
+    "FSx" も一緒に通る。出現ごとに、その位置が識別子 span の内側かを見る。
+    """
+    spans = [
+        match.span() for pattern in IDENT_SPANS for match in pattern.finditer(line)
+    ]
+    return [
+        match
+        for match in BARE_FSX.finditer(line)
+        if not any(start <= match.start() < end for start, end in spans)
+    ]
+
 
 # ---------------------------------------------------------------- neutrality
 
@@ -426,7 +455,7 @@ def audit_line(
         for pattern, message in NAMING_RULES:
             if pattern.search(line):
                 findings.append(("naming", message))
-        if BARE_FSX.search(line) and not IDENT_CONTEXT.search(line):
+        if bare_fsx_matches(line):
             findings.append(("naming", "bare 'FSx'; use 'FSx for ONTAP'"))
 
     if not ({"naming", "vendor-ref"} & allowed):
