@@ -111,9 +111,9 @@ Windows 識別情報は workgroup モードの CIFS サーバーに作ったロ�
 
 | 操作 | 影響 |
 |---|---|
-| Origin のセキュリティスタイル変更 | Cache は削除して作り直すことになる（上記の前提が成り立つ場合） |
+| Origin のセキュリティスタイル変更 | **Cache は削除して作り直すことになる。** 条件付きではない — Cache 側は作成時に指定できず、作成後の変更も ONTAP が拒否する（[継承の検証記録](verification/flexcache-security-style-inheritance.md)） |
 | S3 Access Point の `NetworkOrigin` | 作成後は変更できない。変更するには削除して作り直す（エイリアスが変わる）。到達性の条件は[サポート状況](support-matrix.md)にある |
-| FlexCache の削除順序 | Cache を残したまま Origin 側を削除しない。ピアリングの削除は Cache と SVM ピアの解除が先 |
+| FlexCache の削除順序 | Cache を残したまま Origin 側を削除しない。ピアリングの削除は Cache と SVM ピアの解除が先。**さらに 2 つ実測で分かっている** — Origin に触る（offline にする）のは Cache の解放が**終わったあと**で、**SVM ピアの解除は ONTAP に到達できるホストがまだある間**に行う（[実測](verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠)） |
 | SnapLock / 改ざん防止 Snapshot の有効化 | 取り消せない。**保持期間を明示した指示がない限り有効化しない**。詳細は [AGENTS.md](../../AGENTS.md) の不可逆操作の節 |
 
 ## 関連ドキュメント

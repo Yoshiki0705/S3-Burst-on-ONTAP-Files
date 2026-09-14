@@ -178,6 +178,31 @@ This is not a premise of the architecture. It and attaching an S3 Access Point t
       **This result is not evidence about what the S3 Access Point supports. They are separate
       mechanisms**
 
+## 6. The audit trail, and event notification
+
+Environment needed: the same as item 1. **Nothing extra to build.**
+
+**This item asks whether it can be shown afterwards who did what, not whether something works.** In
+an environment with audit requirements it decides adoption, and **being asked after the architecture
+is built means rebuilding the distribute layer.**
+
+**The answers are already measured. What is worth confirming locally is the version and the
+configuration, which differ.**
+
+- [ ] **Confirm that operations through the S3 Access Point raise no FPolicy notification.** They do
+      not (measured 2026-08-26, ONTAP 9.18.1P3D1, both UNIX and WINDOWS identities). **A `mandatory`
+      synchronous policy does not block them either.** An FPolicy event accepts only `cifs`, `nfsv3`
+      or `nfsv4`; `s3` is refused with HTTP 400 ([verification status](verification-status.md)).
+- [ ] **Confirm that the ONTAP native audit log (`vserver audit`) does record them.** It does, as
+      `Source=HTTP` / `Source=S3`. **It is not a substitute for event-driven work, but it serves as
+      the audit trail.**
+- [ ] **Decide which of the two is the basis for auditing, and write it down.** A design that assumes
+      FPolicy leaves the collect-side writes alone outside monitoring — **and there is no path by
+      which anyone notices the gap**, which is what makes this item dangerous.
+- [ ] **If event-driven work is a requirement, stop here.** The options are polling or the native
+      audit log as the trigger (branch 3 of
+      [the decision tree](reference/decision-trees/choosing-this-architecture.md)).
+
 ## How to write the record
 
 - Put the environment first (Region, ONTAP version, file system generation and configuration,
