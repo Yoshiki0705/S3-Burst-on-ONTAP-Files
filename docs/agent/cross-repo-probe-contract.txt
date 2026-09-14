@@ -12,6 +12,44 @@
 # string is gone. Hand-maintained rather than generated: a probe is a *chosen* claim-bearing substring,
 # and there is nothing to derive it from.
 #
+# NOT BLOCKING ON A PULL REQUEST, AND THE CONDITION THAT WOULD CHANGE THAT.
+#
+# Resolving these strings means reading someone else's documents, so a failure usually means a sibling
+# reworded something. Turning a pull request red for that teaches contributors to ignore red, so CI
+# runs this offline -- reporting only that the contract parses -- and the scheduled job resolves the
+# strings.
+#
+# The premise is the shape of this contract, not a preference. Stated in a form the checker verifies,
+# because a premise that goes stale keeps justifying the decision it no longer supports:
+#
+#   SHAPE: 11 rows across 3 files, 5 in the largest.
+#
+# The two largest are translations of each other, so one rewrite of that errata can fail five rows at
+# once: an other-caused red arrives as a batch that blocks every unrelated change until someone else's
+# edit is reconciled.
+#
+# Revisit when that stops being true: rows spread across enough files that a single rewrite fails one
+# or two, the way it is for the sibling that made the opposite call for that reason. Their
+# arrangement is not wrong for them -- 18 rows over 6 files -- and this one is not right in general.
+#
+# The gap this leaves is stated rather than hidden: `make all` catches a bad citation for anyone
+# holding the sibling checkouts, and a contributor without them can merge a citation whose string was
+# never resolved.
+#
+# AUDITED 2026-09-14 FOR THE OBSERVATION / INTERPRETATION SPLIT, AND IT FOUND ONE GAP.
+#
+# A cited sentence often carries a measurement and a conclusion drawn from it. Protecting only the
+# measurement leaves the conclusion free to be withdrawn while this gate stays green -- and the
+# conclusion is usually the part restated here, because it is what a reader acts on.
+#
+# The FPolicy errata's row reads "S3 AP 経由の操作は FPolicy 通知を**発火しない**ため、代わりにならない":
+# one clause measured, one concluded. Only the first was registered, while four documents here say
+# "FPolicy は代替にならない". The conclusion is now registered too, in both languages. Every other
+# registered string was checked and carries its own claim whole.
+#
+# Applies to new rows as well: when a cited sentence has both, register both or say which half this
+# repository restates.
+#
 # role:
 #   retraction  Expected to survive. Its absence means the claim moved or was retracted, and a claim
 #               here has lost its evidence. Worth failing on.
@@ -56,9 +94,11 @@
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	An FPolicy event accepts only `cifs`, `nfsv3` or `nfsv4`; `s3` returns HTTP 400
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	Operations on that path are **not blocked**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	The ONTAP native audit log (`vserver audit`) does
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	notification, so it is not a substitute
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.en.md	retraction	raise no FPolicy notification
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	FPolicy 通知を**発火しない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	ONTAP ネイティブ監査ログ（`vserver audit`）なら載る
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`mandatory` 指定の同期ポリシー + 応答するエンジン | AP 経由の操作は**遮断されない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`s3` は HTTP 400 で拒否されます
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	発火しない**ため、代わりにならない
 VMware-Migration-EC2-ONTAP	docs/ja/tco-comparison.md	retraction	容量単価だけで FSx for ONTAP を選ぶ根拠は、ブロックでは成立しません

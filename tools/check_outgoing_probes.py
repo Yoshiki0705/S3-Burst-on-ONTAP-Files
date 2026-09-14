@@ -28,6 +28,7 @@ Run:  python3 tools/check_outgoing_probes.py [--fetch]
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -206,9 +207,54 @@ def out_of_order(text: str) -> list[str]:
     return []  # pragma: no cover - unreachable while the lists differ
 
 
+SHAPE = re.compile(
+    r"SHAPE:\s*(\d+) rows across (\d+) files, (\d+) in the largest", re.MULTILINE
+)
+
+
+def shape_drift(text: str) -> list[str]:
+    """The header states the contract's shape, and that shape is the premise of a decision.
+
+    Not blocking on this check in CI is justified by the rows being concentrated: one rewrite of the
+    file that holds most of them fails several at once, so an other-caused red would block every
+    unrelated change. That argument stops holding as rows spread out -- and a hand-written count goes
+    stale silently, which would leave the decision standing on a premise that is no longer true.
+
+    So the numbers are recomputed and compared, the same way pattern counts are. Absent header: also a
+    failure. A premise that can be deleted to make the check pass is not a premise.
+    """
+    rows = [line for line in text.split("\n") if line and not line.startswith("#")]
+    per_file: dict[tuple[str, str], int] = {}
+    for line in rows:
+        fields = line.split("\t")
+        if len(fields) >= 2:
+            per_file[(fields[0], fields[1])] = (
+                per_file.get((fields[0], fields[1]), 0) + 1
+            )
+    actual = (len(rows), len(per_file), max(per_file.values(), default=0))
+
+    match = SHAPE.search(text)
+    if match is None:
+        return [
+            f"{CONTRACT.as_posix()}: the header no longer states a SHAPE line. It carries the "
+            "premise for not blocking on this check in CI, so removing it removes the reason "
+            f"rather than the requirement. Expected: SHAPE: {actual[0]} rows across {actual[1]} "
+            f"files, {actual[2]} in the largest."
+        ]
+    stated = tuple(int(group) for group in match.groups())
+    if stated != actual:
+        return [
+            f"{CONTRACT.as_posix()}: the header states {stated[0]} rows across {stated[1]} files "
+            f"with {stated[2]} in the largest; the rows are {actual[0]} across {actual[1]} with "
+            f"{actual[2]} in the largest. Update the SHAPE line -- and if the rows have spread out, "
+            "the reason this check does not block on a pull request may no longer hold."
+        ]
+    return []
+
+
 def main() -> int:
     contract_text = (ROOT / CONTRACT).read_text(encoding="utf-8")
-    problems = out_of_order(contract_text)
+    problems = out_of_order(contract_text) + shape_drift(contract_text)
     if problems:
         for problem in problems:
             print(f"  {problem}", file=sys.stderr)
