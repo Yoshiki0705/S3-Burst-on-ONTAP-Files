@@ -71,13 +71,21 @@ jobs:
       # from its own side.
       - name: Check cited sibling-repository anchors
         run: python3 tools/check_external_anchors.py
-      # Skips here for the same reason, plus a second one while this is new: the sibling has not
-      # published the probe contract yet. Both show up as the same skip message, which says so.
+      # --fetch, not the offline mode. Without a sibling checkout the offline mode skips every row and
+      # exits 0, so this step was green while verifying nothing -- a pull request that reworded a
+      # probed string merged, and the only detection was a weekly, non-blocking report. Fetching the
+      # published contract needs no checkout, and a failure here is caused by an edit in this pull
+      # request, so it belongs in the merge decision.
+      #
+      # A sibling can still redden an unrelated pull request by registering a probe on a string this
+      # repository never carried. That is rarer than the case above and worth surfacing anyway: a
+      # registration nobody can satisfy is a citation that is already broken.
       - name: Check claims a sibling repository cites
-        run: python3 tools/check_incoming_probes.py
-      # The other direction: claims this repository cites in a sibling. Skips per repository without a
-      # checkout, so on a runner it reports only that the contract parses. The scheduled --fetch run
-      # is what actually resolves the strings.
+        run: python3 tools/check_incoming_probes.py --fetch
+      # The other direction stays offline on purpose, so on a runner it reports only that the contract
+      # parses. A failure resolving these strings means a *sibling* reworded something, which would
+      # turn this red on a pull request that did not touch it -- and a gate that reddens for someone
+      # else's change teaches contributors to ignore red. The scheduled --fetch run reports those.
       - name: Check claims this repository cites in a sibling
         run: python3 tools/check_outgoing_probes.py
 
