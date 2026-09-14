@@ -48,6 +48,7 @@ Run:  python3 tools/check_incoming_probes.py
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -190,8 +191,45 @@ def parse_contract(body: str) -> tuple[list[Probe], list[str]]:
     return probes, problems
 
 
-def contract_from(base: Path) -> tuple[list[Probe], list[str]]:
-    return parse_contract((base / CONTRACT).read_text(encoding="utf-8"))
+def committed_contract(base: Path) -> str | None:
+    """The contract as the sibling has published it, read from git rather than from the checkout.
+
+    A working tree can hold an unpushed edit in either direction and the two fail differently. A row
+    added but not pushed makes this gate enforce a registration no reader can see, which is merely
+    over-strict. A row *removed* but not pushed is the harmful one: the registration is still
+    published, the sibling still cites the claim, and this gate quietly stops checking it while
+    reporting a clean run.
+
+    Reading `origin/main` costs nothing -- it is a local object, not a fetch -- and it is the side the
+    sibling's own CI and readers see. Returns None when the checkout is not a git repository, has no
+    `origin/main`, or does not carry the contract at that ref; the caller falls back to the working
+    tree and says which side it read.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(base), "show", f"origin/main:{CONTRACT.as_posix()}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def contract_from(base: Path) -> tuple[list[Probe], list[str], str]:
+    """Parse one sibling's contract, preferring the published side over the working tree.
+
+    The source is returned rather than inferred, because which side was read is part of the result:
+    a run that fell back to the working tree is not the same evidence as one that read origin/main.
+    """
+    committed = committed_contract(base)
+    if committed is not None:
+        probes, problems = parse_contract(committed)
+        return probes, problems, f"{base.name} at origin/main"
+    probes, problems = parse_contract((base / CONTRACT).read_text(encoding="utf-8"))
+    return probes, problems, f"{base.name} working tree -- origin/main was unreadable"
 
 
 def fetch_contract(sibling: Sibling) -> tuple[list[Probe] | None, list[str]]:
@@ -304,8 +342,7 @@ def check_sibling(sibling: Sibling, fetch: bool) -> tuple[int, int, bool]:
                 "instead of by this gate."
             )
             return 0, 0, True
-        probes, problems = contract_from(base)
-        source = base.name
+        probes, problems, source = contract_from(base)
 
     if problems:
         for problem in problems:
