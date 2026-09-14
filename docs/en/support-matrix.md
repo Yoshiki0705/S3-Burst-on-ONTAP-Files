@@ -94,7 +94,7 @@ is treated as something to verify.
 
 | Constraint | Detail |
 |---|---|
-| Security style | Treated as an item inherited from the origin at cache creation time and not settable on the cache. For the source and the unconfirmed scope see [decisions that come first](design-first-decisions.md) |
+| Security style | **Inherited from the origin at cache creation time. Measured** ([the inheritance record](../ja/verification/flexcache-security-style-inheritance.md) (Japanese), FSx for ONTAP on both sides). **It cannot be specified at creation, and ONTAP refuses to change it afterwards.** How it maps to the fan-out protocol is unmeasured; for that scope see [decisions that come first](design-first-decisions.md) |
 | Caches per origin | AWS documentation recommends write-around above 10 origin volumes. The behaviour as the number of fan-out targets grows is unverified |
 | Deletion order | Do not delete the origin side while a cache still exists. Releasing the cache and the SVM peer comes before removing the peering |
 | Writes on the cache side | Not addressed here. Writes are consolidated on the origin-side S3 Access Point |

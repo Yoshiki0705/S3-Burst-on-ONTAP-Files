@@ -1,7 +1,8 @@
 # いまの構成から読む
 
-<!-- LANG-SWITCHER-START -->
-<!-- LANG-SWITCHER-END -->
+<!-- lang-switcher:start -->
+🌐 [日本語](from-your-current-setup.md) | [English](../../../en/reference/decision-trees/from-your-current-setup.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->
 
 **この構成が自分に当てはまるかは、製品名では決まりません。** 決まるのは、いまデータが
 どこに入ってどこから読まれているか、その間を何が運んでいるかです。
@@ -76,8 +77,12 @@
 ## どの形にも共通して先に決めること
 
 **利用拠点で NFS を使うのか SMB を使うのか。** Origin のセキュリティスタイル（UNIX / NTFS）と
-対応し、**Origin ボリュームを作る前に決めます。** Cache が継承するかは未確認ですが、継承する
-場合の手戻りが大きく、継承しない場合に失うものが無いので、先に決めるほうが安全です。
+対応し、**Origin ボリュームを作る前に決めます。**
+
+**Cache は Origin から継承します。実測しました**
+（[継承の検証記録](../../verification/flexcache-security-style-inheritance.md)、両側 FSx for ONTAP）。
+**そして Cache 側で選び直す経路がありません** — 作成時に渡す引数が無く、作成後の変更は ONTAP が
+拒否します。**つまり先に決める理由は「念のため」ではなく、あとから直せないことです。**
 詳細は[最初に決めること](../../design-first-decisions.md)にあります。
 
 ## 次に読むもの
@@ -89,3 +94,7 @@
 | 金額の内訳 | [FinOps の費用構造](../comparison/finops-s3-vs-s3ap.md) |
 | どこまで確かめられているか | [検証状況](../../verification-status.md) |
 | 実際に作る | [収集側の手順](../../deployment/aws-cloudformation.md) / [配布側の手順](../../deployment/onprem-terraform.md) |
+
+<!-- lang-switcher:start -->
+🌐 [日本語](from-your-current-setup.md) | [English](../../../en/reference/decision-trees/from-your-current-setup.md) | [🏠 リポジトリトップ](../../../../README.md)
+<!-- lang-switcher:end -->

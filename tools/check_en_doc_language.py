@@ -84,6 +84,14 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # The round that measured the nine outstanding items and corrected five published figures.
         "#残していた-9-件を測ったこの記録の数値を-5-つ訂正します",
     ),
+    # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
+    # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is
+    # the measurement plus the three limits that stop it being read as a distribution figure. The
+    # record is a measurement record and Japanese-only by the Tier 2 policy; restating the figures in
+    # English would put them in a second place, where the two copies drift.
+    "docs/en/reference/decision-trees/from-your-current-setup.md": (
+        "#f-1-iscsi-の実測",
+    ),
     # The teardown traps from the security-style inheritance run. The English teardown step warns
     # that skipping the peer release strands the stack, and this anchor is the eight failures behind
     # that warning -- including the two that only appear when the order is already wrong. Restating
