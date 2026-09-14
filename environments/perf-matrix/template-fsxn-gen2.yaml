@@ -43,7 +43,7 @@ Metadata:
       - Label: {default: Performance}
         Parameters: [ThroughputCapacityPerHAPair, StorageCapacityGiB, ProvisionedSsdIops]
       - Label: {default: Volume}
-        Parameters: [VolumeSizeBytes]
+        Parameters: [VolumeSizeBytes, BlockVolumeSizeBytes]
       - Label: {default: Naming and credentials}
         Parameters: [NamePrefix, FsxAdminPasswordSecretArn]
 
@@ -77,7 +77,8 @@ Parameters:
     Default: 4096
     MinValue: 1024
     Description: >-
-      **Sized for IOPS, not for data.** Two 900 GiB volumes need 2,048 GiB, but FSx for ONTAP caps
+      **Sized for IOPS, not for data.** A 900 GiB file volume and an 1,800 GiB block volume need
+      2,700 GiB, but FSx for ONTAP caps
       provisioned SSD IOPS at 50 per GB of SSD, so 200,000 IOPS needs at least 4,000 GiB. The extra
       capacity is what stops SSD IOPS from binding before the throughput capacity does -- see
       ProvisionedSsdIops. The data itself only has to exceed the 256 GB in-memory cache, which is why
@@ -116,6 +117,17 @@ Parameters:
       account IDs to a secret scanner. runbook.sh computes it, where arithmetic exists. Size it to
       hold more than twice the 256 GB in-memory cache, which is what a read has to exceed once the
       NVMe read cache is disabled -- 900 GiB is what the runbook passes.
+  BlockVolumeSizeBytes:
+    Type: String
+    AllowedPattern: "^[0-9]{11,13}$"
+    Description: >-
+      The block volume, in bytes, sized apart from VolumeSizeBytes because it holds two objects rather
+      than one: the iSCSI LUN and the NVMe/TCP namespace, at 600 GiB each. At 900 GiB they do not both
+      fit, which is why F-1 and F-2 were first measured on separate file systems -- and deploy-to-deploy
+      variance there reached 2.64x, larger than the protocol difference being read out of the pair. No
+      default, for the same reason VolumeSizeBytes has none: runbook.sh does the arithmetic, and a byte
+      literal here is indistinguishable from an account ID to a secret scanner. It passes 1,800 GiB.
+      Unused when EnableBlockProtocols is false, but still validated, so it is always passed.
   EnableBlockProtocols:
     Type: String
     Default: "false"
@@ -385,9 +397,20 @@ Resources:
   # (https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-fsx-volume-ontapconfiguration.html).
   # Believe the API. The junction is harmless -- no export policy sends traffic to it.
   #
-  # AWS recommends a volume at least 5% larger than the LUN, so the runbook sizes a 600 GiB LUN into
-  # the 900 GiB this passes. 600 GiB is the same figure the file side used, and for the same reason --
-  # more than twice the 256 GB in-memory cache.
+  # AWS recommends a volume at least 5% larger than the LUN. 600 GiB is the same figure the file side
+  # used, and for the same reason -- more than twice the 256 GB in-memory cache.
+  #
+  # **Sized separately from VolumeSizeBytes, and that is what makes the same-file-system comparison
+  # possible.** This volume holds the iSCSI LUN *and* the NVMe/TCP namespace at the same time, so both
+  # protocols are measured against one volume on one file system. At 900 GiB it could not: two 600 GiB
+  # objects do not fit, F-1 and F-2 became separate runs on separate file systems, and the published
+  # caveat is that deploy-to-deploy variance reached 2.64x -- larger than the difference being
+  # attributed to the protocol.
+  #
+  # A single volume carrying both is a documented configuration, not an assumption: AWS's own
+  # troubleshooting page has a section for a volume that "contains an iSCSI LUN, an NVMe/TCP
+  # namespace, or both"
+  # (https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/misconfigured-volume.html).
   #
   # **Deployed 2026-09-12.** The JunctionPath above is why the first attempt failed.
   BlockVolume:
@@ -402,7 +425,7 @@ Resources:
         JunctionPath: !Sub "/${NamePrefix}_blk_vol"
         SecurityStyle: UNIX
         StorageEfficiencyEnabled: false
-        SizeInBytes: !Ref VolumeSizeBytes
+        SizeInBytes: !Ref BlockVolumeSizeBytes
         TieringPolicy:
           Name: NONE
         SnapshotPolicy: none
