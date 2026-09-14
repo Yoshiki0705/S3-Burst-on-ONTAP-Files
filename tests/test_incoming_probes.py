@@ -262,3 +262,74 @@ def test_zero_rows_for_this_repository_is_not_a_pass() -> None:
         row("docs/a.md", "retraction", "x", repo="Some-Other-Repo")
     )
     assert not probes and not problems
+
+
+# --- which side of the sibling gets read -------------------------------------------------------
+
+
+def _sibling_with(tmp_path: Path, published: str, working: str) -> Path:
+    """A throwaway sibling whose published contract and working tree disagree.
+
+    Built with a bare remote rather than by faking a ref, because the checker asks git for
+    `origin/main` and a fixture that does not have one would pass for the wrong reason.
+    """
+    import subprocess
+
+    bare = tmp_path / "origin.git"
+    work = tmp_path / "sibling"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    subprocess.run(["git", "clone", "-q", str(bare), str(work)], check=True)
+    for key, value in (("user.email", "fixture@example.com"), ("user.name", "t")):
+        subprocess.run(["git", "-C", str(work), "config", key, value], check=True)
+    contract = work / mod.CONTRACT
+    contract.parent.mkdir(parents=True, exist_ok=True)
+    contract.write_text(published, encoding="utf-8")
+    subprocess.run(["git", "-C", str(work), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(work), "commit", "-q", "-m", "publish"],
+        check=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(tmp_path)},
+    )
+    subprocess.run(
+        ["git", "-C", str(work), "push", "-q", "origin", "HEAD:main"], check=True
+    )
+    subprocess.run(["git", "-C", str(work), "fetch", "-q", "origin"], check=True)
+    contract.write_text(working, encoding="utf-8")
+    return work
+
+
+def test_the_published_contract_is_read_not_the_working_tree(tmp_path: Path) -> None:
+    """A row removed locally but still pushed must keep being enforced.
+
+    This is the asymmetry that matters. An unpushed *addition* only makes this gate stricter than
+    any reader can see. An unpushed *removal* leaves the registration published and cited while the
+    gate stops checking it, and reports a clean run for doing so -- the sibling would find out by
+    their own CI failing, which is the arrangement this check exists to avoid relying on.
+    """
+    base = _sibling_with(
+        tmp_path,
+        published=row("docs/published.md", "retraction", "still cited") + "\n",
+        working=row("docs/working.md", "retraction", "only local") + "\n",
+    )
+    probes, problems, source = mod.contract_from(base)
+    assert not problems
+    assert [p.text for p in probes] == ["still cited"]
+    assert "origin/main" in source
+
+
+def test_the_working_tree_is_the_fallback_and_says_so(tmp_path: Path) -> None:
+    """No git repository, no origin/main, or no contract at that ref: read the checkout instead.
+
+    The fallback is not silent. Which side was read is reported, because a run that fell back is
+    weaker evidence than one that read the published side, and a reader of the output cannot tell
+    the two apart otherwise.
+    """
+    base = tmp_path / "plain"
+    (base / mod.CONTRACT).parent.mkdir(parents=True)
+    (base / mod.CONTRACT).write_text(
+        row("docs/a.md", "retraction", "from the checkout") + "\n", encoding="utf-8"
+    )
+    probes, problems, source = mod.contract_from(base)
+    assert not problems
+    assert [p.text for p in probes] == ["from the checkout"]
+    assert "working tree" in source and "unreadable" in source

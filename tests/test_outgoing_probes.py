@@ -195,3 +195,70 @@ def test_an_empty_contract_is_not_a_pass(
     root = sibling(tmp_path, monkeypatch, None)
     assert run(monkeypatch, "# only a comment", root) == 1
     assert "holds no probe" in capsys.readouterr().err
+
+
+# --- which side of the sibling gets read -------------------------------------------------------
+
+
+def _published(tmp_path: Path, path: str, published: str, working: str) -> Path:
+    """A throwaway sibling whose published file and working tree disagree."""
+    import subprocess
+
+    bare = tmp_path / "origin.git"
+    work = tmp_path / "sibling"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    subprocess.run(["git", "clone", "-q", str(bare), str(work)], check=True)
+    for key, value in (("user.email", "fixture@example.com"), ("user.name", "t")):
+        subprocess.run(["git", "-C", str(work), "config", key, value], check=True)
+    target = work / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(published, encoding="utf-8")
+    subprocess.run(["git", "-C", str(work), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(work), "commit", "-q", "-m", "publish"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(work), "push", "-q", "origin", "HEAD:main"], check=True
+    )
+    subprocess.run(["git", "-C", str(work), "fetch", "-q", "origin"], check=True)
+    target.write_text(working, encoding="utf-8")
+    return work
+
+
+def test_a_sentence_only_in_the_checkout_does_not_satisfy_a_citation(
+    tmp_path: Path,
+) -> None:
+    """The harmful direction for this check is an unpushed *addition*.
+
+    A citation is a promise that a reader who follows it finds the claim. If the gate reads a working
+    tree, a sentence someone has written but not pushed satisfies it, and the published document a
+    reader lands on does not carry the claim. So the published side is what gets read, and a body
+    that exists only in the checkout must not count.
+    """
+    doc = "docs/ja/example.md"
+    base = _published(
+        tmp_path, doc, published="nothing here\n", working="cited sentence\n"
+    )
+    body, from_git = mod.committed(base, doc)
+    assert from_git, (
+        "origin/main resolves, so this checkout can answer for the published side"
+    )
+    assert body == "nothing here\n"
+    assert "cited sentence" not in (body or "")
+
+
+def test_a_checkout_without_origin_main_is_reported_as_a_fallback(
+    tmp_path: Path,
+) -> None:
+    """No origin/main means this checkout cannot answer for the published side.
+
+    That is a different outcome from "the file is absent there", and the two are distinguished by
+    asking git for the ref rather than by matching the wording of a failure -- a message that is free
+    to change between git versions.
+    """
+    base = tmp_path / "plain"
+    (base / "docs").mkdir(parents=True)
+    (base / "docs" / "a.md").write_text("x\n", encoding="utf-8")
+    body, from_git = mod.committed(base, "docs/a.md")
+    assert not from_git
+    assert body is None

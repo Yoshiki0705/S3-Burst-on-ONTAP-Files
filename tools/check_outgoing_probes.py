@@ -124,6 +124,46 @@ def checkout(repo: str) -> Path | None:
     return None
 
 
+def committed(base: Path, path: str) -> tuple[str | None, bool]:
+    """One file from the sibling as published, read from git rather than from the checkout.
+
+    Returns `(body, read_from_git)`. `read_from_git` false means the caller should fall back and say
+    so; a None body with it true means the file is genuinely absent at `origin/main`.
+
+    The harmful direction here is the opposite of the incoming check's. There, an unpushed removal
+    stops a published registration from being enforced. Here, an **unpushed addition** lets this
+    repository cite a sentence no reader can see: the gate goes green against a working tree while
+    the published document does not carry the claim. Reading `origin/main` is local -- no fetch -- and
+    it is the side a reader following the citation lands on.
+    """
+    import subprocess
+
+    def git(*args: str) -> subprocess.CompletedProcess[str] | None:
+        try:
+            return subprocess.run(
+                ["git", "-C", str(base), *args],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    # Asked separately, and not inferred from the wording of a failure. "This checkout cannot answer
+    # for origin/main" and "origin/main does not carry this file" need opposite handling -- fall back
+    # versus report the file as gone -- and telling them apart by matching git's stderr would rest the
+    # distinction on a message that is free to change between versions.
+    ref = git("rev-parse", "--verify", "--quiet", "origin/main")
+    if ref is None or ref.returncode != 0:
+        return None, False
+
+    shown = git("show", f"origin/main:{path}")
+    if shown is None:
+        return None, False
+    return (shown.stdout, True) if shown.returncode == 0 else (None, True)
+
+
 def fetch(repo: str, path: str) -> str | None:
     import urllib.error
     import urllib.request
@@ -164,6 +204,10 @@ def main() -> int:
     failures: list[str] = []
     warnings: list[str] = []
     skipped: set[str] = set()
+    # Repositories whose published side could not be read, so the checkout answered instead. Named in
+    # the summary: a run that fell back proves less than one that read origin/main, and the output is
+    # the only place a reader can tell which happened.
+    fell_back: set[str] = set()
     bodies: dict[tuple[str, str], str | None] = {}
     checked = 0
 
@@ -176,10 +220,17 @@ def main() -> int:
             if online:
                 bodies[key] = fetch(probe.repo, probe.path)
             else:
-                target = checkout(probe.repo) / probe.path  # type: ignore[operator]
-                bodies[key] = (
-                    target.read_text(encoding="utf-8") if target.is_file() else None
-                )
+                base = checkout(probe.repo)
+                assert base is not None
+                body, from_git = committed(base, probe.path)
+                if from_git:
+                    bodies[key] = body
+                else:
+                    fell_back.add(probe.repo)
+                    target = base / probe.path
+                    bodies[key] = (
+                        target.read_text(encoding="utf-8") if target.is_file() else None
+                    )
         body = bodies[key]
         checked += 1
 
@@ -218,6 +269,13 @@ def main() -> int:
             "outgoing-probes: SKIPPED for "
             + ", ".join(sorted(skipped))
             + " (no local checkout beside this repository; the scheduled job runs --fetch)"
+        )
+    if fell_back:
+        print(
+            "outgoing-probes: read the working tree for "
+            + ", ".join(sorted(fell_back))
+            + " because origin/main was unreadable there. An unpushed edit in that checkout can "
+            "make this pass while the published document does not carry the claim."
         )
     if checked:
         print(f"outgoing-probes: {checked} probe(s) resolve against {source}")
