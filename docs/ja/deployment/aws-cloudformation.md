@@ -32,6 +32,21 @@
   検証ホストは受信ルールを持たず、キーペアも使いません
 - `aws` CLI が認証済みであること
 
+> **ネットワークに関する補足**: **配布側を繋ぐなら、このテンプレートが開けないポートが 2 つあります。**
+> クラスタピアリングは**インタークラスタ LIF 間の TCP 11104-11105** を使い、そこは
+> **双方のファイルシステムのセキュリティグループに、相手側からの許可を自分で足す**必要があります。
+> このテンプレートは 1 台分しか作らないので、相手側の存在を知りません。
+>
+> | 何を許可するか | どちらの SG に | ポート |
+> |---|---|---|
+> | クラスタピアリング | **双方向**（Origin 側 SG に Cache 側 SG から、Cache 側 SG に Origin 側 SG から） | TCP **11104-11105** |
+> | ONTAP REST / CLI | 相手側の SG に、作業ホストの SG から | TCP 443 / 22 |
+> | NFSv3 | Cache 側 SG に、利用側の SG から | TCP 2049 / 111 / 635 / 4045-4046 |
+>
+> **リージョンを跨ぐ場合は SG 参照が使えず、CIDR で書くことになります**
+> （[配布側のデプロイ](onprem-terraform.md)に既出）。到達性そのものの確認手順は
+> [PoC チェックリスト](../poc-checklist.md)にあります。
+
 > **セキュリティに関する補足**: `NTFS` を選ぶ場合、SVM に CIFS サーバーが必要です。
 > **このテンプレートは CIFS サーバーの作成も Active Directory 参加も行いません。**
 > AD 参加は必須ではなく、ドメインが利用できない場合は workgroup モードで構成できます
@@ -231,6 +246,14 @@ Secrets Manager のシークレットは既定で復旧期間を持って削除�
 | アクセスポイントを追加したら、それだけ `AccessDenied` になる | **VPC エンドポイントポリシーを絞っている環境では、新しいアクセスポイントの ARN が許可対象に入っていません。** 既定は全許可なので、絞っていない環境ではこの層の存在に気づきません（[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)。AWS のドキュメント記載で、このリポジトリでは実測していません） |
 | `HeadBucket` は通るのにデータ操作が失敗する | AD 参加 SVM ならドメインコントローラーへの到達性。`HeadBucket` は偽陽性になります |
 | 書いたのに NFS に見えない | マウントオプション。`actimeo=0` のマウントポイントで確認してください |
+| FlexCache の作成が `Volumes of this type must be at least 50GB` で失敗する | **Cache ボリュームは 50 GB 未満で作れません。** Origin より小さくはできますが、この下限は別です |
+| FlexCache の作成が `Aggregates not matching FabricPool requirements` で失敗する | **`use_tiered_aggregate`（CLI は `-use-tiered-aggregate`）を有効にしてください。** FSx for ONTAP のアグリゲートは FabricPool 有効で、既定は「階層化アグリゲートに Cache を置かない」です |
+| Cache ボリュームが `volume delete` で消えない | **FlexCache は専用の削除経路です**（CLI は `volume flexcache delete`、REST は `/storage/flexcache/flexcaches/{uuid}`）。**先に unmount して offline にする必要があります** |
+| Cache を消したのに Origin が「まだ Cache がある」と言って消えない | **Cache を解放する前に Origin を offline にすると、Cache 削除時の Origin 側 cleanup が失敗します。** `Origin` に触るのは解放が終わったあとです。復旧は[継承の検証記録](../verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠)にあります |
+| スタック削除が `svmLifecycle should be DELETING, but get: MISCONFIGURED` で失敗する | **SVM ピアが残っています。** 解除は ONTAP 側からで、**そのホストを消す前に行ってください**（[削除](#5-削除)） |
+
+**上の 5 行は 2026-09-13 に実際に踏んだものです**（ONTAP 9.18.1P6、両側 FSx for ONTAP）。
+エラー文はそのまま検索できる形で載せてあります。
 
 ## 関連ドキュメント
 
