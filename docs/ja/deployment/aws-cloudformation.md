@@ -57,10 +57,35 @@
 
 ## 2. スタックの作成
 
+**パラメータは 19 個ありますが、書き換えが必要なのは 2 個だけです。** 残りは既定のまま動きます。
+**1 個だけ、既定のままにしてはいけないもの（作り直しになる決定）があります。**
+
+| 何を | どうする | なぜ |
+|---|---|---|
+| `VpcId` / `SubnetId` | **必ず自分の値に置き換える** | 置き換えないと存在しない ID で失敗します |
+| `OriginVolumeSecurityStyle` | **既定は `UNIX`。SMB で読むなら `NTFS` に変える** | **後から変えられません。**[最初に決めること](../design-first-decisions.md)にある唯一の不可逆な選択です |
+| 残り 16 個 | **触らなくてよい** | 検証に使った値です。費用は下の見積りのとおりで、`StorageCapacityGiB` と `ThroughputCapacityMBps` を上げると比例して増えます |
+
+**`VpcId` と `SubnetId` は次で調べられます。**
+
+```bash
+# 自分のアカウントの VPC を一覧する（Name タグ付き）
+aws ec2 describe-vpcs --region ap-northeast-1 \
+  --query 'Vpcs[].[VpcId,CidrBlock,Tags[?Key==`Name`].Value|[0]]' --output table
+
+# 選んだ VPC のサブネットを一覧する。ファイルシステムと検証ホストは同じサブネットに置きます
+aws ec2 describe-subnets --region ap-northeast-1 \
+  --filters Name=vpc-id,Values=<選んだ VpcId> \
+  --query 'Subnets[].[SubnetId,AvailabilityZone,CidrBlock,AvailableIpAddressCount]' --output table
+```
+
+**`AvailableIpAddressCount` を見てください。** ファイルシステムは複数の IP を取るので、
+空きが乏しいサブネットでは作成が失敗します（下の[うまくいかないとき](#うまくいかないとき)の 1 行目）。
+
 ```bash
 cd environments/aws-origin
 cp params.example.json params.json    # params.json は追跡されません
-# VpcId と SubnetId を自分の値に変更する
+# VpcId と SubnetId を上で調べた値に変更する
 #
 # スループットを測る場合は params.throughput.example.json を使う。t3.small ではなく
 # c5n.9xlarge を指定し、ホストに S3 のデータ経路権限を与える構成で、費用が上がる。

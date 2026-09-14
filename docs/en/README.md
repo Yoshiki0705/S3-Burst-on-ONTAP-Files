@@ -140,6 +140,20 @@ nothing to lose if it does not. The steps to confirm it are in the
 
 ## Start here
 
+**Arriving for the first time, read these three in order.** The table below is an index, **not a
+reading order** — there is no need to go through all of it.
+
+1. **[Architecture](architecture.md) (5 min)** — what it solves, and what it does not
+2. **[Reading from your current setup](../ja/reference/decision-trees/from-your-current-setup.md) (Japanese) (5 min)** —
+   whether the shape you already run fits. **Two shapes end in "out of scope", and it says so**
+3. **[What to decide first](design-first-decisions.md) (5 min)** —
+   **the one thing to settle before the origin volume exists** (security style). **It cannot be
+   changed afterwards**
+
+**Then, to actually run it, go to [deploying the collect side](deployment/aws-cloudformation.md)
+(40 min).** **Two of the 19 parameters need editing, and the commands to find their values are on
+that page.** The cost estimate is there as well.
+
 | What you want | Guide | Time |
 |---|---|---|
 | Understand the shape of the architecture | [Architecture](architecture.md) | 5 min |
