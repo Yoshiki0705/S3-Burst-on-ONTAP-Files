@@ -61,3 +61,4 @@ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-covera
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	FPolicy 通知を**発火しない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	ONTAP ネイティブ監査ログ（`vserver audit`）なら載る
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`s3` は HTTP 400 で拒否されます
+VMware-Migration-EC2-ONTAP	docs/ja/tco-comparison.md	retraction	容量単価だけで FSx for ONTAP を選ぶ根拠は、ブロックでは成立しません
