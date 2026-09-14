@@ -262,3 +262,35 @@ def test_a_checkout_without_origin_main_is_reported_as_a_fallback(
     body, from_git = mod.committed(base, "docs/a.md")
     assert not from_git
     assert body is None
+
+
+# --- a citation that protects less than it looks like it does --------------------------------------
+
+
+def test_a_string_occurring_twice_in_the_cited_file_is_reported_as_weak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Two occurrences let the sibling reword one and leave this green while the citation goes stale.
+
+    Unlike the incoming direction, the string was chosen here, so the fix is this repository's. The
+    first run of this check found one: a probe registered against a phrase that sits in two table rows
+    of the cited errata, which had been passing for as long as it had existed.
+    """
+    sibling(tmp_path, monkeypatch, "一度目は 発火しない、二度目も 発火しない")
+    assert run(monkeypatch, row("docs/errata.md", "retraction", "発火しない")) == 0
+    out = capsys.readouterr().out
+    assert "weak probe" in out
+    assert "occurs 2 times" in out
+
+
+def test_a_weak_citation_still_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The string resolves, so this is not a retraction and the exit status stays 0.
+
+    Failing would conflate "the claim was withdrawn" with "the anchor is fragile". The first needs a
+    conversation with the sibling; the second needs a longer string on this side.
+    """
+    sibling(tmp_path, monkeypatch, "発火しない と 発火しない")
+    assert run(monkeypatch, row("docs/errata.md", "retraction", "発火しない")) == 0
+    assert "no longer resolve" not in capsys.readouterr().out

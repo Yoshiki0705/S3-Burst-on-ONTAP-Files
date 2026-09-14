@@ -268,10 +268,18 @@ def fetch_contract(sibling: Sibling) -> tuple[list[Probe] | None, list[str]]:
 
 def check(
     probes: list[Probe], citing: str = "the sibling"
-) -> tuple[list[str], list[str]]:
-    """Substring test per probe. Failures for retraction, warnings for reread."""
+) -> tuple[list[str], list[str], list[str]]:
+    """Substring test per probe. Failures for retraction, warnings for reread, plus weak probes.
+
+    A probe whose string occurs more than once protects less than it looks like it does: rewording
+    one occurrence leaves the other in place, this gate stays green, and the sibling is told nothing.
+    Reported rather than failed, because the string was the sibling's choice and the fix -- a longer
+    string, or a different sentence -- is theirs to make. Counting it here is what turns a check that
+    was being done by hand, three times in one exchange, into one the run does every time.
+    """
     failures: list[str] = []
     warnings: list[str] = []
+    weak: list[str] = []
     cache: dict[str, str | None] = {}
 
     for probe in probes:
@@ -293,7 +301,14 @@ def check(
             )
             continue
 
-        if probe.text in body:
+        occurrences = body.count(probe.text)
+        if occurrences > 1:
+            weak.append(
+                f"{probe.path}: {probe.text!r} occurs {occurrences} times, so rewording one of "
+                f"them leaves this gate green and {citing} unwarned. A longer string, or one from "
+                "a sentence that appears once, protects the claim."
+            )
+        if occurrences:
             continue
 
         if probe.role == FAIL_ROLE:
@@ -308,7 +323,7 @@ def check(
                 "of a measurement set, so a new measurement is expected to move it. **Not a "
                 f"retraction** -- tell {citing} the range changed and why."
             )
-    return failures, warnings
+    return failures, warnings, weak
 
 
 def check_sibling(sibling: Sibling, fetch: bool) -> tuple[int, int, bool]:
@@ -364,10 +379,14 @@ def check_sibling(sibling: Sibling, fetch: bool) -> tuple[int, int, bool]:
         )
         return 1, 0, False
 
-    failures, warnings = check(probes, citing=sibling.label)
+    failures, warnings, weak = check(probes, citing=sibling.label)
 
     for warning in warnings:
         print(f"  reread [{sibling.label}]: {warning}")
+    # Printed apart from the reread warnings: that one says a string moved, this one says a string
+    # protects less than it appears to. Confusing them would hide a fragility behind an expected note.
+    for note in weak:
+        print(f"  weak probe [{sibling.label}]: {note}")
     for failure in failures:
         print(f"  [{sibling.label}] {failure}", file=sys.stderr)
 
@@ -382,6 +401,8 @@ def check_sibling(sibling: Sibling, fetch: bool) -> tuple[int, int, bool]:
     counts = {role: sum(1 for p in probes if p.role == role) for role in ROLES}
     summary = ", ".join(f"{counts[role]} {role}" for role in ROLES)
     tail = f", {len(warnings)} reread probe(s) moved" if warnings else ""
+    if weak:
+        tail += f", {len(weak)} weak probe(s)"
     print(
         f"incoming-probes [{sibling.label}]: {len(probes)} probe(s) resolve "
         f"({summary}) ({source}){tail}"
