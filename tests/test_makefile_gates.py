@@ -45,6 +45,11 @@ NOT_IN_ALL = {
     # uncommitted icon package to rebuild what it compares against, so in CI it could only ever
     # fail for a missing download. It is a local check, run alongside `diagrams`.
     "diagrams-check",
+    # Audits the article drafts under `.private/`, which is gitignored and therefore absent on a
+    # runner. In the aggregate it would fail locally and pass in CI -- the shape of every hole this
+    # repository has found in its own gates. It is a pre-publication step, and the tool says so loudly
+    # when the directory is missing rather than reporting a clean scan of nothing.
+    "audit-drafts",
     "links-external",  # needs a network
     # Needs a network, and compares against a page AWS owns. In the aggregate it would turn the
     # commit gate red on a pull request that changed nothing, which is the failure that teaches
