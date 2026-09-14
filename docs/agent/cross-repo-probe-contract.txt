@@ -22,15 +22,20 @@
 # The premise is the shape of this contract, not a preference. Stated in a form the checker verifies,
 # because a premise that goes stale keeps justifying the decision it no longer supports:
 #
-#   SHAPE: 11 rows across 3 files, 5 in the largest.
+#   SHAPE: 15 rows across 5 files, 5 in the largest.
 #
 # The two largest are translations of each other, so one rewrite of that errata can fail five rows at
 # once: an other-caused red arrives as a batch that blocks every unrelated change until someone else's
 # edit is reconciled.
 #
 # Revisit when that stops being true: rows spread across enough files that a single rewrite fails one
-# or two, the way it is for the sibling that made the opposite call for that reason. Their
-# arrangement is not wrong for them -- 18 rows over 6 files -- and this one is not right in general.
+# or two.
+#
+# A sibling reached the opposite conclusion on that same reasoning and then reversed it, which is the
+# reason this premise is checked rather than written once. They had described their contract as spread
+# thinly, blocked on the strength of that, and found on counting that 13 of 22 rows sat in one file --
+# so the shape they were relying on was not the shape they had. Do not cite another repository's shape
+# from memory of what they said: count it, or do not use it.
 #
 # The gap this leaves is stated rather than hidden: `make all` catches a bad citation for anyone
 # holding the sibling checkouts, and a contributor without them can merge a citation whose string was
@@ -49,6 +54,23 @@
 #
 # Applies to new rows as well: when a cited sentence has both, register both or say which half this
 # repository restates.
+#
+# EXTENDED 2026-09-14 TO THE UNPUBLISHED DRAFTS, WHICH IS WHERE THE NEXT GAP WAS.
+#
+# The first pass read tracked documents only. The article drafts under `.private/` are gitignored but
+# they are a publishing surface, and they cite four sibling documents this contract said nothing about.
+# Two of them carry restated measurements and are now registered: the object-size ceiling being binary
+# rather than decimal, and the rebalance states missing from the REST reference.
+#
+# Two are deliberately not registered, and the reasons differ:
+#
+#   * fsx-ontap-management-interfaces.md -- the endpoint reachability claim is quoted there from AWS's
+#     own documentation, so a withdrawal on their side does not remove the basis for it here.
+#   * solutions/amplify-portal/docs/verification-results.md -- what the draft describes is how that
+#     document is organised, not a claim about behaviour. Nothing loses its evidence if it is
+#     reorganised; the sentence just goes stale, and a probe would report the wrong thing.
+#
+# A sibling found this axis first, by noticing their own drafts restated more than their tracked docs.
 #
 # role:
 #   retraction  Expected to survive. Its absence means the claim moved or was retracted, and a claim
@@ -101,4 +123,8 @@ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-covera
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`mandatory` 指定の同期ポリシー + 応答するエンジン | AP 経由の操作は**遮断されない**
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	`s3` は HTTP 400 で拒否されます
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/errata-fpolicy-s3ap-coverage.md	retraction	発火しない**ため、代わりにならない
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/s3ap-object-size-limits-verification.md	retraction	= 5 × 1024³ = 5 GiB
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/s3ap-object-size-limits-verification.md	retraction	十進 5 GB = 5,000,000,000 ではない
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	solutions/amplify-portal/docs/flexgroup-rebalance-verification.md	retraction	REST リファレンスのボリューム側一覧に無い
+FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	solutions/amplify-portal/docs/flexgroup-rebalance-verification.md	retraction	`idle`（実行中・移動対象なし）
 VMware-Migration-EC2-ONTAP	docs/ja/tco-comparison.md	retraction	容量単価だけで FSx for ONTAP を選ぶ根拠は、ブロックでは成立しません
