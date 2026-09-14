@@ -187,10 +187,17 @@ aws s3api delete-object --bucket "$AP" --key check.txt
    > **そして 4 は、2 を実行できる唯一のホストを先に消します。** 管理 LIF はプライベート
    > アドレスなので、検証ホストが消えると ONTAP に到達する経路がありません。
    >
-   > 順序を間違えたときの復旧は 3 段階です。**同じサブネットに ONTAP へ到達できるホストを
+   > 順序を間違えたときの復旧は 4 段階です。**同じサブネットに ONTAP へ到達できるホストを
    > 立て直し**、ピアを消し、**`aws fsx delete-storage-virtual-machine` で SVM を直接削除して**
    > からスタック削除を再試行します。**CloudFormation は `MISCONFIGURED` を見て呼び出す前に
    > 断りますが、FSx for ONTAP の API 自体は同じ状態でも受け付けます。**
+   >
+   > 4 段階目は**そのホストをいつ消すか**です。**SVM が消えたことを確認するまで残してください** —
+   > `aws fsx describe-storage-virtual-machines` がその SVM を返さなくなるまでです。
+   > **再試行が失敗すると、同じホストがもう一度必要になります。**
+   > この段階は姉妹リポジトリ（VMware-Migration-EC2-ONTAP）の DR runbook の追加で、
+   > **こちらはホストを消したあとに SVM がまだ `MISCONFIGURED` だと気づいて立て直しました。**
+   >
    > 実際に踏んだ記録は[継承の検証記録](../verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠)にあります。
 3. S3 Access Point を外す
 

@@ -190,11 +190,18 @@ The measured figures, and what they do and do not support, are in the
    > **And step 4 deletes the only host that can carry out step 2.** The management LIF is a private
    > address, so once the verification host is gone there is no route left into ONTAP.
    >
-   > Recovering from the wrong order takes three moves: **stand up a host in the same subnet that can
+   > Recovering from the wrong order takes four moves: **stand up a host in the same subnet that can
    > reach ONTAP**, release the peers, and **delete the SVM directly with
    > `aws fsx delete-storage-virtual-machine`** before retrying the stack deletion.
    > **CloudFormation reads the `MISCONFIGURED` lifecycle and declines before calling delete; the FSx for ONTAP
-   > API accepts the same call in the same state.** The record of walking into this is in
+   > API accepts the same call in the same state.**
+   >
+   > The fourth move is **when to delete that host**. Keep it until the SVM is confirmed gone -- until
+   > `aws fsx describe-storage-virtual-machines` no longer returns it. **A failed retry needs the same
+   > host again.** This step comes from the sibling repository's DR runbook; here the host was deleted
+   > first, the SVM turned out to still be `MISCONFIGURED`, and it had to be stood up twice.
+   >
+   > The record of walking into this is in
    > [the inheritance record](../../ja/verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠) (Japanese).
 
 3. Detach the S3 Access Point.

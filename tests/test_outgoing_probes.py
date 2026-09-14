@@ -133,11 +133,31 @@ def sibling(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str | None) -
     return root
 
 
+def shape_header(contract: str) -> str:
+    """The SHAPE line the checker expects, computed for a fixture contract.
+
+    Kept here rather than asked of the production code so that these tests exercise `main` without
+    depending on the very function one of them is asserting. The computation itself is covered
+    directly by the shape tests below.
+    """
+    rows = [line for line in contract.split("\n") if line and not line.startswith("#")]
+    per_file: dict[tuple[str, str], int] = {}
+    for line in rows:
+        fields = line.split("\t")
+        if len(fields) >= 2:
+            key = (fields[0], fields[1])
+            per_file[key] = per_file.get(key, 0) + 1
+    largest = max(per_file.values(), default=0)
+    return f"# SHAPE: {len(rows)} rows across {len(per_file)} files, {largest} in the largest.\n"
+
+
 def run(
     monkeypatch: pytest.MonkeyPatch, contract: str, root: Path | None = None
 ) -> int:
     base = root if root is not None else mod.ROOT
-    (base / mod.CONTRACT).write_text(contract + "\n", encoding="utf-8")
+    (base / mod.CONTRACT).write_text(
+        shape_header(contract) + contract + "\n", encoding="utf-8"
+    )
     monkeypatch.setattr(mod.sys, "argv", ["check_outgoing_probes.py"])
     return mod.main()
 
@@ -340,3 +360,38 @@ def test_comments_and_blank_lines_do_not_count_toward_the_order() -> None:
         ]
     )
     assert not mod.out_of_order(text)
+
+
+# --- the premise behind not blocking on a pull request --------------------------------------------
+
+
+def test_the_committed_contract_states_its_own_shape_correctly() -> None:
+    """The real file. The numbers are the premise for this check not blocking in CI.
+
+    Written by hand once, and a hand-written count of something derivable goes stale silently -- which
+    here would leave a decision standing on a premise that stopped being true.
+    """
+    assert not mod.shape_drift((ROOT / mod.CONTRACT).read_text(encoding="utf-8"))
+
+
+def test_a_row_added_without_updating_the_shape_fails() -> None:
+    text = "\n".join(
+        [
+            "# SHAPE: 1 rows across 1 files, 1 in the largest.",
+            row("docs/a.md", "retraction", "first"),
+            row("docs/a.md", "retraction", "second"),
+        ]
+    )
+    problems = mod.shape_drift(text)
+    assert len(problems) == 1
+    assert "the rows are 2 across 1" in problems[0]
+
+
+def test_deleting_the_shape_line_is_also_a_failure() -> None:
+    """Otherwise the cheapest way to pass is to remove the premise, which removes the reason and
+    leaves the requirement."""
+    text = "\n".join(["# no shape here", row("docs/a.md", "retraction", "first")])
+    problems = mod.shape_drift(text)
+    assert len(problems) == 1
+    assert "no longer states a SHAPE line" in problems[0]
+    assert "SHAPE: 1 rows across 1 files, 1 in the largest" in problems[0]
