@@ -33,6 +33,8 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
+import probe_strength
+
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = Path("docs/agent/cross-repo-probe-contract.txt")
 
@@ -328,14 +330,20 @@ def main() -> int:
         # the sibling can reword one occurrence and this stays green, so the citation here goes stale
         # without anyone being told. Chosen on this side, so unlike the incoming direction the fix is
         # this repository's -- pick a longer string, from a sentence that appears once.
-        occurrences = body.count(probe.text)
-        if occurrences > 1:
+        count = probe_strength.occurrences(body, probe.text)
+        if count > 1:
             weak.append(
-                f"{probe.repo}: {probe.text!r} occurs {occurrences} times in {probe.path}, so "
+                f"{probe.repo}: {probe.text!r} occurs {count} times in {probe.path}, so "
                 "rewording one occurrence leaves this green while the citation here goes stale. "
                 "Re-anchor on a string that appears once."
             )
-        if occurrences:
+        if probe_strength.heading_only(body, probe.text):
+            weak.append(
+                f"{probe.repo}: {probe.text!r} only ever appears as a section heading in "
+                f"{probe.path}. The heading survives its section being replaced with the opposite "
+                "conclusion, so this never fires. Re-anchor on the claim, usually the line below."
+            )
+        if count:
             continue
         message = (
             f"{probe.repo}: {probe.text!r} is gone from {probe.path}. This repository restates "
