@@ -19,8 +19,10 @@ should find out from a red test rather than from a reader.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import audit_public_output as audit
+import pytest
 from conftest import (
     REAL_LOOKING_ACCOUNT,
     REAL_LOOKING_FSX_ID,
@@ -354,3 +356,63 @@ def test_ordinary_japanese_senses_of_the_same_characters_pass() -> None:
 def test_a_coinage_can_be_allowed_on_the_line() -> None:
     # The rule that documents the coinage has to be able to quote it.
     assert "coinage" not in categories("段を上げる <!-- allow:coinage -->")
+
+
+# --- the scan range, and what excluding the drafts hid ---------------------------------------------
+
+
+def test_a_retina_filename_is_not_an_email_address() -> None:
+    """`@2x.png` was read as an address at `2x.png`.
+
+    Eight of them, in the drafts, the first time the audit was pointed at documents that reference
+    images written that way. The rule had never met a filename because the scan range excluded the
+    only files that carry them -- so the false positive could not be seen from inside the range.
+    """
+    findings = audit.audit_line(
+        "![alt](docs/_assets/images/s3burst-architecture-overview@2x.png)", frozenset()
+    )
+    assert not [category for category, _ in findings if category == "pii"]
+
+
+def test_a_real_address_is_still_caught() -> None:
+    """The narrowing must not be a hole. Only image suffixes are excused."""
+    # `test.example` rather than a plausible corporate domain: the pre-commit secret scan rejects the
+    # latter even inside a test, and an address that cannot be committed cannot prove anything here.
+    findings = audit.audit_line("write to fixture@test.example", frozenset())
+    assert [category for category, _ in findings if category == "pii"]
+
+
+def test_the_drafts_are_out_of_scope_by_default(tmp_path: Path) -> None:
+    """Default behaviour is unchanged: CI has no .private/ and must not depend on one."""
+    (tmp_path / ".private").mkdir()
+    (tmp_path / ".private" / "blog-draft-x.md").write_text(
+        "bare FSx here\n", encoding="utf-8"
+    )
+    assert list(audit.iter_files(tmp_path)) == []
+
+
+def test_the_drafts_are_in_scope_when_asked_for(tmp_path: Path) -> None:
+    """And only the article drafts: the review notes beside them are working material.
+
+    That distinction is the reason the directory is skipped at all -- names and account IDs are allowed
+    to sit in the notes, and auditing them would report findings that are not defects.
+    """
+    private = tmp_path / ".private"
+    private.mkdir()
+    (private / "blog-unpublished-y.md").write_text("draft\n", encoding="utf-8")
+    (private / "REVIEW-notes.md").write_text("notes\n", encoding="utf-8")
+    (private / "problem-statement.md").write_text("notes\n", encoding="utf-8")
+    # Excluded for a different reason than the notes: it mirrors a published post and blog-sync holds
+    # it byte-identical, so a finding there cannot be annotated away. Auditing it would only offer the
+    # one fix that is unavailable.
+    (private / "blog-draft-z.md").write_text("bare FSx\n", encoding="utf-8")
+    found = {path.name for path in audit.iter_files(tmp_path, include_drafts=True)}
+    assert found == {"blog-unpublished-y.md"}
+
+
+def test_asking_for_drafts_that_are_not_there_says_so(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A request to audit the drafts that audits nothing must not read as a clean scan."""
+    assert list(audit.iter_files(tmp_path, include_drafts=True)) == []
+    assert "is not a pass" in capsys.readouterr().err

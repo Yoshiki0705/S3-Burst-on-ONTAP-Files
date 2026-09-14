@@ -52,7 +52,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # tools/ and scripts/ hold the validators themselves; their pattern literals are the rules, not
-# violations of them. .private/ and .kiro/ are never published.
+# violations of them. .kiro/ is never published.
+#
+# .private/ is skipped by default and that used to be justified as "never published", which is false
+# for one thing in it: the article drafts are what gets published next. So the audit that enforces the
+# publication rules was not looking at the documents about to be published, and the naming and
+# neutrality checks on a draft were being done by hand. `--include-drafts` adds them; see DRAFT_GLOBS.
+#
+# Not on by default, because .private/ is gitignored and absent in CI: including it would mean a rule
+# that fails locally and passes on the runner, which is the shape of every hole found in this
+# repository's gates so far.
 SKIP_DIRS = (
     ".private",
     ".kiro",
@@ -303,7 +312,14 @@ PII_RULES: list[tuple[re.Pattern[str], str]] = [
         "personal absolute path; use a relative path or ${PROJECT_DIR}",
     ),
     (
-        re.compile(r"\b[\w.+-]+@(?!example\.(?:com|org)\b)[\w-]+\.[a-z]{2,}\b"),
+        # The trailing exclusion is not tidiness. Retina image filenames end in `@2x.png`, which this
+        # pattern read as an address at `2x.png` -- eight of them, in the drafts, the first time the
+        # audit was pointed at a document set that contains image references written that way. The
+        # rule had never been exercised against a filename, so the false positive was invisible while
+        # the scan range excluded the only files that trip it.
+        re.compile(
+            r"\b[\w.+-]+@(?!example\.(?:com|org)\b)[\w-]+\.(?!png\b|jpg\b|jpeg\b|gif\b|webp\b|svg\b)[a-z]{2,}\b"
+        ),
         "remove email addresses; use '(internal reviewer)' or an example.com address",
     ),
     (
@@ -338,7 +354,21 @@ ROLE_LABEL = re.compile(
 )
 
 
-def iter_files(root: Path):
+# The publishing surface inside .private/: drafts that are not published yet, and can therefore still
+# be changed. The review notes, problem statements and communication drafts beside them are working
+# material and stay out -- they are where names and account IDs are allowed to sit, which is why the
+# directory is skipped at all.
+#
+# `blog-draft-*.md` is excluded for a different reason, and not because it is clean. Those mirror posts
+# that are already published, and `make blog-sync` holds them byte-identical to what went out. Adding
+# an audit marker to one is a change to the mirror, which that check correctly reports as divergence --
+# so a finding there cannot be annotated away. It has to be read as a correction to the published post
+# or accepted as correct usage the rule does not know about. Auditing them here would only offer the
+# annotation that is not available.
+DRAFT_GLOBS = ("blog-unpublished-*.md",)
+
+
+def iter_files(root: Path, include_drafts: bool = False):
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
@@ -346,6 +376,21 @@ def iter_files(root: Path):
             continue
         if path.suffix.lower() in SCAN_SUFFIXES:
             yield path
+    if not include_drafts:
+        return
+    private = root / ".private"
+    if not private.is_dir():
+        # Named rather than passed over. The drafts are absent on a runner and in a fresh clone, and a
+        # request to audit them that quietly audits nothing is the failure this repository keeps
+        # finding in its own gates.
+        print(
+            "audit: --include-drafts was asked for but .private/ does not exist here, so no draft "
+            "was audited. This is expected in CI and in a fresh clone; it is not a pass.",
+            file=sys.stderr,
+        )
+        return
+    for pattern in DRAFT_GLOBS:
+        yield from sorted(private.glob(pattern))
 
 
 def file_allowances(lines: list[str]) -> set[str]:
@@ -449,13 +494,20 @@ def audit_line(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--path", default=str(ROOT), help="directory to audit")
+    parser.add_argument(
+        "--include-drafts",
+        action="store_true",
+        help="also audit the article drafts under .private/, which are the next thing published. "
+        "Deliberately not the default: that directory is gitignored, so a default that included it "
+        "would fail locally and pass in CI.",
+    )
     args = parser.parse_args()
 
     root = Path(args.path).resolve()
     findings: list[str] = []
     scanned = 0
 
-    for path in iter_files(root):
+    for path in iter_files(root, include_drafts=args.include_drafts):
         scanned += 1
         rel = path.relative_to(root)
         try:
