@@ -898,6 +898,9 @@ Environment:
   for tools  STAGING_BUCKET -- the clients have no route to PyPI or GitHub, so VDBENCH,
              auto_vdbench and the Python wheels come in over S3
   optional   NAME_PREFIX AWS_REGION VOLUME_SIZE_GIB GEN2_STORAGE_GIB GEN2_SSD_IOPS
+             BLOCK_VOLUME_SIZE_GIB -- the block volume, 1800 GiB by default, because it holds the
+             600 GiB LUN and the 600 GiB namespace at once. Below twice BLOCK_LUN_GIB plus 5% the
+             gen2 phase refuses rather than letting the second fill stop at 100%
              GEN2_THROUGHPUT (1536|3072|6144, default 6144) GEN2_BLOCK (true opens iSCSI/NVMe-TCP) AD_DOMAIN_NAME
              AD_SHORT_NAME AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE

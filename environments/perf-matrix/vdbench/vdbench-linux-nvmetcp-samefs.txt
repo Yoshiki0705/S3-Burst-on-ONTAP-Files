@@ -1,0 +1,52 @@
+**********************************************************************
+* The NVMe/TCP side of the same-file-system block pair.
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-nvmetcp-samefs.txt -o /opt/bench/report-nvmetcp-samefs-<mode>-<pass>
+*
+* Run from the directory holding this file: VDBENCH resolves `include=`
+* against the current directory, not against the path given to -f.
+*
+* A diff against vdbench-linux-iscsi-samefs.txt is the complete list of
+* differences between the two runs, and it is one line: `lun=`.
+*
+* The namespace shares its volume and its file system with the LUN the
+* iSCSI file reads. That is the point: the published F-1 / F-2 pair was
+* measured on separate file systems, and deploy-to-deploy variance there
+* reached 2.64x.
+**********************************************************************
+* THE PATH BELOW IS A PLACEHOLDER AND MUST NOT BE TAKEN ON TRUST.
+*
+* `nvme list` is ordered by discovery and the client's root EBS volume is
+* an NVMe device too -- it appears as /dev/nvme0n1 in AWS's own example,
+* with the ONTAP namespace at nvme2n1. **Writing to the wrong node
+* destroys the client.**
+*
+* `runbook.sh block-provision nvme` prints the namespace-to-device map
+* from `nvme netapp ontapdevices`. **Set the line below from that output**
+* -- the runbook reports the device, it does not edit this file -- and
+* `runbook.sh block-preflight` then refuses to proceed until the path here
+* is the ONTAP namespace.
+**********************************************************************
+
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* Multipathing is not the same mechanism as on the iSCSI side, and it is
+* part of the measurement rather than a detail of the setup.
+*
+* iSCSI uses dm-multipath. NVMe/TCP uses ANA, and the two paths are **not
+* symmetric**: the node holding the namespace reports `optimized` and the
+* other `non-optimized`, with round-robin across them. So the load is not
+* split the way dm-multipath splits it.
+*
+* **That asymmetry is a candidate explanation for any difference this pair
+* finds**, and with the file system no longer varying it is one of the few
+* left. The preflight records `iopolicy` and both paths' ANA states, and
+* the result carries them.
+**********************************************************************
+sd=default,openflag=o_direct
+sd=sd1-1,host=hd1,lun=/dev/nvme2n1
+
+include=workloads-samefs.txt

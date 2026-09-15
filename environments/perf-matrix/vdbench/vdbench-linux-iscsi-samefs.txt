@@ -1,0 +1,46 @@
+**********************************************************************
+* The iSCSI side of the same-file-system block pair.
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-iscsi-samefs.txt -o /opt/bench/report-iscsi-samefs-<mode>-<pass>
+*
+* Run from the directory holding this file: VDBENCH resolves `include=`
+* against the current directory, not against the path given to -f.
+*
+* A diff against vdbench-linux-nvmetcp-samefs.txt is the complete list of
+* differences between the two runs, and it is one line: `lun=`. The same
+* property the F-1 / F-2 pair had -- except those two ran on separate file
+* systems, which is what this pair exists to remove.
+*
+* The LUN and the namespace live in **one 1,800 GiB volume on one file
+* system**, both 600 GiB, both filled before any read is measured.
+**********************************************************************
+* WRITING TO A RAW DEVICE DESTROYS WHAT IS ON IT, AND THE ROOT VOLUME IS ONE.
+*
+* The client's root EBS volume appears as /dev/nvme0n1, and device indices
+* move with attach order. The name below is a dm-multipath friendly name
+* derived from the LUN's serial-hex, created by
+* `runbook.sh block-provision iscsi`, and `runbook.sh block-preflight`
+* refuses to proceed until it resolves to the ONTAP LUN.
+*
+* Getting this wrong costs a client rebuild, not a re-run.
+**********************************************************************
+
+* One host. Its 50 Gbps is a guaranteed figure, which is what allows a
+* plateau to be read as the storage ceiling rather than the client's.
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* No size=. A raw device already has a length, and giving one that
+* disagrees with it either reads past the end or measures a smaller
+* working set than the name suggests.
+*
+* openflag=o_direct as on the NFS side. On a raw device there is no page
+* cache to bypass, but the flag is kept so the two sides differ in the
+* target and not in the flags.
+**********************************************************************
+sd=default,openflag=o_direct
+sd=sd1-1,host=hd1,lun=/dev/mapper/perfmatrix-blk
+
+include=workloads-samefs.txt
