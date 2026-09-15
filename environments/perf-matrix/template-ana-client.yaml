@@ -143,6 +143,13 @@ Resources:
           set -x
           dnf install -y https://s3.${AWS::Region}.amazonaws.com/amazon-ssm-${AWS::Region}/latest/linux_amd64/amazon-ssm-agent.rpm
           systemctl enable --now amazon-ssm-agent
+          # **The AWS CLI is not in this image.** Amazon Linux ships it, Rocky does not, and the first
+          # run of this template discovered that when the phase that pulls VDBENCH out of S3 answered
+          # `aws: command not found`. Installed from the official archive rather than a distribution
+          # package, because Rocky's repositories carry no awscli.
+          curl -sS https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+          unzip -q -o /tmp/awscliv2.zip -d /tmp && /tmp/aws/install --update
+          ln -sf /usr/local/bin/aws /usr/bin/aws
           # nvme-cli for the namespace, the iSCSI and multipath packages so the same preflight runs,
           # java for VDBENCH. **The kernel is deliberately not updated** -- the running kernel's
           # config is what the measurement is about, and a reboot into a different one would change
