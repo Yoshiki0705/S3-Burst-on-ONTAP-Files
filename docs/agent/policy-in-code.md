@@ -15,6 +15,7 @@ the prose instead produces a confident answer that the tool then contradicts.
 | A diagram or an icon | `docs/agent/diagrams.md`, then `tools/build_diagrams.py` |
 | Anything about the two languages or the switcher | `docs/i18n-terms.md`, `tools/check_i18n_parity.py` |
 | A number stated in prose | `tools/check_derived_counts.py` — `COUNT_GLOBS` |
+| **Adding a verification section** | `docs/agent/superseded-claims.txt` — **前に、その節が覆す旧記述を探す。** probe は文字列が消えたときにしか鳴らないので、覆された旧記述が残っている限り全ゲートが緑のまま通る。見つけた分を登録すると `make superseded` が注記を保つ |
 | A published article and its draft | `tools/check_blog_draft_sync.py` |
 | The Interconnect Region pairs or a CSP's lifecycle | `tools/check_interconnect_regions.py` — `DOCUMENTS` and `CSP_HEADINGS` |
 
