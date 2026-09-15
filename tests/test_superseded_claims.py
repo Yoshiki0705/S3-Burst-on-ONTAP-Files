@@ -156,3 +156,15 @@ def test_the_published_registry_is_sorted() -> None:
     assert rows == sorted(rows), (
         "sorted, so a diff shows what changed rather than where it moved"
     )
+
+
+def test_the_header_says_a_sibling_reads_this_file() -> None:
+    """外部の読み手がいることを、機械が確認できる形で残す。
+
+    VMware-Migration-EC2-ONTAP の outgoing check がこのファイルを origin/main から読む。
+    その事実がヘッダから消えると、次に形式を変える人は破壊的変更だと気づけない。
+    ここが赤くなったら、消したのは注意書きであって依存ではない。
+    """
+    header = mod.CONTRACT.read_text(encoding="utf-8")
+    assert "THIS FORMAT IS PUBLISHED" in header
+    assert "VMware-Migration-EC2-ONTAP" in header
