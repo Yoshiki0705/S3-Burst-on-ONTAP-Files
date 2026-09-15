@@ -108,6 +108,9 @@ jobs:
           python3 tools/check_diagram_fonts.py
       - name: Check derived counts
         run: python3 tools/check_derived_counts.py
+
+      - name: Check superseded statements name their replacement
+        run: python3 tools/check_superseded_claims.py
       - name: Check pattern status words
         run: python3 tools/check_pattern_status.py
       # The cost tables are generated. Checking here catches the case where the model was edited and

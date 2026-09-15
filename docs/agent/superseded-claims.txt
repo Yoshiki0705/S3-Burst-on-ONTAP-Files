@@ -1,0 +1,39 @@
+# Statements this repository has superseded, and the section that superseded them.
+#
+# Format: <path>\t<superseded string>\t<anchor of the superseding section>, sorted.
+# The string is the last field but one and is taken whole; `#` starts a comment only at the
+# beginning of a line.
+#
+# WHY THIS FILE EXISTS, AND WHAT IT DOES NOT DO.
+#
+# A new verification section can leave an older statement standing that it contradicts. It happened
+# twice, and both times a sibling repository found it rather than any gate here:
+#
+#   * a scoped observation ("do not generalise this to AL2023") stayed in the runbook while a new
+#     section generalised to exactly that scope, measured across three kernel lines;
+#   * before that, the same shape one file away.
+#
+# **A cross-repository probe cannot catch this.** A probe fires when a string disappears, and a
+# superseded statement is one that is still there. Silence is what it produces. So the check has to
+# run in the other direction: given a string that a later measurement overturned, require the
+# overturning section to be named next to it.
+#
+# `make superseded` fails when a registered string is present without its anchor within the following
+# few lines, and also when the string is gone -- because then this row is stale and should be deleted
+# rather than left as a claim about a file it no longer describes.
+#
+# **The gate only knows what is declared here.** A supersession nobody registers stays invisible, so
+# this is a ratchet rather than a guarantee: the entries accumulate as they are found, and each one
+# stops that particular sentence from drifting back to unannotated. The generative rule is the one to
+# apply by hand: **when a measurement lands, search for the sentences it overturns before writing the
+# new section, not after.** A sibling stated the reading order that follows from this -- when a new
+# section appears, look first for the old text it overturns.
+#
+# Rewording is the alternative to registering, and it is better when the old statement is simply
+# wrong rather than scoped. A statement that was true when written keeps its wording and gains a note;
+# a statement that was wrong gets corrected in place, and then it does not belong in this file.
+#
+docs/ja/verification/block-measurement-runbook.md	「AL2023 では」と一般化しない	#ana-マルチパスが-amazon-linux-2023-で使えないこと
+docs/ja/verification/perf-matrix-results.md	9.08 Gbps を運んでおり、同じ上限には当たっていない	#59164-の正体と-ana-経路の寄与
+docs/ja/verification/perf-matrix-results.md	この AMI では ANA が使えない	#ana-マルチパスが-amazon-linux-2023-で使えないこと
+docs/ja/verification/perf-matrix-results.md	この候補を検証していない	#ana-経路の寄与とデバイス番号が経路を表さないこと
