@@ -1,0 +1,56 @@
+**********************************************************************
+* Workload and run definitions for the ANA iopolicy comparison.
+*
+* Four run definitions, and the pairing is the point. The previous ANA
+* measurement found that **sequential read aggregates across the two paths
+* and 4 KiB random read does not** -- 2,909.49 MB/s against 2,366.47 for a
+* single path, while 203,774 IOPS matched a single path's 203,730 to 0.02%.
+*
+* That asymmetry was found with one iopolicy, `queue-depth`, which is not
+* the kernel default: nvme-cli ships a udev rule that sets it for any
+* subsystem whose model is `NetApp ONTAP Controller`. So two questions are
+* open, and this file exists to answer both in one pass per policy:
+*
+*   Does the aggregation depend on the policy?   `queue-depth` against
+*                                                `round-robin` and `numa`.
+*   Does writing behave like reading?            The read pair above says
+*                                                nothing about writes, and
+*                                                the write ceiling is the
+*                                                figure that differs most
+*                                                between configurations.
+*
+*   seq-read-1024k    The one that aggregated.
+*   rand-read-4k      The one that did not, and the control: it reproduced
+*                     across deploys within 4%, so a figure far from it
+*                     means something other than the policy changed.
+*   seq-write-1024k   Unmeasured with ANA.
+*   rand-write-4k     Unmeasured with ANA.
+*
+* Everything below is verbatim from workloads-common.txt -- same iorate,
+* warmup, elapsed and threads -- so a diff against that file is the list of
+* workloads dropped and nothing else. Four runs at 360 seconds, so one
+* invocation is about 24 minutes and three policies are about 72.
+*
+* **The order matters and is deliberate.** Reads run before writes, so the
+* read figures are taken against data the fill wrote rather than against
+* whatever the previous run's writes left. Every policy runs the same four
+* in the same order, so that difference is not between them.
+**********************************************************************
+
+* --- sequential ------------------------------------------------------
+wd=seq-bs1024k-read100,sd=*,seekpct=.0,xfersize=1024k,rdpct=100
+wd=seq-bs1024k-read0,sd=*,seekpct=.0,xfersize=1024k,rdpct=0
+
+* --- random ----------------------------------------------------------
+wd=rand-bs4k-read100,sd=*,seekpct=100,xfersize=4k,rdpct=100
+wd=rand-bs4k-read0,sd=*,seekpct=100,xfersize=4k,rdpct=0
+
+**********************************************************************
+* Run definitions. Identical to workloads-common.txt.
+**********************************************************************
+rd=default,iorate=max,warmup=60,elapsed=300,interval=1,threads=512
+
+rd=seq-read-1024k,wd=seq-bs1024k-read100
+rd=rand-read-4k,wd=rand-bs4k-read100
+rd=seq-write-1024k,wd=seq-bs1024k-read0
+rd=rand-write-4k,wd=rand-bs4k-read0
