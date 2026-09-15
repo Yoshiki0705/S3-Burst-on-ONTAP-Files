@@ -1,0 +1,53 @@
+**********************************************************************
+* Workload and run definitions for the same-file-system block pair.
+*
+* Two run definitions, not the seven in workloads-common.txt, and the
+* reason is what this pair is for rather than economy alone.
+*
+* F-1 and F-2 were measured on **separate file systems**, because a
+* 900 GiB volume cannot hold a 600 GiB LUN and a 600 GiB namespace at
+* once. So the published pair carries deploy-to-deploy variance, and that
+* variance was measured at up to 2.64x -- larger than the protocol
+* difference being read out of the pair. The block volume is now 1,800 GiB
+* and holds both, so this run puts the two protocols on one volume on one
+* file system.
+*
+*   seq-read-1024k   The comparison itself. 1,135.18 MB/s (iSCSI) against
+*                    591.64 MB/s (NVMe/TCP) is a sequential-read pair, and
+*                    it is the figure whose ratio was withdrawn.
+*
+*   rand-read-4k     The control, and it is here to be *unsurprising*.
+*                    Across the two earlier deploys this workload gave
+*                    126,964 and 128,154 IOPS -- within 1% -- while
+*                    sequential read scattered. If this run reproduces
+*                    that band, the environment matches the earlier ones
+*                    and the sequential figures can be compared with them.
+*                    If it does not, something other than the protocol
+*                    changed and the sequential result is not evidence of
+*                    anything. A comparison with no control that must
+*                    succeed cannot tell a real difference from a broken
+*                    setup.
+*
+* Everything else is verbatim from workloads-common.txt: same iorate, same
+* warmup, same elapsed, same threads. A diff of the two files is the list
+* of workloads dropped, and nothing else.
+**********************************************************************
+
+* --- sequential, read ------------------------------------------------
+wd=seq-bs1024k-read100,sd=*,seekpct=.0,xfersize=1024k,rdpct=100
+
+* --- random ----------------------------------------------------------
+wd=rand-bs4k-read100,sd=*,seekpct=100,xfersize=4k,rdpct=100
+
+**********************************************************************
+* Run definitions. Identical to workloads-common.txt -- iorate=max for a
+* ceiling, elapsed=300 with warmup=60 because shorter runs on this storage
+* have landed inside a cache-warming window and read high, threads=512 to
+* match auto_vdbench's default so concurrency is not another difference.
+*
+* Two runs at 360 seconds each, so one invocation is about 12 minutes.
+**********************************************************************
+rd=default,iorate=max,warmup=60,elapsed=300,interval=1,threads=512
+
+rd=seq-read-1024k,wd=seq-bs1024k-read100
+rd=rand-read-4k,wd=rand-bs4k-read100
