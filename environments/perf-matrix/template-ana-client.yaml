@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  A second measurement client on a kernel that has NVMe native multipath compiled in, so ANA can be
+  measured at all. Everything else about the environment is unchanged: it joins the same security
+  group as the Amazon Linux client, so the FSx for ONTAP ingress rules already admit it, and it reads
+  the same staging bucket.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Placement}
+        Parameters: [SubnetId, ClientSecurityGroupId, InstanceType]
+      - Label: {default: Image}
+        Parameters: [AmiId]
+      - Label: {default: Tooling}
+        Parameters: [StagingBucketName, NamePrefix]
+
+  # WHY THIS FILE EXISTS AT ALL, AND WHAT IT DEVIATES FROM.
+  #
+  # ANA -- asymmetric namespace access -- is the mechanism AWS's NVMe/TCP procedure assumes: two
+  # controllers merge into one namespace device, one path reports `optimized` and the other
+  # `non-optimized`, and an iopolicy spreads I/O across them. **Amazon Linux 2023 cannot do it.** All
+  # three kernel lines in its repositories (6.1.186, 6.12.103, 6.18.48) ship with
+  # CONFIG_NVME_MULTIPATH unset, checked from the packages rather than inferred, so on that client the
+  # two controllers appear as two separate devices and every figure is a single-path figure.
+  #
+  # Rocky Linux 9 is the RHEL 9 rebuild that AWS's procedure is written against, and its kernel has
+  # CONFIG_NVME_MULTIPATH=y (verified from the published package before this file existed). Hence a
+  # second client rather than a change to the first: the Amazon Linux client stays exactly as it was,
+  # so the two sit on one file system and one namespace, and **ANA is the only difference between
+  # them.**
+  #
+  # **THE DEVIATION: this instance gets a public IP. The Amazon Linux clients do not.**
+  #
+  # Those clients reach nothing but S3, Systems Manager, Secrets Manager and the targets -- measured,
+  # not assumed: PyPI and GitHub time out, because the subnet sets MapPublicIpOnLaunch false and there
+  # is no NAT. Rocky's repositories are not in S3 and its AMI has no Systems Manager agent, so without
+  # egress this instance cannot be reached or provisioned at all.
+  #
+  # What the public IP does and does not open:
+  #
+  #   * Outbound works, through the internet gateway the route table already has.
+  #   * **Inbound does not.** The security group it joins has exactly one ingress rule, SSH from
+  #     itself, and the FSx for ONTAP groups admit it rather than the reverse. There is no rule with an internet
+  #     source, so a public address grants no reachability from outside.
+  #
+  # It is still a deviation from a documented property of this environment, it exists for one
+  # measurement, and it goes away with the stack. Do not copy it into the Amazon Linux clients.
+
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: The subnet the Amazon Linux clients are in, so both see the same path to the target.
+  ClientSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >-
+      The measurement client group from the clients stack. Joining it rather than creating another is
+      what makes the FSx for ONTAP ingress rules apply without editing them.
+  InstanceType:
+    Type: String
+    Default: c5n.9xlarge
+    Description: >-
+      The same type as the Amazon Linux client. A different type would put the instance's own network
+      allowance into the comparison, which is the one variable this measurement is trying to remove.
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: >-
+      A Rocky Linux 9 image. Passed rather than looked up: Rocky publishes no Systems Manager public
+      parameter, so there is no path like the Amazon Linux one and the value has to be read from
+      describe-images and recorded with the result.
+  StagingBucketName:
+    Type: String
+    Description: >-
+      The bucket holding VDBENCH. Read-only, and read over the S3 gateway endpoint like the other
+      clients -- the public IP is for the distribution's own repositories, not for the instrument.
+  NamePrefix:
+    Type: String
+    Default: perfmatrix
+
+Resources:
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: read-the-staging-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Narrowed to the one prefix that holds the instrument. The clients hold nothing worth
+              # writing back, so there is no PutObject here.
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/*"
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+      Tags:
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Role]
+
+  Client:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref ClientSecurityGroupId]
+          # The deviation, and the reason is in the Metadata block above. Inbound stays closed
+          # because the group has no rule with an internet source.
+          AssociatePublicIpAddress: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Reported into the console log rather than silently: this instance is reached over Systems
+          # Manager, and if the agent install fails there is no other way in.
+          set -x
+          dnf install -y https://s3.${AWS::Region}.amazonaws.com/amazon-ssm-${AWS::Region}/latest/linux_amd64/amazon-ssm-agent.rpm
+          systemctl enable --now amazon-ssm-agent
+          # nvme-cli for the namespace, the iSCSI and multipath packages so the same preflight runs,
+          # java for VDBENCH. **The kernel is deliberately not updated** -- the running kernel's
+          # config is what the measurement is about, and a reboot into a different one would change
+          # the thing being recorded.
+          dnf install -y nvme-cli device-mapper-multipath iscsi-initiator-utils unzip java-17-openjdk-headless
+          mkdir -p /etc/nvme
+          [ -s /etc/nvme/hostnqn ] || nvme gen-hostnqn > /etc/nvme/hostnqn
+          # The one fact this client exists to establish, written where it survives the boot.
+          grep -E '^#?\s*CONFIG_NVME_MULTIPATH' "/boot/config-$(uname -r)" > /root/ana-capability.txt 2>&1
+          uname -r >> /root/ana-capability.txt
+      Tags:
+        - {Key: Name, Value: !Sub "${NamePrefix}-ana-client"}
+        - {Key: DeleteAfterMeasurement, Value: "true"}
+
+Outputs:
+  AnaClientInstanceId:
+    Description: The Rocky Linux client, reached over Systems Manager like the others.
+    Value: !Ref Client
+  AnaCapabilityFile:
+    Description: >-
+      Read /root/ana-capability.txt first. It carries the running kernel and whether
+      CONFIG_NVME_MULTIPATH is set, which decides whether anything else on this instance is worth
+      measuring.
+    Value: /root/ana-capability.txt

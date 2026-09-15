@@ -40,6 +40,9 @@ STACK_CLIENTS="${PREFIX}-clients"
 STACK_EFS="${PREFIX}-efs"
 STACK_EFS_PROV="${PREFIX}-efs-prov"
 STACK_GEN2="${PREFIX}-gen2"
+# The second client, on a kernel that has NVMe native multipath compiled in. Separate stack rather
+# than a parameter on the clients stack: it takes a public IP, which the Amazon Linux clients must not.
+STACK_ANA="${PREFIX}-ana-client"
 STACK_AD="${PREFIX}-ad"
 STACK_WINDOWS="${PREFIX}-windows"
 STACK_SMB_SVM="${PREFIX}-smb-svm"
@@ -58,6 +61,42 @@ stack_output() {
 }
 
 # --- clients -------------------------------------------------------------------------------------
+
+# The ANA client. Amazon Linux 2023 cannot measure ANA at all -- all three kernel lines in its
+# repositories ship with CONFIG_NVME_MULTIPATH unset -- so this puts a Rocky Linux 9 client, whose
+# kernel has it, on the same file system and the same namespace. **ANA is then the only difference
+# between the two clients.**
+#
+# The AMI is passed rather than looked up: Rocky publishes no Systems Manager public parameter, so
+# there is no equivalent of the Amazon Linux path. Read it with describe-images and **record the value
+# with the result** -- the kernel it carries is the measurement condition.
+#
+# **This instance takes a public IP and the Amazon Linux clients must not.** The reason and the limits
+# are in the template's Metadata block. It exists for one measurement and goes with the stack.
+deploy_ana_client() {
+  [[ -n "${SUBNET_ID:-}" ]] || die "set SUBNET_ID"
+  [[ -n "${ANA_AMI_ID:-}" ]] || die "set ANA_AMI_ID -- a Rocky Linux 9 image. Read it with:
+  aws ec2 describe-images --region $REGION --owners 792107900819 \\
+    --filters 'Name=name,Values=Rocky-9-EC2-Base-*x86_64*' 'Name=state,Values=available' \\
+    --query 'reverse(sort_by(Images,&CreationDate))[0].[ImageId,Name]' --output text"
+  [[ -n "${STAGING_BUCKET:-}" ]] || die "set STAGING_BUCKET; VDBENCH comes from there"
+  local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
+  [[ -n "$sg" && "$sg" != "None" ]] || die "no ClientSecurityGroupId; run './runbook.sh clients' first"
+  log "ANA client: $STACK_ANA (${ANA_INSTANCE_TYPE:-c5n.9xlarge}, public IP, about \$2.45/hour)"
+  aws cloudformation deploy \
+    --region "$REGION" \
+    --stack-name "$STACK_ANA" \
+    --template-file "$HERE/template-ana-client.yaml" \
+    --capabilities CAPABILITY_IAM \
+    --parameter-overrides \
+      "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" "AmiId=$ANA_AMI_ID" \
+      "InstanceType=${ANA_INSTANCE_TYPE:-c5n.9xlarge}" \
+      "StagingBucketName=$STAGING_BUCKET" "NamePrefix=$PREFIX" \
+    --no-fail-on-empty-changeset
+  printf 'AnaClientInstanceId=%s\n' "$(stack_output "$STACK_ANA" AnaClientInstanceId)"
+  printf 'Read /root/ana-capability.txt before measuring. It carries the running kernel and whether\n'
+  printf 'CONFIG_NVME_MULTIPATH is set -- if it is unset, nothing else on this instance is worth measuring.\n'
+}
 
 deploy_clients() {
   # cheap to create, but pointless without the instrument. `tooling` reads the bucket rather than the variable, and dies on a gap.
@@ -860,6 +899,10 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
 
   ad                     Create AWS Managed Microsoft AD (15-30 min, ~$0.146/hour). Do this first.
   clients                Create the Linux clients and the shared security group
+  ana-client             Create a Rocky Linux 9 client, whose kernel has NVMe native multipath, so
+                         ANA can be measured at all (~$2.45/hour). Needs ANA_AMI_ID. **Takes a
+                         public IP; the Amazon Linux clients must not.** Read /root/ana-capability.txt
+                         before measuring
   gen2                   Create the second-generation FSx for ONTAP target (~$23.03/hour)
   ad-ports               Read the directory's security group and admit the clients and SVM interfaces
   smb-svm                Create the SMB-only SVM and its NTFS volume, unjoined
@@ -1412,6 +1455,7 @@ case "${1:-}" in
   ad)                   deploy_ad ;;
   ad-ports)             ad_ports ;;
   clients)              deploy_clients ;;
+  ana-client)           deploy_ana_client ;;
   efs)                  deploy_efs "${2:-elastic}" ;;
   drop-efs-provisioned) drop_efs_provisioned ;;
   gen2)                 deploy_gen2 ;;
