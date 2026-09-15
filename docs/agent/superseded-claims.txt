@@ -4,6 +4,22 @@
 # The string is the last field but one and is taken whole; `#` starts a comment only at the
 # beginning of a line.
 #
+# THIS FORMAT IS PUBLISHED. A SIBLING READS THIS FILE.
+#
+# VMware-Migration-EC2-ONTAP's outgoing check reads it from `origin/main` and inherits the coverage:
+# a string registered here as superseded tells them that a claim they cite has been overturned even
+# though the sentence carrying it is still present, which is the one case their own probes cannot
+# report. On their first run it matched one row. So:
+#
+#   * Changing the field order or the separator breaks their reader. Treat it as a breaking change and
+#     tell them, the same way the probe contract's format is treated.
+#   * **Removing a row narrows what they inherit, silently.** A row leaves when the string is
+#     reworded away -- `make superseded` insists on that, because a registry that keeps claims about
+#     text that is gone is worse than no registry -- but the narrowing is not visible from their side
+#     unless they had pinned that same string themselves. Say so when a row goes.
+#   * Neither side sees a supersession that neither has registered. Inheriting the coverage widens
+#     it; it does not close the hole.
+#
 # WHY THIS FILE EXISTS, AND WHAT IT DOES NOT DO.
 #
 # A new verification section can leave an older statement standing that it contradicts. It happened
