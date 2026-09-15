@@ -51,6 +51,7 @@
 #
 docs/ja/verification/block-measurement-runbook.md	「AL2023 では」と一般化しない	#ana-マルチパスが-amazon-linux-2023-で使えないこと
 docs/ja/verification/perf-matrix-results.md	1.33 倍は経路で説明できる	#ana-を有効にした-nvmetcp同一ファイルシステム上での対照
+docs/ja/verification/perf-matrix-results.md	4 KiB ランダム読みは経路をまたいで足し合わさらない	#iopolicy-の-3-種と-ana-有効時の書き込み
 docs/ja/verification/perf-matrix-results.md	9.08 Gbps を運んでおり、同じ上限には当たっていない	#59164-の正体と-ana-経路の寄与
 docs/ja/verification/perf-matrix-results.md	この AMI では ANA が使えない	#ana-マルチパスが-amazon-linux-2023-で使えないこと
 docs/ja/verification/perf-matrix-results.md	この候補を検証していない	#ana-経路の寄与とデバイス番号が経路を表さないこと

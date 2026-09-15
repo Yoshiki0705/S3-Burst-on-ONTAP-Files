@@ -147,9 +147,16 @@ Resources:
           # run of this template discovered that when the phase that pulls VDBENCH out of S3 answered
           # `aws: command not found`. Installed from the official archive rather than a distribution
           # package, because Rocky's repositories carry no awscli.
+          #
+          # **unzip is installed on the line before, and that ordering is the fix for the second
+          # attempt.** The archive is a zip, so putting the CLI install before the package line left
+          # it failing on a missing unzip -- quietly, because this script sets -x and not -e, so the
+          # instance came up with every other tool present and the CLI absent.
+          dnf install -y unzip
           curl -sS https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
           unzip -q -o /tmp/awscliv2.zip -d /tmp && /tmp/aws/install --update
           ln -sf /usr/local/bin/aws /usr/bin/aws
+          command -v aws || echo "FAILED: the AWS CLI did not install; VDBENCH cannot be staged"
           # nvme-cli for the namespace, the iSCSI and multipath packages so the same preflight runs,
           # java for VDBENCH. **The kernel is deliberately not updated** -- the running kernel's
           # config is what the measurement is about, and a reboot into a different one would change
