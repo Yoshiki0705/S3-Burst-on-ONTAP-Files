@@ -130,6 +130,35 @@
 # the claim at all -- a product name, a section label. Length does not decide it. An eight-character
 # measured ratio protects a great deal; a thirteen-character product name protects nothing.
 #
+# A FIFTH WAY TO STAY SILENT, OBSERVED BETWEEN TWO REPOSITORIES RATHER THAN REASONED ABOUT.
+#
+# A probe can stay green because the measurement it was waiting for was recorded **somewhere else**.
+# The claim changed, the cited sentence did not, and nothing fired -- so the citing side kept
+# publishing an instruction whose premise had been measured false.
+#
+# It happened with the single-connection range in perf-matrix-results.md. A sibling pinned that range
+# and wrote, in their own citation table, that a block measurement landing there would move it. The
+# block figures were measured and did not move it, because this repository had decided **before
+# measuring** not to extend that table: its three rows say "similar values, different ceilings", and a
+# figure at twice the ceiling does not belong in them. The decision was correct and is still in force.
+# The defect was on the citing side, in predicting when a probe would fire: a prediction turns silence
+# into confirmation that nothing has happened yet.
+#
+# Two rules follow, and the second is the one that generalises:
+#
+#   * Do not write when a probe is expected to fire. Register the string, state what it protects, and
+#     read the result. There is no prediction anywhere in this contract, and there should not be.
+#   * When a decision is *not to record something in a particular place*, that decision is itself
+#     citable. A probe on the decision fires if the decision is reversed, which is the signal a
+#     reader of the unchanged table actually needs. The sibling registered exactly that, and it is a
+#     better anchor than the range it replaces.
+#
+# One trap while writing the above down: **quoting a pinned string verbatim, in the file it is pinned
+# in, weakens the probe.** Explaining the arrangement in prose next to it took the sibling's new
+# single-occurrence probe to two occurrences, and `make incoming-probes` reported it as weak on the
+# next run. Describe the pinned claim, do not reproduce it. The gate catches this, which is the only
+# reason it was a minute's work rather than a silent loss of protection.
+#
 # ---------------------------------------------------------------------------------------------------
 # FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns
 #
