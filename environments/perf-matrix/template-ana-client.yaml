@@ -112,6 +112,12 @@ Resources:
 
   Client:
     Type: AWS::EC2::Instance
+    # checkov:skip=CKV_AWS_88: the public IP is the point of this template and the reason is in the
+    # Metadata block above. Rocky's repositories are not in S3 and its image carries no Systems Manager
+    # agent, so with no egress the instance can neither be provisioned nor reached, and ANA -- which
+    # Amazon Linux 2023 cannot do on any of its three kernel lines -- stays unmeasurable. Inbound is
+    # not opened: the group it joins has one ingress rule, SSH from itself, and no rule with an
+    # internet source. It is deleted before that group, and it is the only instance here that gets one.
     Properties:
       ImageId: !Ref AmiId
       InstanceType: !Ref InstanceType
