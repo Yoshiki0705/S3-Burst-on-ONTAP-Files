@@ -164,6 +164,25 @@ from what was known.
 
 ### Changed
 
+- **Every block figure in this repository is an `iorate=max` saturation point, no block run has a
+  latency curve, and one proportionality claimed a day earlier is withdrawn as uncontrolled.** The
+  measurement conditions already said `iorate=max`; what they did not say is what that costs a reader.
+  The file-protocol side measured it: a 4,400 IOPS target gives **4,406 MB/s at 8.86 ms** while
+  unthrottled gives **4,204 MB/s at 121.79 ms** — 5% less throughput at fourteen times the response
+  time. **A single `iorate=max` point recorded as "the ceiling" is lower than what is reachable and an
+  order of magnitude worse in latency.** The thread sweep makes it plainer still: the same
+  2,364 MB/s appears at 216.6 ms and at 860.3 ms. Response time was **only ever recorded for F-10's
+  two thread sweeps**; elsewhere VDBENCH printed it and it was not kept. At a fixed 512 threads it is
+  the identity `512 ÷ IOPS` (216.6 derived against 216.588 measured), so the figures can be read as
+  latency — **as derived values, never as measurements**. The reason no block run has a curve is
+  now recorded rather than left implicit: **auto_vdbench, which produces the curves and cutoffs on the
+  file-protocol side, builds test files under a mounted path and cannot drive a raw device or an NVMe
+  namespace.** Doing the same for block needs a different driver and is not started. The withdrawal:
+  yesterday's entry said the fragmented sequential read is proportional to the provisioned IOPS. It is
+  not established — 546.02 at 100,000 against 1,272.8 at 200,000 is a ratio of **2.33, not 2.00, and
+  the two came from different deployments.** No run varied the provisioned IOPS while fragmented.
+  Saturation at 89–95% of the setting makes proportionality a reasonable expectation; it was not
+  measured, and it is now labelled that way.
 - **The surviving candidate for the random-read amplification is disproved, and "a write breaks the
   layout" is narrowed to "a small random write does" — both by the controlled sequence the previous
   entry asked for.** One device, one run, four states: the 4 KiB random read was **0.659 of the
