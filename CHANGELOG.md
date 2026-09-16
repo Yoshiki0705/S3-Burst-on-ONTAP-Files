@@ -164,6 +164,27 @@ from what was known.
 
 ### Changed
 
+- **The surviving candidate for the random-read amplification is disproved, and "a write breaks the
+  layout" is narrowed to "a small random write does" — both by the controlled sequence the previous
+  entry asked for.** One device, one run, four states: the 4 KiB random read was **0.659 of the
+  provisioned IOPS on a fresh fill, before any random write had ever run on it**, then 0.654 after a
+  300-second 4 KiB random write and 0.651 after a sequential refill — a 1.3% spread. The candidate
+  followed five observations and did not survive being varied deliberately. **Amplification moves with
+  neither layout nor write history.** What F-6 / F-7's 0.83–0.97 comes from is again open; the
+  differences that remain are the ONTAP patch level and the client, **neither varied inside a single
+  run**, so both are named as candidates and nothing more. The narrowing is the other half: a 4 KiB
+  random write for **thirty seconds costs 0.9%** and for **300 seconds costs 77%**, so the threshold
+  sits between them, and **300 seconds of sequential writing costs 0.03%** — writing does not break
+  the layout, writing small and randomly does. The earlier wording happened to be right and must not
+  be widened. Two ceilings also stop being unexplained in one direction: quadrupling the outstanding
+  requests moves the block sequential read by **0.07%** (512 / 1,024 / 2,048 threads, with response
+  time proportional at 216.6 / 433.3 / 860.3 ms) and the NFS 4 KiB random read by **2.2%**, which
+  **retires the concurrency half of the two-way split** that the throughput-capacity measurement could
+  not separate. The NFS figure reproduced at **94,949.6 against the original 95,630 (0.7%) on half the
+  SSD capacity**, so that ceiling is not capacity either. And raising the provisioned IOPS 100,000 →
+  200,000 gave a ratio of **2.02**, confirming the proportionality **in both directions** — the earlier
+  downward result was not an artefact of the update. What binds one client, and what binds the NFS
+  read, are still not measured.
 - **The layout mechanism is confirmed inside a single run, and the hypothesis that it also explains
   the random-read amplification is disproved.** Every five-minute interval of five runs was read from
   retained CloudWatch at **no cost**. For the 1 MiB sequential read the disk-side read size goes
