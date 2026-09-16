@@ -43,6 +43,7 @@ STACK_GEN2="${PREFIX}-gen2"
 # The second client, on a kernel that has NVMe native multipath compiled in. Separate stack rather
 # than a parameter on the clients stack: it takes a public IP, which the Amazon Linux clients must not.
 STACK_ANA="${PREFIX}-ana-client"
+STACK_ANA_RHEL="${PREFIX}-rhel-client"
 STACK_AD="${PREFIX}-ad"
 STACK_WINDOWS="${PREFIX}-windows"
 STACK_SMB_SVM="${PREFIX}-smb-svm"
@@ -73,27 +74,52 @@ stack_output() {
 #
 # **This instance takes a public IP and the Amazon Linux clients must not.** The reason and the limits
 # are in the template's Metadata block. It exists for one measurement and goes with the stack.
+#
+# **Takes the distribution as an argument, and both come from this one template.** `rocky` is the
+# rebuild the earlier ANA figures were taken on; `rhel` is what AWS's procedure is actually written
+# against, at the same minor version, so that the distribution is the only difference between the two.
+# Deploy both and the pair answers whether the rebuild's numbers stand for RHEL's; deploy one and that
+# stays an assumption.
 deploy_ana_client() {
-  [[ -n "${SUBNET_ID:-}" ]] || die "set SUBNET_ID"
-  [[ -n "${ANA_AMI_ID:-}" ]] || die "set ANA_AMI_ID -- a Rocky Linux 9 image. Read it with:
+  local variant="${1:-rocky}" stack ami name_suffix hint
+  case "$variant" in
+    rocky)
+      stack="$STACK_ANA"; ami="${ANA_AMI_ID:-}"; name_suffix="ana-client"
+      hint="set ANA_AMI_ID -- a Rocky Linux 9 image. Read it with:
   aws ec2 describe-images --region $REGION --owners 792107900819 \\
     --filters 'Name=name,Values=Rocky-9-EC2-Base-*x86_64*' 'Name=state,Values=available' \\
     --query 'reverse(sort_by(Images,&CreationDate))[0].[ImageId,Name]' --output text"
+      ;;
+    rhel)
+      stack="$STACK_ANA_RHEL"; ami="${RHEL_AMI_ID:-}"; name_suffix="rhel-client"
+      # Pin the minor version in the filter rather than taking the newest RHEL. A different minor
+      # version carries a different kernel, and then the comparison against the rebuild measures the
+      # version gap instead of the distribution.
+      hint="set RHEL_AMI_ID -- a RHEL 9 image at the same minor version as the Rocky one. Read it with:
+  aws ec2 describe-images --region $REGION --owners 309956199498 \\
+    --filters 'Name=name,Values=RHEL-9.7*x86_64*' 'Name=state,Values=available' \\
+    --query 'reverse(sort_by(Images,&CreationDate))[0].[ImageId,Name]' --output text
+  These are Hourly2 images: they carry a per-hour licence fee on top of the instance."
+      ;;
+    *) die "usage: runbook.sh ana-client [rocky|rhel]" ;;
+  esac
+  [[ -n "${SUBNET_ID:-}" ]] || die "set SUBNET_ID"
+  [[ -n "$ami" ]] || die "$hint"
   [[ -n "${STAGING_BUCKET:-}" ]] || die "set STAGING_BUCKET; VDBENCH comes from there"
   local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
   [[ -n "$sg" && "$sg" != "None" ]] || die "no ClientSecurityGroupId; run './runbook.sh clients' first"
-  log "ANA client: $STACK_ANA (${ANA_INSTANCE_TYPE:-c5n.9xlarge}, public IP, about \$2.45/hour)"
+  log "ANA client ($variant): $stack (${ANA_INSTANCE_TYPE:-c5n.9xlarge}, public IP, about \$2.45/hour)"
   aws cloudformation deploy \
     --region "$REGION" \
-    --stack-name "$STACK_ANA" \
+    --stack-name "$stack" \
     --template-file "$HERE/template-ana-client.yaml" \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides \
-      "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" "AmiId=$ANA_AMI_ID" \
-      "InstanceType=${ANA_INSTANCE_TYPE:-c5n.9xlarge}" \
+      "SubnetId=$SUBNET_ID" "ClientSecurityGroupId=$sg" "AmiId=$ami" \
+      "InstanceType=${ANA_INSTANCE_TYPE:-c5n.9xlarge}" "NameSuffix=$name_suffix" \
       "StagingBucketName=$STAGING_BUCKET" "NamePrefix=$PREFIX" \
     --no-fail-on-empty-changeset
-  printf 'AnaClientInstanceId=%s\n' "$(stack_output "$STACK_ANA" AnaClientInstanceId)"
+  printf 'AnaClientInstanceId=%s\n' "$(stack_output "$stack" AnaClientInstanceId)"
   printf 'Read /root/ana-capability.txt before measuring. It carries the running kernel and whether\n'
   printf 'CONFIG_NVME_MULTIPATH is set -- if it is unset, nothing else on this instance is worth measuring.\n'
 }
@@ -641,6 +667,51 @@ nvme_cache() {
   printf '\nRead the is_enabled values above. Every node must report false before the disk-path read.\n'
 }
 
+# Reads ONTAP's per-LIF counters, so that "did the second path carry anything" is answered by where the
+# bytes went rather than by the total the client reported.
+#
+# **This is the only way to tell two different findings apart.** A client-side total that fails to grow
+# when a second path is added is consistent with both "the policy never used the second path" and "it
+# used it and the ceiling is somewhere else entirely". The counters separate them, and every ANA figure
+# recorded so far was a client-side total.
+#
+# Two subcommands, because the table name is not something to assume across versions. `tables` lists
+# what this cluster publishes; `read <table>` dumps its rows. Sample it before and after a workload and
+# take the difference -- these are cumulative counters, not rates.
+#
+# **An empty result exits non-zero rather than printing nothing.** A table that exists with no rows and
+# a table name that does not exist on this version look identical once the output is summed, and they
+# mean opposite things -- so the scan that finds nothing has to fail rather than read as a quiet zero.
+lif_counters() {
+  local action="${1:-tables}" table="${2:-}"
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN"
+  local instance; instance="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  [[ -n "$instance" && "$instance" != "None" ]] || die "no client; run './runbook.sh clients' first"
+  local mgmt="management.${fs_id}.fsx.${REGION}.amazonaws.com"
+
+  # Built by concatenation with the quoting flipped from the rest of this file: single quotes outside,
+  # so the python program's own double quotes need no escaping and $PW stays literal for the client.
+  local url script
+  case "$action" in
+    tables)
+      url="https://${mgmt}/api/cluster/counter/tables?fields=name&max_records=2000"
+      script='curl -s -k -u "fsxadmin:$PW" "'"$url"'" | python3 -c '\''import json,sys;names=[r["name"] for r in json.load(sys.stdin).get("records",[])];hits=[n for n in names if any(t in n for t in ("lif","nvmf","iscsi"))];print("TABLES_TOTAL=%d MATCHED=%d"%(len(names),len(hits)));[print(n) for n in hits];sys.exit(0 if hits else 1)'\'''
+      ;;
+    read)
+      [[ -n "$table" ]] || die "usage: runbook.sh lif-counters read <table>; get the name from 'lif-counters tables'"
+      url="https://${mgmt}/api/cluster/counter/tables/${table}/rows?fields=*&max_records=2000"
+      script='curl -s -k -u "fsxadmin:$PW" "'"$url"'" | python3 -c '\''import json,sys;rows=json.load(sys.stdin).get("records",[]);print("ROWS=%d"%len(rows));[print(r.get("id"),json.dumps({c["name"]:c.get("value",c.get("values")) for c in r.get("counters",[]) if any(t in c["name"] for t in ("data","ops","latency"))},sort_keys=True)) for r in rows];sys.exit(0 if rows else 1)'\'''
+      ;;
+    *) die "usage: runbook.sh lif-counters [tables|read <table>]" ;;
+  esac
+
+  log "per-LIF counters on $fs_id: $action ${table}"
+  ontap_rest_on_client "$instance" "$script"
+  printf '\nCumulative counters. Take the difference across a workload, and read which row moved.\n'
+}
+
 # Runs a shell snippet on a client with $PW holding the fsxadmin password, and prints its output.
 #
 # The password is fetched on the client from Secrets Manager rather than passed in, because a Run
@@ -899,10 +970,11 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
 
   ad                     Create AWS Managed Microsoft AD (15-30 min, ~$0.146/hour). Do this first.
   clients                Create the Linux clients and the shared security group
-  ana-client             Create a Rocky Linux 9 client, whose kernel has NVMe native multipath, so
-                         ANA can be measured at all (~$2.45/hour). Needs ANA_AMI_ID. **Takes a
-                         public IP; the Amazon Linux clients must not.** Read /root/ana-capability.txt
-                         before measuring
+  ana-client [rocky|rhel]  Create a client whose kernel has NVMe native multipath, so ANA can be
+                         measured at all (~$2.45/hour, and RHEL adds a per-hour licence fee). `rocky`
+                         needs ANA_AMI_ID, `rhel` needs RHEL_AMI_ID at the same minor version.
+                         **Takes a public IP; the Amazon Linux clients must not.** Read
+                         /root/ana-capability.txt before measuring
   gen2                   Create the second-generation FSx for ONTAP target (~$23.03/hour)
   ad-ports               Read the directory's security group and admit the clients and SVM interfaces
   smb-svm                Create the SMB-only SVM and its NTFS volume, unjoined
@@ -913,6 +985,10 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
                          account. Run it before mounting: two of these fail with messages that
                          point elsewhere
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
+  lif-counters tables    List the counter tables this cluster publishes whose name mentions a LIF
+  lif-counters read <t>  Dump that table's rows. Cumulative: sample before and after a workload.
+                         **This is what separates "the second path carried nothing" from "it carried
+                         traffic and the ceiling is elsewhere"** -- a client-side total cannot
 
   Block protocols (pattern F). Read each phase's output, not its exit status:
   block-packages         Install the iSCSI and NVMe/TCP clients; print the IQN and the NQN
@@ -1455,7 +1531,7 @@ case "${1:-}" in
   ad)                   deploy_ad ;;
   ad-ports)             ad_ports ;;
   clients)              deploy_clients ;;
-  ana-client)           deploy_ana_client ;;
+  ana-client)           deploy_ana_client "${2:-rocky}" ;;
   efs)                  deploy_efs "${2:-elastic}" ;;
   drop-efs-provisioned) drop_efs_provisioned ;;
   gen2)                 deploy_gen2 ;;
@@ -1466,6 +1542,7 @@ case "${1:-}" in
   windows-status)       windows_status ;;
   raise-gen1)           raise_gen1 ;;
   nvme-cache)           nvme_cache "${2:-show}" ;;
+  lif-counters)         lif_counters "${2:-tables}" "${3:-}" ;;
   block-packages)       block_packages ;;
   block-provision)      case "${2:-}" in
                           iscsi) block_provision_iscsi "${3:-}" ;;

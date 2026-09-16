@@ -11,7 +11,7 @@ Metadata:
       - Label: {default: Placement}
         Parameters: [SubnetId, ClientSecurityGroupId, InstanceType]
       - Label: {default: Image}
-        Parameters: [AmiId]
+        Parameters: [AmiId, NameSuffix]
       - Label: {default: Tooling}
         Parameters: [StagingBucketName, NamePrefix]
 
@@ -29,6 +29,11 @@ Metadata:
   # second client rather than a change to the first: the Amazon Linux client stays exactly as it was,
   # so the two sit on one file system and one namespace, and **ANA is the only difference between
   # them.**
+  #
+  # **The same template also deploys the RHEL client, and that is the point of NameSuffix.** Every ANA
+  # figure so far came from the rebuild, and "Rocky 9.7 stands in for RHEL 9.7" is an assumption, not a
+  # measurement. Deploying both from one file at one minor version keeps the distribution as the only
+  # difference; deploying them from two files would put the template's own drift into that gap.
   #
   # **THE DEVIATION: this instance gets a public IP. The Amazon Linux clients do not.**
   #
@@ -65,9 +70,17 @@ Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
     Description: >-
-      A Rocky Linux 9 image. Passed rather than looked up: Rocky publishes no Systems Manager public
-      parameter, so there is no path like the Amazon Linux one and the value has to be read from
-      describe-images and recorded with the result.
+      A Rocky Linux 9 or Red Hat Enterprise Linux 9 image. Passed rather than looked up: neither
+      publishes a Systems Manager public parameter, so there is no path like the Amazon Linux one and
+      the value has to be read from describe-images and recorded with the result.
+  NameSuffix:
+    Type: String
+    Default: ana-client
+    Description: >-
+      Distinguishes the instances when both distributions are deployed from this one template. Rocky
+      is the rebuild and RHEL is what AWS's procedure is written against, so the pair is the
+      measurement -- and a console listing two instances named alike is how the wrong one gets read.
+    AllowedValues: [ana-client, rhel-client]
   StagingBucketName:
     Type: String
     Description: >-
@@ -168,12 +181,14 @@ Resources:
           grep -E '^#?\s*CONFIG_NVME_MULTIPATH' "/boot/config-$(uname -r)" > /root/ana-capability.txt 2>&1
           uname -r >> /root/ana-capability.txt
       Tags:
-        - {Key: Name, Value: !Sub "${NamePrefix}-ana-client"}
+        - {Key: Name, Value: !Sub "${NamePrefix}-${NameSuffix}"}
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
 Outputs:
   AnaClientInstanceId:
-    Description: The Rocky Linux client, reached over Systems Manager like the others.
+    Description: >-
+      The client on an ANA-capable kernel -- Rocky or RHEL, whichever AmiId named -- reached over
+      Systems Manager like the others.
     Value: !Ref Client
   AnaCapabilityFile:
     Description: >-

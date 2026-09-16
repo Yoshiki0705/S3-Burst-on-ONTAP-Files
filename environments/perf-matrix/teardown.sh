@@ -131,10 +131,14 @@ else
 fi
 
 log "step 5 of 9: the file system, then the clients"
-# The ANA client joins the clients group rather than making its own, so it has to go before that group
-# does. It is also the one instance in this environment with a public IP, which is a further reason not
-# to leave it standing.
+# The ANA clients join the clients group rather than making their own, so they have to go before that
+# group does. They are also the only instances in this environment with a public IP, which is a further
+# reason not to leave them standing. **Both variants are named here.** The RHEL one is deployed from the
+# same template as the Rocky one, so a teardown that names only one leaves an instance with a public IP
+# and a per-hour licence fee behind, and the security-group deletion below is what would report it --
+# by failing, several steps later, for a reason that reads as unrelated.
 delete_stack "${PREFIX}-ana-client"
+delete_stack "${PREFIX}-rhel-client"
 delete_stack "${PREFIX}-gen2"
 delete_stack "${PREFIX}-clients"
 
