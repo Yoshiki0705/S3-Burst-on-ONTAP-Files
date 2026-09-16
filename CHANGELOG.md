@@ -164,6 +164,20 @@ from what was known.
 
 ### Changed
 
+- **The layout mechanism is confirmed inside a single run, and the hypothesis that it also explains
+  the random-read amplification is disproved.** Every five-minute interval of five runs was read from
+  retained CloudWatch at **no cost**. For the 1 MiB sequential read the disk-side read size goes
+  **87.9 KiB after thirty minutes idle → 11.8 KiB after a 4 KiB random write → 88.2 KiB after a
+  sequential refill**, all within one run, with the write size visible in the same table. F-7 shows the
+  same shape: 99.6 KiB before writes of 6.3 and 4.0 KiB, 12.5 KiB after. **The disproof matters more**:
+  if layout also set the random-read amplification, a sequential refill would restore it. It does not —
+  the sequential read returned to 88 KiB while the random read stayed at **190–208%**, so the two are
+  different variables. The surviving candidate is **whether a 4 KiB random write has ever run on that
+  device**, which five observations follow (96.5% and 83.3% before any such write, 170–208% after, and
+  a sequential refill does not undo it) — recorded as a hypothesis with the controlled sequence that
+  would settle it, not as a finding. Also noted: comparing `d_io` across intervals requires holding the
+  client's own read size fixed, or workload differences read as layout differences. And the two-client
+  sum is now confirmed from the storage side at 4,168.0 MB/s against 4,204.55 measured on the clients.
 - **What moves the block sequential read is the on-disk layout, not cache residency — the mechanism
   was named wrongly twice and is corrected here.** Settled from retained CloudWatch at **no cost**, by
   reading the disk-side average read size per five-minute interval. Just after a sequential fill the
