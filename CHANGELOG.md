@@ -164,6 +164,24 @@ from what was known.
 
 ### Changed
 
+- **What moves the block sequential read is the on-disk layout, not cache residency — the mechanism
+  was named wrongly twice and is corrected here.** Settled from retained CloudWatch at **no cost**, by
+  reading the disk-side average read size per five-minute interval. Just after a sequential fill the
+  disk serves **87.3–89.6 KiB per read** (five intervals, 2.6% spread) at 13% of the provisioned IOPS;
+  after a 300-second 4 KiB random write the same client read is served in **11.7–11.8 KiB per read**
+  (six intervals, 0.9%) at 89–95% of it. **`DiskReadBytes ÷ DataReadBytes` is about 100% in the fast
+  case, so that data still came off disk** — it was never memory-served, and the earlier "residency"
+  framing had it backwards. The disk read count rises 7.3× and saturates the setting; the throughput
+  falling 1.79× is the consequence. This also explains the one thing F-8 could not: **a 4 KiB random
+  read is one disk read whatever the layout**, which is why it alone does not move. Renamed the
+  affected headings and every reference to them, corrected `verification-status.md`, and registered
+  the two statements that stay but narrow. **Also corrected: "no measurement exists for a shape where
+  IOPS bind"** — F-9 is that measurement, and at 6,144 MBps the disk reached 195,905 IOPS, 98% of the
+  200,000 setting, so on that throughput capacity the setting is reachable. The "150,000 IOPS you
+  cannot reach" figure is specific to 1,536 MBps and is unaffected. **And the 82% `DiskIopsUtilization`
+  that could not be separated from a concurrency limit is now half-separated**: saturation reads
+  89–98%, so 82% is not it — though the thread count was never varied, so the concurrency side is
+  still not demonstrated.
 - **The cross-deployment 4 KiB random-read spread was not unexplained; this repository already
   prescribed the check and F-8 / F-9 skipped it.** Settled from retained CloudWatch at **no cost**.
   Taking only the five-minute intervals whose mean read size is 4 KiB, **client-visible IOPS is the
