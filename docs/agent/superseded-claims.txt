@@ -58,4 +58,4 @@ docs/ja/verification/perf-matrix-results.md	この AMI では ANA が使えな�
 docs/ja/verification/perf-matrix-results.md	この候補を検証していない	#ana-経路の寄与とデバイス番号が経路を表さないこと
 docs/ja/verification/perf-matrix-results.md	変えたのは政策だけである	#f-8-経路別の内訳と2-つの階層の原因
 docs/ja/verification/perf-matrix-results.md	逐次読みが 23% 上がった	#f-8-経路別の内訳と2-つの階層の原因
-docs/ja/verification/throughput-capacity-burst-and-baseline.md	どちらが律速したかは判定できない	#4-kib-ランダム読みが指定-iops-に比例すること
+docs/ja/verification/throughput-capacity-burst-and-baseline.md	どちらが律速したかは判定できない	#f-10-増幅率の対照実験配置を崩す条件スレッド数指定-iops-の反転対照
