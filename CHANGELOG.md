@@ -164,6 +164,22 @@ from what was known.
 
 ### Changed
 
+- **The cross-deployment 4 KiB random-read spread was not unexplained; this repository already
+  prescribed the check and F-8 / F-9 skipped it.** Settled from retained CloudWatch at **no cost**.
+  Taking only the five-minute intervals whose mean read size is 4 KiB, **client-visible IOPS is the
+  provisioned SSD IOPS divided by that run's disk-read amplification.** Where amplification is about
+  1.5 the disk saturates at 98% of the setting and the client stops at 131,617; where it is about 0.8
+  the disk sits at 81% and the client reaches 203,961. The "0.657 / 0.660 of the setting" recorded
+  above is the reciprocal of that 1.5 — the same relationship seen from the other side. Intervals were
+  selected by `DataReadBytes ÷ DataReadOperations` rather than from run notes, which F-6 does not
+  carry. **The diagnostic is `DiskReadBytes ÷ DataReadBytes`, and it is in this repository's own
+  defaults table**: a read that only slightly exceeds the cache is not measuring the disk path, and
+  the way to notice is that ratio being a few per cent. F-8 and F-9 read `DiskIopsUtilization`
+  instead and wrote the result up as unconfirmed. Applying it gives 104–181% across all five runs, so
+  **no run was cache-served** — which also rules out the plausible-sounding "it exceeded the setting
+  because it came from memory", which is what this entry was one edit away from asserting. What stays
+  open is narrower and real: **why the amplification splits into 0.8 and 1.5** on the same template,
+  the same setting and the same workload.
 - **"`queue-depth` is the one iopolicy that uses the second ANA path" is withdrawn, and the block
   sequential-read figure is now known to depend on how recently the data was written.** The stage on
   the iopolicy claim drops from **verified to undetermined**; two new claims are recorded as verified.
