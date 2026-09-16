@@ -15,6 +15,22 @@ from what was known.
 
 ### Added
 
+- **The GitHub links in blog drafts are now resolved by a gate (`make blog-links`), anchors
+  included.** An article is the only path most readers have into the verification record, and
+  **nothing checked those 48 links.** `check_links.py` skips `.private/` deliberately — the drafts are
+  gitignored, so a clone without them is normal — which left a document rename able to break every
+  inbound link while every commit gate stayed green. The anchor case is the one worth most: the file
+  still resolves, GitHub serves the page from the top, and the reader is never told that the sentence
+  they were sent to verify has been renamed away. All 48 currently resolve. **Two failure modes are
+  encoded because both were committed while writing the checker**: comparing a sibling's path against
+  *this* checkout reported four correct links as broken and produced a plan to "fix" them, so the
+  repository name now decides which root a link resolves against; and re-deriving the anchor slug
+  reported two live anchors as misses, so `check_links.slugify` is imported rather than rewritten —
+  GitHub turns each whitespace character into its own hyphen without collapsing runs, which is why
+  `（1 / 4 / 8 台）` becomes `1--4--8-台`. A pinned ref and an absent sibling checkout are reported as
+  not checked rather than counted as passes, and **drafts present with zero links found fails**: that
+  is the reader breaking, not an absence of links.
+
 - **ONTAP's per-LIF counters can now be read from the runbook (`lif-counters`), and the ANA client
   template deploys RHEL as well as the rebuild.** Both exist for one reason: every ANA figure recorded
   so far is a client-side total, and **a total that fails to grow when a second path is added is

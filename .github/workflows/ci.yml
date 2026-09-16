@@ -111,6 +111,11 @@ jobs:
 
       - name: Check superseded statements name their replacement
         run: python3 tools/check_superseded_claims.py
+
+      # Skips in CI: the drafts are gitignored, so there is nothing to read here. It runs for the
+      # verdict on a developer's machine, where the drafts and the sibling checkouts both exist.
+      - name: Resolve the GitHub links blog drafts point at
+        run: python3 tools/check_blog_links.py
       - name: Check pattern status words
         run: python3 tools/check_pattern_status.py
       # The cost tables are generated. Checking here catches the case where the model was edited and
