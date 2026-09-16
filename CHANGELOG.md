@@ -15,6 +15,24 @@ from what was known.
 
 ### Added
 
+- **What drops the block sequential-read figure is a write, not elapsed time — and the 4 KiB random
+  read scales exactly with the provisioned SSD IOPS while the sequential read ignores it.** Three
+  claims move to verified and one open item is closed as "not the policy". On one fill: three
+  full-device reads held 2,263.8 / 2,267.5 / 2,268.4 MB/s (0.2%), **thirty minutes idle changed
+  nothing** (2,258.5), and **a 300-second 4 KiB random write dropped it to 1,272.8**; refilling
+  restored 2,235.4. So F-8's "time or other activity" is settled: reads and elapsed time do not cool
+  it. Changing only the provisioned IOPS gave 131,413.5 at 200,000 and **66,016.9 at 100,000** — ratio
+  1.990, and 0.657 / 0.660 of the setting at both points — while the sequential read stayed at
+  2,265.7. **The reversal control is missing**: raising it back is refused for six hours, because a
+  provisioned-IOPS change counts as a storage-capacity update. **This does not explain the
+  cross-deployment 131k / 203k / 242k spread** — every deployment used 200,000, and F-6's 203,730 is
+  102% of it, so that figure was not disk-limited and the two are bound by different things.
+  Switching the policy mid-run leaves the 4 KiB random read flat (132,044.8 across three policies
+  against 131,413.5 for `queue-depth` alone), which closes the last piece of the F-7 withdrawal.
+  **The warm ceiling is per client**: two clients reading the same namespace simultaneously gave
+  2,040.69 + 2,163.86 = 4,204.55 MB/s, 1.86× one client's 2,265.7, which is why nothing on the
+  storage side was saturated. What binds a single client is not measured.
+
 - **The GitHub links in blog drafts are now resolved by a gate (`make blog-links`), anchors
   included.** An article is the only path most readers have into the verification record, and
   **nothing checked those 48 links.** `check_links.py` skips `.private/` deliberately — the drafts are
