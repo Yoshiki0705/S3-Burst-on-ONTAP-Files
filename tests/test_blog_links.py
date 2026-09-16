@@ -23,7 +23,12 @@ assert SPEC and SPEC.loader
 bl = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bl)
 
-URL = "https://github.com/Yoshiki0705/{repo}/blob/{ref}/{path}{anchor}"
+# The owner is a placeholder rather than a literal. `test_owner_repo_links.py` scans tracked
+# source lines for this owner's URLs and rejects repository names it does not know, and a
+# template reading `{repo}` is not a repository name. Writing the owner in literally made that
+# test fail -- in CI rather than locally, because it walks *tracked* files and this one was still
+# unstaged when the gate ran here.
+URL = "https://github.com/{owner}/{repo}/blob/{ref}/{path}{anchor}"
 
 
 def draft(tmp_path: Path, body: str) -> Path:
@@ -35,7 +40,7 @@ def draft(tmp_path: Path, body: str) -> Path:
 def link(
     repo="s3-burst-on-ontap-files", ref="main", path="docs/ja/x.md", anchor=""
 ) -> str:
-    return f"[see]({URL.format(repo=repo, ref=ref, path=path, anchor=anchor)})"
+    return f"[see]({URL.format(owner=bl.OWNER, repo=repo, ref=ref, path=path, anchor=anchor)})"
 
 
 def test_a_link_to_a_file_that_does_not_exist_fails(tmp_path, monkeypatch):
