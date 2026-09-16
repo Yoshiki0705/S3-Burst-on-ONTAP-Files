@@ -5,7 +5,7 @@ PY ?= python3
 # name exists, and make then reports "up to date" without running the recipe — a gate that never
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
-.PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync ja-headings sources-export superseded \
+.PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync blog-links ja-headings sources-export superseded \
         audit audit-drafts secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
         pattern-status iac-security drift external-anchors incoming-probes outgoing-probes shell \
         citation-coverage \
@@ -291,6 +291,9 @@ superseded: ## Superseded statements must name the section that superseded them
 blog-sync: ## Verify no blog draft has moved ahead of its published post
 	@$(PY) tools/check_blog_draft_sync.py
 
+blog-links: ## Resolve the GitHub links blog drafts point at, anchors included
+	@$(PY) tools/check_blog_links.py
+
 drift: ## Compare the contents of translated tables, not just their headings
 	@$(PY) tools/check_translation_drift.py
 
@@ -315,7 +318,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts superseded blog-sync pattern-status iac-security finops diagram-fonts diagram-flow test commit-subjects ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts superseded blog-sync blog-links pattern-status iac-security finops diagram-fonts diagram-flow test commit-subjects ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
