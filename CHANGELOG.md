@@ -15,6 +15,19 @@ from what was known.
 
 ### Added
 
+- **ONTAP's per-LIF counters can now be read from the runbook (`lif-counters`), and the ANA client
+  template deploys RHEL as well as the rebuild.** Both exist for one reason: every ANA figure recorded
+  so far is a client-side total, and **a total that fails to grow when a second path is added is
+  consistent with two opposite findings** — the policy never used that path, or it used it and the
+  ceiling is somewhere else. The counters separate them; `queue-depth` aggregating reads by 1.73× while
+  leaving writes inside 1.5% is the case that needs them. They are cumulative, so they are sampled
+  before and after a workload, and **a table with no rows exits non-zero rather than printing nothing**:
+  "the table exists and is empty" and "this version has no such table" look identical once summed and
+  mean opposite things. RHEL comes from the same template as Rocky at the same minor version, because
+  "Rocky 9.7 stands in for RHEL 9.7" has been an assumption throughout, and a different minor version
+  would measure the version gap instead of the distribution. `teardown.sh` names both variants — it is
+  the only thing that removes an instance carrying a public IP and, for RHEL, a per-hour licence fee.
+
 - **Seven words this repository invented were replaced with ordinary Japanese, and `make audit` now
   rejects them** under a `coinage` category. A reader found them; no check did. `段`, used for a
   throughput-capacity tier, had reached **84 occurrences and was recorded in the glossary as the
