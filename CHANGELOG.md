@@ -130,6 +130,28 @@ from what was known.
 
 ### Changed
 
+- **"`queue-depth` is the one iopolicy that uses the second ANA path" is withdrawn, and the block
+  sequential-read figure is now known to depend on how recently the data was written.** The stage on
+  the iopolicy claim drops from **verified to undetermined**; two new claims are recorded as verified.
+  The earlier reading came from client-side totals only, and F-8 counted the bytes per path from two
+  independent places — ONTAP's `nvmf_tcp_port` and the client's own sockets, one per controller
+  address. **Under `queue-depth` the non-optimized path stayed at `total_ops` 4 through all four
+  workloads, reads included**, on both Rocky 9.7 and RHEL 9.7. Switching the policy inside a single
+  run produced **no step and no transient**. What does move the figure is recency: on one deployment,
+  one device, one path and one policy, refilling the namespace took it from **1,239.15 to 2,298.54
+  MB/s** and a second read straight after held 2,296.12. The cold side is **SSD-IOPS-bound**
+  (`DiskIopsUtilization` peaking 95.0–99.7% while throughput capacity sits under 41% and network
+  under 11%); the warm side saturates **nothing FSx for ONTAP publishes**, so what binds it is
+  unconfirmed.
+  Ruled out within the one deployment: path (1,278.11 optimized against 1,279.07 non-optimized),
+  policy, connection order (three orders inside 0.06%), queue count, and distribution. F-7's
+  sequential-read 1.73× is therefore the decay across that session, matching the order the four
+  configurations were measured in — **and F-6's 23% is the same shape**, so both now carry a note and
+  a row in `superseded-claims.txt`. **The 4 KiB random read's 1.53× is not explained**: it does not
+  move with recency (0.2% across warm and cold), and the within-run switch was only tried on the
+  sequential read. **Rocky 9.7 does stand in for RHEL 9.7** — same namespace, same cold state, reads
+  within 0.1% and 4 KiB random write within 0.3%; sequential write was not measured in matching
+  states, so those two figures are not comparable.
 - **The EFS mount-helper speedup is a quota tier, not more TCP flows.** The claim was recorded as
   "the mechanism by which the helper exceeds the single-flow limit", with the ratio left unexplained.
   Both halves were wrong in the same way: the plain mount stops at a **documented per-client quota**
