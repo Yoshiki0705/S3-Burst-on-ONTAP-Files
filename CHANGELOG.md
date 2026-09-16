@@ -164,6 +164,24 @@ from what was known.
 
 ### Changed
 
+- **The measurement records had no route to the adoption guidance, and four findings from the block
+  runs now reach it.** The sibling playbook registers **25 probes into `perf-matrix-results.md`** and
+  cites this repository from twenty places; **not one measurement record cited anything back.** The
+  guidance side read the numbers and a reader inside the numbers had no way out to the guidance. The
+  bridge already existed — `performance-testing-guide.md` is the "read before measuring" page and
+  already links the playbook's triage tree and its CloudWatch note — but **none of the new findings
+  had reached it**, so they never got to the bridge. Added there: **`iorate=max` and a target rate are
+  not the same column** (4,406 MB/s at 8.86 ms against 4,204 at 121.79, and the same 2,364 MB/s at
+  216.6 ms and at 860.3 ms); **auto_vdbench cannot drive a raw device or an NVMe namespace**, which is
+  why no block run has a curve; **what a small random write does to the on-disk layout** (unchanged by
+  reads, by thirty minutes idle and by 300 seconds of sequential writing; −77% after 300 seconds of
+  4 KiB random writing; fully restored by a sequential refill), with the four metrics that reach the
+  mechanism where `DiskIopsUtilization` alone does not; and **three hypotheses that were disproved**,
+  the last of which had five observations following it without exception. Two new rows in the
+  withdrawal table: comparing configurations across time, and reading 82% as "near the limit" without
+  knowing that saturation shows as 89–98%. Two return citations into the playbook required a
+  registration on its side first (its contract is declared, not inferred), so
+  **FSx-for-ONTAP-Adoption-Playbook#263 landed before this** — 40 anchored citations became 42.
 - **Every block figure in this repository is an `iorate=max` saturation point, no block run has a
   latency curve, and one proportionality claimed a day earlier is withdrawn as uncontrolled.** The
   measurement conditions already said `iorate=max`; what they did not say is what that costs a reader.
