@@ -55,3 +55,5 @@ docs/ja/verification/perf-matrix-results.md	4 KiB ランダム読みは経路を
 docs/ja/verification/perf-matrix-results.md	9.08 Gbps を運んでおり、同じ上限には当たっていない	#59164-の正体と-ana-経路の寄与
 docs/ja/verification/perf-matrix-results.md	この AMI では ANA が使えない	#ana-マルチパスが-amazon-linux-2023-で使えないこと
 docs/ja/verification/perf-matrix-results.md	この候補を検証していない	#ana-経路の寄与とデバイス番号が経路を表さないこと
+docs/ja/verification/perf-matrix-results.md	変えたのは政策だけである	#f-8-経路別の内訳と2-つの階層の原因
+docs/ja/verification/perf-matrix-results.md	逐次読みが 23% 上がった	#f-8-経路別の内訳と2-つの階層の原因
