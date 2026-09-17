@@ -82,6 +82,14 @@ hd=hd1,system=localhost,user=root
 * One file, seven disjoint regions, plus sd_fill spanning the whole file.
 *
 * 100/7 = 14.2857 per cent each, which is 371 GiB of 2,600 GiB.
+*
+* **THE SMB TWIN NO LONGER HAS THIS SHAPE, AND NEITHER SHOULD THIS ONE.**
+* vdbench-windows-smb-cachecontrolled.txt now gives each region its own file,
+* because format runs per SD and one file formats at a queue depth of 2 -- the
+* fill there ran at 165 MB/s, and 315 MB/s once formatxfersize was set. This
+* file has not been converted because it has not been re-run since; convert it
+* before running it, and take the reasoning from the SMB file rather than
+* copying the layout below.
 **********************************************************************
 * `lun=` cannot go on sd=default -- VDBENCH rejects it with "You may not specify
 * the 'lun=' parameter for sd=default" -- so every SD names the file itself. The

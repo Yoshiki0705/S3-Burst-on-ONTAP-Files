@@ -1,13 +1,23 @@
 **********************************************************************
 * The SMB shapes with the cache-hit ratio controlled.
 *
-* NOT YET EXECUTED. The NFS counterpart did not finish: the volume filled
-* and the run was abandoned. The cause was documented behaviour and the
-* omission was ours -- automatic daily backups were on, the backup snapshot
-* held the pre-overwrite blocks, and the volume went 88% -> 100% full.
-* That is closed in template-fsxn-gen2.yaml (AutomaticBackupRetentionDays: 0),
-* but read the account in docs/ja/verification/perf-matrix-results.md before
-* running this, because the same shape of mistake has more than one cause.
+* NOT YET EXECUTED. Two attempts have ended before the first measured
+* number, and both are worth reading before a third:
+*
+*   1. The NFS counterpart filled the volume and was abandoned. Automatic
+*      daily backups were on, the backup snapshot held the pre-overwrite
+*      blocks, and the volume went 88% -> 100% full. That is closed in
+*      template-fsxn-gen2.yaml (AutomaticBackupRetentionDays: 0).
+*   2. This file stalled on its own fill. `size=2600g` was declared against
+*      an existing 600 GB file, which VDBENCH refuses rather than extends
+*      ("Insufficient amount of lun size specified"), and once the fill was
+*      moved to `format=yes` it ran at 165 MB/s -- because format ignores
+*      the run's `xfersize` and `threads` and writes 128 KiB at queue depth
+*      2. `formatxfersize=1m` lifted it to 315 MB/s and left the depth at 2,
+*      which is a fifth of what the same file reaches when overwritten.
+*
+* The account is in docs/ja/verification/perf-matrix-results.md. Read it:
+* the same shape of failure has more than one cause.
 *
 * WHY CONTROLLING THE RATIO IS THE ONLY HANDLE
 *
@@ -25,10 +35,10 @@
 *   cd C:\bench
 *   C:\bench\vdbench50407\vdbench.bat -f vdbench-windows-smb-cachecontrolled.txt -o C:\bench\out-cc
 **********************************************************************
-* Every shape reads its own region of one large file, and no two shapes
-* share a region. A shape therefore starts with the cache holding the
-* *previous* shape's region, which is disjoint from its own, so it begins
-* close to cold without any cache-flush step.
+* Every shape reads its own region, and no two shapes share one. A shape
+* therefore starts with the cache holding the *previous* shape's region,
+* which is disjoint from its own, so it begins close to cold without any
+* cache-flush step.
 *
 * Two constraints set the region size:
 *
@@ -38,19 +48,44 @@
 *   2. A region has to be larger than what its window can consume, or the
 *      shape wraps and starts reading what it just pulled in.
 *
-* Ranges on one file rather than one file per region. Pointing several SDs
-* at separate files makes VDBENCH format each of them: with eight SDs that
-* was 5,197 GiB of formatting before any measurement started. `range=` on a
-* single file avoids it and keeps the regions provably disjoint.
+* ONE FILE PER REGION, WHICH REVERSES WHAT THIS FILE USED TO SAY.
 *
-* Region 1 -- the head of the file -- is measured first, and the fill leaves
-* the cache holding the *tail*, so the first shape does not start warm.
+* The earlier version pointed seven SDs at ranges of one 2,600 GB file and
+* gave the reason as format volume: separate files would make VDBENCH format
+* each one, "5,197 GiB of formatting before any measurement started". That
+* figure counted the whole-file fill SD *and* the seven ranges. Dropping the
+* fill SD -- the regions are what needs data, and together they are the file
+* -- makes the two layouts format the same 2,597 GiB.
+*
+* At equal volume, separate files are the better shape for two reasons:
+*
+*   - **Format runs per SD, so seven files format concurrently.** One file
+*      formats at a single queue depth of 2. Whether that actually multiplies
+*      the rate is **a prediction, not a result** -- see below.
+*   - Several SDs on one file is a shape this project has already recorded as
+*      a mistake, under "同じファイルに複数の SD を向けない". Keeping it here
+*      while calling it out there is how the wrong one gets copied.
+*
+* WHAT TO RECORD, WHICHEVER WAY IT GOES
+*
+* The fill rate. If seven-way format reaches roughly 7 x 315 MB/s, the queue
+* depth of 2 was the constraint and this layout removed it. **If it does not,
+* the constraint is somewhere else and the paragraph above is withdrawn** --
+* write the measured rate either way. A prediction left in place without its
+* result reads, to the next person, as a procedure that was verified.
+*
+* Region 1 is measured first, and the fill leaves the cache holding the last
+* region formatted, so the first shape does not start warm. With concurrent
+* format that ordering is weaker than it was with one sequential pass: seven
+* streams finish at about the same time, so the cache holds a slice of each.
+* **Record the disk-to-data ratio of the first shape** rather than assuming
+* the ordering did the work.
 **********************************************************************
 hd=default,shell=vdbench,jvms=16
 hd=hd1,system=localhost
 **********************************************************************
-* 2,600 GB, which is 7 regions of about 371 GiB. The volume has to hold it
-* with headroom: at 100% full, writes fall by roughly a factor of eight
+* 371 GiB per SD, seven of them, 2,597 GiB in total. The volume has to hold
+* it with headroom: at 100% full, writes fall by roughly a factor of eight
 * before failing, and the run reports that as a measurement.
 *
 * `openflag=directio` (Windows). The NFS side uses `o_direct`.
@@ -58,21 +93,22 @@ hd=hd1,system=localhost
 * Both SVMs share the file system's throughput capacity. Run this while the
 * NFS side is idle, and record that it was.
 **********************************************************************
-sd=default,openflag=directio,size=2600g,host=hd1
-* The fill writes the whole file once. Sequential to the end, then stop.
-sd=sd_fill,lun=Z:\file1
-sd=sd1,lun=Z:\file1,range=(0,14.2857)
-sd=sd2,lun=Z:\file1,range=(14.2857,28.5714)
-sd=sd3,lun=Z:\file1,range=(28.5714,42.8571)
-sd=sd4,lun=Z:\file1,range=(42.8571,57.1429)
-sd=sd5,lun=Z:\file1,range=(57.1429,71.4286)
-sd=sd6,lun=Z:\file1,range=(71.4286,85.7143)
-sd=sd7,lun=Z:\file1,range=(85.7143,100)
+sd=default,openflag=directio,size=371g,host=hd1
+sd=sd1,lun=Z:\cc1
+sd=sd2,lun=Z:\cc2
+sd=sd3,lun=Z:\cc3
+sd=sd4,lun=Z:\cc4
+sd=sd5,lun=Z:\cc5
+sd=sd6,lun=Z:\cc6
+sd=sd7,lun=Z:\cc7
 **********************************************************************
 * One shape per region, in the same order as the NFS file so the two are
 * read side by side.
+*
+* wd_fmt exists only to give the format run every SD at once. It carries no
+* measured window.
 **********************************************************************
-wd=wd_fill,sd=sd_fill,seekpct=eof,xfersize=1024k,rdpct=0
+wd=wd_fmt,sd=(sd1,sd2,sd3,sd4,sd5,sd6,sd7),seekpct=eof,xfersize=1024k,rdpct=0
 wd=wd1,sd=sd1,seekpct=.0,xfersize=1024k,rdpct=100
 wd=wd2,sd=sd2,seekpct=.0,xfersize=64k,rdpct=100
 wd=wd3,sd=sd3,seekpct=.0,xfersize=1024k,rdpct=0
@@ -84,16 +120,21 @@ wd=wd7,sd=sd7,seekpct=100,xfersize=64k,rdpct=100
 * The fill is a phase of the run, not a preparation step to be skipped: the
 * regions have to contain data before a read of one means anything.
 *
-* elapsed=2700 is a ceiling, not a target -- seekpct=eof ends it at the end
-* of the file. At around 2,000 MB/s a 2,600 GB fill takes about 22 minutes,
-* which at $23.03/hour is roughly $8.50 of file system time before the first
-* measured number. That is the price of controlling the ratio and it belongs
-* in the cost record.
+* `format=yes` creates each file at `size=` and writes it. `formatxfersize=1m`
+* is required: without it format writes 128 KiB regardless of the xfersize
+* above, and that alone cost a factor of two last time.
+*
+* elapsed=3600 is a ceiling, not a target -- format ends when the files are
+* written. At 2,000 MB/s a 2,597 GiB fill takes about 22 minutes, which at
+* $23.03/hour is roughly $8.50 of file system time before the first measured
+* number. That is the price of controlling the ratio and it belongs in the
+* cost record. **At 315 MB/s it is 2.3 hours and $53**, which is why the fill
+* rate is the first thing to read in the output rather than the last.
 *
 * interval=30 during the fill: nothing about it is being measured, and
 * per-second rows for 22 minutes bury the shapes that follow.
 **********************************************************************
-rd=cc-fill,wd=wd_fill,iorate=max,warmup=0,elapsed=2700,interval=30,threads=512
+rd=cc-format,wd=wd_fmt,iorate=max,warmup=0,elapsed=3600,interval=30,threads=512,format=yes,formatxfersize=1m
 rd=cc-seq-read-1024k,wd=wd1,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
 rd=cc-seq-read-64k,wd=wd2,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
 rd=cc-seq-write-1024k,wd=wd3,iorate=max,warmup=30,elapsed=120,interval=1,threads=512
