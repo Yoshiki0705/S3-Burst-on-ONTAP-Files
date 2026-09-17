@@ -5,6 +5,16 @@
 [測定環境](../../../environments/perf-matrix/README.md)にあり、テンプレートとスクリプトから
 再現できる。
 
+**この記録を設計判断に翻訳しているのは playbook 側である。** こちらは環境と数値を持ち、
+**どちらを選ぶかの指針は持たない。** ブロックのパス構成とフェイルオーバーは
+[パスはフェイルオーバーの仕組みそのもの](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/paths-are-the-failover-mechanism.md)、
+ブロックの監視で取れる次元は
+[ブロックの監視には LUN の次元もプロトコルの次元もない](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/what-block-monitoring-shows.md)、
+単一接続が何を測っているかは
+[単一接続はクライアントを測っている](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/performance/notes/a-single-connection-measures-the-client.md)。
+**引用の向きは向こうからこちらで、こちらは向こうの記述に依拠していない** — この行は読者の動線で、
+主張の根拠ではない。
+
 ## この測定でいちばん効いた要因
 
 **単一接続の測定は、ストレージではなく EC2 の 1 フローあたりの帯域上限を測っている。**

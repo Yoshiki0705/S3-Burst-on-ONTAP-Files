@@ -10,6 +10,10 @@ iSCSI と NVMe/TCP を FSx for ONTAP の raw device に対して測るときの�
 **この文書はファイルプロトコル側の手順とは別にしてある。** 環境の作り方は
 [測定環境](../../../environments/perf-matrix/README.md)と共通で、そこに足すと 1,000 行を超える。
 
+**ここで測れるかどうかを決めるカーネル要件は、設計側の判断として playbook にある** —
+[パスはフェイルオーバーの仕組みそのもの](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/paths-are-the-failover-mechanism.md)。
+**構築前に `CONFIG_NVME_MULTIPATH` を確認する手順はあちら側にあり、こちらは確認した結果を持つ。**
+
 ## 先に読む — 止まらない課金
 
 **ブロックだけを立てた状態で時間あたり約 $25.48。** ap-northeast-1 の On-Demand 単価から積んだ
