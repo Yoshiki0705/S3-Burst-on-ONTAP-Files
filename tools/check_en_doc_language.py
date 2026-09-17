@@ -83,6 +83,10 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     "docs/en/verification-status.md": (
         # The round that measured the nine outstanding items and corrected five published figures.
         "#残していた-9-件を測ったこの記録の数値を-5-つ訂正します",
+        # The re-measurement that read 2.15x the file server's in-memory cache in one pass, which is
+        # what the 7.14x from SSD IOPS had been missing. It reproduces the low point and not the
+        # high one, so the English row states a ratio that only this record's conditions explain.
+        "#キャッシュを超える作業セットでの再測定2026-09-17",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is
