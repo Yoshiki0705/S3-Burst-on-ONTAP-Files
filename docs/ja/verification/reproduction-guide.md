@@ -57,7 +57,7 @@
 ### 共通の前提
 
 ```bash
-git clone https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files.git
+git clone https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files
 cd S3-Burst-on-ONTAP-Files
 pip install -r requirements-dev.txt      # cfn-lint など。測定には不要だが、テンプレートを直すなら要る
 ```

@@ -59,6 +59,9 @@ def test_the_published_list_is_not_empty() -> None:
         # either, so rejecting one of them would be a false positive on a working link.
         "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files",
         "https://github.com/Yoshiki0705/fsx-for-ontap-adoption-playbook",
+        # The clone form. The reproduction guide tells a reader to `git clone`, and a URL ending in
+        # `.git` is the same repository -- rejecting it would fail a working command.
+        "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files.git",
     ],
 )
 def test_a_published_repository_passes(url: str) -> None:
@@ -104,7 +107,7 @@ def test_no_tracked_file_links_to_an_unpublished_repository() -> None:
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):
             for match in pattern.finditer(line):
-                if match.group(1) not in links.PUBLISHED_REPOS:
+                if not links.repo_is_published(match.group(1)):
                     rel = path.relative_to(ROOT)
                     problems.append(f"{rel}:{lineno}: {match.group(1)}")
     assert not problems, (

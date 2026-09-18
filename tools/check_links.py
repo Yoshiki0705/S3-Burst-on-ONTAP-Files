@@ -234,13 +234,24 @@ PUBLISHED_LOWER = frozenset(name.lower() for name in PUBLISHED_REPOS)
 OWNER_URL = re.compile(rf"https://github\.com/{OWNER}/([^/#?\s)\"',]+)")
 
 
+def repo_is_published(name: str) -> bool:
+    """Whether a captured repository name is one of the published ones.
+
+    Case-insensitive for the reason `PUBLISHED_REPOS` records, and a trailing `.git` is stripped
+    because a clone URL carries one and GitHub resolves both forms. Both normalisations live here so
+    that the corpus check in `tests/test_owner_repo_links.py` cannot drift from the checker: it
+    compared case-sensitively once, and rejected the canonical spelling of this very repository.
+    """
+    return name.removesuffix(".git").lower() in PUBLISHED_LOWER
+
+
 def check_owner_repo(url: str) -> str | None:
     """Whether a link to one of this owner's repositories names a published one."""
     match = OWNER_URL.match(url)
     if not match:
         return None
     name = match.group(1)
-    if name.lower() in PUBLISHED_LOWER:
+    if repo_is_published(name):
         return None
     return (
         f"unknown repository {name!r} for {OWNER}; a local directory name is not a repository name. "
