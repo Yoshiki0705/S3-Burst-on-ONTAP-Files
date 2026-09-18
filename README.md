@@ -158,6 +158,8 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | 他の方式と比べる | [代替案との比較](docs/ja/reference/comparison/alternatives.md) | 10 分 |
 | Amazon S3 Files と比べる | [S3 Files と本構成の比較検証](docs/ja/verification/s3files-vs-flexcache.md) | 10 分 |
 | S3 Files の実測値と落とし穴を見る | [S3 Files 実測記録](docs/ja/verification/s3files-measured.md) | 10 分 |
+| **測らずに性能の期待値を読む** | [測る前に読む性能の期待値](docs/ja/performance-expectations.md) | 15 分 |
+| **自分の環境で測り直す（環境構築込み）** | [再現の手引き](docs/ja/verification/reproduction-guide.md) | 20 分 |
 | スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |
 | プロトコル別に測れる組み合わせを知る | [プロトコル別の可否](docs/ja/verification/protocol-matrix-efs-vs-ontap.md) | 5 分 |
 | NFS / SMB / EFS の実測値を見る | [プロトコル別測定の結果](docs/ja/verification/perf-matrix-results.md) | 20 分 |
