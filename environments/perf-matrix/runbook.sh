@@ -642,6 +642,34 @@ NOTE
 #
 # The password is read on the client from Secrets Manager rather than passed in: a Run Command's
 # parameters are kept in Systems Manager's command history.
+# Read the ONTAP release from the cluster, and fail if it cannot be read.
+#
+# **The AWS API does not carry it.** `FileSystemTypeVersion` is populated for FSx for Lustre and
+# returns null for FSx for ONTAP, so a run that reads only the AWS side ends with no release recorded
+# -- and every number in this project is supposed to carry one. Two consecutive sessions shipped
+# without it because null read as "not available" rather than "ask the cluster".
+#
+# It is unrecoverable after teardown, which is why this is wired into `preflight` as a gate rather
+# than left as a step in a document.
+ontap_version() {
+  local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
+  [[ -n "$fs_id" && "$fs_id" != "None" ]] || die "no FileSystemId; run './runbook.sh gen2' first"
+  [[ -n "${FSXADMIN_SECRET_ARN:-}" ]] || die "set FSXADMIN_SECRET_ARN"
+  local instance; instance="$(stack_output "$STACK_CLIENTS" SingleHostInstanceId)"
+  [[ -n "$instance" && "$instance" != "None" ]] || die "no client; run './runbook.sh clients' first"
+  local mgmt="management.${fs_id}.fsx.${REGION}.amazonaws.com"
+  log "ONTAP release on $fs_id"
+  local out
+  out="$(ontap_rest_on_client "$instance" \
+    "curl -s -k -u \"fsxadmin:\$PW\" \"https://${mgmt}/api/cluster?fields=version\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"version\"][\"full\"])'")" \
+    || die "could not reach the cluster to read its release"
+  printf '%s\n' "$out"
+  # The release string always contains "NetApp Release". Grepping for it rather than for a non-empty
+  # answer: an error page, an empty records list and a Python traceback are all non-empty.
+  grep -q 'NetApp Release' <<<"$out" \
+    || die "the cluster did not return a release. Do not measure without one: FileSystemTypeVersion is null for FSx for ONTAP, and after teardown the release cannot be recovered"
+}
+
 nvme_cache() {
   local action="${1:-show}"
   local fs_id; fs_id="$(stack_output "$STACK_GEN2" FileSystemId)"
@@ -889,6 +917,13 @@ preflight() {
   log "preflight"
   python3 "$HERE/../../scripts/protocol_matrix_harness.py" --dry-run
 
+  # Read the ONTAP release, and refuse to go on without it. Two consecutive sessions recorded a full
+  # set of numbers and no release: `FileSystemTypeVersion` is null for FSx for ONTAP, both times that
+  # null was taken as "unavailable", and by the time the gap was noticed the file system had been
+  # deleted. A measurement without a release cannot be compared with the next one, and the release is
+  # unrecoverable afterwards -- so this is a gate rather than a reminder.
+  ontap_version
+
   log "NVMe read cache state"
   nvme_cache show
   cat <<'NOTE'
@@ -984,6 +1019,9 @@ Order: ad -> clients -> gen2 -> ad-ports -> smb-svm -> join-svm -> windows -> wi
   smb-preflight          Read the SVM name, the data share, its junction path and the domain
                          account. Run it before mounting: two of these fail with messages that
                          point elsewhere
+  ontap-version          Read the ONTAP release from the cluster. **The AWS API returns null for
+                         FSx for ONTAP**, and the release cannot be recovered after teardown, so
+                         `preflight` gates on this
   nvme-cache show|off    Read or disable the NVMe read cache over the ONTAP REST API
   lif-counters tables    List the counter tables this cluster publishes whose name mentions a LIF
   lif-counters read <t>  Dump that table's rows. Cumulative: sample before and after a workload.
@@ -1541,6 +1579,7 @@ case "${1:-}" in
   windows)              deploy_windows ;;
   windows-status)       windows_status ;;
   raise-gen1)           raise_gen1 ;;
+  ontap-version)        ontap_version ;;
   nvme-cache)           nvme_cache "${2:-show}" ;;
   lif-counters)         lif_counters "${2:-tables}" "${3:-}" ;;
   block-packages)       block_packages ;;
