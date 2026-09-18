@@ -62,6 +62,17 @@ cd S3-Burst-on-ONTAP-Files
 pip install -r requirements-dev.txt      # cfn-lint など。測定には不要だが、テンプレートを直すなら要る
 ```
 
+**着手前に 1 コマンドで確認できます。** 下に散っている前提のうち、機械で読めるものはこれが読みます。
+
+```bash
+make preflight-pre VPC=vpc-xxxxxxxx SUBNET=subnet-xxxxxxxx MBPS=2048
+```
+
+読むのは 4 つ。**リージョン合計のスループットキャパシティ**（上の枠。他人のファイルシステムも
+同じ枠を使う）、SSD 容量の合計、サブネットが指定 VPC にあることと空き IP、
+**Session Manager への到達性**。**枠が読めなかった場合も finding として出ます**（既定値との
+比較に落ちて黙って通らない）。
+
 **VPC とサブネットは自分で用意します。** テンプレートは作りません。要件は 2 つだけです。
 
 - **ファイルシステムとクライアントが同じサブネット**にあること（管理エンドポイントへ到達でき、
@@ -323,6 +334,26 @@ aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes
 **引用に耐える記録には、数値と同じ数の条件が付きます。** 落とすと後から復元できません。
 項目は[期待値のページ](../performance-expectations.md#引用のときに落とさないこと)に 9 つ挙げてあります。
 **ONTAP の版だけは撤去後に取り戻せないので、測定より先に読んでください。**
+
+**測定を始める前に、もう 1 コマンドあります。**
+
+```bash
+make preflight-post FS=fs-xxxxxxxxxxxx IID=i-xxxxxxxxxxxx SECRET=arn:aws:secretsmanager:...
+```
+
+| 見るもの | 落ちる条件 |
+|---|---|
+| **ONTAP の版** | クラスタが `NetApp Release` を含む文字列を返さないなら止まる。空でない応答（エラーページ・空の records・バージョン番号だけ）はすべて不合格 |
+| **NVMe リードキャッシュ** | どのノードかが有効なら止まる。**ノードが 0 件返ったときも止まる**（「無効」と区別できないため）。意図して有効のまま測るなら `ALLOW_NVME_CACHE=1` |
+| 自動バックアップ・スナップショットポリシー・インライン効率化 | 既定のままなら指摘する |
+| `tcp_max_transfer_size` | 判定しない。記録に載せるために表示する |
+
+**撤去のあとは残留を掃きます。**
+
+```bash
+make sweep                 # 報告のみ
+make sweep DELETE=1        # 実行（最終バックアップ・未アタッチ EBS は取り消せません）
+```
 
 ## 関連ドキュメント
 

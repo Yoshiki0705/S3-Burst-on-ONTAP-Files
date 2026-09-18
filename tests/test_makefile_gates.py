@@ -73,6 +73,13 @@ NOT_IN_ALL = {
     # An aggregate of `all` plus the message check, meant to be the single command before a
     # commit. Reaching it from `all` would be circular.
     "ready",
+    # The two operational gates and the teardown sweep. They call AWS, they take arguments, and
+    # `preflight-pre` runs before the file system it checks headroom for exists -- none of which a
+    # commit gate can do. They are wired into the deployment guides instead, at the step where the
+    # reader is standing.
+    "preflight-pre",
+    "preflight-post",
+    "sweep",
     "clean",
 }
 

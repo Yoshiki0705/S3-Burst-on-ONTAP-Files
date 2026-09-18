@@ -32,6 +32,22 @@
   検証ホストは受信ルールを持たず、キーペアも使いません
 - `aws` CLI が認証済みであること
 
+**前提が揃っているかは 1 コマンドで確認できます。** 作成前に効く 2 つ（リージョンの枠と
+Session Manager 到達性）は、どちらも**失敗が 25 分後か 20 分後にしか現れない**種類です。
+
+```bash
+make preflight-pre VPC=vpc-xxxxxxxx SUBNET=subnet-xxxxxxxx MBPS=128
+```
+
+| 見るもの | 揃っていないと |
+|---|---|
+| **リージョン合計のスループットキャパシティ**（既定 10,240 MB/s、他人のファイルシステムも同じ枠） | 作成が `ServiceLimitExceeded` で失敗する。**25 分待ってから分かる** |
+| SSD 容量の合計 | 同上 |
+| サブネットが指定 VPC にあること・空き IP | 作成時に失敗する |
+| **Session Manager への到達性**（0.0.0.0/0 の経路か、`ssm` / `ssmmessages` / `ec2messages` の 3 エンドポイント） | ホストは正常に起動して Session Manager に現れない。**原因が出ないまま 20 分失う** |
+
+**枠が読めなかった場合も finding として出ます。** 既定値との比較に落ちて黙って通ることはありません。
+
 > **ネットワークに関する補足**: **配布側を繋ぐなら、このテンプレートが開けないポートが 2 つあります。**
 > クラスタピアリングは**インタークラスタ LIF 間の TCP 11104-11105** を使い、そこは
 > **双方のファイルシステムのセキュリティグループに、相手側からの許可を自分で足す**必要があります。
@@ -252,8 +268,38 @@ aws s3api delete-object --bucket "$AP" --key check.txt
    aws cloudformation wait stack-delete-complete --stack-name s3burst-origin --region ap-northeast-1
    ```
 
+**`AllowFlexCachePeering` を有効にした場合は、1 の前にもう 1 手あります。**
+**2 つのスタックがお互いのセキュリティグループを参照している間、どちらも SG を削除できません。**
+EC2 は `has a dependent object` と返し、**依存しているオブジェクトの名前を出しません。**
+2026-09-18 にこれで origin スタックの削除が 2 回失敗しました。**両側の相互参照を先に外します。**
+
+```bash
+# 両方の SG について、別の SG を参照している ingress を洗い出して落とす
+for sg in <origin-fs-sg> <cache-fs-sg>; do
+  for id in $(aws ec2 describe-security-group-rules --filters Name=group-id,Values=$sg \
+      --query 'SecurityGroupRules[?ReferencedGroupInfo.GroupId!=null].SecurityGroupRuleId' \
+      --output text | tr '\t' '\n'); do
+    aws ec2 revoke-security-group-ingress --group-id "$sg" --security-group-rule-ids "$id"
+  done
+done
+```
+
+**削除し終えたら、残留を掃いてください。** 削除で止まらないものが 4 種類あります
+（最終バックアップ・未アタッチ EBS・シークレット・親を失ったボリュームと SVM）。
+
+```bash
+python3 scripts/sweep_after_teardown.py --region ap-northeast-1              # 報告のみ
+python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --delete --yes
+```
+
+**最終バックアップはタグを持たず、`FileSystem.FileSystemId` も `null` です。**
+タグで絞る掃除は 1 件も見つけません。`SkipFinalBackup` は `AWS::FSx::Volume` が受け付けないので、
+バックアップは必ず作られます。
+
 Secrets Manager のシークレットは既定で復旧期間を持って削除されます。同じ名前で作り直す場合は
 待つか、`--force-delete-without-recovery` を明示してください。
+**上のスクリプトは 7 日の復旧期間つきで予約削除します**（ここで唯一取り消せる削除なので、
+取り消せる形にしてあります）。
 
 > **不可逆操作に関する補足**: このテンプレートは SnapLock も改ざん防止 Snapshot も
 > 有効化しません。有効化するとボリューム・SVM・**ファイルシステム全体**が保持期間中
