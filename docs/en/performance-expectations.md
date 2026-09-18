@@ -57,9 +57,13 @@ threads moved throughput 0.07% and latency from 216.6 to 860.3 ms.
 |---|---|---|---|
 | First-generation 2048, SSD IOPS 3,072 | 256.47 MB/s | **SSD IOPS** (112% utilization) | 512 GiB in one pass, 1 MiB sequential, 8 streams, `o_direct` |
 | First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **Not established** (disk 67%, IOPS 43%, network 43%) | As above, NVMe read cache disabled |
+| Second-generation 2048, SSD IOPS 3,072, 1 MiB transfers | 300.95 MB/s | **SSD IOPS** (103% utilization) | 512 GiB once, `rsize=wsize=1048576`, eight streams |
+| Second-generation 2048, SSD IOPS 40,000, 1 MiB transfers | **1,215.06 MB/s** | **Not established** (IOPS 34%) | As above. **Sixteen times the transfer size leaves the ratio at 4.04x** |
 | Second-generation 1,536 | read 2,882 MB/s for 27 minutes, then 1,439 | The network baseline, about twice the specified value | 1 MiB sequential |
 | Second-generation 6,144, eight clients | same region **11,916.29** / disjoint **2,173.37** | Memory in the first case, the disk path in the second | 128 connections, working set held at 600 GiB |
 | Second-generation 6,144, SMB, eight clients | same range **10,721.19** / one eighth each **4,225.31** | As above | Multichannel, four channels |
+| Through FlexCache (cache 128, origin 2048) | first pass **207.53** / resident **210.59** | **The cache's own throughput step**, and it was bursting | 100 GiB in one pass, 1 MiB, eight streams |
+| The same pair, reading the origin directly (control) | **1,706.67** | The origin's memory (`DiskReadBytes` was 0) | As above |
 
 **5.5x on one file system at one connection count.** What decides it is **whether the clients read
 overlapping regions**. Settle that before counting clients.
@@ -110,7 +114,7 @@ than the value of the ceiling.
 | Anything measured at `iorate=max` | **A saturation point is not an operating point.** The same 2,364 MB/s sits at 216 ms and at 860 ms. With a target of 4,400 IOPS: 4,406 MB/s at 8.86 ms; unbounded: 4,204 MB/s at 121.79 ms |
 | A window of 300 s or less | **It contains burst.** Second-generation 1,536 held 2,882 MB/s for 27 minutes and then fell to 1,439 |
 | First-generation reasoning applied to second | **The specified value means something different** — a disk baseline, with the network at roughly twice it. Carrying it over misses reads by 2x |
-| FlexCache "2.31x" | **Both sides were 128 MBps.** Raising the origin may reverse it (not measured) |
+| FlexCache "2.31x" | **Both sides were 128 MBps.** Raising only the origin to 2048 MBps **inverts it: the origin is 8.1 times faster** (measured 2026-09-18). **The ratio comes from the pair of throughput steps, so do not cite one side of it alone** |
 | A sequential write measured on Rocky Linux | **It does not match RHEL.** Medians differ by 7.0% and the spreads by an order: 29.6% against 2.1%. Reads and 4 KiB random writes do match, within 0.1% and 0.3% |
 | An NFS figure used for SMB | **Not measured.** The multiplicity comes from different places: connections the client specifies against channels that get negotiated |
 
@@ -137,11 +141,11 @@ than the value of the ceiling.
 
 | Item | State |
 |---|---|
-| The ceiling near 1,250 MB/s at 40,000 IOPS, first-generation 2048 | No published utilization is saturated, and adding threads lowers it. The candidate is `tcp_max_xfer_size`, measured at 64 KiB |
+| The ceiling near 1,250 MB/s at 40,000 IOPS | No published utilization is saturated, and adding threads lowers it. **`tcp_max_xfer_size` is ruled out** -- at 1 MiB the ratio stays at 4.04x (2026-09-18). What the ceiling is remains unidentified |
 | About 300 MB/s on first-generation 128 | Neither the disk nor the network burst ceiling is reached, and the burst balance is not exhausted |
 | Why first-generation 2048 writes stop at 55% of the HA-pair ceiling | Two candidates (writes consuming twice the network, per-request fixed cost) are not separated |
 | Why the block amplification splits between 0.8 and 1.5 | Neither layout nor write history. **One remaining candidate, the ONTAP patch release, cannot be selected on FSx for ONTAP, so no controlled experiment is available** |
-| The 12.4% between SMB at 300 s and at 900 s | Needs a run that varies only the window |
+| The 12.4% between SMB at 300 s and at 900 s | **The window ladder was run, but on the single-channel path** (2026-09-18, flat to 0.07%). **The four-channel path, where the gap appeared, is unmeasured.** The remaining candidate is that the channel count fell during the run, which is a hypothesis |
 
 Stages and the full list are in [verification status](verification-status.md).
 

@@ -18,6 +18,13 @@ Cache は独立したファイルシステムなので、自分の throughput ca
 両側 128 MBps 構成）。**代価は初回にかかる。** 一度も読まれていないデータの初回読み取りは常駐時の
 2.88 分の 1 で、この差は設計時に見込む必要がある。
 
+**ただしこの向きは指定値で変わる。** Origin だけを 2048 MBps に上げて測り直すと、Cache 常駐
+210.59 に対して Origin 直読みが 1,706.67 MB/s で、**Origin のほうが 8.1 倍速くなった**
+（[実測記録](verification/throughput-iops-concurrency.md#origin-を-2048-mbps-に上げたときの向きの逆転2026-09-18)、
+Origin 2048 / Cache 128、2026-09-18）。**Cache 側の天井は Cache 自身の指定値で決まり、Origin を
+上げても動かない。** 初回と常駐の差も、どちらも Cache の天井で止まるため +1.5% まで縮んだ。
+**消費側の要求から Cache の指定値を決めること。**
+
 ```mermaid
 flowchart LR
     subgraph AWS["AWS"]

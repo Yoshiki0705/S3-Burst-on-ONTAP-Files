@@ -87,6 +87,14 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # what the 7.14x from SSD IOPS had been missing. It reproduces the low point and not the
         # high one, so the English row states a ratio that only this record's conditions explain.
         "#キャッシュを超える作業セットでの再測定2026-09-17",
+        # The 1 MiB transfer-size re-measurement that closed the candidate the row above left open.
+        # Both ends move and the ratio does not, which is the finding; the English row states the
+        # ratio and this record holds the two points and the conditions that produced them.
+        "#転送サイズ-1-mib-での再測定2026-09-18-倍率の不変",
+        # The FlexCache pair measured with the origin at 2048 and the cache at 128, where the 2.31x
+        # inverts. The row states the inversion; the record holds why each figure is conditional --
+        # the resident read was bursting and the direct origin read came from memory.
+        "#origin-を-2048-mbps-に上げたときの向きの逆転2026-09-18",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is

@@ -209,6 +209,28 @@ NVMe リードキャッシュが無効であること。**版は AWS API では�
 （`FileSystemTypeVersion` は FSx for ONTAP では `null`）。**撤去後は復元できないので、
 測定より先に読みます。**
 
+**関門は、それが置かれた経路にしか効きません。** 上の 14 手順を通さずに CloudFormation を
+直接叩いて作ると、`preflight` も `smb-preflight` も走りません。**急ぐときに手で作るのが、
+版を落とし、Multichannel を落とす経路です**（2026-09-17 と 09-18 に 1 回ずつ踏んでいます）。
+
+#### SMB を測る前に必ず確認する 2 つ
+
+1. **サーバー側の `is_multichannel_enabled` が `true` であること。** 既定は `false` です。
+2. **有効化の後にセッションを張り直したこと。** 既存セッションはチャネルが増えません
+   （`Remove-SmbMapping` → `New-SmbMapping`）。
+
+**確認は負荷をかけながら `(Get-SmbMultichannelConnection).CurrentChannels` を読みます。**
+チャネル数はアイドル時に減るので、測定していない時に読んだ値は測定条件ではありません。
+
+> **単一チャネルは値で見分けられます。** 1 MiB 逐次で **574 MB/s・応答 891 ms** に張り付いたら、
+> それは単一チャネルです。**この値は別環境・別の日に 0.05% 以内で再現しました**
+> （測定窓を 300〜900 秒に振っても 0.07% しか動きません）。
+> 4 チャネルなら同じ測定が読み 2,227.61 / 書き 1,698.42 MB/s の水準になります。
+
+**充填のパラメータも確認してください。** `format=yes` は実行ブロックの `xfersize` と `threads` を
+無視し、キュー深度 2 で書きます。**`formatxfersize` を設定しないと 600 GiB の充填に 63 分**
+かかり（実測 162.73 MB/s）、その時間はそのまま費用です。
+
 ### V-7 — FlexCache（2 ファイルシステム + ピアリング）
 
 **CloudFormation では書けません。** クラスタピアリング・SVM ピアリング・FlexCache はいずれも
@@ -227,6 +249,25 @@ aws cloudformation create-stack --stack-name my-cache  ... ThroughputCapacityMBp
 **インターコネクトの IP を SG で通しておく必要があります。** 通っていないとピアリングは
 `Unable to communicate` で止まります。ポートと手順は
 [FlexCache の検証記録](flexcache-security-style-inheritance.md)にあります。
+**別スタックで 2 つ作ると、cache 側の SG は origin 側のホストもファイルシステムも知りません。**
+cache の FS SG に、origin のホスト SG と origin の FS SG からの 443 / 111 / 2049 / 4045 / 4046 /
+11104 / 11105 を足してください。**443 が抜けていると ONTAP REST に届かず、
+「FlexCache が存在しない」に見えます。**
+
+**FlexCache の作成で止まる 3 点は
+[オンプレミス側の手順](../deployment/onprem-terraform.md#ピアリングと-flexcache-作成で実際に踏んだ-5-点)に
+表でまとめてあります。** 要点だけ再掲すると、`use_tiered_aggregate` を `true` にすること、
+`return_timeout` の上限が 120 であること、FlexCache ボリュームの最小が 50 GB であること。
+
+> **この 3 点は 2026-09-01 に記録した後、2026-09-18 に 2 つ踏み直しました。**
+> ドキュメントには入っていましたが、**実行していたスクリプト側に入っていなかった**ためです。
+> **手順を直したら、その手順を実行する側にも同じ変更を入れてください。**
+> 症状は `Aggregates not matching FabricPool requirements: aggr1` で、
+> **フラグの名前はメッセージに出ません。**
+
+**ジョブの終状態まで見てください。** 作成は非同期で、POST は job を返して成功します。
+`use_tiered_aggregate` が無い状態でも POST は 200 を返し、**失敗は 30 秒後のジョブ状態にしか
+現れません。** 応答が返ったことを作成できたことの証拠にしないでください。
 
 **撤去の順序も固定です。** cache を先に解放し、SVM ピア、クラスタピアの順に外してから
 ファイルシステムを消します。**逆にすると origin 側のファイルシステムが消えず、課金が続きます。**
