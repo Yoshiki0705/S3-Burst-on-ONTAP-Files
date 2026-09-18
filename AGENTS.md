@@ -105,8 +105,10 @@ second extending the first's coverage. It does not. Split the table by route, an
 what chooses between routes.
 
 Forbidden: `beats X`, `X is inferior`, `competing tools`, `競合ツール`, `より優れて`, `優位性`,
-`game-changer`, `best-in-class`, and any vendor-versus positioning. Every comparison carries a
-"how to choose" path — see `docs/ja/reference/decision-trees/choosing-this-architecture.md`.
+`game-changer`, `best-in-class`, and any vendor-versus positioning. **In English too**, missed for
+as long as the rule existed: `customer` (address the reader as `you`; `customer managed key` is the
+KMS term and is exempt), `differentiation`, `competitive`, `advantage over`. Every comparison carries
+a "how to choose" path — see `docs/ja/reference/decision-trees/choosing-this-architecture.md`.
 
 ## Evidence discipline
 

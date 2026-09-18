@@ -137,7 +137,7 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 
 ## はじめ方
 
-**初めてここに来た場合は、次の 3 つを順に読んでください。** 下の表は 29 行あり、**読む順序では
+**初めてここに来た場合は、次の 3 つを順に読んでください。** 下の表は 35 行あり、**読む順序では
 なく索引です。** 全部読む必要はありません。
 
 1. **[構成の形](docs/ja/architecture.md)（5 分）** — 何を解いて、何を解かないか
@@ -146,9 +146,20 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 3. **[最初に決めること](docs/ja/design-first-decisions.md)（5 分）** —
    **Origin ボリュームを作る前に決める 1 つ**（セキュリティスタイル）。**あとから変えられません**
 
-**そのうえで実際に動かすなら [収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md)（40 分）へ。**
-**書き換えが必要なパラメータは 19 個のうち 2 個で、調べるコマンドもそこに書いてあります。**
-費用は同じページの見積りにあります。
+**そのうえで実際に動かすなら、まず [最初の 1 時間](docs/ja/quickstart.md)（1 時間、約 $0.4/時）へ。**
+**最小構成で 1 回だけ通し、S3 API で書いたものがファイルから読めることを自分の環境で確かめます。**
+判断は求めません。埋めるのは 2 個で、最後に撤去まで書いてあります。
+
+**全手順と、うまくいかないときの表は
+[収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md)（40 分）にあります。**
+**パラメータを自分の環境に合わせるときは
+[パラメータの選び方](docs/ja/deployment/choosing-parameters.md)** — 21 個のうち考えるのは 5 個で、
+**費用が桁で変わるのは 3 箇所だけ**です。
+
+**いま動いているものがある場合は
+[いま動いているものからの移り方](docs/ja/reference/scenarios/from-what-you-run-today.md)** —
+コピージョブ・Amazon EFS・S3 中心のパイプラインの 3 つの出発点について、
+**足さないほうがよい条件まで**書いてあります。
 
 | やりたいこと | ガイド | 所要時間 |
 |---|---|---|
@@ -179,7 +190,11 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | 対応バージョンと制約を調べる | [サポート状況](docs/ja/support-matrix.md) | 10 分 |
 | 他クラウドとの接続経路を調べる | [他クラウドとの接続経路](docs/ja/multi-cloud-connectivity.md) | 10 分 |
 | 用語の違いを確認する | [用語の整理](docs/ja/reference/glossary/object-access-on-ontap.md) | 5 分 |
+| 最小構成で 1 回通す | [最初の 1 時間](docs/ja/quickstart.md) | 1 時間 |
 | 検証環境をデプロイする（AWS 側） | [収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md) | 40 分 |
+| パラメータを自分の環境に合わせる | [パラメータの選び方](docs/ja/deployment/choosing-parameters.md) | 10 分 |
+| いま動いているものから移る | [いま動いているものからの移り方](docs/ja/reference/scenarios/from-what-you-run-today.md) | 15 分 |
+| 本番に持っていくときの差分 | [検証環境と本番の差分](docs/ja/from-verification-to-production.md) | 15 分 |
 | 検証環境をデプロイする（AWS 以外） | [配布側のデプロイ](docs/ja/deployment/onprem-terraform.md) | 40 分 |
 | 実測値と測定条件を見る | [検証記録](docs/ja/verification/s3ap-nfs-visibility.md) | 10 分 |
 | 実機で確かめる | [PoC チェックリスト](docs/ja/poc-checklist.md) | 10 分 |

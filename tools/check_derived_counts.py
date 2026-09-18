@@ -69,6 +69,25 @@ def _templates_under(*relative: str) -> int:
     return total
 
 
+def _origin_template_parameters() -> int | None:
+    """Parameters declared by `environments/aws-origin/template.yaml`.
+
+    Four documents state this number -- the quickstart, the deployment guide in both languages, and
+    the page about choosing the values. It went from 19 to 21 when the FlexCache peering pair was
+    added, and nothing would have caught the three stale copies. Parsed with a regex rather than a
+    YAML loader because the template uses CloudFormation short-form tags, which a plain loader
+    rejects; the block boundary is `Conditions:` at column zero.
+    """
+    template = ROOT / "environments" / "aws-origin" / "template.yaml"
+    if not template.is_file():
+        # A tree without the template makes no claim about it. Returning 0 would be read as "the
+        # reader stopped matching", which is a different and louder failure.
+        return None
+    head, _, _ = template.read_text(encoding="utf-8").partition("\nConditions:")
+    _, _, block = head.partition("\nParameters:")
+    return len(re.findall(r"^  (\w+):$", block, re.MULTILINE))
+
+
 def _claim_regex(subject: str) -> re.Pattern[str]:
     """Match a count next to `subject` in any of the orders Japanese and English prose use.
 
@@ -102,6 +121,22 @@ COUNT_CLAIMS: list[dict] = [
         "regex": _claim_regex(r"(?:パイプラインパターン|pipeline patterns?)"),
         "count": lambda: _templates_under("patterns/pipelines"),
         "source": "patterns/pipelines/*/template.yaml",
+    },
+    {
+        # The prose says "21 parameters" in four places, in two languages. The subject has to be
+        # specific enough not to match a different count in the same sentence, which is why it is
+        # "パラメータ" / "parameters" rather than a bare noun.
+        "name": "aws-origin-parameters",
+        # Not `_claim_regex`. A generic subject matched "parameters: 5" in a title and a
+        # per-scenario "2 parameter files" in a measurement plan -- two different counts in the
+        # same words. Only the two sentence shapes that state the total are checked, and the
+        # documents are written to use them.
+        "regex": re.compile(
+            r"(?:(?<![ぁ-んァ-ヶ一-龥])パラメータは\s*(\d+)\s*個"
+            r"|There are\s*(\d+)\s*parameters)"
+        ),
+        "count": _origin_template_parameters,
+        "source": "environments/aws-origin/template.yaml Parameters:",
     },
     {
         "name": "patterns-total",
@@ -154,6 +189,9 @@ def check() -> list[str]:
                 if stated is None:
                     continue
                 actual = expected[claim["name"]]
+                if actual is None:
+                    # The source this claim reads is absent from the tree being checked.
+                    continue
                 if actual == 0:
                     findings.append(
                         f"{rel}:{lineno}: states {stated} for {claim['name']} but "

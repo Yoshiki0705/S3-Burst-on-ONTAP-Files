@@ -167,6 +167,40 @@ def test_the_vendors_two_words_for_reader_and_product_are_flagged() -> None:
         assert "neutrality" in categories(line)
 
 
+def test_the_english_half_of_the_same_rule_is_flagged() -> None:
+    """顧客 was blocked and `customer` was not, for as long as the rule existed.
+
+    The asymmetry is the defect: one English document carried fourteen lines addressing the reader
+    as a vendor's account -- "what the customer configures", "What the customer owns" -- while its
+    Japanese original said 利用者. The same applies to the three words that frame a comparison as a
+    contest.
+    """
+    for line in (
+        "what the customer configures",
+        "| What the customer owns |",
+        "The customer owns the path",
+        "our differentiation is the cache layer",
+        "a competitive advantage in this space",
+        "the advantages over a copy job",
+        "against competitors in the same space",
+    ):
+        assert "neutrality" in categories(line), line
+
+
+def test_the_kms_term_of_art_is_not_flagged() -> None:
+    """`customer managed key` is the AWS term, and it appears next to the reason a CMK is not used.
+
+    Rewriting it would make three template comments wrong rather than neutral, so the pattern
+    excludes it rather than relying on a marker in each file.
+    """
+    for line in (
+        "encrypted with the service-managed key. A customer managed key would add a resource",
+        "Encrypted with the AWS managed key rather than a customer managed key.",
+        "a customer-managed key has a mandatory waiting period",
+    ):
+        assert "neutrality" not in categories(line), line
+
+
 def test_the_reader_words_that_replace_them_are_not_flagged() -> None:
     """The replacement has to pass, or the rule just moves the problem."""
     for line in (

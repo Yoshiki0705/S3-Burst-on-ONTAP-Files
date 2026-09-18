@@ -44,7 +44,7 @@ verification is [at the end of this document](#what-is-to-be-verified).
 ## Three ways of building it
 
 Every path produces the same result — a private connection. What differs is **who owns the physical
-layer, and what the customer configures**. The per-cloud sections below map onto these three.
+layer, and what you configure**. The per-cloud sections below map onto these three.
 
 ```mermaid
 flowchart LR
@@ -59,7 +59,7 @@ flowchart LR
     end
 ```
 
-| Way | Already in place | What the customer owns | What decides whether it can be used |
+| Way | Already in place | What you own | What decides whether it can be used |
 |---|---|---|---|
 | 1 Managed service | Circuit capacity between the AWS and the other CSP's routers. Cabling, capacity growth and support are owned by both CSPs | Selecting the target CSP, its Region and the bandwidth in the console or CLI. One attachment is issued | **The Region pairs published by the service provider** |
 | 2 Partner route | The interconnection provider's physical presence at both clouds' connection locations | The AWS-side hosted connection and its virtual interface, the other cloud's dedicated circuit, the cross-connect inside the provider, and BGP on both sides | **Direct Connect locations, the other cloud's connection locations, and the provider's footprint** |
@@ -296,11 +296,11 @@ flowchart LR
 
 | Segment | Mechanism | Who configures it | Stage |
 |---|---|---|---|
-| Azure NetApp Files to Azure VNet | ANF's mount path | Customer | Documented by Microsoft |
-| Azure VNet to AWS VPC (way 1) | AWS Interconnect – multicloud with Azure Multicloud Interconnect | Both CSPs own the physical layer and the redundancy; the customer picks the CSP, the Region and the bandwidth | **Preview**. Four pairs |
-| Azure VNet to ExpressRoute (way 2) | An ExpressRoute circuit and its connection | Customer | Documented |
-| ExpressRoute to Direct Connect (way 2) | The cross-connect inside the interconnection provider's fabric | Customer and provider | Differs by provider. **unconfirmed in this repository** |
-| Direct Connect to AWS VPC (way 2) | A virtual interface and a virtual private gateway / Transit Gateway | Customer | Documented |
+| Azure NetApp Files to Azure VNet | ANF's mount path | You | Documented by Microsoft |
+| Azure VNet to AWS VPC (way 1) | AWS Interconnect – multicloud with Azure Multicloud Interconnect | Both CSPs own the physical layer and the redundancy; you pick the CSP, the Region and the bandwidth | **Preview**. Four pairs |
+| Azure VNet to ExpressRoute (way 2) | An ExpressRoute circuit and its connection | You | Documented |
+| ExpressRoute to Direct Connect (way 2) | The cross-connect inside the interconnection provider's fabric | You and the provider | Differs by provider. **unconfirmed in this repository** |
+| Direct Connect to AWS VPC (way 2) | A virtual interface and a virtual private gateway / Transit Gateway | You | Documented |
 | Azure NetApp Files to a FlexCache with FSx for ONTAP as cache | — | — | **unconfirmed**. The dashed edge above |
 
 **Way 1 reaching Preview does not change the dashed edge.** Network reachability and presence in the
@@ -398,12 +398,12 @@ follows centres on way 2: what to provide, and what to confirm.
 
 | Where | What to provide | Who configures it |
 |---|---|---|
-| AWS side | A Direct Connect hosted connection procured from the interconnection provider, and a virtual interface on it | Customer (the provider issues it) |
-| Other cloud side | An ExpressRoute circuit / Cloud Interconnect / FastConnect procured from the same provider | Customer |
-| Inside the provider | The cross-connect joining those two | Customer, in the provider's portal |
-| Both sides | BGP peering and route advertisement | Customer |
+| AWS side | A Direct Connect hosted connection procured from the interconnection provider, and a virtual interface on it | You (the provider issues it) |
+| Other cloud side | An ExpressRoute circuit / Cloud Interconnect / FastConnect procured from the same provider | You |
+| Inside the provider | The cross-connect joining those two | You, in the provider's portal |
+| Both sides | BGP peering and route advertisement | You |
 
-The difference from a managed service is that **the customer owns the path and the routing.** With a
+The difference from a managed service is that **you own the path and the routing.** With a
 managed service both CSPs own them.
 
 ### What decides whether it can be used
@@ -449,7 +449,7 @@ not add a Japanese pair** (it covers us-east-1, us-west-1, eu-central-1 and ap-s
    Both CSPs own the physical layer, the capacity, the redundancy and the support.
 2. **If not, consider way 2 or 3. This is a different construction, not a means of widening way 1's
    pairs.** Availability is decided not by the table above but by Direct Connect locations, the other
-   cloud's connection locations and the provider's footprint. The customer owns the path and the
+   cloud's connection locations and the provider's footprint. You own the path and the
    routing.
 3. **Where way 1 is available, compare within it.** Google Cloud has two managed services, differing
    in bandwidth increments and in which side can order. OCI has two, differing in how explicit the
@@ -482,7 +482,7 @@ unconfirmed. The two places MACsec does appear in an ONTAP context both cover so
 Cisco-switch-side setting on MetroCluster IP WAN ISLs (optional), and the method used between Google
 Cloud NetApp Volumes' Performance service type and Google Cloud
 ([NetApp](https://docs.netapp.com/us-en/netapp-solutions/ehc/ncvs/ncvs-gc-data-encryption-in-transit.html)),
-**which is not something a customer configures.**
+**which is not something you configure.**
 
 ### MTU
 

@@ -221,6 +221,33 @@ NEUTRALITY_RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"顧客"),
         "write for the reader (読者 / 利用者 / 運用者) rather than about a vendor's customers",
     ),
+    # **The English half of the same rule, which was missing for as long as the rule existed.**
+    # 顧客 was blocked and `customer` was not, so `docs/en/multi-cloud-connectivity.md` carried nine
+    # occurrences of "what the customer configures" while its Japanese original said 利用者側. The
+    # asymmetry is the failure: the English reader was addressed as a vendor's account while the
+    # Japanese reader was addressed as the person doing the work.
+    #
+    # `customer managed key` and `customer-managed` are excluded. That is the KMS term of art, it
+    # appears in three templates next to the reason a CMK is not used there, and rewriting it would
+    # make the comment wrong rather than neutral.
+    (
+        re.compile(r"\bcustomers?\b(?!\s*[- ]?managed)", re.IGNORECASE),
+        "address the reader (you / the reader / the operator) rather than a vendor's customer. "
+        "'customer managed key' is the KMS term and is exempt; a citation title that contains the "
+        "word is evidence and carries an allow marker",
+    ),
+    (
+        re.compile(r"\bdifferentiat(?:e|es|ed|ing|ion|or)\b", re.IGNORECASE),
+        "differentiation is vendor framing; describe which conditions suit which option",
+    ),
+    (
+        re.compile(
+            r"\bcompetitive(?:ly)?\b|\bcompetitors?\b|\badvantages?\s+over\b",
+            re.IGNORECASE,
+        ),
+        "not a contest; state each option's exclusion conditions at the same granularity, "
+        "this architecture's own included",
+    ),
     (
         re.compile(r"\b(?:beats|outperforms)\s+\w", re.IGNORECASE),
         "avoid vendor-versus phrasing",

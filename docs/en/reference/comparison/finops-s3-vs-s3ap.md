@@ -1261,7 +1261,7 @@ here.
 | SMB | On a write-back-enabled cache, SMB opportunistic locks (oplocks) for writing are not supported | Same |
 | Free space on the origin | At 20% or less free on the origin volume it switches to write-around automatically. The threshold is evaluated against both the origin's reported figure and the aggregate's physical free space, so an over-provisioned configuration switches earlier than expected | Same |
 | Network | A narrow or lossy inter-cluster network affects write-back performance strongly | Same |
-| Resources on the origin | 128 GB of RAM and 20 or more CPUs per origin node are strongly recommended. For a scale-up FSx for ONTAP configuration, 1,024 GiB or more of SSD is cited as the reference point | [TCO case study](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/) |
+| Resources on the origin | 128 GB of RAM and 20 or more CPUs per origin node are strongly recommended. For a scale-up FSx for ONTAP configuration, 1,024 GiB or more of SSD is cited as the reference point | [TCO case study](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/) <!-- allow:neutrality the source URL and the article's own title, not how the reader is addressed --> |
 | Licence | FlexCache needs no additional licence, write-back included | Same |
 | Peering | Inter-cluster peering between origin and cache, and SVM peering with the FlexCache option, are required | Same |
 
@@ -1295,7 +1295,7 @@ the estimate as a cost item from the start.
 
 | Item | How it works | Source |
 |---|---|---|
-| ONTAP's data management features | FlexCache, SnapMirror, Snapshot, FlexClone, deduplication and compression are included in the FSx for ONTAP price. There is no separate licence to procure | For FlexCache, the AWS Storage Blog states "included with your ONTAP purchase ... No extra license is required" ([source](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/)) |
+| ONTAP's data management features | FlexCache, SnapMirror, Snapshot, FlexClone, deduplication and compression are included in the FSx for ONTAP price. There is no separate licence to procure | For FlexCache, the AWS Storage Blog states "included with your ONTAP purchase ... No extra license is required" ([source](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/)) <!-- allow:neutrality the source URL and the article's own title, not how the reader is addressed --> |
 | SnapLock | A separate licence item. The AWS Storage Blog lists the cost components as "SSD storage, SSD IOPS, Capacity Pool usage, throughput capacity, backups, and SnapLock licensing", and SnapLock usage appears in the billing report in GB-Month | [Sizing](https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/) and [the billing report](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/FSxONTAP-Billing.html) |
 | The S3 AP itself | There is no per-access-point hourly charge. What is charged is requests and data transfer | [FSx for ONTAP pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/) |
 | Where the distribution side is not FSx for ONTAP | Placing a cache on on-premises ONTAP or similar adds that platform's licensing and maintenance | [Portability](../../portability.md) |

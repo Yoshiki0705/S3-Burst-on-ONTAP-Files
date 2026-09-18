@@ -61,7 +61,7 @@ make preflight-pre VPC=vpc-xxxxxxxx SUBNET=subnet-xxxxxxxx MBPS=128
 
 ## 2. Create the stack
 
-**There are 19 parameters and only two of them have to be edited.** The rest work as they are.
+**There are 21 parameters and only two of them have to be edited.** The rest work as they are.
 **One more must not be left at its default, because changing it later means a rebuild.**
 
 | Parameter | What to do | Why |
