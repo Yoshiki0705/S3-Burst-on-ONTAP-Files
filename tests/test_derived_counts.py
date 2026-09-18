@@ -141,3 +141,57 @@ def test_a_line_exemption_is_honoured(repo) -> None:
 def test_a_file_exemption_is_honoured(repo) -> None:
     write_readme(repo, "<!-- counts-exempt-file -->\n\n9 collect patterns\n")
     assert counts.check() == []
+
+
+# --- the aws-origin parameter count ------------------------------------------------------------
+#
+# Four documents state this number, in two languages. It moved from 19 to 21 when the FlexCache
+# peering pair landed, and the three stale copies were found by reading rather than by a check --
+# which is the shape this whole module exists to close.
+
+
+def _parameter_claim() -> dict:
+    return next(
+        claim
+        for claim in counts.COUNT_CLAIMS
+        if claim["name"] == "aws-origin-parameters"
+    )
+
+
+def test_the_parameter_count_comes_from_the_template() -> None:
+    """Parsed from the template, not from a constant that someone has to remember to change."""
+    counted = _parameter_claim()["count"]()
+    assert counted >= 19, "the template has at least the parameters it shipped with"
+    text = (counts.ROOT / "environments" / "aws-origin" / "template.yaml").read_text(
+        encoding="utf-8"
+    )
+    # A spot check on two that must be in the block, so a regex that silently matched nothing
+    # would not read as a plausible count.
+    assert "\n  VpcId:\n" in text
+    assert "\n  AllowFlexCachePeering:\n" in text
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "**パラメータは 21 個ありますが、書き換えが必要なのは 2 個だけです。**",
+        "パラメータは 21 個あります。",
+        "**There are 21 parameters** in the template.",
+    ],
+)
+def test_the_two_canonical_sentence_shapes_are_recognised(line: str) -> None:
+    assert _parameter_claim()["regex"].search(line), line
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # A different count in the same words. The generic matcher accepted both of these, and
+        # reported the document as stale while the document was right.
+        "# Choosing parameters: 5 of the 21 need thought",
+        "G-2 のパラメータファイルは 2 つある",
+        "埋めるパラメータは 2 個で、最後に撤去まで書いてあります",
+    ],
+)
+def test_a_different_count_in_the_same_words_is_not_this_claim(line: str) -> None:
+    assert not _parameter_claim()["regex"].search(line), line

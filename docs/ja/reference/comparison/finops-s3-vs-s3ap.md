@@ -1241,7 +1241,7 @@ Origin が確定してから応答するため、**Cache 側の書き込みが O
 | SMB | write-back 有効の Cache では、書き込みの SMB Opportunistic Lock (oplock) が非対応 | 同上 |
 | Origin の空き容量 | Origin ボリュームの空きが 20% 以下になると自動的に write-around へ切り替わる。閾値は Origin の報告値とアグリゲートの物理空き容量の両方で評価されるため、オーバープロビジョニングしていると想定より早く切り替わる | 同上 |
 | ネットワーク | 帯域が細い、あるいはロスのあるクラスタ間ネットワークは write-back 性能に強く影響する | 同上 |
-| Origin 側のリソース | Origin の各ノードに 128 GB RAM と 20 CPU 以上が強く推奨される。FSx for ONTAP のスケールアップ構成では SSD 1,024 GiB 以上が基準として挙げられている | [TCO 事例](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/) |
+| Origin 側のリソース | Origin の各ノードに 128 GB RAM と 20 CPU 以上が強く推奨される。FSx for ONTAP のスケールアップ構成では SSD 1,024 GiB 以上が基準として挙げられている | [TCO 事例](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/) <!-- allow:neutrality 出典 URL とブログ記事のタイトル。読者の呼び方ではない --> |
 | ライセンス | write-back を含め FlexCache に追加ライセンスは不要 | 同上 |
 | ピアリング | Origin と Cache のクラスタ間ピアリングと、FlexCache オプション付きの SVM ピアリングが必要 | 同上 |
 
@@ -1275,7 +1275,7 @@ Cache に書き込み機能がないからではない。上の条件を負わ�
 
 | 項目 | 扱い | 出典 |
 |---|---|---|
-| ONTAP のデータ管理機能 | FlexCache、SnapMirror、Snapshot、FlexClone、重複排除と圧縮は FSx for ONTAP の料金に含まれる。別途のライセンス調達はない | FlexCache については AWS Storage Blog が「included with your ONTAP purchase ... No extra license is required」と記載 ([出典](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/)) |
+| ONTAP のデータ管理機能 | FlexCache、SnapMirror、Snapshot、FlexClone、重複排除と圧縮は FSx for ONTAP の料金に含まれる。別途のライセンス調達はない | FlexCache については AWS Storage Blog が「included with your ONTAP purchase ... No extra license is required」と記載 ([出典](https://aws.amazon.com/blogs/storage/how-a-customer-reduced-storage-tco-by-28-with-amazon-fsx-for-netapp-ontap/)) <!-- allow:neutrality 出典 URL とブログ記事のタイトル。読者の呼び方ではない --> |
 | SnapLock | 独立したライセンス項目。AWS Storage Blog はコスト構成要素を「SSD storage, SSD IOPS, Capacity Pool usage, throughput capacity, backups, and SnapLock licensing」と列挙し、請求レポートにも SnapLock usage が GB-Month で現れる | [サイジング](https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/) と [請求レポート](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/FSxONTAP-Billing.html) |
 | S3 AP そのもの | アクセスポイント単位の時間課金はない。課金はリクエストとデータ転送 | [FSx for ONTAP 料金](https://aws.amazon.com/fsx/netapp-ontap/pricing/) |
 | 配布側が FSx for ONTAP 以外の場合 | オンプレミス ONTAP などに Cache を置くなら、そのプラットフォームのライセンスと保守が別に載る | [移植性](../../portability.md) |

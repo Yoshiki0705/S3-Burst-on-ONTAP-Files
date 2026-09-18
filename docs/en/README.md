@@ -150,9 +150,21 @@ reading order** — there is no need to go through all of it.
    **the one thing to settle before the origin volume exists** (security style). **It cannot be
    changed afterwards**
 
-**Then, to actually run it, go to [deploying the collect side](deployment/aws-cloudformation.md)
-(40 min).** **Two of the 19 parameters need editing, and the commands to find their values are on
-that page.** The cost estimate is there as well.
+**Then, to actually run it, start with [the first hour](quickstart.md) (1 hour, about $0.4 per
+hour).** **One pass through the smallest form, confirming in your own account that what the S3 API
+wrote can be read as a file.** No decisions to make: two parameters to fill in, and the teardown at
+the end.
+
+**Every step, and the table for when it does not work, is in
+[deploying the collect side](deployment/aws-cloudformation.md) (40 min).**
+**To fit the parameters to your own environment, see
+[choosing parameters](deployment/choosing-parameters.md)** -- 5 of the 21 need thought, and
+**only three places change the cost by an order of magnitude**.
+
+**If something is already running, see
+[moving from what you run today](../ja/reference/scenarios/from-what-you-run-today.md) (Japanese)**
+-- three starting points (a copy job, Amazon EFS, an S3-first pipeline), each with **the conditions
+under which not to add this**.
 
 | What you want | Guide | Time |
 |---|---|---|
@@ -165,7 +177,9 @@ that page.** The cost estimate is there as well.
 | Look up versions and constraints | [Support matrix](support-matrix.md) | 10 min |
 | Look up cross-cloud connectivity | [Cross-cloud connectivity](multi-cloud-connectivity.md) | 10 min |
 | Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](reference/glossary/object-access-on-ontap.md) | 5 min |
+| Run it once, in the smallest form | [The first hour](quickstart.md) | 1 hour |
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
+| Fit the parameters to your environment | [Choosing parameters](deployment/choosing-parameters.md) | 10 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
 | Read the measured figures and their conditions | [Verification record](verification/s3ap-nfs-visibility.md) | 10 min |
 | Read the NFS / SMB / EFS throughput figures | [Protocol measurement results](../ja/verification/perf-matrix-results.md) (Japanese) | 20 min |
