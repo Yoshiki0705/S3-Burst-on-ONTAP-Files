@@ -85,6 +85,37 @@ aws cloudformation describe-stacks --stack-name s3burst-quickstart \
 
 ## 3. Create the S3 Access Point
 
+**Create the identity's user first.** The access point authorizes every request as the **UNIX user
+named in `FileSystemIdentity`**, and a new SVM has only `root`, `pcuser` and `nobody`. **Create the
+writing user yourself, and make it the owner of the volume root.**
+
+Two calls on the ONTAP side, run from the verification host because the management endpoint is
+VPC-only.
+
+```bash
+# On the host. PW is the fsxadmin password, from the OntapAdminSecretArn output
+H=https://management.<FileSystemId>.fsx.ap-northeast-1.amazonaws.com/api
+curl -s -k -u "fsxadmin:$PW" -X POST -H 'Content-Type: application/json' \
+  -d '{"svm":{"name":"origin_svm"},"name":"s3ap","id":1001}' "$H/name-services/unix-groups"
+curl -s -k -u "fsxadmin:$PW" -X POST -H 'Content-Type: application/json' \
+  -d '{"svm":{"name":"origin_svm"},"name":"s3ap-writer","id":1001,"primary_gid":1001}' \
+  "$H/name-services/unix-users"
+```
+
+**Give that user the volume root.** Doing it after the mount in step 4 also works, but **before the
+access point exists is the tidier order** -- fixing permissions afterwards only adds a round of
+working out why a write was refused.
+
+```bash
+sudo chown 1001:1001 /mnt/origin-noac     # the mount is the one from step 4
+```
+
+> **Being non-root is not itself the control.** What decides is **the effective permission that
+> identity holds on the volume root**. This one writes, so it owns the root. **For a read-only access
+> point, choose an identity the volume withholds write from** -- at `755`, one that is neither the
+> owner nor in the owning group. The material for that decision is in
+> [Deploying the collect side](deployment/aws-cloudformation.md#3-create-the-s3-access-point).
+
 ```bash
 cd environments/aws-origin
 cp access-point.example.json access-point.json
@@ -96,6 +127,10 @@ cd ../..
 
 **Pass a JSON file.** The positional form of `--ontap-configuration` parses badly, and the error it
 produces does not point at the quoting.
+
+> **`"Type": "ONTAP"` is required.** The example file did not carry it, so **the first end-to-end run
+> of this page, on 2026-09-19, stopped at `Missing required parameter in input: "Type"`.** The
+> example is fixed; it remains an easy field to miss when assembling the input by hand.
 
 **Every request through the access point is authorized as one identity.** Callers are not
 distinguished. The default is fine for this pass, but **a read-only access point needs the AWS-side
@@ -110,12 +145,19 @@ aws ssm start-session --target <VerificationHostId> --region ap-northeast-1
 
 On the host, read the SVM's NFS endpoint and mount it.
 
+**Mount by DNS name.** The form is
+`<StorageVirtualMachineId>.<FileSystemId>.fsx.<region>.amazonaws.com`.
+
 ```bash
-NFS_IP=$(aws fsx describe-storage-virtual-machines --region ap-northeast-1 \
-  --storage-virtual-machine-ids <StorageVirtualMachineId> \
-  --query 'StorageVirtualMachines[0].Endpoints.Nfs.IpAddresses[0]' --output text)
-sudo mount -t nfs -o nfsvers=3,actimeo=0 "$NFS_IP":/origin_vol /mnt/origin-noac
+SVM_DNS=<StorageVirtualMachineId>.<FileSystemId>.fsx.ap-northeast-1.amazonaws.com
+sudo mount -t nfs -o nfsvers=3,actimeo=0 "$SVM_DNS":/origin_vol /mnt/origin-noac
 ```
+
+> **Do not call `aws fsx describe-...` from the host.** This subnet carries only the Session Manager
+> endpoints, so a request to `fsx.<region>.amazonaws.com` **times out**
+> (`Connect timeout on endpoint URL: "https://fsx.ap-northeast-1.amazonaws.com/"`).
+> **Walked into on 2026-09-19, following this page.** Resolve the IP from your own machine if you
+> need it. **The DNS name needs no API call.**
 
 **`actimeo=0` is there for a reason.** Linux caches a directory listing for up to 60 seconds, so
 **a new file can be invisible for a minute regardless of what the storage did.** Use it when
@@ -126,7 +168,8 @@ Write, then read.
 
 ```bash
 AP=arn:aws:s3:ap-northeast-1:<account-id>:accesspoint/<access-point-name>
-echo hello | aws s3api put-object --bucket "$AP" --key check.txt --body /dev/stdin
+echo hello > /tmp/check.txt
+aws s3api put-object --bucket "$AP" --key check.txt --body /tmp/check.txt
 cat /mnt/origin-noac/check.txt
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
@@ -141,10 +184,26 @@ The measured timings, and what they do and do not support, are in
 
 ```bash
 aws fsx detach-and-delete-s3-access-point --region ap-northeast-1 --name <access-point-name>
+
+# **Wait for it to be gone.** The call above returns at once and prints nothing.
+while aws fsx describe-s3-access-point-attachments --region ap-northeast-1 \
+        --names <access-point-name> >/dev/null 2>&1; do sleep 15; done
+
 aws cloudformation delete-stack --stack-name s3burst-quickstart --region ap-northeast-1
 aws cloudformation wait stack-delete-complete --stack-name s3burst-quickstart --region ap-northeast-1
 make sweep
 ```
+
+> **Moving on without waiting fails the stack deletion.** `detach-and-delete-s3-access-point` is
+> **asynchronous and returns no body.** Deleting the stack immediately afterwards stops on the volume
+> with `Cannot delete volume while it has one or multiple S3 access points: [<name>]`, and the stack
+> lands in `DELETE_FAILED` (**walked into on 2026-09-19, following this page** -- three seconds
+> later).
+>
+> **The completion signal is `describe-s3-access-point-attachments` answering
+> `S3AccessPointAttachmentNotFound`.** The detach command's own output is empty and indicates
+> neither success nor failure. **Re-running the stack deletion afterwards works**; nothing is left
+> in a broken state.
 
 **Do not skip `make sweep`.** Four kinds of resource do not stop with the stack, and **the final
 backup carries no tags and a null file system id**, so a tag-filtered sweep finds none of them.

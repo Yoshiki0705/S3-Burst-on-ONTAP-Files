@@ -801,6 +801,11 @@ Outputs:
     Description: >-
       AWS::FSx::StorageVirtualMachine returns only ResourceARN, UUID and StorageVirtualMachineId, so
       the NFS endpoint cannot be output either. Read it after the stack settles.
+      **Run this where the AWS API is reachable, which is usually not the verification host**: a
+      subnet carrying only the Session Manager endpoints answers a request to fsx.<region>.amazonaws.com with a
+      connect timeout. On the host, mount by DNS name instead --
+      <StorageVirtualMachineId>.<FileSystemId>.fsx.<region>.amazonaws.com -- which resolves without
+      an API call.
     Value: !Sub >-
       aws fsx describe-storage-virtual-machines --region ${AWS::Region}
       --storage-virtual-machine-ids ${StorageVirtualMachine}

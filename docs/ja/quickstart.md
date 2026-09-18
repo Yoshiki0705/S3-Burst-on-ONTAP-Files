@@ -80,6 +80,35 @@ aws cloudformation describe-stacks --stack-name s3burst-quickstart \
 
 ## 3. S3 Access Point の作成
 
+**先に識別情報のユーザを作ります。** アクセスポイントは `FileSystemIdentity` に指定した
+**UNIX ユーザ名で全リクエストを認可します**。新しい SVM には `root` / `pcuser` / `nobody` しか
+いないので、**書き込み用のユーザは自分で作り、ボリュームルートの所有者にします。**
+
+ONTAP 側の 2 コマンドです（管理エンドポイントは VPC 内なので、検証ホストから実行します）。
+
+```bash
+# 検証ホストの中で。PW は fsxadmin のパスワード（出力の OntapAdminSecretArn から取る）
+H=https://management.<FileSystemId>.fsx.ap-northeast-1.amazonaws.com/api
+curl -s -k -u "fsxadmin:$PW" -X POST -H 'Content-Type: application/json' \
+  -d '{"svm":{"name":"origin_svm"},"name":"s3ap","id":1001}' "$H/name-services/unix-groups"
+curl -s -k -u "fsxadmin:$PW" -X POST -H 'Content-Type: application/json' \
+  -d '{"svm":{"name":"origin_svm"},"name":"s3ap-writer","id":1001,"primary_gid":1001}' \
+  "$H/name-services/unix-users"
+```
+
+**そのユーザにボリュームルートを持たせます。** 手順 4 でマウントしてから実行してもよいですが、
+**アクセスポイント作成前に済ませるほうが順番として素直です**（作成後に権限を直しても、
+書けなかった理由を切り分ける手間が増えるだけです）。
+
+```bash
+sudo chown 1001:1001 /mnt/origin-noac     # マウントは手順 4 と同じ
+```
+
+> **非 root であること自体は制御になりません。** 効くのは**その識別情報がボリュームルートに対して
+> 持つ実効権限**です。ここでは書き込みたいので所有者にしています。**読み取り専用にしたいなら、
+> 逆にボリュームが書き込みを与えていない識別情報を選びます**（`755` で所有者でもグループでもない、
+> など）。判断材料は[収集側のデプロイ](deployment/aws-cloudformation.md#3-s3-access-point-の作成)にあります。
+
 ```bash
 cd environments/aws-origin
 cp access-point.example.json access-point.json
@@ -91,6 +120,10 @@ cd ../..
 
 **JSON ファイルで渡します。** `--ontap-configuration` を位置引数で書く形は解析が壊れやすく、
 そのときのエラーは引用符の問題を指してくれません。
+
+> **`"Type": "ONTAP"` が必須です。** 例ファイルにはこれが入っていなかったので、
+> **2026-09-19 にこの手順を初めて通したときに `Missing required parameter in input: "Type"` で
+> 止まりました。** 例ファイルは修正済みですが、自分で組み立てる場合は忘れやすい場所です。
 
 **アクセスポイント経由の全リクエストは 1 つの識別情報で認可されます。** 呼び出し元ごとの区別は
 付きません。ここでは既定で進めますが、**読み取り専用にしたい場合は AWS 側のポリシーと
@@ -104,12 +137,19 @@ aws ssm start-session --target <VerificationHostId> --region ap-northeast-1
 
 ホストの中で、SVM の NFS エンドポイントを取得してマウントします。
 
+**マウント先は DNS 名で指定します。** 形は
+`<StorageVirtualMachineId>.<FileSystemId>.fsx.<region>.amazonaws.com` です。
+
 ```bash
-NFS_IP=$(aws fsx describe-storage-virtual-machines --region ap-northeast-1 \
-  --storage-virtual-machine-ids <StorageVirtualMachineId> \
-  --query 'StorageVirtualMachines[0].Endpoints.Nfs.IpAddresses[0]' --output text)
-sudo mount -t nfs -o nfsvers=3,actimeo=0 "$NFS_IP":/origin_vol /mnt/origin-noac
+SVM_DNS=<StorageVirtualMachineId>.<FileSystemId>.fsx.ap-northeast-1.amazonaws.com
+sudo mount -t nfs -o nfsvers=3,actimeo=0 "$SVM_DNS":/origin_vol /mnt/origin-noac
 ```
+
+> **ホストから `aws fsx describe-...` を呼ばないでください。** このサブネットには Session Manager
+> の VPC エンドポイントしか無いので、**`fsx.<region>.amazonaws.com` 宛ては接続タイムアウトになります**
+> （`Connect timeout on endpoint URL: "https://fsx.ap-northeast-1.amazonaws.com/"`）。
+> **2026-09-19 にこのページの手順を実際に通して踏みました。** IP を引く必要があるなら
+> 手元（API に到達できる側）で引いてください。**DNS 名なら API を呼ばずに解決できます。**
 
 **`actimeo=0` を付ける理由があります。** Linux の既定はディレクトリ一覧を最大 60 秒
 キャッシュするので、**ストレージ側と無関係に、新しいファイルが最大 1 分見えません。**
@@ -119,7 +159,8 @@ sudo mount -t nfs -o nfsvers=3,actimeo=0 "$NFS_IP":/origin_vol /mnt/origin-noac
 
 ```bash
 AP=arn:aws:s3:ap-northeast-1:<account-id>:accesspoint/<access-point-name>
-echo hello | aws s3api put-object --bucket "$AP" --key check.txt --body /dev/stdin
+echo hello > /tmp/check.txt
+aws s3api put-object --bucket "$AP" --key check.txt --body /tmp/check.txt
 cat /mnt/origin-noac/check.txt
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
@@ -134,10 +175,25 @@ aws s3api delete-object --bucket "$AP" --key check.txt
 
 ```bash
 aws fsx detach-and-delete-s3-access-point --region ap-northeast-1 --name <access-point-name>
+
+# **消えるまで待ちます。** 上のコマンドは即座に戻り、何も出力しません。
+while aws fsx describe-s3-access-point-attachments --region ap-northeast-1 \
+        --names <access-point-name> >/dev/null 2>&1; do sleep 15; done
+
 aws cloudformation delete-stack --stack-name s3burst-quickstart --region ap-northeast-1
 aws cloudformation wait stack-delete-complete --stack-name s3burst-quickstart --region ap-northeast-1
 make sweep
 ```
+
+> **待たずに次へ進むとスタック削除が失敗します。** `detach-and-delete-s3-access-point` は
+> **戻り値を持たず、非同期です。** 直後にスタックを消すと、ボリュームの削除が
+> `Cannot delete volume while it has one or multiple S3 access points: [<name>]` で止まり、
+> スタックは `DELETE_FAILED` になります（**2026-09-19 に、このページの手順どおりに実行して
+> 踏みました**。3 秒後でした）。
+>
+> **完了の判定は `describe-s3-access-point-attachments` が
+> `S3AccessPointAttachmentNotFound` を返すことです。** detach コマンド自身の出力は空で、
+> 成功も失敗も示しません。**そのあとスタック削除を再実行すれば通ります**（状態は壊れません）。
 
 **`make sweep` を飛ばさないでください。** スタックを消しても止まらないものが 4 種類あります。
 とくに**最終バックアップはタグを持たず、ファイルシステム ID も空**なので、タグで探す掃除では
