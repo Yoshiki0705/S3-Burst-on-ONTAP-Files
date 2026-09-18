@@ -65,7 +65,7 @@ ONTAP 9.18.1P5）。**エラーメッセージが原因を名指ししない箇�
 |---|---|
 | `Aggregates not matching FabricPool requirements: aggr1` | **`use_tiered_aggregate` が既定の false。** FSx for ONTAP の aggregate は FabricPool 付きなので、既定では「非 FabricPool の aggregate を探して見つからない」動作になる。**true を明示すると通る**。メッセージは aggregate を名指しし、フラグには触れない |
 | `Volume ... results in a volume that is too small - 20GB` | **FlexCache ボリュームの最小サイズは 50 GB。** 20 GiB を指定して失敗した |
-| `The value "180" is invalid for field "return_timeout" (<0..120>)` | `return_timeout` の上限は 120 |
+| `The value "180" is invalid for field "return_timeout" (<0..120>)` | `return_timeout` の上限は 120。**これは REST を自分で呼ぶときだけ当たります** — Terraform プロバイダ（NetApp/netapp-ontap 2.7.1）は POST / PATCH / DELETE に `return_timeout=60` を固定で付けるので（`internal/restclient/rest_client.go`）、**この経路では設定項目がなく、設定する必要もありません。** 2026-09-18 に踏み直したのはシェルスクリプト側です |
 | SVM ピアが `pending` のまま進まない | **Origin 側で明示的に受諾が必要。** `PATCH /api/svm/peers/{uuid}` に `{"state":"peered"}` を送る。作成側は `initiated`、相手側は `pending` になる |
 | ONTAP REST が HTTP 401 と `User is not authorized.` を返す | **認証の不一致で、権限の問題ではない。** 生成した fsxadmin パスワードが実効パスワードになっていなかった。詳細は[検証状況](../verification-status.md)の該当行 |
 

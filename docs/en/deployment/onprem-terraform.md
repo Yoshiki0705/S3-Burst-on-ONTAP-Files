@@ -68,7 +68,7 @@ A record of running the whole sequence over the REST API against two FSx for ONT
 |---|---|
 | `Aggregates not matching FabricPool requirements: aggr1` | **`use_tiered_aggregate` defaults to false.** FSx for ONTAP aggregates are FabricPool-attached, so the default asks for a non-FabricPool aggregate and finds none. **Setting it true works.** The message names the aggregate and never mentions the flag |
 | `Volume ... results in a volume that is too small - 20GB` | **The minimum FlexCache volume is 50 GB.** 20 GiB was rejected |
-| `The value "180" is invalid for field "return_timeout" (<0..120>)` | `return_timeout` caps at 120 |
+| `The value "180" is invalid for field "return_timeout" (<0..120>)` | `return_timeout` caps at 120. **This only bites when calling REST yourself**: the Terraform provider (NetApp/netapp-ontap 2.7.1) sets `return_timeout=60` on POST, PATCH and DELETE in `internal/restclient/rest_client.go`, so **there is nothing to configure on this path and nothing that needs configuring.** What walked into it again on 2026-09-18 was a shell script |
 | The SVM peer stays `pending` | **It has to be accepted explicitly on the origin side**: `PATCH /api/svm/peers/{uuid}` with `{"state":"peered"}`. The initiating side reads `initiated`, the other `pending` |
 | ONTAP REST returns HTTP 401 with `User is not authorized.` | **An authentication mismatch, not a permissions problem.** The generated fsxadmin password was not the file system's effective password. See the corresponding row in the verification status |
 

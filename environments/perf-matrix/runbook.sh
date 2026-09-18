@@ -913,6 +913,15 @@ tooling() {
   printf 'All three present. VDBENCH is the one that cannot be re-fetched in the moment, so this is the gate.\n'
 }
 
+# **The same two gates exist as a standalone script**, `scripts/preflight.py post`, for an
+# environment that was not built through this runbook. That is not redundancy: on 2026-09-18 a file
+# system created by calling CloudFormation directly recorded a full set of numbers with no ONTAP
+# release, because this phase -- the only place the release was read -- was never on that path. A
+# gate only covers the route it sits on.
+#
+# Use this phase inside the protocol-matrix flow, and the script anywhere else. `scripts/preflight.py
+# pre` has no equivalent here at all: it checks the Region's quota headroom, which has to happen
+# before any of this exists.
 preflight() {
   log "preflight"
   python3 "$HERE/../../scripts/protocol_matrix_harness.py" --dry-run

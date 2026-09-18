@@ -35,6 +35,23 @@ and [the environments index](../../../environments/README.md) for why.
   host has no inbound rule and no key pair.
 - An authenticated `aws` CLI.
 
+**One command answers whether the prerequisites hold.** The two that bite before anything else --
+the Region's quota pool and Session Manager reachability -- both surface **25 minutes, or 20
+minutes, after the mistake** rather than at the moment of it.
+
+```bash
+make preflight-pre VPC=vpc-xxxxxxxx SUBNET=subnet-xxxxxxxx MBPS=128
+```
+
+| What it reads | If it does not hold |
+|---|---|
+| **Region-wide throughput capacity** (10,240 MB/s by default, shared with every other file system in the account) | Creation fails with `ServiceLimitExceeded`, **about 25 minutes in** |
+| Region-wide SSD capacity | As above |
+| The subnet is in the stated VPC, and has free addresses | Creation fails |
+| **Reachability to Session Manager** (a 0.0.0.0/0 route, or the `ssm`, `ssmmessages` and `ec2messages` endpoints) | The host comes up healthy and is absent from Session Manager. **Twenty minutes with nothing saying why** |
+
+**A quota that could not be read is reported as a finding**, not quietly compared against a default.
+
 > **Security note**: choosing `NTFS` means the SVM needs a CIFS server. **This template creates
 > neither a CIFS server nor an Active Directory join.** Joining AD is not required — where a domain is
 > not available, workgroup mode is the documented alternative ([procedure](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/smb-server-workgroup-setup.html); NTLM only, no
@@ -242,8 +259,38 @@ The measured figures, and what they do and do not support, are in the
    aws cloudformation wait stack-delete-complete --stack-name s3burst-origin --region ap-northeast-1
    ```
 
+**With `AllowFlexCachePeering` on, there is one move before step 1.**
+**While two stacks reference each other's security groups, neither can delete its groups.** EC2
+replies `has a dependent object` and **does not name the object**. That failed the origin stack's
+deletion twice on 2026-09-18. **Revoke the cross-references on both sides first.**
+
+```bash
+# For both groups, find the ingress rules that reference another group, and revoke them
+for sg in <origin-fs-sg> <cache-fs-sg>; do
+  for id in $(aws ec2 describe-security-group-rules --filters Name=group-id,Values=$sg \
+      --query 'SecurityGroupRules[?ReferencedGroupInfo.GroupId!=null].SecurityGroupRuleId' \
+      --output text | tr '\t' '\n'); do
+    aws ec2 revoke-security-group-ingress --group-id "$sg" --security-group-rule-ids "$id"
+  done
+done
+```
+
+**Once the stack is gone, sweep what it left.** Four kinds of resource do not stop with it: the
+final backup, unattached EBS volumes, the secrets, and volumes or SVMs whose parent is gone.
+
+```bash
+python3 scripts/sweep_after_teardown.py --region ap-northeast-1              # report only
+python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --delete --yes
+```
+
+**The final backup carries no tags and its `FileSystem.FileSystemId` is null**, so a tag-filtered
+sweep finds none of them. `SkipFinalBackup` is not a property `AWS::FSx::Volume` accepts, so the
+backup is always taken.
+
 The Secrets Manager secret is deleted with a recovery window by default. Either wait, or pass
-`--force-delete-without-recovery` deliberately, before reusing the name.
+`--force-delete-without-recovery` deliberately, before reusing the name. **The script above
+schedules deletion with a seven-day window**, which keeps the one reversible deletion here
+reversible.
 
 > **Irreversibility note**: this template enables neither SnapLock nor snapshot locking. Enabling
 > either makes the volume, its SVM and **the entire file system** undeletable for the retention

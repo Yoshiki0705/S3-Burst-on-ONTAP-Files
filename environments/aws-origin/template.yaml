@@ -58,6 +58,11 @@ Metadata:
           - HostS3FilesResourceArns
           - HostEfsResourceArns
       - Label:
+          default: FlexCache peering (only when the cache side is a separate stack)
+        Parameters:
+          - AllowFlexCachePeering
+          - PeerSecurityGroupId
+      - Label:
           default: Tagging
         Parameters:
           - ProjectName
@@ -224,6 +229,28 @@ Parameters:
       Left at "*", this grants mount rights on every EFS file system in the account -- including
       ones belonging to other work in a shared account.
 
+  AllowFlexCachePeering:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Open the ports a FlexCache on a second file system needs to reach this one. Off by default,
+      so an existing stack is unaffected by this parameter appearing. Turn it on only when the
+      cache side is a separate stack, and set PeerSecurityGroupId with it — on its own this does
+      nothing, because there is no source group to allow.
+
+  PeerSecurityGroupId:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^sg-[0-9a-f]{8,17}$"
+    Description: >-
+      The cache side's security group, which is the source for the rules above. Two separate
+      stacks do not know each other's groups, and the failure is misleading: with 443 closed the
+      ONTAP REST call from the cache side simply does not arrive, which reads as "the FlexCache
+      does not exist" rather than as a network problem. **The cache side needs the mirror of these
+      rules for 11104 and 11105** — cluster peering is bidirectional, and this template only
+      configures the side it is deployed into.
+
   ProjectName:
     Type: String
     Default: s3-burst-on-ontap-files
@@ -243,6 +270,11 @@ Conditions:
   WantS3DataAccess: !And
     - !Equals [!Ref DeployVerificationHost, "true"]
     - !Equals [!Ref HostS3DataAccess, "true"]
+  # Both, deliberately. The flag on its own would create nothing and read as though the ports were
+  # open, which is the more expensive of the two ways to get this wrong.
+  WantPeering: !And
+    - !Equals [!Ref AllowFlexCachePeering, "true"]
+    - !Not [!Equals [!Ref PeerSecurityGroupId, ""]]
 
 Resources:
   # ---------------------------------------------------------------------------------------------
@@ -478,6 +510,75 @@ Resources:
       ToPort: 22
       SourceSecurityGroupId: !Ref HostSecurityGroup
       Description: ONTAP CLI over SSH, for the steps the REST API does not cover.
+
+  # ---------------------------------------------------------------------------------------------
+  # FlexCache peering, from a cache side that is a separate stack
+  #
+  # Created only when AllowFlexCachePeering is true and PeerSecurityGroupId is set. Four ports,
+  # each of which has cost a session:
+  #
+  #   11104, 11105  cluster peering. Bidirectional -- **the cache side needs the mirror of these
+  #                 two, and this template cannot create them.** Without them the peer stays
+  #                 unavailable and the message is `Unable to communicate`, which names neither
+  #                 port.
+  #   443           the ONTAP REST API. With this closed, a call from the cache side does not
+  #                 arrive, and the reply a reader infers is "the FlexCache does not exist".
+  #   2049          NFS, so a client on the cache side can mount this origin directly. That is the
+  #                 control read a FlexCache figure is compared against; without it the comparison
+  #                 has one leg.
+  #
+  # **These rules make the teardown order-dependent, and nothing in the error says so.** Once the
+  # cache side's group is referenced here, and this stack's groups are referenced there, neither
+  # stack can delete its security groups: EC2 reports `has a dependent object` and names no object.
+  # Revoke the cross-references on both sides first, then delete. The teardown section of
+  # docs/ja|en/deployment/aws-cloudformation.md has the order.
+  # ---------------------------------------------------------------------------------------------
+  FsxFromPeerClusterPeeringA:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantPeering
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 11104
+      ToPort: 11104
+      SourceSecurityGroupId: !Ref PeerSecurityGroupId
+      Description: Cluster peering. The cache side needs the mirror of this rule.
+
+  FsxFromPeerClusterPeeringB:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantPeering
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 11105
+      ToPort: 11105
+      SourceSecurityGroupId: !Ref PeerSecurityGroupId
+      Description: Cluster peering. The cache side needs the mirror of this rule.
+
+  FsxFromPeerManagement:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantPeering
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref PeerSecurityGroupId
+      Description: >-
+        ONTAP REST API from the cache side. Closed, this reads as a missing FlexCache rather than
+        as a blocked port.
+
+  FsxFromPeerNfs:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: WantPeering
+    Properties:
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      SourceSecurityGroupId: !Ref PeerSecurityGroupId
+      Description: >-
+        NFS from the cache side, for the direct origin read a FlexCache figure is compared against.
 
   # ---------------------------------------------------------------------------------------------
   # Verification host

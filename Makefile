@@ -12,7 +12,7 @@ PY ?= python3
         test all new-pattern commit-subjects \
         diagrams diagrams-check diagram-fonts diagram-flow \
         terraform finops finops-write sg-descriptions \
-        commit-gate ready pr-verify clean
+        commit-gate ready pr-verify preflight-pre preflight-post sweep clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -346,6 +346,24 @@ new-pattern: ## Scaffold a pattern. Usage: make new-pattern AXIS=collect SLUG=my
 	@test -n "$(AXIS)" || (echo "AXIS is required (collect | serve | pipelines)"; exit 1)
 	@test -n "$(SLUG)" || (echo "SLUG is required (e.g. SLUG=s3ap-ingest)"; exit 1)
 	@$(PY) scripts/scaffold_pattern.py --axis "$(AXIS)" --slug "$(SLUG)"
+
+# The two operational gates. Neither is in `make all`: both call AWS, and the first one has to run
+# before a file system exists, which is not a moment a commit gate can occupy.
+preflight-pre: ## Before creating: quota headroom, subnet, SSM reach (VPC=… SUBNET=… MBPS=…)
+	@test -n "$(VPC)$(SUBNET)$(MBPS)" || { echo 'usage: make preflight-pre VPC=vpc-… SUBNET=subnet-… MBPS=2048 [REGION=…]'; exit 2; }
+	@$(PY) scripts/preflight.py pre --region $(or $(REGION),ap-northeast-1) \
+		--vpc-id $(VPC) --subnet-id $(SUBNET) --throughput-capacity $(MBPS) \
+		$(if $(SSD),--storage-capacity-gib $(SSD))
+
+preflight-post: ## Before measuring: ONTAP release, read cache, invalidating defaults (FS=… IID=… SECRET=…)
+	@test -n "$(FS)$(IID)$(SECRET)" || { echo 'usage: make preflight-post FS=fs-… IID=i-… SECRET=arn:… [REGION=…]'; exit 2; }
+	@$(PY) scripts/preflight.py post --region $(or $(REGION),ap-northeast-1) \
+		--file-system-id $(FS) --instance-id $(IID) --fsxadmin-secret-arn $(SECRET) \
+		$(if $(ALLOW_NVME_CACHE),--allow-nvme-cache)
+
+sweep: ## After teardown: what still bills. Add DELETE=1 to act (REGION=… PREFIX=…)
+	@$(PY) scripts/sweep_after_teardown.py --region $(or $(REGION),ap-northeast-1) \
+		$(if $(PREFIX),--name-prefix $(PREFIX)) $(if $(DELETE),--delete --yes)
 
 clean: ## Remove local caches and previews
 	@rm -rf .ruff_cache .pytest_cache __pycache__ tools/__pycache__ scripts/__pycache__ \

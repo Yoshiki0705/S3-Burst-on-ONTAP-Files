@@ -53,6 +53,8 @@
   { "ParameterKey": "HostS3ResourceArns", "ParameterValue": "*" },
   { "ParameterKey": "HostS3FilesResourceArns", "ParameterValue": "*" },
   { "ParameterKey": "HostEfsResourceArns", "ParameterValue": "*" },
+  { "ParameterKey": "AllowFlexCachePeering", "ParameterValue": "false" },
+  { "ParameterKey": "PeerSecurityGroupId", "ParameterValue": "" },
   { "ParameterKey": "ProjectName", "ParameterValue": "s3-burst-on-ontap-files" },
   { "ParameterKey": "Environment", "ParameterValue": "verify" }
 ]
