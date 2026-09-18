@@ -262,7 +262,15 @@ def test_anything_without_the_release_string_blocks(monkeypatch, answer):
 # ------------------------------------------------------------------ NVMe read cache
 
 
+def _fs_of(mbps: int):
+    """The file-system read `check_nvme_cache` does before deciding what an empty answer means."""
+    return fake_aws_json(
+        {"describe-file-systems": [{"MBps": mbps, "Depl": "SINGLE_AZ_1"}]}
+    )
+
+
 def test_an_enabled_read_cache_blocks(monkeypatch):
+    monkeypatch.setattr(preflight, "aws_json", _fs_of(2048))
     monkeypatch.setattr(
         preflight,
         "ontap_get",
@@ -282,6 +290,7 @@ def test_an_enabled_read_cache_blocks(monkeypatch):
 
 
 def test_an_enabled_read_cache_can_be_recorded_deliberately(monkeypatch):
+    monkeypatch.setattr(preflight, "aws_json", _fs_of(2048))
     monkeypatch.setattr(
         preflight,
         "ontap_get",
@@ -296,12 +305,35 @@ def test_an_enabled_read_cache_can_be_recorded_deliberately(monkeypatch):
 
 
 def test_no_nodes_at_all_cannot_run(monkeypatch):
-    """An empty list and "the cache is off" look the same once summarised, and are opposites."""
+    """An empty list and "the cache is off" look the same once summarised, and are opposites.
+
+    At or above the threshold, that is. Below it there is no cache object to return -- see the next
+    test, which is the case the first version of this check stopped the quickstart on.
+    """
+    monkeypatch.setattr(preflight, "aws_json", _fs_of(2048))
     monkeypatch.setattr(preflight, "ontap_get", _ontap({"records": []}))
     with pytest.raises(preflight.CheckFailed):
         preflight.check_nvme_cache(
             "i-1", "ap-northeast-1", "arn:secret", "fs-1", allow=False
         )
+
+
+def test_no_nodes_on_a_small_configuration_is_the_answer(monkeypatch, capsys):
+    """Found by running the gate against the configuration the quickstart builds.
+
+    A 128 MBps file system has no NVMe read cache, so the query returns no records -- and the first
+    version of this check called that "could not run" and stopped. The throughput capacity is what
+    separates the two readings of the same empty answer.
+    """
+    monkeypatch.setattr(preflight, "aws_json", _fs_of(128))
+    monkeypatch.setattr(preflight, "ontap_get", _ontap({"records": []}))
+    assert (
+        preflight.check_nvme_cache(
+            "i-1", "ap-northeast-1", "arn:secret", "fs-1", allow=False
+        )
+        == []
+    )
+    assert "not part of this configuration" in capsys.readouterr().out
 
 
 def test_a_body_that_is_not_json_cannot_run(monkeypatch):
@@ -312,6 +344,49 @@ def test_a_body_that_is_not_json_cannot_run(monkeypatch):
     with pytest.raises(preflight.CheckFailed):
         preflight.ontap_get(
             "i-1", "ap-northeast-1", "arn:secret", "fs-1", "/api/cluster"
+        )
+
+
+# ------------------------------------------------------------------ SMB Multichannel
+
+
+def test_multichannel_disabled_blocks_an_smb_measurement(monkeypatch):
+    """The default. Six runs on 2026-09-18 measured the single-channel path because of it."""
+    monkeypatch.setattr(
+        preflight,
+        "ontap_get",
+        _ontap({"records": [{"vserver": "smb_svm", "is_multichannel_enabled": False}]}),
+    )
+    findings = preflight.check_smb_multichannel(
+        "i-1", "ap-northeast-1", "arn:secret", "fs-1", "smb_svm"
+    )
+    assert findings
+    # The message has to carry the number that identifies the path, and the session step: enabling
+    # it on the server alone leaves an existing session on one channel.
+    assert "574" in findings[0]
+    assert "re-establish the session" in findings[0]
+
+
+def test_multichannel_enabled_passes(monkeypatch):
+    monkeypatch.setattr(
+        preflight,
+        "ontap_get",
+        _ontap({"records": [{"vserver": "smb_svm", "is_multichannel_enabled": True}]}),
+    )
+    assert (
+        preflight.check_smb_multichannel(
+            "i-1", "ap-northeast-1", "arn:secret", "fs-1", "smb_svm"
+        )
+        == []
+    )
+
+
+def test_no_cifs_options_cannot_run(monkeypatch):
+    """An SVM with no CIFS server answers empty, which is not "multichannel is on"."""
+    monkeypatch.setattr(preflight, "ontap_get", _ontap({"records": []}))
+    with pytest.raises(preflight.CheckFailed):
+        preflight.check_smb_multichannel(
+            "i-1", "ap-northeast-1", "arn:secret", "fs-1", "smb_svm"
         )
 
 
@@ -456,6 +531,147 @@ def test_orphan_storage_compares_against_the_live_file_systems(monkeypatch):
     volumes, svms = sweep.orphan_storage("ap-northeast-1")
     assert [v["Id"] for v in volumes] == ["fsvol-1"]
     assert [s["Id"] for s in svms] == ["svm-1"]
+
+
+def test_an_ignored_id_is_reported_rather_than_hidden(monkeypatch, capsys):
+    """A shared account holds other people's resources, and this script filters nothing by design.
+
+    The one that prompted this: a 100 GiB gp2 volume created on 2026-09-10 from a snapshot that no
+    longer exists, in an account where Databricks and Snowflake also run. **It is the only copy of
+    whatever it holds**, so it is not deleted -- but it was being reported as a leftover on every
+    run, which is how a real leftover ends up ignored.
+
+    The ignore list prints what it skips. A filter that hides what it hides is the next missed
+    resource.
+    """
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "sweep_after_teardown.py",
+            "--region",
+            "ap-northeast-1",
+            "--ignore",
+            "vol-ignored",
+        ],
+    )
+    monkeypatch.setattr(sweep, "backups", lambda region: [])
+    monkeypatch.setattr(
+        sweep,
+        "unattached_volumes",
+        lambda region: [
+            {
+                "Id": "vol-ignored",
+                "Size": 100,
+                "Type": "gp2",
+                "Iops": 300,
+                "Created": "x",
+                "Name": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(sweep, "secrets", lambda region, prefixes: [])
+    monkeypatch.setattr(sweep, "orphan_storage", lambda region: ([], []))
+
+    assert sweep.main() == 0, "an ignored resource is not a leftover"
+    out = capsys.readouterr().out
+    assert "ignored vol-ignored" in out
+    assert "nothing left behind" in out
+
+
+def test_an_unattributable_volume_is_not_deleted(monkeypatch, capsys):
+    """The regression this defends against destroyed data, so it is asserted rather than reviewed.
+
+    On 2026-09-19 the script ran as `make sweep DELETE=1 PREFIX=s3-burst-on-ontap-files`, with the
+    prefix meant to narrow the secrets. `--delete` applied to every category, and an untagged 100 GiB
+    volume that had already been identified as another workload's -- its source snapshot was gone, so
+    it held the only copy -- was deleted along with the project's own leftovers. **EBS deletion is
+    immediate and there was nothing to restore from.**
+
+    Deletion now requires attribution by name. An untagged volume is reported with the commands to
+    check and remove it deliberately, and `--delete` leaves it alone.
+    """
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sweep_after_teardown.py", "--region", "ap-northeast-1", "--delete", "--yes"],
+    )
+    monkeypatch.setattr(sweep, "backups", lambda region: [])
+    monkeypatch.setattr(
+        sweep,
+        "unattached_volumes",
+        lambda region: [
+            {
+                "Id": "vol-somebody-elses",
+                "Size": 100,
+                "Type": "gp2",
+                "Iops": 300,
+                "Created": "x",
+                "Name": None,
+            },
+            {
+                "Id": "vol-ours",
+                "Size": 20,
+                "Type": "gp3",
+                "Iops": 3000,
+                "Created": "x",
+                "Name": "s3burst-origin-verify-host",
+            },
+        ],
+    )
+    monkeypatch.setattr(sweep, "secrets", lambda region, prefixes: [])
+    monkeypatch.setattr(sweep, "orphan_storage", lambda region: ([], []))
+    monkeypatch.setattr(sweep, "aws", lambda *args: deleted.append(args[-1]) or "")
+
+    sweep.main()
+    out = capsys.readouterr().out
+    assert "vol-ours" in deleted, "a volume named for the project is still deleted"
+    assert "vol-somebody-elses" not in deleted, (
+        "an untagged volume must survive --delete"
+    )
+    assert "NOT deleted" in out
+    assert "cannot be recovered" in out
+
+
+def test_an_unattributable_backup_is_not_deleted(monkeypatch, capsys):
+    """A backup carries no tags, so the volume name it records is the only attribution available."""
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sweep_after_teardown.py", "--region", "ap-northeast-1", "--delete", "--yes"],
+    )
+    monkeypatch.setattr(
+        sweep,
+        "backups",
+        lambda region: [
+            {
+                "Id": "backup-ours",
+                "Created": "x",
+                "Life": "AVAILABLE",
+                "Type": "USER_INITIATED",
+                "Vol": "origin_vol",
+                "Fs": None,
+                "Size": None,
+            },
+            {
+                "Id": "backup-theirs",
+                "Created": "x",
+                "Life": "AVAILABLE",
+                "Type": "USER_INITIATED",
+                "Vol": "someones_database",
+                "Fs": None,
+                "Size": None,
+            },
+        ],
+    )
+    monkeypatch.setattr(sweep, "unattached_volumes", lambda region: [])
+    monkeypatch.setattr(sweep, "secrets", lambda region, prefixes: [])
+    monkeypatch.setattr(sweep, "orphan_storage", lambda region: ([], []))
+    monkeypatch.setattr(sweep, "aws", lambda *args: deleted.append(args[-1]) or "")
+
+    sweep.main()
+    assert "backup-ours" in deleted
+    assert "backup-theirs" not in deleted
+    assert "NOT deleted" in capsys.readouterr().out
 
 
 def test_delete_requires_yes(monkeypatch, capsys):

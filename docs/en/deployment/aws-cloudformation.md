@@ -192,6 +192,11 @@ aws ssm start-session --target <VerificationHostId> --region ap-northeast-1
 
 Read the SVM's NFS endpoint and mount. Two mount points are prepared.
 
+> **`aws fsx describe-...` may not work from the host.** In a subnet carrying only the Session
+> Manager endpoints, a request to `fsx.<region>.amazonaws.com` times out (measured 2026-09-19). **Mount by DNS name
+> instead**: `<StorageVirtualMachineId>.<FileSystemId>.fsx.<region>.amazonaws.com` resolves without
+> an API call.
+
 ```bash
 NFS_IP=$(aws fsx describe-storage-virtual-machines --region ap-northeast-1 \
   --storage-virtual-machine-ids <StorageVirtualMachineId> \
@@ -211,7 +216,8 @@ Check with a **data operation**.
 
 ```bash
 AP=arn:aws:s3:ap-northeast-1:<account-id>:accesspoint/s3burst-origin-ap
-echo hello | aws s3api put-object --bucket "$AP" --key check.txt --body /dev/stdin
+echo hello > /tmp/check.txt
+aws s3api put-object --bucket "$AP" --key check.txt --body /tmp/check.txt
 cat /mnt/origin-noac/check.txt          # expect this within tens of milliseconds
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
@@ -246,11 +252,20 @@ The measured figures, and what they do and do not support, are in the
    > The record of walking into this is in
    > [the inheritance record](../../ja/verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠) (Japanese).
 
-3. Detach the S3 Access Point.
+3. Detach the S3 Access Point, **and wait for it to be gone**.
 
    ```bash
    aws fsx detach-and-delete-s3-access-point --region ap-northeast-1 --name s3burst-origin-ap
+   while aws fsx describe-s3-access-point-attachments --region ap-northeast-1 \
+           --names s3burst-origin-ap >/dev/null 2>&1; do sleep 15; done
    ```
+
+   > **The call is asynchronous and returns no body.** Going straight to step 4 stops the volume
+   > deletion with `Cannot delete volume while it has one or multiple S3 access points: [<name>]`,
+   > and the stack lands in `DELETE_FAILED` (measured 2026-09-19, three seconds after the detach).
+   > **The completion signal is `describe-s3-access-point-attachments` answering
+   > `S3AccessPointAttachmentNotFound`.** If you hit it, re-running the stack deletion once the
+   > attachment is gone works.
 
 4. Delete the stack.
 
@@ -279,13 +294,40 @@ done
 final backup, unattached EBS volumes, the secrets, and volumes or SVMs whose parent is gone.
 
 ```bash
-python3 scripts/sweep_after_teardown.py --region ap-northeast-1              # report only
-python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --delete --yes
+make sweep                          # report only
+make sweep DELETE=1 YES=1           # act. DELETE=1 on its own deletes nothing
 ```
+
+**`--delete` does not remove anything it cannot tie to this project by name.** A final backup is
+matched on the volume name it records (`origin_vol` and the like), an EBS volume on its Name tag.
+**Whatever cannot be matched is reported with the commands to remove it individually.**
+
+> **That behaviour was added after an incident.** On 2026-09-19 `DELETE=1` was passed together with
+> a `PREFIX=` **intended to narrow the secrets**. `--delete` applied to every category, and **an
+> untagged 100 GiB volume that had already been judged another workload's, and left in place on
+> purpose, was deleted. EBS deletion is immediate, its source snapshot was already gone, and there
+> was nothing to restore from.**
+> **Unattributable resources now survive `--delete`.** Establish that one is yours, then run the
+> command the report prints.
 
 **The final backup carries no tags and its `FileSystem.FileSystemId` is null**, so a tag-filtered
 sweep finds none of them. `SkipFinalBackup` is not a property `AWS::FSx::Volume` accepts, so the
 backup is always taken.
+
+> **In a shared account, some of the output is not yours.** The script lists **every backup in the
+> Region, unfiltered**, because there is no tag to filter on. Do not delete another workload's.
+> Having established that something is not yours, drop it with `--ignore <ID>`. **What it skips is
+> printed on every run** -- an exclusion that hides what it hides is how the next real leftover gets
+> missed.
+>
+> ```bash
+> python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --ignore vol-0123456789abcdef0
+> ```
+>
+> **Two things tell you whose it is**: whether `CreateTime` lines up with your own work, and whether
+> the snapshot named in `SnapshotId` still exists
+> (`aws ec2 describe-snapshots --snapshot-ids <id>`). **A volume whose source snapshot is gone is
+> the only copy of whatever it holds.**
 
 The Secrets Manager secret is deleted with a recovery window by default. Either wait, or pass
 `--force-delete-without-recovery` deliberately, before reusing the name. **The script above

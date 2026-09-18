@@ -202,6 +202,11 @@ aws ssm start-session --target <VerificationHostId> --region ap-northeast-1
 
 SVM の NFS エンドポイントを取得してマウントします。マウントポイントは 2 つ用意されています。
 
+> **`aws fsx describe-...` はホストからは通らないことがあります。** Session Manager の VPC
+> エンドポイントだけを持つサブネットでは、`fsx.<region>.amazonaws.com` 宛てが接続タイムアウトになります
+> （2026-09-19 に実測）。**その場合は DNS 名でマウントしてください** —
+> `<StorageVirtualMachineId>.<FileSystemId>.fsx.<region>.amazonaws.com` は API を呼ばずに解決します。
+
 ```bash
 NFS_IP=$(aws fsx describe-storage-virtual-machines --region ap-northeast-1 \
   --storage-virtual-machine-ids <StorageVirtualMachineId> \
@@ -221,7 +226,8 @@ Linux の既定は `acdirmin=30` / `acdirmax=60` なので、クライアント�
 
 ```bash
 AP=arn:aws:s3:ap-northeast-1:<account-id>:accesspoint/s3burst-origin-ap
-echo hello | aws s3api put-object --bucket "$AP" --key check.txt --body /dev/stdin
+echo hello > /tmp/check.txt
+aws s3api put-object --bucket "$AP" --key check.txt --body /tmp/check.txt
 cat /mnt/origin-noac/check.txt          # 数十 ms 以内に見えるはず
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
@@ -255,11 +261,20 @@ aws s3api delete-object --bucket "$AP" --key check.txt
    > **こちらはホストを消したあとに SVM がまだ `MISCONFIGURED` だと気づいて立て直しました。**
    >
    > 実際に踏んだ記録は[継承の検証記録](../verification/flexcache-security-style-inheritance.md#この手順で踏んだ罠)にあります。
-3. S3 Access Point を外す
+3. S3 Access Point を外し、**消えるまで待つ**
 
    ```bash
    aws fsx detach-and-delete-s3-access-point --region ap-northeast-1 --name s3burst-origin-ap
+   while aws fsx describe-s3-access-point-attachments --region ap-northeast-1 \
+           --names s3burst-origin-ap >/dev/null 2>&1; do sleep 15; done
    ```
+
+   > **このコマンドは非同期で、出力を持ちません。** 待たずに 4 へ進むと、ボリュームの削除が
+   > `Cannot delete volume while it has one or multiple S3 access points: [<name>]` で止まり、
+   > スタックが `DELETE_FAILED` になります（2026-09-19 に実測。detach から 3 秒後）。
+   > **完了は `describe-s3-access-point-attachments` が
+   > `S3AccessPointAttachmentNotFound` を返すことで判定します。**
+   > 踏んだ場合は、消えたあとにスタック削除を再実行すれば通ります。
 
 4. スタックを削除する
 
@@ -288,13 +303,38 @@ done
 （最終バックアップ・未アタッチ EBS・シークレット・親を失ったボリュームと SVM）。
 
 ```bash
-python3 scripts/sweep_after_teardown.py --region ap-northeast-1              # 報告のみ
-python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --delete --yes
+make sweep                          # 報告のみ
+make sweep DELETE=1 YES=1           # 実行。DELETE=1 だけでは消えません
 ```
+
+**`--delete` は、このプロジェクトのものと名前で結びつかない資源を消しません。** 最終バックアップは
+ボリューム名（`origin_vol` など）で、EBS は Name タグで判定します。**判定できないものは、
+個別に消すためのコマンドを出力して残します。**
+
+> **この動きは事故のあとに入れました。** 2026-09-19 に `DELETE=1` を**シークレットを絞る目的の
+> `PREFIX=` と一緒に**渡したところ、`--delete` が全カテゴリに効き、**他の作業のものと判断して
+> 残すと決めていた未タグの 100 GiB ボリュームを消しました。EBS の削除は即時で、由来の
+> スナップショットも既に無く、復旧できませんでした。**
+> **判定できない資源は `--delete` では消えません。** 自分のものだと確認したうえで、
+> 出力されたコマンドを自分で実行してください。
 
 **最終バックアップはタグを持たず、`FileSystem.FileSystemId` も `null` です。**
 タグで絞る掃除は 1 件も見つけません。`SkipFinalBackup` は `AWS::FSx::Volume` が受け付けないので、
 バックアップは必ず作られます。
+
+> **共有アカウントでは、出力の一部が自分のものではありません。** このスクリプトは
+> **リージョン内の全バックアップを無条件に並べます**（タグで絞れないため）。他の作業のものを
+> 消さないでください。自分のものでないと判断したら `--ignore <ID>` で外せます。**外したことは
+> 毎回出力に出ます** — 黙って隠す除外は、次の消し忘れを見逃す原因になります。
+>
+> ```bash
+> python3 scripts/sweep_after_teardown.py --region ap-northeast-1 --ignore vol-0123456789abcdef0
+> ```
+>
+> **判断材料は 2 つあります。** `CreateTime` が自分の作業時刻と合うか、
+> そして `SnapshotId` が指すスナップショットがまだ存在するか
+> （`aws ec2 describe-snapshots --snapshot-ids <id>`）。**スナップショットが消えている
+> ボリュームは、その中身の唯一の複製です。**
 
 Secrets Manager のシークレットは既定で復旧期間を持って削除されます。同じ名前で作り直す場合は
 待つか、`--force-delete-without-recovery` を明示してください。

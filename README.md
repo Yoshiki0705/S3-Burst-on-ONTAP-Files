@@ -219,8 +219,8 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | ディレクトリ | 何が入るか |
 |---|---|
 | [`patterns/collect/`](patterns/collect/) | S3 Access Point でデータを集める |
-| [`patterns/serve/`](patterns/serve/) | FlexCache で NFS / SMB に配る |
-| [`patterns/pipelines/`](patterns/pipelines/) | 収集と配布を組んだワークロード単位の構成 |
+| [`patterns/serve/`](patterns/serve/README.md) | FlexCache で NFS / SMB に配る。**いまは空で、理由がそこに書いてあります**（ピアリングと FlexCache に AWS API が無く、テンプレート 1 枚で表せない） |
+| [`patterns/pipelines/`](patterns/pipelines/README.md) | 収集と配布を組んだワークロード単位の構成。**いまは空**（配る側が先。かつ主経路が未検証） |
 
 雛形は [`patterns/_template/`](patterns/_template/README.md) です。
 `make new-pattern AXIS=collect SLUG=<名前>` で起こせます。

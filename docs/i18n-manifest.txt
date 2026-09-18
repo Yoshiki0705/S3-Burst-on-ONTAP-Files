@@ -34,6 +34,21 @@
 # changed: the architecture's central claim is now verified, and the documents stopped moving once the
 # read-side cost model settled. What remains of the original caution is handled by the wording rules
 # in i18n-terms.md and by `make en-lang`, not by withholding the translation.
+# Japanese-only for now, with the condition that promotes them (both written 2026-09-19):
+#
+#   from-verification-to-production.md          -- a contrast table, read while deciding rather than
+#                                                  while creating resources. Promote once the
+#                                                  production-side rows stop changing; several of
+#                                                  them point at material this repository does not
+#                                                  have yet, and translating a moving target
+#                                                  multiplies every later edit.
+#   reference/scenarios/from-what-you-run-today.md -- three starting points. Promote when a fourth
+#                                                  is either added or ruled out; the shape of the
+#                                                  page is what is still settling, not the wording.
+#
+# Neither is promoted by writing a translation and leaving this list alone: `make i18n-check` only
+# compares what is listed here, so an unlisted pair drifts silently.
+
 deployment/aws-cloudformation.md
 deployment/onprem-terraform.md
 architecture.md

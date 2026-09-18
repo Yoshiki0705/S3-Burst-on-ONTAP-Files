@@ -366,14 +366,42 @@ def check_ontap_release(
     return []
 
 
+# Below this, the NVMe read cache is not part of the configuration, so the query returning nothing
+# is the answer rather than a failure. AWS documents the cache as present by default on
+# first-generation Single-AZ file systems at 2 GBps and above; this script does not try to encode
+# the whole matrix, it only separates "no cache here" from "the reader stopped matching".
+NVME_CACHE_MIN_MBPS = 2048
+
+
 def check_nvme_cache(
     instance: str, region: str, secret_arn: str, fs_id: str, allow: bool
 ) -> list[str]:
     """Every node must report the NVMe read cache disabled before a disk-path read.
 
-    An empty node list fails rather than reading as "nothing is enabled" -- those look the same
-    once summarised and mean opposite things.
+    An empty node list normally fails rather than reading as "nothing is enabled" -- those look the
+    same once summarised and mean opposite things.
+
+    **The exception was found by running this against the smallest configuration.** On a 128 MBps
+    file system the query returns no records at all, because there is no external cache object to
+    return, and the first version of this check stopped the quickstart's own environment with
+    "could not run". So the throughput capacity is read first: below the threshold an empty answer
+    is reported as not applicable, and at or above it an empty answer is still a failure.
     """
+    systems = aws_json(
+        "fsx",
+        "describe-file-systems",
+        "--region",
+        region,
+        "--file-system-ids",
+        fs_id,
+        "--query",
+        "FileSystems[].{MBps:OntapConfiguration.ThroughputCapacity,"
+        "Depl:OntapConfiguration.DeploymentType}",
+    )
+    if not systems:
+        raise CheckFailed(f"file system {fs_id} was not found in {region}")
+    mbps = int(systems[0]["MBps"] or 0)
+
     data = ontap_get(
         instance,
         region,
@@ -382,10 +410,16 @@ def check_nvme_cache(
         "/api/private/cli/system/node/external-cache?fields=node,is-enabled",
     )
     records = data.get("records") or []
+    if not records and mbps < NVME_CACHE_MIN_MBPS:
+        print(
+            f"  nvme     not part of this configuration ({mbps} MB/s, "
+            f"{systems[0]['Depl']}): the query returned no nodes, which here is the answer"
+        )
+        return []
     if not records:
         raise CheckFailed(
-            "no nodes came back from the external-cache query, which is not the same as the "
-            "cache being off"
+            f"no nodes came back from the external-cache query on a {mbps} MB/s file system, "
+            "which is not the same as the cache being off"
         )
     enabled = [r.get("node") for r in records if r.get("is_enabled")]
     for record in records:
@@ -471,6 +505,60 @@ def check_measurement_defaults(region: str, fs_id: str) -> list[str]:
     return findings
 
 
+def check_smb_multichannel(
+    instance: str, region: str, secret_arn: str, fs_id: str, svm: str
+) -> list[str]:
+    """Whether server-side SMB Multichannel is on, before an SMB figure is taken.
+
+    **This check exists because its absence cost a whole environment.** On 2026-09-18 a window
+    ladder ran on a freshly built SMB environment -- six runs, 300 to 900 seconds, flat to 0.07% --
+    and every one of them measured the single-channel path, because `is-multichannel-enabled`
+    defaults to false and nobody read it. The question the run was set up to answer is still open,
+    and the environment it needed is gone.
+
+    **A single-channel session is recognisable from the number**: 1 MiB sequential sits at about
+    574 MB/s with about 891 ms of latency, reproduced to within 0.05% on two separately built
+    environments. Four channels put the same measurement near 2,227 MB/s read and 1,698 MB/s write.
+
+    Read through the private CLI passthrough: this is a `vserver cifs options` field, and the public
+    REST endpoint for the CIFS service does not carry it.
+    """
+    data = ontap_get(
+        instance,
+        region,
+        secret_arn,
+        fs_id,
+        f"/api/private/cli/vserver/cifs/options?vserver={svm}"
+        "&fields=is-multichannel-enabled",
+    )
+    records = data.get("records") or []
+    if not records:
+        raise CheckFailed(
+            f"no CIFS options came back for SVM {svm!r}. That is not the same as multichannel "
+            "being enabled -- check the SVM name, and that it has a CIFS server at all"
+        )
+    for record in records:
+        print(
+            f"  smb      {record.get('vserver', svm)} "
+            f"is_multichannel_enabled={record.get('is_multichannel_enabled')}"
+        )
+    if not any(r.get("is_multichannel_enabled") for r in records):
+        return [
+            "server-side SMB Multichannel is disabled, which is the default. **An SMB figure taken "
+            "now measures the single-channel path** -- about 574 MB/s at 1 MiB, against about 2,227 "
+            "with four channels. Enable it with `vserver cifs options modify "
+            "-is-multichannel-enabled true`, then **re-establish the session** (Remove-SmbMapping "
+            "and New-SmbMapping): an existing session does not gain channels. Read "
+            "`(Get-SmbMultichannelConnection).CurrentChannels` while the load is running, because "
+            "the count drops when idle"
+        ]
+    print(
+        "           enabled on the server. Still confirm CurrentChannels under load: the count "
+        "drops when idle, so a value read between runs is not the run's condition"
+    )
+    return []
+
+
 def check_transfer_size(
     instance: str, region: str, secret_arn: str, fs_id: str
 ) -> list[str]:
@@ -549,6 +637,11 @@ def main() -> int:
         action="store_true",
         help="record deliberately that the read cache was on, instead of failing",
     )
+    post.add_argument(
+        "--smb-svm",
+        help="the SMB SVM's name. Given, this also reads whether server-side Multichannel is on -- "
+        "the check whose absence made six SMB runs measure the single-channel path",
+    )
 
     args = parser.parse_args()
 
@@ -592,6 +685,22 @@ def main() -> int:
             (
                 "defaults that change what a number means",
                 lambda: check_measurement_defaults(args.region, args.file_system_id),
+            ),
+            *(
+                [
+                    (
+                        "SMB Multichannel (disabled by default)",
+                        lambda: check_smb_multichannel(
+                            args.instance_id,
+                            args.region,
+                            args.fsxadmin_secret_arn,
+                            args.file_system_id,
+                            args.smb_svm,
+                        ),
+                    )
+                ]
+                if args.smb_svm
+                else []
             ),
             (
                 "NFS transfer size (for the record)",

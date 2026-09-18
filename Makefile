@@ -361,9 +361,14 @@ preflight-post: ## Before measuring: ONTAP release, read cache, invalidating def
 		--file-system-id $(FS) --instance-id $(IID) --fsxadmin-secret-arn $(SECRET) \
 		$(if $(ALLOW_NVME_CACHE),--allow-nvme-cache)
 
-sweep: ## After teardown: what still bills. Add DELETE=1 to act (REGION=… PREFIX=…)
+# DELETE=1 alone does not delete. The script requires --yes as well, and this target used to supply
+# it -- which turned a two-step confirmation into one word and cost an unrecoverable EBS volume on
+# 2026-09-19. YES=1 has to be typed separately, and IGNORE=<id> is threaded through so that
+# "leave this one alone" survives into the deleting run.
+sweep: ## After teardown: what still bills. DELETE=1 YES=1 to act (REGION=… PREFIX=… IGNORE=…)
 	@$(PY) scripts/sweep_after_teardown.py --region $(or $(REGION),ap-northeast-1) \
-		$(if $(PREFIX),--name-prefix $(PREFIX)) $(if $(DELETE),--delete --yes)
+		$(if $(PREFIX),--name-prefix $(PREFIX)) $(if $(IGNORE),--ignore $(IGNORE)) \
+		$(if $(DELETE),--delete) $(if $(YES),--yes)
 
 clean: ## Remove local caches and previews
 	@rm -rf .ruff_cache .pytest_cache __pycache__ tools/__pycache__ scripts/__pycache__ \
