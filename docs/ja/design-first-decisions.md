@@ -32,7 +32,7 @@ FlexCache 一般の仕様として AWS のドキュメントで裏を取れて�
 
 | 事項 | 状態 |
 |---|---|
-| セキュリティスタイルとプロトコルの対応（下表） | Azure NetApp Files のキャッシュボリューム要件に記載。**この構成で同じ規則が成り立つかは未確認**（継承は実測したが、対応関係そのものは測っていない） |
+| セキュリティスタイルとプロトコルの対応（下表） | [Azure NetApp Files のキャッシュボリューム要件](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-requirements)に**表として明記されている**（UNIX → NFS → UNIX、NTFS → SMB → NTFS、**MIXED は継承されるが ANF では非対応**）。同ページは**セキュリティスタイルが作成時にのみ継承され、Cache 側の設定項目ではない**こと、**Origin 側で変えたら Cache を作り直すしかない**ことも書いている。**ただしこれは ANF を Cache としたときの記述で、この構成（両側とも FSx for ONTAP）で同じ規則が成り立つかは未確認**（継承は実測したが、対応関係そのものは測っていない。2026-09-20 に出典を再確認） |
 | 「セキュリティスタイルは Origin から継承される」という性質 | **検証済み。** [継承の検証記録](verification/flexcache-security-style-inheritance.md)。UNIX の Origin だけでは Cache SVM の既定と区別できないため、NTFS の Origin を対照に置いて判別した |
 | セキュリティスタイルを Cache 側で選び直せないこと | **検証済み。** 作成時に渡す引数が無く（REST が `nas` を拒否）、作成後の変更も ONTAP が拒否する |
 | プロトコルを後から変えると配布層の作り直しになる | 上の 2 つからの帰結。**前提が実測になったので、帰結も断定してよい** |

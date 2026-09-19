@@ -459,11 +459,23 @@ Origin として FSx for ONTAP を Cache にする構成は未確認である。
 | ONTAP のトラフィック | cluster peering encryption。ONTAP 9.6 以降、TLS 1.2 AES-256 GCM、事前共有鍵 (PSK) | **SnapMirror、SnapVault、FlexCache**（[NetApp](https://docs.netapp.com/us-en/ontap-technical-reports/ontap-security-hardening/data-replication-encryption.html)） | ドキュメント記載 |
 | ONTAP のトラフィック | IPsec。ONTAP 9.8 以降 | クライアントと SVM の間の IP トラフィック全般。**NetApp は SnapMirror と cluster peering には TLS を推奨している**（[NetApp](https://docs.netapp.com/us-en/ontap/networking/ipsec-prepare.html)） | ドキュメント記載 |
 
-**ONTAP 自身が intercluster LIF に MACsec を提供するという記載は見つけられていない。** 段階は
-未確認である。ONTAP の MACsec として見つかるのは 2 つとも別の対象で、1 つは MetroCluster IP の
-WAN ISL に対する Cisco スイッチ側の設定（任意）、もう 1 つは Google Cloud NetApp Volumes の
+**ONTAP 自身が intercluster LIF に MACsec を提供するという記載は見つけられていない。**
+ONTAP の MACsec として見つかるのは 3 つとも別の対象で、1 つは MetroCluster IP の
+WAN ISL に対する Cisco スイッチ側の設定（任意）、2 つめは
+[MetroCluster IP のサイト間バックエンドトラフィック（NVlog・ストレージ複製）の end-to-end 暗号化](https://docs.netapp.com/us-en/ontap-metrocluster/maintain/task-configure-encryption.html)、
+3 つめは Google Cloud NetApp Volumes の
 Performance service type と Google Cloud の間で使われている方式（[NetApp](https://docs.netapp.com/us-en/netapp-solutions/ehc/ncvs/ncvs-gc-data-encryption-in-transit.html)）で、
-**後者は利用者が設定するものではない。**
+**3 つめは利用者が設定するものではない。**
+
+> **2026-09-20 に調べ直して、書き方を変えた。** 以前は「未確認」としていたが、
+> **「見つからない」で止めるよりも、この経路に何が documented なのかを書くほうが正確である。**
+> **cluster peering の暗号化は PSK と TLS**（[有効化手順](https://docs.netapp.com/us-en/ontap/peering/enable-cluster-peering-encryption-existing-task.html)）で、
+> **ONTAP 9.6 以降に作られた peering 関係では既定で有効**（[System Manager classic の手順](https://docs.netapp.com/us-en/ontap-system-manager-classic/peering/task_creating_cluster_peer_relationship_starting_with_ontap_9_3.html)）、
+> **有効なら cluster peer 間に平文は流せない**（[ONTAP security hardening](https://docs.netapp.com/us-en/ontap-technical-reports/ontap-security-hardening/data-replication-encryption.html)）。
+> **つまり FlexCache のトラフィックが暗号化されるかという問いには documented な答えがある。
+> 答えが MACsec ではない、というだけである。** MACsec を要件に挙げている場合は、
+> **L2 の MACsec と L4 の TLS はどちらも「経路上の暗号化」だが層が違う**ので、
+> 要件がどちらの層を指しているかを先に確定させること。
 
 ### MTU
 
