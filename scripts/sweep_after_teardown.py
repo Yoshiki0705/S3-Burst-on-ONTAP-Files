@@ -45,7 +45,19 @@ import sys
 
 # Volume names this project creates. A backup carries the volume's name even after the file system
 # is gone, which is the only attribution available on a resource that has no tags.
-PROJECT_VOLUME_NAMES = ("origin_vol", "cache_vol", "placeholder_vol", "perfmatrix")
+#
+# `tests/test_sweep_volume_name_coverage.py` reads every template and fails when one names a volume
+# no fragment here matches, so this list does not have to be maintained by remembering to.
+PROJECT_VOLUME_NAMES = (
+    "origin_vol",
+    "cache_vol",
+    "placeholder_vol",
+    "smb_vol",
+    "gen2_vol",
+    "blk_vol",
+    "perfmatrix",
+    "s3burst",
+)
 
 
 class SweepFailed(Exception):
