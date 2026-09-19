@@ -104,6 +104,12 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # English row states that and the utilization figure; the record holds all four points, the
         # response times that double while throughput does not, and what is still unreconciled.
         "#スレッド数を振った結果--1195-を決めていたのは設定-2-つ2026-09-1920",
+        # The re-read of retained CloudWatch that closed the gap between the one-client and
+        # two-client totals without new resources: no burst-balance metric exists on this
+        # configuration, the utilization denominator is the specified value, and both sessions pinned
+        # the server side at the same ceiling. The English rows state each of those; the record holds
+        # the per-minute figures and the counter disagreement it opened in exchange.
+        "#保持された-cloudwatch-で閉じた-2-点2026-09-20",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is
@@ -112,6 +118,15 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     # English would put them in a second place, where the two copies drift.
     "docs/en/reference/decision-trees/from-your-current-setup.md": (
         "#f-1-iscsi-の実測",
+    ),
+    # The English expectations page states, in a note under two measured rows, that above 100% on the
+    # first generation is not burst: the denominator is the specified value and no burst-balance
+    # metric exists on that configuration. That correction is only safe to state next to the
+    # per-minute figures it came from, and those are in the Japanese measurement record. Restating
+    # them here would put a metric's denominator in two places, which is how the "in burst" label
+    # that this note removes got written in the first place.
+    "docs/en/performance-expectations.md": (
+        "#保持された-cloudwatch-で閉じた-2-点2026-09-20",
     ),
     # The teardown traps from the security-style inheritance run. The English teardown step warns
     # that skipping the peer release strands the stack, and this anchor is the eight failures behind
