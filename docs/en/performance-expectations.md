@@ -56,7 +56,8 @@ threads moved throughput 0.07% and latency from 216.6 to 860.3 ms.
 | Configuration | Measured | What bound it | Conditions |
 |---|---|---|---|
 | First-generation 2048, SSD IOPS 3,072 | 256.47 MB/s | **SSD IOPS** (112% utilization) | 512 GiB in one pass, 1 MiB sequential, 8 streams, `o_direct` |
-| First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **Not established** (disk 67%, IOPS 43%, network 43%) | As above, NVMe read cache disabled |
+| First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **The client side** (disk 67%, IOPS 43%, network 43% -- none saturated) | As above, NVMe read cache disabled |
+| The same, two clients on disjoint 300 GiB each | **1,901.48 MB/s** in total (982 + 920) | **The file system's disk path** (102 to 103% utilization, in burst) | 1 MiB, eight streams per client, NVMe read cache disabled |
 | Second-generation 2048, SSD IOPS 3,072, 1 MiB transfers | 300.95 MB/s | **SSD IOPS** (103% utilization) | 512 GiB once, `rsize=wsize=1048576`, eight streams |
 | Second-generation 2048, SSD IOPS 40,000, 1 MiB transfers | **1,215.06 MB/s** | **Not established** (IOPS 34%) | As above. **Sixteen times the transfer size leaves the ratio at 4.04x** |
 | Second-generation 1,536 | read 2,882 MB/s for 27 minutes, then 1,439 | The network baseline, about twice the specified value | 1 MiB sequential |
@@ -141,7 +142,7 @@ than the value of the ceiling.
 
 | Item | State |
 |---|---|
-| The ceiling near 1,250 MB/s at 40,000 IOPS | No published utilization is saturated, and adding threads lowers it. **`tcp_max_xfer_size` is ruled out** -- at 1 MiB the ratio stays at 4.04x (2026-09-18). What the ceiling is remains unidentified |
+| The ceiling near 1,250 MB/s at 40,000 IOPS | **Located (2026-09-19): the client side.** Two clients total 1.59x one, and only then does disk throughput reach 102%. **Which client resource sets it is still unidentified** -- not concurrency |
 | About 300 MB/s on first-generation 128 | Neither the disk nor the network burst ceiling is reached, and the burst balance is not exhausted |
 | Why first-generation 2048 writes stop at 55% of the HA-pair ceiling | Two candidates (writes consuming twice the network, per-request fixed cost) are not separated |
 | Why the block amplification splits between 0.8 and 1.5 | Neither layout nor write history. **One remaining candidate, the ONTAP patch release, cannot be selected on FSx for ONTAP, so no controlled experiment is available** |
