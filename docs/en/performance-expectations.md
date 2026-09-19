@@ -57,8 +57,17 @@ threads moved throughput 0.07% and latency from 216.6 to 860.3 ms.
 |---|---|---|---|
 | First-generation 2048, SSD IOPS 3,072 | 256.47 MB/s | **SSD IOPS** (112% utilization) | 512 GiB in one pass, 1 MiB sequential, 8 streams, `o_direct` |
 | First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **Client-side settings** (disk 67%, IOPS 43%, network 43% -- none saturated) | As above, NVMe read cache disabled, **`rsize` 64 KiB and 8 threads** |
-| The same, two clients on disjoint 300 GiB each | **1,901.48 MB/s** in total (982 + 920) | **The file system's disk path** (102 to 103% utilization, in burst) | 1 MiB, eight streams per client, NVMe read cache disabled |
-| The same, **one client at `rsize` 1 MiB and 16 threads** | **1,646.17 MB/s** | **The file system's disk path** (**102.6%** utilization, in burst) | **One client reaches the same ceiling two did.** 1,446.66 at eight threads (77.2% utilization); flat at 1,647 to 1,649 for 32 and 64, where only the response time doubles |
+| The same, two clients on disjoint 300 GiB each | **1,901.48 MB/s** in total (982 + 920) | **The file system's disk path** (102 to 103% utilization) | 1 MiB, eight streams per client, NVMe read cache disabled |
+| The same, **one client at `rsize` 1 MiB and 16 threads** | **1,646.17 MB/s** | **The file system's disk path** (**102.6%** utilization) | **One client reaches the same ceiling two did.** 1,446.66 at eight threads (77.2% utilization); flat at 1,647 to 1,649 for 32 and 64, where only the response time doubles |
+
+> **Above 100% in those two rows is not burst.** On the first generation the denominator of that
+> metric is the **specified value itself** (2,048 MB/s), so above 100% means it delivered more than
+> the specified value. **This configuration publishes no burst-balance metric at all** (0 of 77
+> contain `Balance`). The 203.5% on second-generation 1,536 is a ratio against a baseline of 1,536,
+> so **the same metric has a different denominator per generation.** Both rows also pinned the
+> server side at about 2,040 MB/s — the same ceiling — so the difference in the client-reported
+> totals is not a difference in what the file system delivered
+> ([measurement](../ja/verification/throughput-iops-concurrency.md#保持された-cloudwatch-で閉じた-2-点2026-09-20) (Japanese)).
 | Second-generation 2048, SSD IOPS 3,072, 1 MiB transfers | 300.95 MB/s | **SSD IOPS** (103% utilization) | 512 GiB once, `rsize=wsize=1048576`, eight streams |
 | Second-generation 2048, SSD IOPS 40,000, 1 MiB transfers | **1,215.06 MB/s** | **Not established** (IOPS 34%) | As above. **Sixteen times the transfer size leaves the ratio at 4.04x** |
 | Second-generation 1,536 | read 2,882 MB/s for 27 minutes, then 1,439 | The network baseline, about twice the specified value | 1 MiB sequential |
@@ -143,7 +152,8 @@ than the value of the ceiling.
 
 | Item | State |
 |---|---|
-| The ceiling near 1,250 MB/s at 40,000 IOPS | **Located (2026-09-19): the client side.** Two clients total 1.59x one, and only then does disk throughput reach 102%. **Which client resource sets it is still unidentified** -- not concurrency |
+| The ceiling near 1,250 MB/s at 40,000 IOPS | **Identified (2026-09-19/20): not a resource, two settings.** `rsize` at 64 KiB (+21% once raised to 1 MiB) and a concurrency of eight (+14% at sixteen, flat after). **What saturates past them is the file system side** (102.6% utilization, i.e. 102.6% of the specified 2,048), and **one client reaches the same ceiling two did.** There is no saturated client-side device |
+| Server-side counters against the client-side tool | **Unconfirmed (opened 2026-09-20).** At the saturated minutes the server reports about 2,043 MB/s while vdbench reports 1,646 to 1,649, a 19% shortfall; with two clients about 2,000 against 1,901, a 5% shortfall. **Two systems disagree, so neither is cited as a ceiling** |
 | About 300 MB/s on first-generation 128 | Neither the disk nor the network burst ceiling is reached, and the burst balance is not exhausted |
 | Why first-generation 2048 writes stop at 55% of the HA-pair ceiling | Two candidates (writes consuming twice the network, per-request fixed cost) are not separated |
 | Why the block amplification splits between 0.8 and 1.5 | Neither layout nor write history. **One remaining candidate, the ONTAP patch release, cannot be selected on FSx for ONTAP, so no controlled experiment is available** |
