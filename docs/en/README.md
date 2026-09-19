@@ -166,6 +166,11 @@ the end.
 -- three starting points (a copy job, Amazon EFS, an S3-first pipeline), each with **the conditions
 under which not to add this**.
 
+**For the measured figures alone, start from the
+[index of measurement records](../ja/verification/README.md) (Japanese).** Records of what was
+measured sit in the same directory as plans for what has not been, so the index labels each with its
+stage. **No figure means anything without the conditions it was measured under.**
+
 | What you want | Guide | Time |
 |---|---|---|
 | Understand the shape of the architecture | [Architecture](architecture.md) | 5 min |
@@ -182,6 +187,8 @@ under which not to add this**.
 | Fit the parameters to your environment | [Choosing parameters](deployment/choosing-parameters.md) | 10 min |
 | Deploy the verification environment (outside AWS) | [Deploying the serve side](deployment/onprem-terraform.md) | 40 min |
 | Read the measured figures and their conditions | [Verification record](verification/s3ap-nfs-visibility.md) | 10 min |
+| **Read what to expect before measuring anything** | [Performance expectations](performance-expectations.md) | 15 min |
+| **List every measurement record with its stage** | [Index of measurement records](../ja/verification/README.md) (Japanese) | 5 min |
 | Read the NFS / SMB / EFS throughput figures | [Protocol measurement results](../ja/verification/perf-matrix-results.md) (Japanese) | 20 min |
 | **Check whether the throughput capacity figure is the read ceiling** | [Throughput capacity, burst and baseline](../ja/verification/throughput-capacity-burst-and-baseline.md) (Japanese) | 10 min |
 | Read the plan for measuring iSCSI / NVMe/TCP | [Block protocol measurement plan](../ja/verification/block-protocol-matrix-plan.md) (Japanese) | 15 min |

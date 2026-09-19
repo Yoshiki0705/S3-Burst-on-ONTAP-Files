@@ -45,6 +45,12 @@
 #   reference/scenarios/from-what-you-run-today.md -- three starting points. Promote when a fourth
 #                                                  is either added or ruled out; the shape of the
 #                                                  page is what is still settling, not the wording.
+#   verification/README.md                      -- the index of measurement records. It names the
+#                                                  headline finding of each record, so it moves every
+#                                                  time any record does. Promote once the records
+#                                                  it indexes are themselves in English; an index in
+#                                                  English pointing at Japanese records is a longer
+#                                                  path to the same page, not a translation.
 #
 # Neither is promoted by writing a translation and leaving this list alone: `make i18n-check` only
 # compares what is listed here, so an unlisted pair drifts silently.
