@@ -56,8 +56,9 @@ threads moved throughput 0.07% and latency from 216.6 to 860.3 ms.
 | Configuration | Measured | What bound it | Conditions |
 |---|---|---|---|
 | First-generation 2048, SSD IOPS 3,072 | 256.47 MB/s | **SSD IOPS** (112% utilization) | 512 GiB in one pass, 1 MiB sequential, 8 streams, `o_direct` |
-| First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **The client side** (disk 67%, IOPS 43%, network 43% -- none saturated) | As above, NVMe read cache disabled |
+| First-generation 2048, SSD IOPS 40,000 | **1,246.67 MB/s** | **Client-side settings** (disk 67%, IOPS 43%, network 43% -- none saturated) | As above, NVMe read cache disabled, **`rsize` 64 KiB and 8 threads** |
 | The same, two clients on disjoint 300 GiB each | **1,901.48 MB/s** in total (982 + 920) | **The file system's disk path** (102 to 103% utilization, in burst) | 1 MiB, eight streams per client, NVMe read cache disabled |
+| The same, **one client at `rsize` 1 MiB and 16 threads** | **1,646.17 MB/s** | **The file system's disk path** (**102.6%** utilization, in burst) | **One client reaches the same ceiling two did.** 1,446.66 at eight threads (77.2% utilization); flat at 1,647 to 1,649 for 32 and 64, where only the response time doubles |
 | Second-generation 2048, SSD IOPS 3,072, 1 MiB transfers | 300.95 MB/s | **SSD IOPS** (103% utilization) | 512 GiB once, `rsize=wsize=1048576`, eight streams |
 | Second-generation 2048, SSD IOPS 40,000, 1 MiB transfers | **1,215.06 MB/s** | **Not established** (IOPS 34%) | As above. **Sixteen times the transfer size leaves the ratio at 4.04x** |
 | Second-generation 1,536 | read 2,882 MB/s for 27 minutes, then 1,439 | The network baseline, about twice the specified value | 1 MiB sequential |

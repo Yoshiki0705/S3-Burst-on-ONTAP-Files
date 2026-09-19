@@ -217,8 +217,8 @@ Once you have read the report and agree, `make sweep DELETE=1`.
 
 ## Why this stops here
 
-**Measuring on this configuration returns something other than what it appears to.** Six defaults
-invalidate a measurement, and **not one of them makes the number look unusual.**
+**Measuring on this configuration returns something other than what it appears to.** The defaults
+below invalidate a measurement, and **not one of them makes the number look unusual.**
 
 | Default | What it does |
 |---|---|
@@ -228,6 +228,8 @@ invalidate a measurement, and **not one of them makes the number look unusual.**
 | `DiskIopsConfiguration` at `AUTOMATIC` | SSD IOPS becomes the ceiling first |
 | A read that only just exceeds the read cache | A read meant for the disk path is served from cache |
 | SMB Multichannel disabled | Flat at 574 MB/s for 1 MiB sequential. Four channels was 3.88 times that |
+| **`tcp-max-xfer-size` at 64 KiB** | A mount asking for `rsize=1048576` succeeds and still gets 64 KiB. Raising it was +21% on the same measurement |
+| **Measuring from one client at low concurrency** | **You get that configuration's figure, not a ceiling.** Correcting the transfer size and the thread count moved a measured 1,195 to 1,646 MB/s |
 
 **Two documents come before measuring**: the figures and their conditions in
 [Performance expectations](performance-expectations.md), and the environments and pass conditions in
