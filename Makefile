@@ -355,10 +355,11 @@ preflight-pre: ## Before creating: quota headroom, subnet, SSM reach (VPC=… SU
 		--vpc-id $(VPC) --subnet-id $(SUBNET) --throughput-capacity $(MBPS) \
 		$(if $(SSD),--storage-capacity-gib $(SSD))
 
-preflight-post: ## Before measuring: ONTAP release, read cache, invalidating defaults (FS=… IID=… SECRET=…)
+preflight-post: ## Before measuring: release, read cache, defaults (FS=… IID=… SECRET=… [SMB_SVM=…])
 	@test -n "$(FS)$(IID)$(SECRET)" || { echo 'usage: make preflight-post FS=fs-… IID=i-… SECRET=arn:… [REGION=…]'; exit 2; }
 	@$(PY) scripts/preflight.py post --region $(or $(REGION),ap-northeast-1) \
 		--file-system-id $(FS) --instance-id $(IID) --fsxadmin-secret-arn $(SECRET) \
+		$(if $(SMB_SVM),--smb-svm $(SMB_SVM)) \
 		$(if $(ALLOW_NVME_CACHE),--allow-nvme-cache)
 
 # DELETE=1 alone does not delete. The script requires --yes as well, and this target used to supply

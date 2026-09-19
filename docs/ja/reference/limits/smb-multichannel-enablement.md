@@ -18,7 +18,7 @@ SVM 側で Multichannel が無効だった。有効化してからも 1 本の�
 | 1 | `Get-NetTCPConnection -RemotePort 445 -State Established` | **1 本**（読み取り 942.65 MB/s の最中） |
 | 2 | `Get-SmbClientConfiguration` | `EnableMultiChannel: True`、`ConnectionCountPerRssNetworkInterface: 4` |
 | 3 | `Get-SmbClientNetworkInterface` / `Get-NetAdapterRss` | `RssCapable: True`、受信キュー 8 |
-| 4 | ONTAP `vserver cifs options` | **`is_multichannel_enabled: false`** |
+| 4 | ONTAP `vserver cifs options` | **`is_multichannel_enabled: false`**。**2026-09-19 に別環境（workgroup モードで作った CIFS サーバー、ONTAP 9.18.1P6）でも `false` を確認した** — AD 参加の有無によらず既定は無効 |
 
 クライアント側は 4 接続を張る設定で、NIC も RSS 対応だった。**残っていたのはサーバー側で、
 そこが無効だった。** インスタンス種別の違いという最初の見立ては、2 段目で否定されている。

@@ -95,6 +95,10 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # inverts. The row states the inversion; the record holds why each figure is conditional --
         # the resident read was bursting and the direct origin read came from memory.
         "#origin-を-2048-mbps-に上げたときの向きの逆転2026-09-18",
+        # The two-client run that settled whether the unexplained ceiling was the client's or the
+        # file system's. The English row states the answer and the two utilization figures that
+        # carry it; the record holds the per-interval values and the conditions.
+        "#2-台で測った結果--天井はクライアント側2026-09-19",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is
