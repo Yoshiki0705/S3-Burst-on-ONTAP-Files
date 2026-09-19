@@ -302,6 +302,13 @@ make sweep DELETE=1 YES=1           # act. DELETE=1 on its own deletes nothing
 matched on the volume name it records (`origin_vol` and the like), an EBS volume on its Name tag.
 **Whatever cannot be matched is reported with the commands to remove it individually.**
 
+> **Adding a template means registering its volume name too.** A name the gate does not match
+> produces a backup that **is reported at every run but not removed** — the report ends there, so it reads as
+> handled. A 10 GiB `smb_vol` backup outlived its file system that way on 2026-09-19. **A test now
+> derives the volume names from every template and compares them**, so a missing one fails at
+> `make test` rather than at teardown. The list is in
+> [`scripts/sweep_after_teardown.py`](../../../scripts/sweep_after_teardown.py).
+
 > **That behaviour was added after an incident.** On 2026-09-19 `DELETE=1` was passed together with
 > a `PREFIX=` **intended to narrow the secrets**. `--delete` applied to every category, and **an
 > untagged 100 GiB volume that had already been judged another workload's, and left in place on

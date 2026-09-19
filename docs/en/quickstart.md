@@ -174,6 +174,12 @@ cat /mnt/origin-noac/check.txt
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
 
+> **`--body` will not take standard input.** `--body /dev/stdin` fails with
+> **`Blob values must be a path to a file`**, not with a length complaint. **Write the file first,
+> then pass it** -- which is what `/tmp/check.txt` above is for. **Hit on 2026-09-19, the first time
+> these steps were run.** This is a place where piping is the obvious move, so the extra line is
+> deliberate.
+
 **`hello` coming back is this architecture's central claim, confirmed once in your own account.**
 The measured timings, and what they do and do not support, are in
 [S3 Access Point and NFS visibility](verification/s3ap-nfs-visibility.md).
@@ -237,6 +243,7 @@ invalidate a measurement, and **not one of them makes the number look unusual.**
 | Fitting the parameters to your environment | [Choosing parameters](deployment/choosing-parameters.md) |
 | Building the serve side as well | [Deploying the collect side](deployment/aws-cloudformation.md), then [the serve side](deployment/onprem-terraform.md) |
 | Performance expectations | [Performance expectations](performance-expectations.md) |
+| List every measurement record | [Index of measurement records](../ja/verification/README.md) (Japanese) |
 | What differs from a production deployment | [From verification to production](../ja/from-verification-to-production.md) (Japanese) |
 
 ---

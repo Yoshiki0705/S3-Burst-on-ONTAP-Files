@@ -137,8 +137,8 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 
 ## はじめ方
 
-**初めてここに来た場合は、次の 3 つを順に読んでください。** 下の表は 35 行あり、**読む順序では
-なく索引です。** 全部読む必要はありません。
+**初めてここに来た場合は、次の 3 つを順に読んでください。** 下の表は長く、**読む順序ではなく
+索引です。** 全部読む必要はありません。
 
 1. **[構成の形](docs/ja/architecture.md)（5 分）** — 何を解いて、何を解かないか
 2. **[いまの構成から読む](docs/ja/reference/decision-trees/from-your-current-setup.md)（5 分）** —
@@ -161,6 +161,10 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 コピージョブ・Amazon EFS・S3 中心のパイプラインの 3 つの出発点について、
 **足さないほうがよい条件まで**書いてあります。
 
+**測った結果だけ見たい場合は [測定記録の索引](docs/ja/verification/README.md) から入ってください。**
+実測の記録と未実施の計画が同じディレクトリに並んでいるので、**段階つきの索引を 1 枚挟んであります。**
+どの数値も測定条件つきでしか意味を持ちません。
+
 | やりたいこと | ガイド | 所要時間 |
 |---|---|---|
 | 構成の全体像をつかむ | [構成の形](docs/ja/architecture.md) | 5 分 |
@@ -169,6 +173,7 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | 他の方式と比べる | [代替案との比較](docs/ja/reference/comparison/alternatives.md) | 10 分 |
 | Amazon S3 Files と比べる | [S3 Files と本構成の比較検証](docs/ja/verification/s3files-vs-flexcache.md) | 10 分 |
 | S3 Files の実測値と落とし穴を見る | [S3 Files 実測記録](docs/ja/verification/s3files-measured.md) | 10 分 |
+| **測った記録を段階つきで一覧する** | [測定記録の索引](docs/ja/verification/README.md) | 5 分 |
 | **測らずに性能の期待値を読む** | [測る前に読む性能の期待値](docs/ja/performance-expectations.md) | 15 分 |
 | **自分の環境で測り直す（環境構築込み）** | [再現の手引き](docs/ja/verification/reproduction-guide.md) | 20 分 |
 | スループット / IOPS / 並列度の実測を見る | [スループット実測記録](docs/ja/verification/throughput-iops-concurrency.md) | 10 分 |

@@ -165,6 +165,12 @@ cat /mnt/origin-noac/check.txt
 aws s3api delete-object --bucket "$AP" --key check.txt
 ```
 
+> **`--body` に標準入力を渡せません。** `--body /dev/stdin` は
+> `Invalid length for parameter Body, value: 0` ではなく
+> **`Blob values must be a path to a file`** で落ちます。**先にファイルへ書いてから渡してください**
+> （上の `/tmp/check.txt` はそのためにあります）。**2026-09-19 にこの手順を初めて通したときに
+> 踏みました。** パイプでつなぎたくなる場所なので、1 行増えるのは意図した形です。
+
 **`hello` が返れば、この構成の中心にある主張を自分の環境で 1 回確かめたことになります。**
 実測した所要時間と、そこから言えること・言えないことは
 [S3 Access Point と NFS の可視性](verification/s3ap-nfs-visibility.md)にあります。
@@ -226,6 +232,7 @@ make sweep
 | パラメータを自分の環境に合わせる | [パラメータの選び方](deployment/choosing-parameters.md) |
 | 配布側（FlexCache）まで作る | [収集側のデプロイ](deployment/aws-cloudformation.md) → [配布側のデプロイ](deployment/onprem-terraform.md) |
 | 性能の期待値 | [測る前に読む性能の期待値](performance-expectations.md) |
+| 測った記録を一覧する | [測定記録の索引](verification/README.md) |
 | 本番に持っていくときの差分 | [検証環境と本番の差分](from-verification-to-production.md) |
 
 ---
