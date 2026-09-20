@@ -98,7 +98,7 @@ AWS; the record will be updated when there is an answer.**
 |---|---|---|
 | iSCSI, one counted TCP connection | 1,135.18 MB/s | Two connections give **the same figure**. What binds at one is not the capacity of a flow |
 | iSCSI, 16 connections | 1,970.43 MB/s | Dividing required bandwidth by 625 MBps is out by 1.82x at one connection and 0.20x at 16 |
-| NVMe/TCP, one I/O queue | 591.64 MB/s | — |
+| NVMe/TCP, one I/O queue | 591.64 MB/s | **Do not read this as a protocol difference.** Re-measured on one file system, iSCSI at one session gives 1,135.19 against **1,135.88** for one NVMe I/O queue, 0.06% apart, so **the 1.92x was two deployment tiers placed side by side** ([measurement](../ja/verification/perf-matrix-results.md#同一ファイルシステムでの-iscsi-と-nvmetcp)) (Japanese). A single-connection figure lands at only 4.73 Gbps or 9.08 Gbps, **a property of the deployment rather than the protocol** |
 | NVMe/TCP, as documented | **1,288.87 to 3,407.60 MB/s** | **2.64x across three deployments. One figure cannot size this** |
 | One deployment, before and after restoring layout | 1,239.15 to **2,298.54** | **1.85x.** Only small random writes break it; 300 s of sequential writes move it 0.03% |
 | 4 KiB random read | About **66%** of the specified SSD IOPS | The same ratio at four points. **Sequential reads do not depend on specified IOPS** |

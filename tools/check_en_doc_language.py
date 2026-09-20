@@ -153,6 +153,10 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     # that this note removes got written in the first place.
     "docs/en/performance-expectations.md": (
         "#保持された-cloudwatch-で閉じた-2-点2026-09-20",
+        # The single-connection block row notes that the 1.92x it used to imply was two deployment
+        # tiers rather than a protocol difference. The same-file-system re-measurement that settles
+        # it is in the Japanese-only measurement record.
+        "#同一ファイルシステムでの-iscsi-と-nvmetcp",
         # The row that closed the counter disagreement states the aligned figures; the record
         # holds the discarded partial minutes that explain where the original 19% came from.
         "#窓を分境界に合わせた-2-系統の比較2026-09-20",
