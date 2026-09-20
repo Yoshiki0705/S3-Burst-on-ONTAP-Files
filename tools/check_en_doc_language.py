@@ -127,6 +127,15 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # them; the record holds both passes, the non-monotonic read outlier at 60 s, and the
         # untested layout hypothesis offered for it.
         "#測定時間だけを振った結果--16-の不在2026-09-20",
+        # The run that located the 4 KiB front-end ceiling by changing only how the working set
+        # was split. The English row states the three deltas and that the disk side reaches 96.6%
+        # at two clients; the record holds all five shapes, the counter cross-check, and why it is
+        # not a reproduction of F-10.
+        "#4-kib-ランダム読みの天井の所在2026-09-20",
+        # The re-measurement that failed to reproduce the SMB 12.4% window-length gap, in the
+        # opposite direction. The English row states both figures and the two limitations; the
+        # record holds the per-minute series and why the long window stopped early.
+        "#smb-の窓長-124-の再現不成立2026-09-20",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is

@@ -130,6 +130,46 @@ else
   printf 'no directory stack; nothing to revoke\n'
 fi
 
+# **Anything created outside a stack has to go before the stack that owns the file system.**
+# Measured the hard way on 2026-09-20: a second SVM and two volumes created straight over the AWS API
+# for a per-SVM / per-volume comparison were invisible to every delete-stack call here. The gen2 stack
+# then failed with "Cannot delete storage virtual machine while it has non-root volumes", the failsafe
+# that was supposed to stop the bill reported success on the calls it made, and a 6,144 MBps file system
+# stayed AVAILABLE for eight hours at $23.03/hour. **The stack deletion succeeding is not the same as
+# the file system being gone**, which is why this step reads the file system itself rather than the
+# stack, and why the check after it is on Lifecycle rather than on a delete-stack exit status.
+sweep_non_stack_fsx () {
+  local fs="$1"
+  [[ -n "$fs" && "$fs" != "None" ]] || return 0
+  local vols svms
+  vols="$(aws fsx describe-volumes --region "$REGION" \
+    --query "Volumes[?FileSystemId=='$fs' && OntapConfiguration.JunctionPath!=null].VolumeId" \
+    --output text 2>/dev/null || true)"
+  for v in $vols; do
+    printf 'deleting non-root volume outside any stack: %s\n' "$v"
+    aws fsx delete-volume --region "$REGION" --volume-id "$v" >/dev/null 2>&1 || warn "delete-volume failed: $v"
+  done
+  # Volumes have to finish before their SVM will go, and the SVM before the file system. Poll rather
+  # than sleep a fixed amount: 300 GiB volumes took about six minutes each.
+  for _ in $(seq 1 60); do
+    vols="$(aws fsx describe-volumes --region "$REGION" \
+      --query "Volumes[?FileSystemId=='$fs' && OntapConfiguration.JunctionPath!=null].VolumeId" \
+      --output text 2>/dev/null || true)"
+    [[ -z "${vols// /}" ]] && break
+    sleep 15
+  done
+  svms="$(aws fsx describe-storage-virtual-machines --region "$REGION" \
+    --query "StorageVirtualMachines[?FileSystemId=='$fs'].StorageVirtualMachineId" --output text 2>/dev/null || true)"
+  for m in $svms; do
+    printf 'deleting SVM outside any stack: %s\n' "$m"
+    aws fsx delete-storage-virtual-machine --region "$REGION" --storage-virtual-machine-id "$m" >/dev/null 2>&1 \
+      || warn "delete-storage-virtual-machine failed: $m"
+  done
+}
+fs_id="$(aws cloudformation describe-stacks --region "$REGION" --stack-name "${PREFIX}-gen2" \
+  --query 'Stacks[0].Outputs[?OutputKey==`FileSystemId`].OutputValue' --output text 2>/dev/null || true)"
+sweep_non_stack_fsx "$fs_id"
+
 log "step 5 of 9: the file system, then the clients"
 # The ANA clients join the clients group rather than making their own, so they have to go before that
 # group does. They are also the only instances in this environment with a public IP, which is a further

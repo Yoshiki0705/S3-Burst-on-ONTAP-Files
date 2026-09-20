@@ -85,7 +85,7 @@ overlapping regions**. Settle that before counting clients.
 |---|---|---|---|
 | Second-generation 1,536 (NFS) | **1,333 MB/s** | **2.60x** the 512 the general rule gives | None observed |
 | Second-generation 6,144 (NFS) | **2,063 / 2,097 MB/s** | **2.05x** the 1,024 in the exception table | None observed, at 900 s and at 1,800 s |
-| Second-generation 6,144 (SMB) | **1,488.03 MB/s** | — | None observed, but 12.4% below the 1,698.42 of a 300 s window |
+| Second-generation 6,144 (SMB) | **1,488.03 MB/s** | — | None observed, but 12.4% below the 1,698.42 of a 300 s window. **The 12.4% gap against the 300 s window's 1,698.42 does not reproduce** (re-measured 2026-09-20: the long window came out 4.0% higher, so the original pair reads as a one-off) |
 
 **The design consequence is over-provisioning, not under.** Working backwards from the published
 figure buys more throughput capacity than the measurement needs (second-generation capacity is
