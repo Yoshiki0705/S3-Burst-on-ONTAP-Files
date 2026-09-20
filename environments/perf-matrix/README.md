@@ -788,6 +788,34 @@ computer object
 > `STAGING_BUCKET` を環境から外す。** 外し忘れると、次のセッションは手順 2 の再ステージから
 > 始まる（手元に zip があれば 10 分、無ければ Oracle のサインインからやり直し）。
 
+## スタックの外に作ったものによる撤去の停止
+
+**2026-09-20 に 8 時間ぶん取りこぼしました。** 6,144 MBps のファイルシステム（$23.03/時）が
+`DELETE_FAILED` のまま `AVAILABLE` で残り、**約 $184 になりました。**
+
+原因は 1 つです。SVM 単位・ボリューム単位の比較のために、**2 つめの SVM とボリューム 2 本を
+AWS API で直接作りました。** これらはどのスタックにも属さないので `delete-stack` からは見えません。
+そして FSx for ONTAP は**非 root ボリュームが残っている SVM を削除しません**。
+
+```text
+v19-gen2  DELETE_FAILED
+  StorageVirtualMachine  Cannot delete storage virtual machine while it has non-root volumes: fsvol-...
+```
+
+**同時に仕掛けてあった自動削除も「成功」と記録していました。** `delete-stack` の呼び出しが 0 で
+返ったからです。**呼び出しの終了コードは、消えたことの証拠ではありません。**
+
+対策を 2 つ入れました。
+
+1. `teardown.sh` の step 5 の前に、**ファイルシステム上の非 root ボリュームと SVM を、スタックの
+   有無に関係なく掃く**処理を追加しました。ボリュームの完了を待ってから SVM、SVM を待ってから
+   ファイルシステムの順です（300 GiB のボリュームで各 6 分程度）。
+2. 判定を終了コードから `Lifecycle` に変えました。`describe-file-systems` が
+   `FileSystemNotFound` を返すまでを撤去完了とします。
+
+**API で直接作るなら、撤去手順に同じ手で消す行を同時に書いてください。** 作るのは 1 コマンドですが、
+消し忘れは時間課金です。
+
 ## AD が測定値に入る形
 
 **ドメインコントローラはデータ経路には乗らない。** バイトはそこを通らない。**認証と name-mapping の
