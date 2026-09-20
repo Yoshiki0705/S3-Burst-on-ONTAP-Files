@@ -369,6 +369,37 @@ AD_PORTS_ADD=1 ./runbook.sh ad-ports   # 判定が「許可されていない」
 グループは削除できないので、**足すたびに teardown が先に revoke しなければならない依存が増える。**
 この環境では 1 度足してしまい、取り消した。
 
+### 4b. ディレクトリを立てない場合の SMB（再現費用を下げる経路）
+
+**SMB の測定にディレクトリは要りません。** 2026-09-20 に実測しました。`workgroup` モードの
+CIFS サーバーは NTLM でローカル ONTAP ユーザーを認証し、**クライアントは SMB 3.1.1 を
+ネゴシエートし、Multichannel も 4 チャネル張ります。** つまり上の `ad` / `ad-ports` /
+`join-svm` の 3 フェーズと Managed AD の費用を丸ごと省いて SMB を測れます。
+
+**AD を立てる理由が残るのは、AD 参加そのものを測るときだけです。** ドメイン参加した SVM では
+全データ操作にドメインコントローラーへの到達性が必要になり、コントローラが別 AZ にあれば
+AZ 跨ぎの経路が測定値に入ります（下の「AD が測定値に入る形」）。**workgroup ではその経路が
+そもそも存在しません。**
+
+省く場合の手順と、踏んだ落とし穴 4 つ:
+
+| 手順 | 落とし穴 |
+|---|---|
+| ファイルシステムを `GEN2_SMB=true` で作る | **445 をディレクトリの有無に紐付けてはいけない。** 以前は `AdSecurityGroupId` が空でないときだけ開いていたため、ディレクトリ無しでは `Test-NetConnection` が 445 に `False` を返し、**健全な SVM が壊れているように見えた** |
+| `POST /api/protocols/cifs/services` に `workgroup` を付けて CIFS サーバーを作る | — |
+| `POST /api/protocols/cifs/local-users` でユーザーを作る | **ユーザー名は SVM 名ではなく CIFS サーバー名で前置される**（`SMBWG1\bench`）。`<svm>\<user>` でグループに追加すると `Failed to resolve name` |
+| `BUILTIN\Administrators` に入れる | エンドポイントは `POST /protocols/cifs/local-groups/{svm.uuid}/{sid}/members` で、**uuid と sid の両方がパスの一部**。片方が空だと文字列 `members` が uuid の位置に入る |
+| 共有を作り、クライアントから `net use` する | **FSx for ONTAP は workgroup SVM の SMB DNS 名を公開しない。** CIFS サーバーを立てて共有が配信できている状態でも `Endpoints.Smb` は `null` のままなので、**データ LIF の IP で叩く**（`Endpoints.Nfs.IpAddresses` と同じ LIF） |
+
+**チャネル数の 4 はクライアント側で決まります。** `ConnectionCountPerRssNetworkInterface` が 4 で、
+RSS 対応 NIC 1 枚あたりのチャネル数はこの値です。サーバー側の `max_connections_per_session=32` は
+セッションあたりの上限で、**増やす側の律速ではありません。**
+
+なお **Windows Server 2022 の AMI に AWS CLI は入っていません。** `aws s3 cp` は
+`CommandNotFoundException` になるので、`Read-S3Object` を使ってください。また vdbench は
+この環境でスレーブ JVM を起動できませんでした（`Slave localhost-0 prematurely terminated`）。
+**原因は未特定です。**
+
 ### 5. SMB 用の SVM と、その AD 参加
 
 ```bash

@@ -137,6 +137,18 @@ Parameters:
       (pattern F). **The LUN, igroup, namespace and subsystem cannot be created from here** -- none of
       them exists in the AWS control-plane API or in AWS::FSx::Volume, so they are runbook phases against the ONTAP
       REST API. This parameter only opens the path and provides the volume they go in.
+  EnableSmb:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Opens TCP 445 without a directory. **SMB does not require a directory**: an SVM can run a CIFS
+      server in workgroup mode, which authenticates with NTLM against local ONTAP users, and a client
+      still negotiates SMB 3.1.1 and still enables Multichannel. Gating 445 on AdSecurityGroupId
+      alone left a domainless SMB measurement unable to reach the share -- Test-NetConnection on 445
+      returned False against a file system whose SMB SVM was healthy, which reads as an SVM problem
+      and is not one. Set this to "true" for a workgroup measurement. Leave it "false" for an
+      NFS-only deployment, which then produces exactly the rules it did before.
   NamePrefix:
     Type: String
     Default: perfmatrix
@@ -151,6 +163,10 @@ Parameters:
 Conditions:
   HasAd: !Not [!Equals [!Ref AdSecurityGroupId, ""]]
   HasBlock: !Equals [!Ref EnableBlockProtocols, "true"]
+  # Either path reaches SMB: a directory-joined SVM, or a workgroup CIFS server with no directory.
+  NeedsSmbPort: !Or
+    - !Not [!Equals [!Ref AdSecurityGroupId, ""]]
+    - !Equals [!Ref EnableSmb, "true"]
 
 Resources:
   FileSystemSecurityGroup:
@@ -214,11 +230,12 @@ Resources:
         - {Key: Name, Value: !Sub "${NamePrefix}-gen2-fs-sg"}
         - {Key: DeleteAfterMeasurement, Value: "true"}
 
-  # The SMB path, added only when a directory exists. Separate resources rather than more entries in
-  # the lists above, so an NFS-only deployment produces exactly the rules it did before this was added.
+  # The SMB path, added when a directory exists **or** when EnableSmb asks for it without one.
+  # Separate resources rather than more entries in the lists above, so an NFS-only deployment produces
+  # exactly the rules it did before this was added.
   SmbFromClients:
     Type: AWS::EC2::SecurityGroupIngress
-    Condition: HasAd
+    Condition: NeedsSmbPort
     Properties:
       GroupId: !Ref FileSystemSecurityGroup
       IpProtocol: tcp
