@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  A Windows measurement client that is NOT joined to a domain, for measuring SMB against an
+  FSx for ONTAP SVM whose CIFS server runs in workgroup mode. Whether Multichannel comes up this
+  way is measured, not assumed -- read the stage in docs/ja/verification-status.md first.
+
+# Why this sits next to template-windows.yaml rather than replacing it: that one takes a DirectoryId,
+# a DirectoryName and the directory's DNS addresses, because the SVM it measures is joined to AWS
+# Managed AD and the client has to resolve and authenticate against the same domain. Standing that up
+# is the largest single cost in the SMB measurements and the longest wait.
+#
+# ONTAP supports a CIFS server in workgroup mode, which authenticates with NTLM only and has no
+# Kerberos (https://docs.netapp.com/us-en/ontap/smb-config/set-up-server-workgroup-task.html).
+# SMB Multichannel's documented prerequisite is that the client negotiates SMB 3.0 or later
+# (https://docs.netapp.com/us-en/ontap/smb-hyper-v-sql/configure-smb-multichannel-performance-task.html);
+# neither a domain nor Kerberos appears in it. So a domainless client and a workgroup CIFS server
+# should be able to carry Multichannel, which is what this template exists to test and, if it holds,
+# to let anyone reproduce the SMB measurements without a directory.
+
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet for the client. Must reach the SVM's SMB endpoint and Session Manager.
+  ClientSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >-
+      The security group the file system already accepts SMB from. Reused rather than created so
+      that the file system's ingress rule does not have to change for this client.
+  InstanceType:
+    Type: String
+    Default: c5n.9xlarge
+    Description: >-
+      c5n.9xlarge matches the instance the existing SMB figures were taken on. Multichannel needs an
+      RSS-capable NIC, which ENA provides.
+  StagingBucketName:
+    Type: String
+    Default: ""
+    Description: Optional. Bucket holding the measurement tooling, read-only.
+  LatestWindowsAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
+  NamePrefix:
+    Type: String
+    Default: v17c
+
+Conditions:
+  HasStagingBucket: !Not [!Equals [!Ref StagingBucketName, ""]]
+
+Resources:
+  # Session Manager only. No key pair and no inbound rule: the client is driven over SSM, and an
+  # RDP path would be a second way in that nothing here needs.
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - !If
+          - HasStagingBucket
+          - PolicyName: read-tooling
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: s3:GetObject
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}/*"
+                - Effect: Allow
+                  Action: s3:ListBucket
+                  Resource: !Sub "arn:${AWS::Partition}:s3:::${StagingBucketName}"
+          - !Ref AWS::NoValue
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Role]
+
+  Client:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestWindowsAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref ClientSecurityGroupId]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 80
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-windows-workgroup"
+
+Outputs:
+  InstanceId:
+    Value: !Ref Client
+    Description: Drive it with Session Manager. Give it a few minutes after create to register.
+  HowToMountWithoutADomain:
+    Value: >-
+      net use Z: \\<svm-data-lif-ip>\<share> /user:<cifs-local-user> <password> -- workgroup mode
+      authenticates with NTLM, so a local ONTAP CIFS user is the credential, not a domain account.
+    Description: >-
+      **Measured 2026-09-20: FSx for ONTAP publishes no SMB DNS name for a workgroup SVM.**
+      Endpoints.Smb stayed null after the CIFS server was up and the share was reachable, so the
+      data LIF address is the only name available -- read it from Endpoints.Nfs.IpAddresses, which is
+      the same LIF. Order: create the CIFS server in workgroup mode over ONTAP REST, then a local
+      user, then the share, then map it by IP. Note the local user is prefixed with the CIFS server
+      name, not the SVM name, so adding it to a group as <svm>\<user> fails to resolve.
+      TCP 445 also has to be open: deploy the file system with EnableSmb=true when there is no
+      directory, or the mount fails in a way that looks like an SVM fault.
+  ReadTheChannelCountUnderLoad:
+    Value: (Get-SmbMultichannelConnection).CurrentChannels
+    Description: >-
+      Sample it during the run, per window. **Measured 2026-09-20**: 4 channels at all 31 samples
+      across a 900 s window, and also 4 before the load and 10 s after it stopped, so it did not
+      drop while idle here -- this output previously stated that it does, which the measurement did
+      not support. Keep sampling under load anyway, because an idle reading is not a condition of
+      the measurement even when it happens to match. The 4 comes from the client's
+      ConnectionCountPerRssNetworkInterface, not from the server's max_connections_per_session,
+      which was 32.

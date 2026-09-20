@@ -322,6 +322,9 @@ deploy_gen2() {
   # Opens the iSCSI and NVMe/TCP path and adds the volume a LUN or namespace goes in. Off unless asked,
   # so a run that does not measure block produces the rules it produced before that existed.
   local block="${GEN2_BLOCK:-false}"
+  # SMB does not need a directory. A workgroup CIFS server authenticates with NTLM against local
+  # ONTAP users and still negotiates SMB 3.1.1, so 445 has to be openable without AdSecurityGroupId.
+  local smb="${GEN2_SMB:-false}"
   local sg; sg="$(stack_output "$STACK_CLIENTS" ClientSecurityGroupId)"
   # The template takes bytes and CloudFormation cannot multiply, so the conversion happens here.
   # 900 GiB holds more than twice the 256 GB in-memory cache, which is what the read has to exceed.
@@ -410,6 +413,7 @@ print(f'{(tp*2.013 + ssd*0.15 + max(0, prov - 3*ssd)*0.0204)/730:.2f}')")"
       "AdSecurityGroupId=$sg_ad" \
       "ThroughputCapacityPerHAPair=$tp" "ProvisionedSsdIops=$iops" \
       "EnableBlockProtocols=$block" \
+      "EnableSmb=$smb" \
       "StorageCapacityGiB=$ssd_gib" "VolumeSizeBytes=$vol_bytes" \
       "BlockVolumeSizeBytes=$blk_bytes" \
       "FsxAdminPasswordSecretArn=$FSXADMIN_SECRET_ARN" "NamePrefix=$PREFIX" \
@@ -1067,7 +1071,7 @@ Environment:
              BLOCK_VOLUME_SIZE_GIB -- the block volume, 1800 GiB by default, because it holds the
              600 GiB LUN and the 600 GiB namespace at once. Below twice BLOCK_LUN_GIB plus 5% the
              gen2 phase refuses rather than letting the second fill stop at 100%
-             GEN2_THROUGHPUT (1536|3072|6144, default 6144) GEN2_BLOCK (true opens iSCSI/NVMe-TCP) AD_DOMAIN_NAME
+             GEN2_THROUGHPUT (1536|3072|6144, default 6144) GEN2_BLOCK (true opens iSCSI/NVMe-TCP) GEN2_SMB (true opens 445 with no directory) AD_DOMAIN_NAME
              AD_SHORT_NAME AD_ADMIN_USER SVM_NETBIOS_NAME SMB_SVM_ID
 USAGE
 }

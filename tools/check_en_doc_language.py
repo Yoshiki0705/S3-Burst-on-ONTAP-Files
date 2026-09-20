@@ -110,6 +110,23 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
         # the server side at the same ceiling. The English rows state each of those; the record holds
         # the per-minute figures and the counter disagreement it opened in exchange.
         "#保持された-cloudwatch-で閉じた-2-点2026-09-20",
+        # The aligned-window comparison that closed the counter disagreement the entry above
+        # opened. The English row states that the two counters agree to within 0.2% once the
+        # window starts on a minute boundary and partial minutes are discarded; the record holds
+        # both windows, the excluded partial minutes that produced the original 19%, and why the
+        # server-side read cache could not be dropped between them.
+        "#窓を分境界に合わせた-2-系統の比較2026-09-20",
+        # The 900 s window that refuted the last remaining hypothesis for the SMB 300-vs-900
+        # gap: the channel count held at 4 across all 31 samples. The English row states that
+        # and the limitation that the magnitudes are not reproducible at 1,536 MBps; the record
+        # holds the samples, the two prerequisites for measuring SMB without a directory, and
+        # why no throughput figure is reported from that run.
+        "#900-秒のあいだチャネル数が減らないこと2026-09-20",
+        # The run that varied only the measurement duration and found no 16% effect. The English
+        # row states the write means and that run-to-run variation at a fixed duration exceeds
+        # them; the record holds both passes, the non-monotonic read outlier at 60 s, and the
+        # untested layout hypothesis offered for it.
+        "#測定時間だけを振った結果--16-の不在2026-09-20",
     ),
     # The block measurements, cited from the shape that this architecture does not serve. Shape 5 sends
     # a reader who needs iSCSI or NVMe/TCP away, and the one thing worth handing them on the way out is
@@ -127,6 +144,9 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     # that this note removes got written in the first place.
     "docs/en/performance-expectations.md": (
         "#保持された-cloudwatch-で閉じた-2-点2026-09-20",
+        # The row that closed the counter disagreement states the aligned figures; the record
+        # holds the discarded partial minutes that explain where the original 19% came from.
+        "#窓を分境界に合わせた-2-系統の比較2026-09-20",
     ),
     # The teardown traps from the security-style inheritance run. The English teardown step warns
     # that skipping the peer release strands the stack, and this anchor is the eight failures behind

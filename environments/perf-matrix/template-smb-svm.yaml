@@ -125,6 +125,9 @@ Outputs:
     Description: >-
       The SVM's SMB DNS name appears only after the join succeeds. Read it with
       `aws fsx describe-storage-virtual-machines --query 'StorageVirtualMachines[0].Endpoints.Smb'`.
+      **With no directory it never appears at all** -- measured 2026-09-20: Endpoints.Smb stayed null
+      on a workgroup-mode SVM whose share was reachable and serving. A domainless run therefore
+      mounts by the data LIF address from Endpoints.Nfs.IpAddresses, which is the same LIF.
       FSx for ONTAP exposes volumes under the administrative c$ share by default.
   SmbDnsLookup:
     Value: !Sub >-
