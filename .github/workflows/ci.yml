@@ -109,6 +109,12 @@ jobs:
       - name: Check derived counts
         run: python3 tools/check_derived_counts.py
 
+      - name: Check ONTAP version is recorded in every measurement-conditions table
+        run: python3 tools/check_ontap_version_recorded.py
+
+      - name: Check every blog draft declares its public range, and that range is clean
+        run: python3 tools/check_public_range.py
+
       - name: Check superseded statements name their replacement
         run: python3 tools/check_superseded_claims.py
 

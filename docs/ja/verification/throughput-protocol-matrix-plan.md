@@ -1,5 +1,7 @@
 # プロトコル別スループットの測定計画
 
+<!-- ontap-version-exempt-file: this is a measurement plan, not a record of what was measured. -->
+
 **この文書に測定値はない。** 何をどう測るか、そのために何が必要か、そして既存の測定では答えに
 ならない理由を書く。実行後に別の記録として結果を追加する。
 

@@ -12,7 +12,7 @@ whether those conditions match yours is what decides if the number transfers.
 | Know what will bind in your configuration | [The kinds of ceiling](#the-kinds-of-ceiling-and-which-ones-actually-bound), below |
 | Take a figure into a design | [Expectations by layer](#expectations-by-layer). **Keep the conditions column** |
 | Measure it yourself | [The reproduction guide](../ja/verification/reproduction-guide.md) (Japanese) — one environment per question, with its acceptance gate |
-| Know what invalidates a measurement | [Performance testing considerations](../ja/reference/performance-testing-guide.md) (Japanese) |
+| Know what invalidates a measurement | [Performance testing considerations](reference/performance-testing-guide.md) |
 | Price a verification environment | [Cost structure per verification pattern](../ja/reference/comparison/finops-performance-test-patterns.md) (Japanese) |
 
 > **No figure originates here.** Each one lives in a measurement record, linked from its row.
@@ -164,7 +164,7 @@ Stages and the full list are in [verification status](verification-status.md).
 ## Related documents
 
 - [The reproduction guide](../ja/verification/reproduction-guide.md) (Japanese) — environment, parameters, gate and cost per question
-- [Performance testing considerations](../ja/reference/performance-testing-guide.md) (Japanese) — defaults to change, and what starts mattering once a run is going
+- [Performance testing considerations](reference/performance-testing-guide.md) — defaults to change, and what starts mattering once a run is going
 - [Verification status](verification-status.md) — the stage of every claim
 - [Cost structure per verification pattern](../ja/reference/comparison/finops-performance-test-patterns.md) (Japanese)
 - [The measurement environment](../../environments/perf-matrix/README.md) (Japanese) — the fourteen steps and why they are in that order

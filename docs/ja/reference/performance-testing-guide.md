@@ -1,5 +1,9 @@
 # AWS 上のファイルストレージとオブジェクトストレージの性能を測るときの考慮点
 
+<!-- lang-switcher:start -->
+🌐 [日本語](performance-testing-guide.md) | [English](../../en/reference/performance-testing-guide.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->
+
 Amazon EFS、Amazon S3、Amazon S3 Files、Amazon FSx for NetApp ONTAP を測る前に確認することを
 1 か所に集める。**過去の測定で数値を取り下げた原因は、ほぼすべてここに列挙した項目のどれかだった。**
 
@@ -162,14 +166,27 @@ autodelete は協調して動き、`-space-mgmt-try-first` がどちらを先に
 
 - **記録に「読む直前に小さいランダム書きを走らせたか」を入れる**（上の一覧）。挟まなければ
   何回読んでも 30 分置いても動かず、挟むと 1.8 倍動く
-- **`DiskIopsUtilization` だけでは届かない。** 飽和しているかは分かるが、**なぜ飽和したのか**
-  （1 回が細かいから）が分からない。**4 つ採る** — `DataReadBytes` / `DataReadOperations` /
-  `DiskReadBytes` / `DiskReadOperations`
 - **崩れる閾値は 30 秒と 300 秒の間で、どこかは分かっていない**
 - **4 KiB ランダム読みはこの影響を受けない。** 配置がどうであれディスク側でも 1 回の読みである
 
 ブロック側でどのメトリクスが取れるか（LUN の次元もプロトコルの次元も無いこと）は
 [playbook 側](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/what-block-monitoring-shows.md#実測した次元とメトリクス)にある。
+
+### 最初に見る 4 つの CloudWatch メトリクス
+
+**`DiskIopsUtilization` だけでは届かない。** 飽和しているかは分かるが、**なぜ飽和したのか**
+（1 回の読みが細かいから）が分からない。上の配置の崩れを切り分けるには、次の 4 つを採る。
+
+| メトリクス | 何を答えるか |
+|---|---|
+| `DataReadBytes` | クライアントが要求した読み取りバイト数 |
+| `DataReadOperations` | クライアントが要求した読み取り回数 |
+| `DiskReadBytes` | ディスク側で実際に読んだバイト数 |
+| `DiskReadOperations` | ディスク側で実際に読んだ回数 |
+
+`DiskReadBytes ÷ DataReadBytes` が 100% 近辺ならディスクから読んでいる（キャッシュではない）。
+`DataReadOperations` に対する `DiskReadOperations` の比が大きいほど、1 回の要求がディスク側で
+何回に分割されているかが分かる — この記事の例では 7.3 倍に増え、それが飽和の原因だった。
 
 ## FSx for ONTAP — リードキャッシュの 2 層構成
 
@@ -476,3 +493,7 @@ NVMe リードキャッシュも同じ形で、1,536 では `system/node/externa
 | [S3 Files とこの構成の比較](../verification/s3files-vs-flexcache.md) | 設計点の違い |
 | [性能の語の日英対訳](glossary/performance-terms-ja-en.md) | 上限の種別と測定条件の語 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |
+
+<!-- lang-switcher:start -->
+🌐 [日本語](performance-testing-guide.md) | [English](../../en/reference/performance-testing-guide.md) | [🏠 リポジトリトップ](../../../README.md)
+<!-- lang-switcher:end -->

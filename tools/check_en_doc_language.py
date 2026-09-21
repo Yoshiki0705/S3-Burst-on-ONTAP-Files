@@ -76,6 +76,9 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     "docs/en/reference/comparison/finops-s3-vs-s3ap.md": (
         "#小さいオブジェクトの-iops",  # why extra SSD IOPS does not raise the S3 request rate
     ),
+    "docs/en/reference/block-protocol-testing-guide.md": (
+        "#記録に必ず添える項目",  # the file/S3 protocol recording-items list, Japanese-only guide
+    ),
     "docs/en/reference/limits/s3ap-design-guide.md": (
         "#複数クライアントでの集約",  # shared versus per-client ceilings, at two clients
         "#クライアント台数を-1-から-4-まで上げたとき",  # the same, extended to four
@@ -167,6 +170,21 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     # them in English would put the recovery procedure in two places, and the copy a reader reaches
     # while their stack is stuck is the one that must not be the stale one.
     "docs/en/deployment/aws-cloudformation.md": ("#この手順で踏んだ罠",),
+    # File/S3 protocol measurement notes with no English counterpart, in this repository's own
+    # verification record and in the sibling Playbook repository. Each anchor names a specific
+    # finding this page cites (a triage conclusion, a metric list, a block-vs-file comparability
+    # condition, a burst/credit pitfall); restating the finding in English would put the same
+    # measurement in two places. Closing an entry means translating the target document.
+    "docs/en/reference/performance-testing-guide.md": (
+        "#配置が崩れるとディスク側の-1-回が-75-分の-1-になること",  # the layout-disturbance record
+        "#測定条件上の共通条件からの差分",  # why the block side has no target-IOPS curve
+        "#fsx-for-ontap-第二世代nconnect16auto_vdbench目標値を振った系列",  # target-IOPS vs iorate=max
+        "#1-台のクライアントの上限が同時実行数でないこと",  # throughput flat while response time doubles
+        "#結論",  # the Playbook's triage conclusion / p99-must-be-client-side conclusion
+        "#実測した次元とメトリクス",  # the Playbook's block-monitoring dimension list
+        "#ブロックの値をこの表に並べる条件",  # the Playbook's block-vs-file comparability condition
+        "#ベンチマークを壊すバーストとクレジット",  # the Playbook's burst/credit benchmark pitfall
+    ),
 }
 
 
