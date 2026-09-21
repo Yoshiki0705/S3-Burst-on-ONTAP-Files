@@ -59,7 +59,8 @@
 |---|---|---|
 | [再現の手引き](reproduction-guide.md) | 環境の作り方と合格条件。**測定を無効にする既定値の一覧つき** | 手順 |
 | [ブロック測定の実行手順](block-measurement-runbook.md) | iSCSI / NVMe-TCP を測るときの手順 | 手順 |
-| [性能検証の考慮点](../reference/performance-testing-guide.md) | 測る前に踏む落とし穴 | 手順 |
+| [性能検証の考慮点](../reference/performance-testing-guide.md) | 測る前に踏む落とし穴（ファイル / S3） | 手順 |
+| [ブロックプロトコルを測るときの考慮点](../reference/block-protocol-testing-guide.md) | 測る前に踏む落とし穴（iSCSI / NVMe-TCP） | 手順 |
 
 **測らずに設計を進められるなら、そのほうが速くて安いです。**
 数値と条件は[測る前に読む性能の期待値](../performance-expectations.md)にまとめてあります。

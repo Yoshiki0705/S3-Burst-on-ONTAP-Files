@@ -1,5 +1,8 @@
 # 検証記録 — Amazon S3 Files の相互可視性と同期の実測
 
+<!-- ontap-version-exempt-file: this record measures Amazon S3 Files standalone; ONTAP is
+     mentioned only as a reference to a different, external measurement, not this file's own. -->
+
 **この記録は Amazon S3 Files 単体の測定です。** この構成（S3 Access Point で収集し FlexCache で
 配布する形）との比較は[比較検証](s3files-vs-flexcache.md)にあります。
 測定手法はこのリポジトリの既存測定に揃えていますが、**マウントオプションは揃いません**。

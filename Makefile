@@ -6,7 +6,7 @@ PY ?= python3
 # runs is indistinguishable from a gate that passes. `tests/test_makefile_gates.py` fails when a
 # target is missing from this list, because the omission is invisible at the point it matters.
 .PHONY: help lint markdown python format-python cfn i18n-check switcher-check switcher-write blog-sync blog-links ja-headings sources-export superseded \
-        audit audit-drafts secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts \
+        audit audit-drafts secrets pinning zizmor links links-external interconnect-regions budget en-lang xlang counts ontap-version public-range \
         pattern-status iac-security drift external-anchors incoming-probes outgoing-probes shell \
         citation-coverage \
         test all new-pattern commit-subjects \
@@ -285,6 +285,13 @@ en-lang: ## Catch untranslated Japanese in docs/en/
 
 counts: ## Verify every count stated in prose against the filesystem
 	@$(PY) tools/check_derived_counts.py
+
+ontap-version: ## Every measurement-conditions table that mentions ONTAP records a version or an explicit gap
+	@$(PY) tools/check_ontap_version_recorded.py
+
+public-range: ## Every blog draft declares its public range, and that range stays free of strikethrough/addenda/comments
+	@$(PY) tools/check_public_range.py
+
 superseded: ## Superseded statements must name the section that superseded them
 	@$(PY) tools/check_superseded_claims.py
 
@@ -318,7 +325,7 @@ finops-write: ## Regenerate the cost tables from the model
 test: ## Run every discovered test directory, one pytest process each
 	@$(PY) scripts/run_tests.py
 
-all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts superseded blog-sync blog-links pattern-status iac-security finops diagram-fonts diagram-flow test commit-subjects ## Commit gate
+all: lint i18n-check switcher-check xlang drift external-anchors incoming-probes outgoing-probes audit ja-headings secrets pinning zizmor links budget en-lang counts ontap-version public-range superseded blog-sync blog-links pattern-status iac-security finops diagram-fonts diagram-flow test commit-subjects ## Commit gate
 	@echo "All checks passed."
 
 pr-verify: ## Confirm CI passed for the commit a PR currently points at (needs PR=<n>)
