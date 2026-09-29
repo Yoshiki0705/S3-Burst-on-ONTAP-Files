@@ -73,7 +73,14 @@ flowchart LR
 そこから先（他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成）は
 この文書が主張しない範囲である。
 
-![他クラウドとの接続経路](../_assets/images/s3burst-cross-cloud-connectivity.svg)
+![左に AWS Cloud（Amazon VPC 内に Amazon FSx for NetApp ONTAP と Amazon S3 Access Point）が
+あり、そこから private 接続で右の 3 つのクラウド（Google Cloud VPC + Google Cloud NetApp
+Volumes、OCI VCN + OCI File Storage、Azure VNet + Azure NetApp Files）へ矢印が伸びる。Google
+Cloud と OCI は AWS Direct Connect または AWS Interconnect – multicloud（いずれも GA）、Azure は
+同じ経路が Preview（2026-08 時点）か、AWS Direct Connect を相互接続プロバイダのファブリック経由で
+Azure ExpressRoute につなぐパートナー経由（2 パートナー経由）のいずれか。矢印は各クラウドの
+VPC/VNet/VCN で止まり、その先（他クラウドのファイルストレージを Origin として FSx for ONTAP を
+Cache にする構成）はこの図の対象外と注記されている](../_assets/images/s3burst-cross-cloud-connectivity.svg)
 
 図と同じことを表にしておく。
 
