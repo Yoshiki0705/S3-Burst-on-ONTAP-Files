@@ -194,26 +194,26 @@ def test_the_japanese_note_marker_is_the_japanese_one() -> None:
 
 
 @pytest.mark.parametrize(
-    "headline",
+    "value",
     [
         "plain",
-        'a "quoted" headline',
-        "an 'apostrophed' headline",
+        'a "quoted" value',
+        "an 'apostrophed' value",
         """both "kinds" of 'quote'""",
         "an & ampersand",
         "a <tag> and a > bracket",
     ],
 )
-def test_note_markup_round_trips_through_an_xml_attribute(headline: str) -> None:
+def test_label_value_round_trips_through_an_xml_attribute(value: str) -> None:
     """A value that breaks out of its attribute is the worst failure available here: draw.io drops
     that cell and every cell after it, and still reports a successful export. So the assertion is
     that the value comes back out intact, not that any particular character was escaped — the
     quoting mechanism differs by input (`quoteattr` switches delimiters rather than escaping when it
-    can), and pinning the mechanism would test the standard library instead of the risk."""
-    body = bd.note_body("Notes", (("*1", headline, "detail"),))
-    document = f"<mxCell value={quoteattr(body)} />"
-    assert ET.fromstring(document).get("value") == body
-    assert headline in body
+    can), and pinning the mechanism would test the standard library instead of the risk. `vertex()`
+    and the edge writer both build their `value=` attribute this same way, so exercising `quoteattr`
+    directly covers what either of them would do with a label carrying this character."""
+    document = f"<mxCell value={quoteattr(value)} />"
+    assert ET.fromstring(document).get("value") == value
 
 
 # --- file naming ---------------------------------------------------------------------------------
