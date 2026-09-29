@@ -86,6 +86,128 @@ tell you which was generated. That is client-side behaviour, not a property of F
 This architecture's path does not use presigned URLs.
 Depending on it in a production workload is not recommended.
 
+## Authorization design — least-privilege policy examples
+
+Of the two layers described in [Architecture](../../architecture.md) — the AWS side and the ONTAP
+side — this section gives least-privilege examples for the AWS side: the identity-based policy and
+the access point policy. **This architecture uses only the S3 Access Point on the origin, so the
+ARN scope can be narrowed to one access point and the prefixes it is expected to carry.**
+
+### Identity-based policy (attached to the caller)
+
+Grant the collection pipeline's execution role only the target access point and the prefixes it is
+expected to write to. Do not use `Resource: "*"`.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry",
+        "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry/object/year=*/month=*/day=*/*"
+      ]
+    }
+  ]
+}
+```
+
+Assigning the ingest and consume prefixes from [directory design](#directory-design) to separate
+execution roles narrows the audit trail by IAM role as well as by access point.
+
+### Access point policy (attached to the access point)
+
+Within one account, the identity-based policy alone is sufficient to grant access, so **narrowing
+with an access point policy requires an explicit deny** — the concrete case of "narrowing the
+`Allow` is not a restriction" stated in [Architecture](../../architecture.md).
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry/object/*",
+      "Condition": {
+        "StringNotLike": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/ingest-pipeline-role"
+        }
+      }
+    }
+  ]
+}
+```
+
+Do not show `Principal: "AWS": "*"` as a production example. The example above denies every other
+principal within the same account; a cross-account design needs a separate cross-account grant.
+
+### When these two are not enough on their own
+
+With a `VPC` origin access point, the VPC endpoint policy also has to permit the caller's request
+([configuring network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)).
+If an AWS Organizations SCP denies the service, an explicit deny at any level in the organization
+reaches every account underneath it regardless of what any of the policies above allow
+([IAM's policy evaluation logic](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic_policy-eval-denyallow.html)).
+**This architecture has not measured this; the statement rests on the published documentation.**
+
+Permission on the AWS side does not substitute for the file system side. Unless the file
+permissions — mode bits or ACLs — held by the identity fixed on the access point allow it, the data
+stays out of reach no matter how much the AWS side allows (Layer 2 in
+[Architecture](../../architecture.md)).
+
+### A denial even when all five AWS-side layers are correct — the VPC mismatch
+
+**Even when the network origin check, VPC endpoint policy, access point policy, IAM identity
+policy and SCP are all configured correctly, a request can still be denied for a separate
+reason.** In a centralized VPC endpoint architecture — several VPCs forwarding DNS to a shared
+endpoint — a Route 53 Resolver forwarding rule that redirects `*.amazonaws.com` to a centralized
+resolver can return the private IP of an S3 Interface Endpoint sitting in a hub VPC. When that
+happens, the VPC the S3 Access Point's VPC origin is bound to no longer matches the VPC the
+traffic actually traversed. The error reads `explicit deny in a resource-based policy`, and every
+IAM policy, SCP, and VPC endpoint policy checked individually still looks correct
+([documented](https://repost.aws/articles/ARIOhwOHPMSOupacb7AbcdAQ/managing-fsxn-s3-access-points-in-centralized-vpc-endpoint-architectures)).
+
+**Diagnose it from CloudTrail.** Check the denied event's `vpcEndpointId` and
+`vpcEndpointAccountId` against the VPC and account you expect. A mismatch means the request
+travelled through a shared VPC endpoint owned by a different account or VPC.
+
+**This architecture has not measured this; the statement rests on the AWS re:Post article.** The
+fix is one of:
+
+- Recreate the access point's VPC origin bound to the hub VPC the traffic actually traverses
+- Use internet origin instead of VPC origin, removing the bound-VPC constraint outright
+- Create an S3 Interface Endpoint in the workload VPC that takes priority over the centralized
+  DNS forwarding
+
+### What the IAM Policy Simulator does not verify
+
+Testing the policy examples above with the IAM Policy Simulator: **identity-based policies and
+SCPs are evaluated, including condition keys and resource scoping, but Resource Control Policies
+(RCPs) and session policies are not supported**
+([documented](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_testing-policies.html) —
+session policies are not among the policy types the simulator accepts as input). **The same page
+states that results can differ from live behavior for VPC endpoint policies, role chaining, and
+multiple resource-based policies on one resource.** The VPC endpoint policy this architecture uses
+falls squarely into that category, so **do not settle this architecture's authorization design on
+the simulator's result alone.** The policy examples above show syntactic validity; confirming
+behaviour on real infrastructure is a separate step.
+
+**Supplementary source (one tier below AWS's own documentation; "documented" in this repository is
+reserved for AWS/NetApp's own pages)**: [IAM Policy Evaluation Logic Step-by-Step](https://hidekazu-konishi.com/entry/iam_policy_evaluation_logic_step_by_step.html)
+cites AWS's own documentation while diagramming the evaluation order as seven stages (Explicit
+Deny -> RCP -> SCP -> Resource-Based Policy -> Identity-Based Policy -> Permission Boundary ->
+Session Policy). The five AWS-side layers this architecture uses map onto six of those seven
+stages, RCP excluded (this architecture assumes neither a Permission Boundary nor an
+Organizations RCP). The article's diagram of a Permission Boundary acting as a ceiling rather than
+a grant, and of same-account access unioning the resource-based and identity-based policy while
+cross-account access requires both, goes into finer detail than AWS's own pages do.
+
 ## Designing concurrency and throughput
 
 **The S3 AP, NFS and SMB all share the same FSx for ONTAP provisioned throughput.**

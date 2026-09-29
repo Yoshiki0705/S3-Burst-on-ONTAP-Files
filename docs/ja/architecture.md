@@ -103,14 +103,38 @@ Get Started の前に読む価値があるのはこの 1 点だけなので、�
 - 収集を S3 API で受けつつ、利用側は NFS / SMB のまま。両者の間に独立した複製・同期ジョブを置かない。転送は読まれた範囲について発生する
 - 書き込み経路を Origin 側の S3 Access Point に集約できる（本リポジトリの設計上の主張であり、
   引用先の実測がこの集約を検証したものではない）。**ただし認可は単一層ではない。**
-  独立した 2 層を順に通り、両方を通らなければデータに届かない。Layer 1（AWS 側）は呼び出し元の
-  プリンシパルと `s3:` アクションを評価し、絞り込みを担うのは**明示的な拒否**である。
-  同一アカウントでは identity-based ポリシーとアクセスポイントポリシーが結合されるため、
-  `Allow` を狭く書くことは絞り込みにならない。Layer 2（ファイルシステム側）はアクセスポイントに
-  固定した識別情報が持つファイル権限（mode bits / ACL）を評価する。**層をまたいだ引き算は起きない**。
-  結合されることと、`Allow` だけでは絞れないことは
-  [AWS のドキュメント記載](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)であり、
-  そのとおりになることを確かめた[実測記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)がある。
+  独立した 2 層（Layer 1 = AWS 側、Layer 2 = ファイルシステム側）を順に通り、両方を通らなければ
+  データに届かない。**Layer 1（AWS 側）はさらに 5 つの Stage に分かれ、評価される順序が
+  一様ではない**（[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)）。
+
+  1. **Stage 1: Network origin check** — VPC origin のアクセスポイントでは、リクエストが
+     束縛先の VPC のエンドポイントから来ているかを**他のポリシー評価より先に**見る。
+     ここで一致しなければ、以降の Stage に進む前に拒否される
+  2. **Stage 2: VPC endpoint policy** — VPC endpoint を経由するリクエストにだけ適用される
+  3. **Stage 3: access point policy** — 同一アカウントでは identity-based ポリシーと
+     どちらか一方が許可すれば足りるが、**クロスアカウントでは両方が許可を出す必要がある**。
+     同一アカウントで絞り込みたい場合は `Allow` を狭くするのではなく明示的な**拒否**を書く
+     （`Allow` だけでは identity-based ポリシー側の許可が残るため絞り込みにならない）
+  4. **Stage 4: IAM identity policy** — 呼び出し元のプリンシパルと `s3:` アクションを評価する
+  5. **Stage 5: Service control policies (SCPs)** — AWS Organizations 配下にある場合、
+     明示的な拒否はアカウント配下のすべてに及ぶ
+     （[IAM のポリシー評価ロジック](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic_policy-eval-denyallow.html)）
+
+  **Stage 2〜5 はまとめて評価され、どの Stage の明示的な拒否も他 Stage の許可を上書きする。**
+  Stage 1 だけが順序として先に立つ。**Layer 1 の 5 Stage すべてが正しく設定されていても、
+  DNS 転送を集中させた centralized VPC endpoint 構成では別の理由で拒否されることがある**
+  — VPC origin の束縛先 VPC と、実際にトラフィックが通った VPC endpoint の VPC が
+  一致しないケースで、Route 53 Resolver のフォワーディングルールが原因になる
+  （[ドキュメント記載](https://repost.aws/articles/ARIOhwOHPMSOupacb7AbcdAQ/managing-fsxn-s3-access-points-in-centralized-vpc-endpoint-architectures)、
+  診断は CloudTrail の `vpcEndpointId` / `vpcEndpointAccountId` を見る）。
+  **この構成での実測はなく、公式ドキュメントおよび AWS re:Post 記事の記載に基づく。**
+
+  Layer 2（ファイルシステム側）はアクセスポイントに固定した識別情報が持つファイル権限
+  （mode bits / ACL）を評価する。**層をまたいだ引き算は起きない**。Layer 1 内の結合と、
+  `Allow` だけでは絞れないことは
+  そのとおりになることを確かめた[実測記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--結合で評価されることの帰結)がある（実測は Stage 3 の access point policy と
+  Stage 4 の identity-based ポリシーの結合を対象にしたもので、Stage 1 の Network origin check や
+  Stage 2 の VPC endpoint policy を含まない）。
   Layer 2 が絞り込みを担うことの[対測定](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--絞り込みを担うファイルシステム側の権限)も同じ記録にある
 - **集約すると監査でも主体が 1 つに潰れる。** ONTAP のファイルアクセス監査に残るのはアクセスポイントに
   固定した識別情報の SID だけで、`SubjectUserName` と `SubjectDomainName` は `Not Present`、

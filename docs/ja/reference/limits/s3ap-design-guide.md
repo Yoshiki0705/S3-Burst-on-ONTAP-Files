@@ -81,6 +81,126 @@ SigV2 を生成し、`client.meta.config.signature_version` はどちらの場�
 
 この構成の経路では presigned URL を使わない。
 
+## 認可設計 — 最小権限のポリシー例
+
+[構成の形](../../architecture.md)で述べた二層（AWS 側と ONTAP 側）のうち、ここでは AWS 側の
+identity-based ポリシーとアクセスポイントポリシーの最小権限例を示す。**この構成は Origin 側の
+S3 Access Point だけを使うので、ARN のスコープをアクセスポイント 1 つと配下のプレフィックスに
+絞れる。**
+
+### identity-based ポリシー（呼び出し元に付与）
+
+収集パイプラインの実行ロールには、対象のアクセスポイントと想定するプレフィックスだけを許可する。
+`Resource: "*"` は使わない。
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry",
+        "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry/object/year=*/month=*/day=*/*"
+      ]
+    }
+  ]
+}
+```
+
+パーティション設計（[ディレクトリ設計](#ディレクトリ設計)）で分けた投入用と消費用のプレフィックスを
+異なる実行ロールに割り当てると、監査ログでアクセスポイントの単位に加えて IAM ロールの単位でも
+絞り込める。
+
+### アクセスポイントポリシー（アクセスポイント側に付与）
+
+同一アカウント内では identity-based ポリシー単独でも許可が成立するため、
+**アクセスポイントポリシーで絞り込みたい場合は明示的な拒否を書く**
+（[構成の形](../../architecture.md)で述べた「`Allow` を狭く書くことは絞り込みにならない」の実例）。
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/ingest-telemetry/object/*",
+      "Condition": {
+        "StringNotLike": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/ingest-pipeline-role"
+        }
+      }
+    }
+  ]
+}
+```
+
+`Principal: "AWS": "*"` を実運用例として示さない。上の例は同一アカウント内の他プリンシパルを
+拒否する形で書いており、他アカウントを想定する場合は別途クロスアカウントの許可設計が要る。
+
+### この 2 つだけでは絞り込みにならない場合
+
+`VPC` origin のアクセスポイントを使う場合、上記に加えて VPC endpoint policy が呼び出し元の
+リクエストを許可している必要がある
+（[ネットワークアクセスの設定](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)）。
+AWS Organizations の SCP でこのサービスを拒否している場合、上記のどのポリシーを許可に書いても
+アカウント配下では拒否が優先される
+（[IAM のポリシー評価ロジック](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic_policy-eval-denyallow.html)）。
+**この構成での実測はなく、公式ドキュメントの記載に基づく。**
+
+AWS 側の許可はファイルシステム側の権限を代替しない。アクセスポイントに固定した識別情報の
+mode bits / ACL が許可しなければ、AWS 側をどれだけ許可してもデータには届かない
+（[構成の形](../../architecture.md)の Layer 2）。
+
+### AWS 側 5 層すべてが正しくても拒否される場合 — VPC ミスマッチ
+
+**Network origin check・VPC endpoint policy・access point policy・IAM identity policy・SCP の
+5 層がすべて正しく設定されていても、別の理由で `AccessDenied` になることがある。**
+centralized VPC endpoint 構成（複数の VPC から共有の VPC endpoint へ DNS 転送する構成）で、
+Route 53 Resolver のフォワーディングルールが `*.amazonaws.com` を集中管理された DNS
+リゾルバへ転送し、そのリゾルバがハブ VPC 側の S3 Interface Endpoint の private IP を返すと、
+S3 Access Point の VPC origin が束縛している VPC と、実際にトラフィックが通った VPC endpoint
+の VPC が一致しなくなる。エラーメッセージは `explicit deny in a resource-based policy` で、
+IAM ポリシー・SCP・VPC endpoint policy を個別に確認してもすべて正しく見える
+（[ドキュメント記載](https://repost.aws/articles/ARIOhwOHPMSOupacb7AbcdAQ/managing-fsxn-s3-access-points-in-centralized-vpc-endpoint-architectures)）。
+
+**診断は CloudTrail で行う。** 拒否されたイベントの `vpcEndpointId` と `vpcEndpointAccountId`
+を見て、想定している VPC / アカウントと一致するかを確認する。一致しない場合、リクエストは
+別アカウントまたは別 VPC が持つ共有の VPC endpoint を経由している。
+
+**この構成での実測はなく、AWS re:Post 記事の記載に基づく。** 対処は次のいずれか。
+
+- アクセスポイントの VPC origin を、実際にトラフィックが通るハブ側の VPC に向けて作り直す
+- VPC origin ではなく internet origin を使う（束縛先 VPC の制約自体を外す）
+- ワークロード側の VPC に S3 Interface Endpoint を作り、集中管理された DNS 転送より優先させる
+
+### IAM Policy Simulator の検証対象外の層
+
+上記のポリシー例を IAM Policy Simulator で検証する場合、**identity-based ポリシーと SCP は
+条件キーとリソースの絞り込みを含めて評価されるが、Resource Control Policies (RCPs) と
+session policy には対応していない**（[ドキュメント記載](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_testing-policies.html)。session policy は
+シミュレーターが受け付ける入力ポリシー種別に含まれていない）。**VPC endpoint policy、
+ロールチェーン、同一リソースに複数の resource-based ポリシーがある場合の結果は、実機の挙動と
+異なることがある**と同じページに明記されている。この構成が使う VPC endpoint policy は
+まさにこの「実機と異なることがある」対象に含まれるため、**Policy Simulator の結果だけで
+この構成の認可設計を確定させない。** 上記のポリシー例は構文の妥当性を示すものであり、
+実機での動作確認は別途必要。
+
+**補足資料（AWS 公式より一段低い evidence tier、documented の対象は AWS 公式ドキュメントに
+限る）**: [IAM Policy Evaluation Logic Step-by-Step](https://hidekazu-konishi.com/entry/iam_policy_evaluation_logic_step_by_step.html)
+は、AWS 公式ドキュメントを出典として引用しながら評価順序を 7 段（Explicit Deny → RCP → SCP →
+Resource-Based Policy → Identity-Based Policy → Permission Boundary → Session Policy）として
+図解している。この構成が使う 5 層（AWS 側）は、この 7 段のうち RCP を除く 6 段の一部に対応する
+（この構成では Permission Boundary と Organizations の RCP は前提としていない）。
+Permission Boundary が「許可の付与」ではなく「上限」として働くこと、同一アカウントでは
+resource-based ポリシーと identity-based ポリシーが OR で結合されクロスアカウントでは
+AND になることの図解は、この記事が AWS 公式ドキュメントより詳細な粒度でまとめている。
+
 ## 並行度とスループットの設計
 
 **S3 AP、NFS、SMB はすべて同じ FSx for ONTAP プロビジョンドスループットを共有する。**
