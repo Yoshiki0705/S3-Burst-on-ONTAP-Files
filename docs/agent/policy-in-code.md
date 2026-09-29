@@ -128,3 +128,19 @@ CI on the commit that added it.
 
 Worked example, with sources and the error-to-cause table:
 [SMB でマウントできる名前と、識別子を読む場所](../ja/reference/limits/smb-share-and-identifier-reading.md).
+
+## An external fetch landing somewhere unexpected is a URL bug first, not a missing source
+
+Fetching a citation URL and getting a profile page, a 404, or a redirect target that clearly is not
+the article is not evidence that the source cannot be confirmed. It is evidence that the URL string
+is wrong, and the two calls for opposite next steps: one is "cite as a lower evidence tier or drop
+the claim", the other is "fix the request and try again before concluding anything."
+
+A citation to `hidekazu-konishi.com` was withdrawn in one review round because the fetch resolved to
+an author bio page, and reinstated in the next round because the URL had one missing underscore
+(`..._stepbystep.html` versus the real `..._step_by_step.html`). The article was there the whole
+time; only the request was wrong. **Before writing "could not confirm this source", re-issue the
+fetch and check that the returned title and opening paragraph match what the citation claims to be.**
+A profile page, an error page, or a page about an unrelated topic is the signal to suspect the URL
+string itself — a missing word separator, a stale slug, a redirect — not to downgrade or withdraw the
+citation on the first attempt.

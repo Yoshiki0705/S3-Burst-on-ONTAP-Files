@@ -283,6 +283,7 @@ Automated checks catch syntax. These catch design-level problems.
 | [docs/ja/reference/comparison/alternatives.md](docs/ja/reference/comparison/alternatives.md) | Every option's suited and unsuited conditions, this one included — EFS, block protocols (iSCSI / NVMe/TCP) and S3 Files all have their own row and cost table |
 | [docs/ja/reference/decision-trees/choosing-this-architecture.md](docs/ja/reference/decision-trees/choosing-this-architecture.md) | Whether to adopt this architecture |
 | [docs/ja/reference/limits/s3-access-point.md](docs/ja/reference/limits/s3-access-point.md) | Limits with source and stage |
+| [docs/agent/pending-decisions.md](docs/agent/pending-decisions.md) | Restructuring deferred, and the condition that ends the deferral |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Authoring conventions and the review gate |
 
 ## External dependencies
