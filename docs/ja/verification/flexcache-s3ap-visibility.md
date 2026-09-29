@@ -18,7 +18,7 @@
 | **ONTAP バージョン** | **NetApp Release 9.18.1P3D1**（両クラスタ同一） |
 | 接続 | VPC ピアリング（同一リージョン、同一アカウント） |
 | Origin ボリューム | `s3burst_origin_vol2`、SVM `fsxsvm02`、セキュリティスタイル UNIX |
-| Cache ボリューム | `s3burst_cache_vol2`、SVM `FSxN_OnPre`、FlexCache（`use_tiered_aggregate: true`） |
+| Cache ボリューム | `s3burst_cache_vol2`、SVM `FSxN_OnPre`、FlexCache（`use_tiered_aggregate: true`） <!-- allow:naming --> |
 | S3 Access Point | `s3burst-verify-ap`、ファイルシステム識別情報 UNIX（root）、`NetworkOrigin` 指定なし（Internet） |
 | クライアント | 同一 VPC・Cache クラスタと同一サブネットの EC2、NFSv3 |
 | マウント | `actimeo=0`（サーバ側の反映を測るため） |

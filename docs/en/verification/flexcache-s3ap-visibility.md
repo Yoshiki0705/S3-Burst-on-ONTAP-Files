@@ -22,7 +22,7 @@ volume in a different cluster, by way of FlexCache.
 | **ONTAP version** | **NetApp Release 9.18.1P3D1** (identical on both clusters) |
 | Connection | VPC peering (same Region, same account) |
 | Origin volume | `s3burst_origin_vol2`, SVM `fsxsvm02`, security style UNIX |
-| Cache volume | `s3burst_cache_vol2`, SVM `FSxN_OnPre`, FlexCache (`use_tiered_aggregate: true`) |
+| Cache volume | `s3burst_cache_vol2`, SVM `FSxN_OnPre`, FlexCache (`use_tiered_aggregate: true`) <!-- allow:naming --> |
 | S3 Access Point | `s3burst-verify-ap`, file system identity UNIX (root), `NetworkOrigin` unspecified (Internet) |
 | Client | EC2 in the same VPC and the same subnet as the Cache cluster, NFSv3 |
 | Mount | `actimeo=0` (to measure server-side propagation) |

@@ -80,7 +80,15 @@ Putting real service names into the classification above gives the following. **
 figure stop at the AWS VPC.** What lies beyond it — another cloud's file storage as the origin with
 FSx for ONTAP as the cache — is the part this document does not claim.
 
-![Cross-cloud connectivity](../_assets/images/s3burst-cross-cloud-connectivity-en.svg)
+![On the left, AWS Cloud (an Amazon VPC holding Amazon FSx for NetApp ONTAP and an Amazon S3
+Access Point). Arrows run right over private connectivity to three other clouds: Google Cloud VPC
+with Google Cloud NetApp Volumes, OCI VCN with OCI File Storage, and Azure VNet with Azure NetApp
+Files. Google Cloud and OCI reach AWS via AWS Direct Connect or AWS Interconnect – multicloud
+(both GA); Azure reaches it via the same path at Preview (as of 2026-08), or via a partner route
+(category 2) that connects AWS Direct Connect to Azure ExpressRoute through an interconnect
+provider's fabric. Every arrow stops at the peer cloud's VPC/VNet/VCN, and a note states that
+what lies beyond — another cloud's file storage as the origin with FSx for ONTAP as the cache —
+is out of scope for this figure](../_assets/images/s3burst-cross-cloud-connectivity-en.svg)
 
 The same content as a table.
 
