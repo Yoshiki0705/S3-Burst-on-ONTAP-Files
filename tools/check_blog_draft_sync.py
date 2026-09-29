@@ -26,6 +26,19 @@ access and a credential per platform, and a check that cannot run offline is a c
 skipped. This compares the draft against its own recorded digest, which is enough to catch the
 draft moving -- the case that actually happened.
 
+This glob also does not touch `blog-unpublished-*.md`. Those files have no marker to compare,
+because there is nothing published yet to record a digest against -- but "unpublished" describes
+this repository's own publish decision, not whether the platform has a draft. All four
+block-protocol articles were sitting as real drafts on Hatena and dev.to, editable and diffable,
+while a text search for their titles on the drafts list came back empty and was read as "no draft
+exists." A hit count of zero from a UI search is not evidence of absence; open the drafts list and
+look. Once a real draft is confirmed, diff it against the local file in both directions before
+editing either one -- a platform-side draft can move ahead of the local copy (an agent or the
+author may have edited it directly), and copying local-to-platform in that case overwrites newer
+content with older content. There is no automated check for this: it needs an authenticated
+browser session per platform, so it stays a manual step every time a `blog-unpublished-*.md` file
+is touched.
+
 The drafts are gitignored, so a clone without them is normal and skipped rather than failed.
 
 Run:  python3 tools/check_blog_draft_sync.py
