@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a diagram makes the reader work out which way to read it.
 
-Three rules, all of them things that are only visible in the rendered image and therefore easy to
+Five rules, all of them things that are only visible in the rendered image and therefore easy to
 break while every generator function still looks correct.
 
 **Direction.** Every edge must advance rightwards or downwards, never leftwards and never upwards.
@@ -31,10 +31,44 @@ standard offset. Raising it is how a boundary's name ends up sitting next to an 
 inside the boundary, which then looks exactly like that icon's own label while the icon's real label
 sits underneath -- two names, one of them wrong.
 
-Crossing edges are deliberately not checked. Whether two lines cross depends on the routing, which
-is not in the file, and approximating it with straight centre-to-centre segments reports crossings
-that do not render and misses ones that do. The direction rule removes most of them anyway: lines
-that all advance the same way have far fewer opportunities to meet.
+**AWS Cloud mislabelling.** When a diagram contains exactly **one** group drawn with the
+`group_aws_cloud` pictogram (the cloud-outline icon in its corner badge), that group must carry the
+literal title "AWS Cloud", optionally with a parenthetical qualifier such as "AWS Cloud (Origin
+Region)". A lone occurrence of the pictogram has only one plausible meaning in a figure that
+otherwise draws no boundary at all: the account/partition edge every AWS reference diagram uses it
+for. This is what shipped in `s3burst-two-ceilings` before it was caught by eye -- the cloud
+pictogram, alone in the figure, captioned "FSx for ONTAP file server".
+
+The check is deliberately silent when the pictogram appears more than once in the same diagram.
+Several figures in this repository use it as a repeated per-panel card border ("A. ...", "B. ...")
+or as an outer boundary with distinctly-captioned cards nested inside it -- both established,
+intentional patterns unrelated to the account-edge meaning, and neither is what broke. Requiring
+every occurrence to say "AWS Cloud" would make the rule fire on those instead of on the one shape
+it exists to catch.
+
+**Label spilling out of its own boundary.** An icon's label is not stored as a box in the file -- it
+is text drawn below the icon at render time -- so a group or frame sized to the icon alone has no
+room for what actually appears underneath it once the label wraps to two lines. This check
+estimates the label's rendered height from its line count and font size and rejects any group or
+frame whose rectangle fully contains the icon but ends before that estimated label does. This is
+what shipped in `s3burst-block-c-layout`: the per-deployment group closed 30px above the second
+line of the FSx caption, so the caption's own text sat on the group's border.
+
+**Boundary title crossing a pass-through edge.** A centred frame or group title occupies the
+horizontal middle of the boundary's top edge. An edge that runs straight through that same
+horizontal band -- entering the boundary from above and continuing to a node below it, rather than
+stopping at the boundary -- is drawn on top of the title whenever draw.io's router keeps to a
+straight vertical run, which it does whenever the edge's exit and entry `x` already agree. This is
+what shipped in `s3burst-block-b-multipath`: two vertical lines from the EC2 client to the two FSx
+for ONTAP controllers passed straight through the centre of the "FSx for ONTAP HA pair" frame title.
+Left-aligning the title (`title_align_left=True` on `Frame`, tracked in `build_diagrams.py`) moves it
+to the corner nothing else crosses.
+
+Crossing edges are otherwise not checked. Whether two arbitrary lines cross depends on the routing,
+which is not in the file, and approximating it with straight centre-to-centre segments reports
+crossings that do not render and misses ones that do. The boundary-title rule above is narrower than
+that: it only fires on the one geometry a title box is guaranteed to occupy (a fixed band at a fixed
+place), not on the router's path.
 
 Nothing here is specific to one repository: paths are discovered rather than configured, so this file
 is copied between repositories as-is. Two things then differ, both of them known. The suppression on
@@ -78,13 +112,34 @@ EPSILON = 8.0
 # along the top edge and lands beside whatever the frame contains.
 GROUP_SPACING_LEFT = 30
 
+# The pictogram that promises "this boundary is the AWS account / partition edge". A group carrying
+# it must be captioned to match; see the module docstring.
+AWS_CLOUD_ICON = re.compile(r"\bgrIcon=mxgraph\.aws4\.group_aws_cloud\b")
+AWS_CLOUD_TITLE = re.compile(r"^AWS Cloud(\s*\([^)]+\))?$")
+
+# A frame or group's title band: how tall a reader's eye treats it as occupying regardless of the
+# frame's own height, and how wide, centred, before an edge crossing that band is judged to cross
+# the title rather than pass beside it. `spacingTop=6` in FRAME_STYLE and the group shape's own
+# title row both sit within this.
+TITLE_BAND_HEIGHT = 40
+TITLE_BAND_WIDTH_FRACTION = 0.5
+
 IMAGE_SHAPE = re.compile(r"\bshape=image\b")
 GROUP_SHAPE = re.compile(r"\bshape=mxgraph\.aws4\.group\b")
 SPACING_LEFT = re.compile(r"\bspacingLeft=(\d+(?:\.\d+)?)")
+LEFT_ALIGNED = re.compile(r"\balign=left\b")
+FONT_SIZE = re.compile(r"\bfontSize=(\d+(?:\.\d+)?)")
 EXIT_X = re.compile(r"\bexitX=(-?\d+(?:\.\d+)?)")
 EXIT_Y = re.compile(r"\bexitY=(-?\d+(?:\.\d+)?)")
 ENTRY_X = re.compile(r"\bentryX=(-?\d+(?:\.\d+)?)")
 ENTRY_Y = re.compile(r"\bentryY=(-?\d+(?:\.\d+)?)")
+
+# A rough per-character width in px at fontSize=16, used only to estimate how many lines a label
+# wraps to inside a fixed-width box -- not to render text. Deliberately generous (real glyphs at
+# this weight run narrower) so the estimate over-wraps rather than under-wraps: missing a real
+# overflow is the failure mode that ships a broken diagram, and a false positive here just adds a
+# comment explaining why a genuinely tight fit is fine.
+CHAR_WIDTH_AT_16PX = 10.0
 
 
 @dataclass(frozen=True)
@@ -160,12 +215,78 @@ def _heading(dx: float, dy: float) -> str | None:
     return " and ".join(parts) if parts else None
 
 
+def _label_line_count(value: str) -> int:
+    """How many lines this label's own text forces, ignoring width-driven wrapping.
+
+    Every label in this repository's generator carries an explicit `\n` where it needs a line
+    break rather than relying on the renderer to find one, so counting `\n` is exact for these
+    files even though it would undercount a label that wraps on width alone.
+    """
+    return value.count("\n") + 1 if value else 0
+
+
+def _label_overflow(
+    rect: tuple[float, float, float, float], style: str, value: str
+) -> float:
+    """How far this icon's rendered label is expected to extend below the icon's own bottom edge.
+
+    Not a layout engine: a fixed per-line height at the cell's own `fontSize`, plus one gap between
+    the icon and the first line. Good enough to catch a container sized to the icon alone with no
+    room left for what actually prints underneath it -- see the module docstring.
+    """
+    lines = _label_line_count(value)
+    if lines == 0:
+        return 0.0
+    match = FONT_SIZE.search(style)
+    font_size = float(match.group(1)) if match else 16.0
+    gap = 8.0
+    line_height = font_size * 1.3
+    return gap + lines * line_height
+
+
+def _is_frame_container(style: str) -> bool:
+    """Whether this style is the dashed frame box `Frame` renders, not a `Note` (filled) or icon.
+
+    `Frame` and `Note` share `dashed=1;dashPattern=8 4`, and only `fillColor` tells them apart:
+    `Frame` is `fillColor=none` (a boundary around something), `Note` is `fillColor=#F5F5F5` (a
+    filled card of its own text). A `Note` has no children to contain and no title band a real
+    edge is meant to stop at, so counting it as a container would check it against geometry it was
+    never meant to satisfy.
+    """
+    return (
+        "dashed=1" in style
+        and "dashPattern=8 4" in style
+        and "fillColor=none" in style
+        and "shape=image" not in style
+    )
+
+
+@dataclass(frozen=True)
+class _Container:
+    cid: str
+    rect: tuple[float, float, float, float]
+    value: str
+    is_group: bool
+    title_left_aligned: bool
+
+
+def _contains(
+    outer: tuple[float, float, float, float], inner: tuple[float, float, float, float]
+) -> bool:
+    ox, oy, ow, oh = outer
+    ix, iy, iw, ih = inner
+    return ix >= ox and ix + iw <= ox + ow and iy >= oy and iy + ih <= oy + oh
+
+
 def inspect(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
     root = _parse(text)
     for model in root.iter("mxGraphModel"):
         rects: dict[str, tuple[float, float, float, float]] = {}
         edges: list[tuple[str, str, str, str, str]] = []
+        icons: list[tuple[str, tuple[float, float, float, float], str, str]] = []
+        containers: list[_Container] = []
+        aws_cloud_groups: list[tuple[str, str]] = []
         for cell in model.iter("mxCell"):
             cid = cell.get("id") or "?"
             style = cell.get("style") or ""
@@ -192,7 +313,10 @@ def inspect(path: Path, text: str) -> list[Finding]:
                         "it -- set verticalLabelPosition=bottom",
                     )
                 )
-            if GROUP_SHAPE.search(style) and value:
+            if IMAGE_SHAPE.search(style) and rect is not None:
+                icons.append((cid, rect, style, value))
+            is_group = bool(GROUP_SHAPE.search(style))
+            if is_group and value:
                 match = SPACING_LEFT.search(style)
                 spacing = float(match.group(1)) if match else 0.0
                 if spacing > GROUP_SPACING_LEFT:
@@ -203,6 +327,87 @@ def inspect(path: Path, text: str) -> list[Finding]:
                             f"cell {cid} ({value}): spacingLeft={spacing:g} pushes the boundary "
                             f"title past the frame corner (max {GROUP_SPACING_LEFT}), where it "
                             "reads as the label of an icon inside the frame",
+                        )
+                    )
+            if is_group and AWS_CLOUD_ICON.search(style):
+                aws_cloud_groups.append((cid, value))
+            if (is_group or _is_frame_container(style)) and rect is not None:
+                containers.append(
+                    _Container(
+                        cid,
+                        rect,
+                        value,
+                        is_group,
+                        LEFT_ALIGNED.search(style) is not None,
+                    )
+                )
+        if len(aws_cloud_groups) == 1:
+            lone_cid, lone_value = aws_cloud_groups[0]
+            if lone_value and not AWS_CLOUD_TITLE.match(lone_value):
+                findings.append(
+                    Finding(
+                        path,
+                        "aws-cloud-mislabel",
+                        f"cell {lone_cid}: the only group_aws_cloud pictogram in this diagram is "
+                        f'captioned {lone_value!r} instead of "AWS Cloud" -- title it "AWS Cloud" '
+                        '(optionally "AWS Cloud (qualifier)"), or drop the pictogram for a boundary '
+                        "that is not the account/partition edge",
+                    )
+                )
+        for icon_cid, icon_rect, icon_style, icon_value in icons:
+            overflow = _label_overflow(icon_rect, icon_style, icon_value)
+            if overflow <= 0:
+                continue
+            _, iy, _, ih = icon_rect
+            label_bottom = iy + ih + overflow
+            for container in containers:
+                if container.cid == icon_cid:
+                    continue
+                if not _contains(container.rect, icon_rect):
+                    continue
+                cx, cy, cw, ch = container.rect
+                if label_bottom > cy + ch:
+                    findings.append(
+                        Finding(
+                            path,
+                            "label-overflow",
+                            f"cell {icon_cid} ({icon_value.splitlines()[0] if icon_value else 'unlabelled'}): "
+                            f"its label runs to an estimated y={label_bottom:.0f}, past container "
+                            f"{container.cid}'s bottom edge at y={cy + ch:.0f} -- give the container "
+                            "more height (see _label_overflow) rather than trimming the label",
+                        )
+                    )
+        for container in containers:
+            if (
+                container.is_group
+                or container.title_left_aligned
+                or not container.value
+            ):
+                continue
+            cx, cy, cw, ch = container.rect
+            band_width = cw * TITLE_BAND_WIDTH_FRACTION
+            band_x0 = cx + (cw - band_width) / 2
+            band_x1 = band_x0 + band_width
+            band_y1 = cy + TITLE_BAND_HEIGHT
+            for cid, source, target, label, style in edges:
+                if source not in rects or target not in rects:
+                    continue
+                sx, sy = _anchor(rects[source], style, EXIT_X, EXIT_Y)
+                tx, ty = _anchor(rects[target], style, ENTRY_X, ENTRY_Y)
+                if abs(sx - tx) > EPSILON:
+                    continue  # not a straight vertical run; the router may dodge the title
+                if sy >= cy or ty <= band_y1:
+                    continue  # does not span from above the frame to below its title band
+                mid_x = (sx + tx) / 2
+                if band_x0 <= mid_x <= band_x1:
+                    findings.append(
+                        Finding(
+                            path,
+                            "boundary-title-crossing",
+                            f"edge {cid} ({source} -> {target}) runs straight through container "
+                            f"{container.cid}'s centred title {container.value!r} at x={mid_x:.0f} "
+                            f"-- set title_align_left=True on the Frame so the title moves to the "
+                            "corner nothing crosses",
                         )
                     )
         for cid, source, target, label, style in edges:
@@ -225,11 +430,20 @@ def inspect(path: Path, text: str) -> list[Finding]:
 
 
 ADVICE = """
-  Rerouting the line is rarely the fix, because the direction follows from the placement. Move the
-  target so it sits right of or below its source; where two nodes must share a column, point the
-  edge the way the thing it carries actually travels rather than drawing a return leg; and where a
-  chain runs downwards, start it from a box, since the space under an icon belongs to that icon's
-  label."""
+  flow-direction: rerouting the line is rarely the fix, because the direction follows from the
+  placement. Move the target so it sits right of or below its source; where two nodes must share a
+  column, point the edge the way the thing it carries actually travels rather than drawing a return
+  leg; and where a chain runs downwards, start it from a box, since the space under an icon belongs
+  to that icon's label.
+
+  aws-cloud-mislabel: caption the group "AWS Cloud" (optionally with a parenthetical qualifier), or
+  choose a group without the group_aws_cloud pictogram when the boundary is not the account edge.
+
+  label-overflow: give the container the height its icon's own label needs, or shorten the label to
+  fewer lines -- not both wrong at once.
+
+  boundary-title-crossing: pass title_align_left=True to the Frame so the title sits in the corner
+  instead of the centre of the top edge."""
 
 
 def check() -> int:
@@ -305,12 +519,31 @@ def _frame(cid: str, x: int, y: int, w: int, h: int) -> str:
     )
 
 
-ICON = "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;"
+ICON = "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;fontSize=16;"
 ICON_SIDE = (
     "sketch=0;html=1;shape=image;verticalLabelPosition=middle;verticalAlign=middle;"
 )
 GROUP = "shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud;align=left;spacingLeft=30;"
 GROUP_WIDE = GROUP.replace("spacingLeft=30", "spacingLeft=160")
+GROUP_OTHER = GROUP.replace("group_aws_cloud", "group_corporate_data_center")
+# The real `FRAME_STYLE` from build_diagrams.py, and its title-left-aligned variant -- copied
+# rather than imported so this test does not depend on the other module's internals.
+FRAME_CENTRED = (
+    "rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeColor=#666666;"
+    "fillColor=none;fontColor=#232F3E;fontSize=16;verticalAlign=top;align=center;spacingTop=6;"
+)
+FRAME_LEFT = FRAME_CENTRED.replace(
+    "align=center;spacingTop=6;", "align=left;spacingTop=6;spacingLeft=16;"
+)
+
+
+def _frame_titled(
+    cid: str, x: int, y: int, w: int, h: int, *, value: str, style: str = FRAME_CENTRED
+) -> str:
+    return (
+        f'<mxCell id="{cid}" value="{value}" style="{style}" vertex="1" parent="1">'
+        f'<mxGeometry x="{x}" y="{y}" width="{w}" height="{h}" as="geometry" /></mxCell>'
+    )
 
 
 def selftest() -> int:
@@ -422,6 +655,132 @@ def selftest() -> int:
                 + _edge("e2", "c", "b")
             ),
             True,
+        ),
+        (
+            "AWS Cloud pictogram captioned AWS Cloud is accepted",
+            _doc(_node("g", 0, 0, style=GROUP, value="AWS Cloud")),
+            False,
+        ),
+        (
+            "AWS Cloud pictogram with a parenthetical qualifier is accepted",
+            _doc(_node("g", 0, 0, style=GROUP, value="AWS Cloud (Origin Region)")),
+            False,
+        ),
+        (
+            "AWS Cloud pictogram captioned with something else is rejected",
+            _doc(_node("g", 0, 0, style=GROUP, value="FSx for ONTAP file server")),
+            True,
+        ),
+        (
+            "a different pictogram is not held to the AWS Cloud caption",
+            _doc(_node("g", 0, 0, style=GROUP_OTHER, value="Cache Site")),
+            False,
+        ),
+        (
+            "two AWS Cloud pictograms as per-panel cards are not judged, even mistitled",
+            _doc(
+                _node("g1", 0, 0, style=GROUP, value="A. Panel one")
+                + _node("g2", 500, 0, style=GROUP, value="B. Panel two")
+            ),
+            False,
+        ),
+        (
+            "an icon whose two-line label fits inside its container is accepted",
+            _doc(
+                _node(
+                    "g",
+                    0,
+                    0,
+                    style=GROUP,
+                    value="AWS Cloud",
+                )
+                + _node(
+                    "a",
+                    20,
+                    40,
+                    style=ICON,
+                    value="Amazon FSx for NetApp ONTAP\n(qualifier)",
+                )
+            ).replace(
+                '<mxGeometry x="0" y="0" width="80" height="80" as="geometry" />',
+                '<mxGeometry x="0" y="0" width="400" height="220" as="geometry" />',
+                1,
+            ),
+            False,
+        ),
+        (
+            "the same icon in a container too short for its own label is rejected",
+            _doc(
+                _node(
+                    "g",
+                    0,
+                    0,
+                    style=GROUP,
+                    value="AWS Cloud",
+                )
+                + _node(
+                    "a",
+                    20,
+                    40,
+                    style=ICON,
+                    value="Amazon FSx for NetApp ONTAP\n(qualifier)",
+                )
+            ).replace(
+                '<mxGeometry x="0" y="0" width="80" height="80" as="geometry" />',
+                '<mxGeometry x="0" y="0" width="400" height="130" as="geometry" />',
+                1,
+            ),
+            True,
+        ),
+        (
+            "a centred frame title with no edge through it is accepted",
+            _doc(_frame_titled("f", 0, 0, 400, 200, value="HA pair")),
+            False,
+        ),
+        (
+            "a straight vertical edge through a centred frame title is rejected",
+            _doc(
+                _node("a", 160, -100, style="rounded=1;")
+                + _frame_titled("f", 0, 0, 400, 200, value="HA pair")
+                + _node("b", 160, 250, style="rounded=1;")
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=0.5;entryY=0;",
+                )
+            ),
+            True,
+        ),
+        (
+            "the same crossing edge is accepted once the title is left-aligned",
+            _doc(
+                _node("a", 160, -100, style="rounded=1;")
+                + _frame_titled("f", 0, 0, 400, 200, value="HA pair", style=FRAME_LEFT)
+                + _node("b", 160, 250, style="rounded=1;")
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=0.5;entryY=0;",
+                )
+            ),
+            False,
+        ),
+        (
+            "an edge that only clips the frame's side, not its title band, is accepted",
+            _doc(
+                _node("a", 360, -100, style="rounded=1;")
+                + _frame_titled("f", 0, 0, 400, 200, value="HA pair")
+                + _node("b", 360, 250, style="rounded=1;")
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=0.5;entryY=0;",
+                )
+            ),
+            False,
         ),
     ]
     probe = ROOT / "selftest.drawio"
