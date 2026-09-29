@@ -184,6 +184,7 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | SMB の書き込みが持続するか見る | [SMB の書き込みの持続](docs/ja/verification/perf-matrix-results.md#smb-の書き込みの持続15-分) | 5 分 |
 | 初期サイジングを測る計画を読む | [初期サイジングの測定計画](docs/ja/verification/initial-sizing-measurement-plan.md) | 15 分 |
 | iSCSI / NVMe/TCP を測る計画を読む | [ブロックプロトコルの測定計画](docs/ja/verification/block-protocol-matrix-plan.md) | 15 分 |
+| ブロックプロトコルとこの構成の関係を先に確認する | [選び方の分岐点 0](docs/ja/reference/decision-trees/choosing-this-architecture.md#分岐点の一覧) と [代替案との比較](docs/ja/reference/comparison/alternatives.md#ブロックプロトコルiscsi--nvmetcpの構成) | 5 分 |
 | 性能を測る前の考慮点を確認する | [性能検証の考慮点](docs/ja/reference/performance-testing-guide.md) | 15 分 |
 | **セキュリティスタイルが Cache に継承されるかを確かめた記録を読む** | [継承の検証記録](docs/ja/verification/flexcache-security-style-inheritance.md) | 10 分 |
 | SMB でマウントする前に読む | [SMB でマウントできる名前と、識別子を読む場所](docs/ja/reference/limits/smb-share-and-identifier-reading.md) | 5 分 |

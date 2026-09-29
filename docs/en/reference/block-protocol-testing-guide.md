@@ -14,6 +14,9 @@ Results are reached from [verification status](../verification-status.md), sourc
 [per-protocol measurement results](../../ja/verification/perf-matrix-results.md) (Japanese) and
 the [block measurement runbook](../../ja/verification/block-measurement-runbook.md) (Japanese).
 
+This document refers to Asymmetric Namespace Access as **multipathing** throughout — the
+mechanism that tells the host which of several paths to an NVMe namespace is the shortest one.
+
 ## Four things before reaching a mount
 
 **Each looks like it succeeded while measuring nothing.**
@@ -44,7 +47,7 @@ NVMe/TCP has nothing equivalent to `nr_sessions`; the corresponding quantity is 
 - Don't use an example's value as your own environment's value. It differs by environment even
   under the same conditions
 
-## Checking whether ANA (multipathing) is available before you're billed
+## Checking whether multipathing is available before you're billed
 
 **The check takes one command and can be done before creating a file system.**
 
@@ -57,7 +60,7 @@ If it returns `# CONFIG_NVME_MULTIPATH is not set`, then AWS's procedure step
 kernel build setting and can't be changed by adding a package.
 
 **Don't generalize this result.** Write what you observed for the kernel version you checked, not
-"ANA doesn't work on AL2023." AL2023's default kernel can change.
+"multipathing doesn't work on AL2023." AL2023's default kernel can change.
 
 ### Having two paths and using two paths are different things
 
@@ -134,7 +137,7 @@ record the following for block:
 - iSCSI: the counted number of TCP connections (the actual count from `ss`, not the requested value)
 - NVMe/TCP: requested queue count and effective queue count (`nvme get-feature --feature-id 7`),
   controller count
-- ANA: kernel's `CONFIG_NVME_MULTIPATH` presence, the kernel version checked
+- Multipathing: kernel's `CONFIG_NVME_MULTIPATH` presence, the kernel version checked
 - `iopolicy` setting value and `nvme-cli` version
 - Per-path byte counts (both the ONTAP-side counter and the client-side aggregation)
 - ONTAP version. **`FileSystemTypeVersion` is a Lustre-only field and cannot be retrieved for

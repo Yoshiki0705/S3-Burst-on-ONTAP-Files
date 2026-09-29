@@ -14,14 +14,14 @@
 
 ## 提出済み（7 件）
 
-| 記事 | 指摘 | 種別 | 状態（2026-09-21 確認） |
+| 記事 | 指摘 | 種別 | 状態（2026-09-22 確認） |
 |---|---|---|---|
-| A | `JunctionPath` の本文と `Required:` 欄が食い違う（[API リファレンス](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateOntapVolumeConfiguration.html)、CloudFormation・CDK に伝播） | 記述の自己矛盾 | 調査中。AWS から一次回答のみ |
-| B | 「パッケージの導入以外は他の EC2 Linux AMI でも有効」に対し `cat /etc/nvme/hostnqn` が AL2023 でファイル不在 | 記述の範囲外の反例 | AWS が観測を確認し、ドキュメントフィードバックとして提出したとの回答。修正時期は未定 |
-| B | 同じ記述に対し `cat /sys/module/nvme_core/parameters/multipath` が AL2023 でファイル不在（`CONFIG_NVME_MULTIPATH` 未設定） | 記述の範囲外の反例 | AWS が観測を確認し提出。付随する確認質問（対象ディストリビューションの確認）は解消済み |
-| B | 手順の `iopolicy` 確認値（`round-robin`）と実測（`queue-depth`）の不一致。版の境界は `nvme-cli` 2.11→2.12 | 版のずれ（記述の誤りではない） | AWS が版差が原因という理解に同意。社内担当部署へ確認の上で状況連絡の約束 |
-| Part 2 | 第二世代の持続書き込みが、指定値に当てるべき公表値を 2 点とも超える | 公表値と実測の乖離 | 返信なし |
-| Part 2 | ap-northeast-1 の NVMe リードキャッシュ容量が表に無く、管理ページも second-generation 限定で書かれている | 記載の欠落（2 か所） | 返信なし |
+| A | `JunctionPath` の本文と `Required:` 欄が食い違う（[API リファレンス](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateOntapVolumeConfiguration.html)、CloudFormation・CDK に伝播） | 記述の自己矛盾 | `Required: No` の理屈についての説明が得られた（RW は必須・DP は指定不可のため、両者を合わせた属性としては必ずしも必須ではない）。`Required: Conditional` への変更は未確約 |
+| B | 「パッケージの導入以外は他の EC2 Linux AMI でも有効」に対し `cat /etc/nvme/hostnqn` が AL2023 でファイル不在 | 記述の範囲外の反例 | 同一環境での再現が確認され、2 つの改善案が担当チームへ共有される見込み。採否・時期は未確約 |
+| B | 同じ記述に対し `cat /sys/module/nvme_core/parameters/multipath` が AL2023 でファイル不在（`CONFIG_NVME_MULTIPATH` 未設定） | 記述の範囲外の反例 | 観測が確認され、ドキュメントフィードバックとして提出された。付随する確認質問（AL2023 が対象から外れている理由）にも技術的な回答があり — 経路統合前提の手順を未統合のまま進めるとデータ破損リスクを伴うため、対象外は妥当と判断された |
+| B | 手順の `iopolicy` 確認値（`round-robin`）と実測（`queue-depth`）の不一致。版の境界は `nvme-cli` 2.11→2.12 | 版のずれ（記述の誤りではない） | 版差が原因という理解が共有され、社内での確認を経て状況連絡の約束があった |
+| Part 2 | 第二世代の持続書き込みが、指定値に当てるべき公表値を 2 点とも超える | 公表値と実測の乖離 | 「最大 3 分の 1」は制限ではなくサイジングのための性能指標との説明が得られた。書き込みはアクティブ／スタンバイ間の同期で帯域を 2 回分使うが、バースト性能により指定値を超えることは想定内とのこと。サイジングは指定値の 3 分の 1 を目安にする従来の考え方どおりで案内された |
+| Part 2 | ap-northeast-1 の NVMe リードキャッシュ容量が表に無く、管理ページも second-generation 限定で書かれている | 記載の欠落（2 か所） | ドキュメント修正は行わない方針が示された。コーナーケースの列挙は非現実的と判断され、個別確認は `system node external-cache show` を案内された |
 
 ## 提出しない（3 件）
 
@@ -39,7 +39,7 @@
 | 記事 | 提出済み | 提出しない | 指摘なし |
 |---|---|---|---|
 | A: セッション数とキュー数 | 1 件 | 1 件 | — |
-| B: ANA が使えるかの確認 | 3 件 | — | — |
+| B: マルチパスが使えるかの確認 | 3 件 | — | — |
 | C: 数値は何で動くか | — | 1 件 | ○ |
 | S3 Burst Part 2 | 2 件 | 1 件 | — |
 

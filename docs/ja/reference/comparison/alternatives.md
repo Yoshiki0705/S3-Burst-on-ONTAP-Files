@@ -16,9 +16,16 @@ S3 とファイルストレージの両方が必要なとき、実務では概�
 | マネージド NFS 単独（Amazon EFS など） | 利用側が AWS 上の Linux で、NFSv4 で足りる。容量を自動で伸ばしたい | **SMB が要る、NFSv3 固定の装置、Windows クライアント**（[EFS は NFSv4.0 / 4.1 のみで Windows 非対応](https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-old.html)）、AWS 外の利用側、収集を S3 API で受けたい |
 | S3 → ファイルゲートウェイ / FUSE | 読み取り中心で、S3 を正本にする方針が確定している | ロックや原子的 rename が要る、メタデータ操作が多い |
 | S3 Files で S3 をファイルシステムとしてマウント | 利用側が AWS 上の Linux コンピュートで、マウントヘルパーを入れられる。S3 を正本にする方針が確定している | 構成を変えられない装置、SMB、NFSv3、AWS 外の利用側。ファイルシステム側の書き込みを 60 秒以内に S3 へ出したい。アーカイブ系からファイルで読みたい |
+| **ブロックプロトコル（iSCSI / NVMe/TCP、FSx for ONTAP のブロックストレージ）** | 利用側が LUN や namespace をブロックデバイスとして要求する。**単一ファイルシステムに直結したクライアントの性能が要件で、拠点への配布は要らない** | **拠点への配布が要る。** FlexCache が配るのはボリュームで、LUN や namespace は配らないため、**この構成の対象外になる。** 実測は[ブロックプロトコルの測定結果](../../verification/perf-matrix-results.md#f-1-iscsi-の実測)にあるが、同一ファイルシステムに直結した値であり配布先の値ではない。**費用で迷う場合は姉妹リポジトリの [TCO 比較](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/ja/tco-comparison.md)** |
 | 二重管理 | 用途が完全に分離していて、突き合わせの必要がない | 監査対応が要る、コスト削減が要る |
 | SnapMirror で拠点へ複製 | 拠点で全量が必要で、**拠点は読み取りで足りる** | 全量転送を避けたい、拠点数が多い、**関係を解除せずに拠点で書きたい** — [宛先は解除するまで読み取り専用で、解除すると Source から分岐する](https://docs.netapp.com/us-en/ontap/data-protection/make-destination-volume-writeable-task.html) |
 | **S3 で収集 → FlexCache で NFS / SMB に配布（この構成）** | 収集は S3、利用は既存のファイルプロトコル。利用は読み取り中心。必要な範囲だけ拠点に置きたい | S3 固有機能が要る、NAS フレンドリでない名前を多用する、Cache 側でも S3 で読みたい、write-back の条件 (ONTAP 版数・Origin 側リソース) を負えない |
+
+**対応バージョン・制約は方式ごとに異なる。** ブロックプロトコルは ONTAP のバージョンに縛られない
+（LUN / namespace は FSx for ONTAP の基本機能）が、**拠点への配布という要件自体が対象外になる。**
+この構成は収集層に ONTAP 9.17.1 以降が必要（[サポート状況](../../support-matrix.md)）。
+S3 Files はバケット側の S3 バージョニングが前提。EFS は NFSv4.0 / 4.1 のみで SMB 非対応。
+各方式の版数・対応プロトコルの詳細は下の代償表と[サポート状況](../../support-matrix.md)にある。
 
 ## それぞれの代償
 
@@ -50,6 +57,41 @@ NAS 上のデータを DataSync / rsync / robocopy / 自作 ETL で S3 に複製
 | 説明可能性 | 保持期間・改ざん防止・監査ログをどちら側で担保するかが曖昧になり、監査で説明できない |
 | コスト | 容量・転送・API リクエストが二重に発生し、削減余地が見えない |
 
+### マネージド NFS 単独（Amazon EFS など）の構成
+
+利用側が AWS 上の Linux で、既存のプロトコル（NFSv4）のまま容量を自動で伸ばしたい場合。
+
+| 代償 | 内容 |
+|---|---|
+| プロトコル | NFSv4.0 と NFSv4.1 のみ。**SMB は対象外**（[マウントの互換性](https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-old.html)） |
+| クライアント OS | Windows クライアントは非対応。**NFSv3 固定の装置も使えない** |
+| 設置場所 | AWS 上のコンピュートが前提。AWS 外の利用側では使えない |
+| 収集経路 | S3 API で受ける経路を持たない。収集を S3 で行いたい場合は別の設計が要る |
+| データ管理機能 | ONTAP の Snapshot / FlexClone / SnapMirror に相当する機能は別の形（AWS Backup 等）になる |
+
+**ブロックプロトコルとの対比が要る。** EFS は NFS（ファイルプロトコル）であり、iSCSI / NVMe/TCP
+（ブロックプロトコル）とは要求の層が異なる。**「NFS で足りるか、ブロックデバイスが要るか」が
+最初の分岐**で、この分岐は[選び方](../decision-trees/choosing-this-architecture.md)の分岐点 0 が
+先に判定する。
+
+### ブロックプロトコル（iSCSI / NVMe/TCP）の構成
+
+利用側が LUN や namespace をブロックデバイスとして要求する場合。この構成（S3 収集 →
+FlexCache 配布）とは**要求の層が異なる** — FlexCache が配るのはボリュームで、LUN や namespace は
+配らない。
+
+| 代償 | 内容 |
+|---|---|
+| 配布不可 | **FlexCache はブロックデバイスを配布しない。** 拠点への配布が要件にあるなら、この方式単独では満たせない |
+| 実測の前提 | 実測は[同一ファイルシステムに直結したクライアントの値](../../verification/perf-matrix-results.md#f-1-iscsi-の実測)であり、**拠点間の配布性能ではない**。同じ環境の測り方は逐次読みで `iorate=max` の飽和点であり、ベースラインではない |
+| プロトコル間の差 | 同一ファイルシステムでは iSCSI と NVMe/TCP の間に測定可能な差は無かった（1 接続で 0.06% 差）。**プロトコル選択は性能ではなく既存ドライバ・OS 対応で決める** |
+| 費用の比較軸 | 容量単価だけで FSx for ONTAP のブロック利用を選ぶ根拠は、姉妹リポジトリの実測では成立しなかった（[TCO 比較](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/ja/tco-comparison.md)）。**このリポジトリはその検算を持たない** |
+
+**この構成（S3 収集 → FlexCache 配布）と組み合わせられるか。** 組み合わせられない。収集層が
+Origin ボリュームに S3 Access Point を付ける設計で、ブロックデバイス（LUN / namespace）はボリューム
+ではないため、同じ Origin から両方を配ることはできない。**ブロックが必要な利用拠点には、
+この構成とは別に、直結の FSx for ONTAP か姉妹リポジトリの経路を検討する。**
+
 ### S3 Files で S3 をファイルシステムとしてマウントする構成
 
 S3 を正本に保ったまま、ファイルシステムのセマンティクス (ロックと POSIX 権限を含む) で読み書きする。
@@ -72,6 +114,9 @@ S3 を正本に保ったまま、ファイルシステムのセマンティク�
 
 反映速度を同一手法で並べる比較は[S3 Files と本構成の比較検証](../../verification/s3files-vs-flexcache.md)にある。
 **S3 Files 側は未測定なので表は空である。**
+
+同一ホストから FSx for ONTAP の S3 Access Point・Amazon S3・Amazon S3 Files を測った記事は
+[3 経路のボトルネック（S3 Burst Part 2）](TODO-LINK-S3BURST2)（公開後にリンクを差し替える）。
 
 ### S3 で収集 → FlexCache で配布（この構成）
 

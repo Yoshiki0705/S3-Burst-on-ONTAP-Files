@@ -13,6 +13,9 @@ iSCSI / NVMe-TCP で FSx for ONTAP をマウント・測定するときに踏ん
 [プロトコル別測定の結果](../verification/perf-matrix-results.md)と
 [ブロック測定の実行手順](../verification/block-measurement-runbook.md)。
 
+この文書では Asymmetric Namespace Access を**マルチパス**と表記する。1 つの NVMe namespace に
+複数の経路がある構成で、どちらが最短経路かをホスト側に伝える仕組みを指す。
+
 ## マウントに到達する前の 4 つ
 
 **どれも「成功したように見えて何も測れていない」形で現れる。**
@@ -40,7 +43,7 @@ NVMe/TCP には `nr_sessions` に相当するものが無く、対応する量�
 - **`queue_count` は admin queue を含み `NCQA + 1` に一致する**（1 → 2、4 → 5）
 - 掲載例の値を自分の環境の値として使わない。同じ条件でも環境によって異なる
 
-## ANA（マルチパス）が使えるかの課金前の確認
+## マルチパスが使えるかの課金前の確認
 
 **確認は 1 コマンドで済み、ファイルシステムを作る前に判定できる。**
 
@@ -52,7 +55,7 @@ grep -i NVME_MULTIPATH /boot/config-$(uname -r)
 `cat /sys/module/nvme_core/parameters/multipath` は成立しない（ファイルが存在しない）。
 これはカーネルのビルド設定であり、パッケージの追加では変えられない。
 
-**この確認結果を、一般化して書かない。** 「AL2023 では ANA が使えない」ではなく、確認した
+**この確認結果を、一般化して書かない。** 「AL2023 ではマルチパスが使えない」ではなく、確認した
 カーネル版でどうだったかを書く。AL2023 の既定カーネルは変わりうる。
 
 ### 経路が 2 本あることと、2 本使っていることは別
@@ -127,7 +130,7 @@ v2.11 は `round-robin`、v2.12 以降は `queue-depth`）。**手順どおり�
 
 - iSCSI: 数えた TCP 接続の本数（指定値ではなく `ss` で数えた実数）
 - NVMe/TCP: 要求したキュー数と実効キュー数（`nvme get-feature --feature-id 7`）、コントローラ数
-- ANA: カーネルの `CONFIG_NVME_MULTIPATH` の有無、確認したカーネル版
+- マルチパス: カーネルの `CONFIG_NVME_MULTIPATH` の有無、確認したカーネル版
 - `iopolicy` の設定値と、`nvme-cli` のバージョン
 - 経路ごとのバイト数（ONTAP 側のカウンタとクライアント側の集計の両方）
 - ONTAP のバージョン。**`FileSystemTypeVersion` は Lustre 専用フィールドで FSx for ONTAP では

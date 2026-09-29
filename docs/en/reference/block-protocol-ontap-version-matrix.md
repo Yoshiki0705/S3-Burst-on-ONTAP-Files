@@ -10,14 +10,17 @@ recorded version, and one article's measurements span more than one version — 
 explicitly in the source article. This document is an index across articles and doesn't
 override what each article says.**
 
+In this document, "multipathing" for Article B refers to Asymmetric Namespace Access — the
+mechanism that tells the host which of several paths to an NVMe namespace is the shortest one.
+
 ## Mapping by article
 
 | Article | Measurement | ONTAP version | Note |
 |---|---|---|---|
 | A: Session and queue counts | Divisor table (3 points) | 9.18.1P5 | — |
 | A: Session and queue counts | Queue-negotiation section | Not recorded | Separate deployment; not read at measurement time and can't be retaken |
-| B: Checking whether ANA is available | Match table's reads and writes | 9.18.1 | — |
-| B: Checking whether ANA is available | Sequential writes (12 points) | Not recorded | `FileSystemTypeVersion` returned `null`; the environment was torn down before it could be re-fetched from the cluster API |
+| B: Checking whether multipathing is available | Match table's reads and writes | 9.18.1 | — |
+| B: Checking whether multipathing is available | Sequential writes (12 points) | Not recorded | `FileSystemTypeVersion` returned `null`; the environment was torn down before it could be re-fetched from the cluster API |
 | C: What moves the numbers | Initial deployment | 9.18.1P5 | — |
 | C: What moves the numbers | Per-path measurement | 9.18.1P6 | — |
 | C: What moves the numbers | Later three deployments | 9.18.1 | — |
