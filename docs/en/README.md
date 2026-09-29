@@ -192,6 +192,7 @@ stage. **No figure means anything without the conditions it was measured under.*
 | Read the NFS / SMB / EFS throughput figures | [Protocol measurement results](../ja/verification/perf-matrix-results.md) (Japanese) | 20 min |
 | **Check whether the throughput capacity figure is the read ceiling** | [Throughput capacity, burst and baseline](../ja/verification/throughput-capacity-burst-and-baseline.md) (Japanese) | 10 min |
 | Read the plan for measuring iSCSI / NVMe/TCP | [Block protocol measurement plan](../ja/verification/block-protocol-matrix-plan.md) (Japanese) | 15 min |
+| Check how block protocols relate to this architecture first | [Choosing, decision point 0](reference/decision-trees/choosing-this-architecture.md#the-decision-points-as-a-table) and [Alternatives](reference/comparison/alternatives.md#block-protocols-iscsi--nvmetcp) | 5 min |
 | Confirm it on real hardware | [PoC checklist](poc-checklist.md) | 10 min |
 
 > **The end-to-end core is verified with FSx for ONTAP on the cache side too.** An object written to

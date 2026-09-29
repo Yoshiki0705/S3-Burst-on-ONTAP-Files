@@ -63,16 +63,14 @@ AWS states the following three supported FlexCache configurations for FSx for ON
 | FSx for ONTAP | On-premises ONTAP | **This architecture's main path** |
 | FSx for ONTAP | FSx for ONTAP | Usable for in-Region and cross-Region replication |
 
-Whether Cloud Volumes ONTAP, ONTAP Select, Azure NetApp Files or Google Cloud NetApp Volumes can be
-the cache when FSx for ONTAP is the origin is not covered by this table. **For now it is treated as
-unconfirmed.** It is never summarised as "it works because it is ONTAP-based".
-
-For reference, Azure NetApp Files has cache volumes that target an external ONTAP or Cloud Volumes
-ONTAP origin
-([cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes)). Whether
-FSx for ONTAP can be used as the origin is not stated explicitly in the
-[requirements](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-requirements), so it
-is treated as something to verify.
+**The platform-by-platform verdict — including Cloud Volumes ONTAP, ONTAP Select,
+Azure NetApp Files and Google Cloud NetApp Volumes (as origin, as cache, minimum version,
+primary source, verdict) — is authoritative in [portability](portability.md).** This table
+states only this architecture's main path. **The verdict differs in kind across the four
+platforms** — Cloud Volumes ONTAP as an origin rests on an AWS blog post rather than a service
+document, while Google Cloud NetApp Volumes can only be an origin in ONTAP mode, which its own
+documentation states outright. Do not collapse that difference into one word ("unconfirmed");
+the detail is kept only in [portability](portability.md).
 
 ## Constraints on the collect layer
 
@@ -147,6 +145,7 @@ design constraints.**
 | [Decisions that come first](design-first-decisions.md) | The relationship between security style and protocol |
 | [Portability](portability.md) | Considering a replacement one layer at a time |
 | [Glossary](reference/glossary/object-access-on-ontap.md) | The mechanism names and their implementers |
+| [Alternatives](reference/comparison/alternatives.md) | **This table covers the collect and serve layers only.** Supported versions and constraints for block protocols, S3 Files and EFS are there |
 
 ---
 

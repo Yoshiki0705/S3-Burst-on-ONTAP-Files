@@ -22,9 +22,17 @@ conditions go in the same column.
 | Managed NFS alone (Amazon EFS and similar) | The consuming side is Linux on AWS and NFSv4 is enough. Capacity should grow on its own | **SMB is required, a device fixed to NFSv3, Windows clients** ([EFS supports only NFSv4.0 / 4.1 and not Windows](https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-old.html)), consumers outside AWS, collection over the S3 API |
 | S3 behind a file gateway / FUSE | Read-centric, and the policy of making S3 the source of truth is settled | Locking or atomic rename is needed, metadata operations are frequent |
 | S3 mounted as a file system with S3 Files | The consuming side is Linux compute on AWS and can install the mount helper. The policy of making S3 the source of truth is settled | Equipment that cannot be changed, SMB, NFSv3, a consuming side outside AWS. A file-system write has to reach S3 within 60 seconds. Archive storage classes have to be readable as files |
+| **Block protocols (iSCSI / NVMe/TCP, FSx for ONTAP block storage)** | The consuming side requires a LUN or namespace as a block device. **The requirement is throughput from a client attached directly to a single file system; fan-out to a site is not needed** | **Fan-out to a site is needed.** FlexCache serves volumes, not LUNs or namespaces, so **this falls outside this architecture.** Measurements are in [block protocol measurement results](../../../ja/verification/perf-matrix-results.md#f-1-iscsi-の実測) (Japanese), but they are values from a client attached directly to the file system, not fan-out values. **For a cost comparison, see the sibling repository's [TCO comparison](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/en/tco-comparison.md)** |
 | Dual management | The uses are completely separate and never have to be reconciled | Audit obligations apply, cost reduction is required |
 | Replicated to sites with SnapMirror | The site needs the whole dataset and **reading at the site is enough** | Full transfer is to be avoided, there are many sites, or **the site has to be written to without breaking the relationship** — [the destination stays read-only until it is broken, and then it diverges from the source](https://docs.netapp.com/us-en/ontap/data-protection/make-destination-volume-writeable-task.html) |
 | **Collect over S3, serve to NFS / SMB with FlexCache (this architecture)** | Collection over S3, consumption over the existing file protocols. Consumption is read-centric. Only the range needed is placed at the site | S3-specific features are needed, NAS-unfriendly names are used heavily, S3 reads are needed on the cache side too, the write-back preconditions (ONTAP version, origin-side resources) cannot be carried |
+
+**Supported versions and constraints differ by approach.** Block protocols are not tied to an ONTAP
+version (LUNs and namespaces are a base FSx for ONTAP feature) — **but the fan-out requirement itself
+is what puts them out of scope here.** This architecture needs ONTAP 9.17.1 or later on the collect
+layer ([support matrix](../../support-matrix.md)). S3 Files presupposes S3 versioning on the bucket.
+EFS supports only NFSv4.0 / 4.1, and not SMB. The version and protocol detail for each approach is in
+the cost tables below and in the [support matrix](../../support-matrix.md).
 
 ## What each one costs you
 
@@ -56,6 +64,42 @@ Replicating data on NAS to S3 with DataSync, rsync, robocopy or a bespoke ETL.
 | Explicability | Which side holds retention, tamper-proofing and audit logging becomes ambiguous, and it cannot be explained in an audit |
 | Cost | Capacity, transfer and API requests all occur twice, and the room to reduce them is invisible |
 
+### Managed NFS alone (Amazon EFS and similar)
+
+For a consuming side that is Linux on AWS and wants capacity to grow automatically on an existing
+protocol (NFSv4).
+
+| Cost | Detail |
+|---|---|
+| Protocol | NFSv4.0 and NFSv4.1 only. **SMB is out of scope** ([mounting compatibility](https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-old.html)) |
+| Client OS | Windows clients are not supported. **A device fixed to NFSv3 cannot be used either** |
+| Where it runs | Compute on AWS is the premise. It cannot be used from a consuming side outside AWS |
+| Collection path | Has no path for collecting over the S3 API. A different design is needed if collection needs S3 |
+| Data management features | The equivalent of ONTAP's Snapshot / FlexClone / SnapMirror takes a different shape (e.g. AWS Backup) |
+
+**Worth contrasting with block protocols.** EFS is NFS (a file protocol), while iSCSI / NVMe/TCP
+(block protocols) sit at a different requirement layer. **"Is NFS enough, or is a block device
+needed" is the first fork**, and [Choosing](../decision-trees/choosing-this-architecture.md) decision
+point 0 answers that fork first.
+
+### Block protocols (iSCSI / NVMe/TCP)
+
+For a consuming side that requires a LUN or namespace as a block device. This sits at a **different
+requirement layer** from this architecture (collect over S3, serve with FlexCache) — FlexCache serves
+volumes, not LUNs or namespaces.
+
+| Cost | Detail |
+|---|---|
+| No fan-out | **FlexCache does not serve block devices.** If fan-out to a site is a requirement, this approach alone cannot meet it |
+| Measurement premise | Measurements are from [a client attached directly to the same file system](../../../ja/verification/perf-matrix-results.md#f-1-iscsi-の実測) (Japanese), **not the throughput of serving a remote site**. The same environment's sequential-read figures are `iorate=max` saturation points, not a baseline |
+| Difference between protocols | No measurable difference was found between iSCSI and NVMe/TCP on the same file system (0.06% at one connection). **Protocol choice is decided by existing driver and OS support, not performance** |
+| Cost comparison axis | Choosing FSx for ONTAP for block storage on capacity price alone did not hold up in the sibling repository's measurement ([TCO comparison](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/en/tco-comparison.md)). **This repository does not carry that check itself** |
+
+**Can it be combined with this architecture (collect over S3, serve with FlexCache)?** No. The collect
+layer attaches the S3 Access Point to the Origin volume, and a block device (LUN / namespace) is not a
+volume, so the same Origin cannot serve both. **A consuming site that needs block storage requires a
+separate design — either a direct FSx for ONTAP connection or the sibling repository's path.**
+
 ### Mounting S3 as a file system with S3 Files
 
 Reading and writing with file-system semantics, including locking and POSIX permissions, while
@@ -77,6 +121,9 @@ makes the idea close to FlexCache.
 Costs are compared in
 [FinOps cost structure](finops-s3-vs-s3ap.md).
 For reading large objects from Linux on AWS, it can come out cheaper than this architecture.
+
+An article measuring the FSx for ONTAP S3 Access Point, Amazon S3 and Amazon S3 Files from the same
+host is [Three bottlenecks (S3 Burst Part 2)](TODO-LINK-S3BURST2-EN) (link filled in once published).
 
 ### Collect over S3, serve with FlexCache (this architecture)
 

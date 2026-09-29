@@ -1,0 +1,61 @@
+# 主経路 PoC（Origin: FSx for ONTAP / Cache: オンプレミス ONTAP）の環境マニフェスト雛形
+#
+# scripts/measure_visibility.py の --output で得られる JSON はレイテンシの生値のみを持ち、
+# 環境条件はコマンドライン引数にしか残らない。このファイルは、その環境条件を機械可読な形で
+# 別途記録するための雛形である。
+#
+# 適用範囲: docs/ja/verification/onprem-cache-poc-template.md の計測、および今後この形式で
+# 追加する新規の PoC 記録に限る。既存の verification-status.md / docs/ja/verification/*.md の
+# 実測記録は本文インライン記述のまま変更しない（全面移行はしない。理由は
+# .private/ の調査記録、または REVIEW.md 参照）。
+#
+# 使い方: このファイルをコピーして <計測日>-<短い識別子>.environment.yaml のような名前で保存し、
+# 各フィールドを埋める。「未記録」は空欄放置と区別できないため、値が無い場合は文字列
+# "not_recorded" を明示的に入れる。
+
+measurement:
+  # verification-status.md または該当ページの見出しアンカーを指す。存在しない場合は "pending"
+  record_ref: "pending"
+  measured_at: "" # ISO 8601, 例: 2026-09-07T10:00:00+09:00
+  measured_by_script: "scripts/measure_visibility.py"
+
+region: ""
+
+origin:
+  platform: "FSx for ONTAP"
+  ontap_version: "" # FileSystemTypeVersion は null を返すため、ONTAP REST の
+                     # /api/cluster?fields=version から取得すること（verification-status.md 参照）
+  deployment_type: "" # 例: SINGLE_AZ_1, SINGLE_AZ_2
+  throughput_capacity_mbps: null
+  storage_capacity_gib: null
+  ssd_iops_mode: "" # AUTOMATIC or USER_PROVISIONED
+  ssd_iops_value: null
+
+cache:
+  platform: "on-premises ONTAP" # AFF / FAS / ONTAP Select のいずれかを追記
+  ontap_version: ""
+  security_style: "" # UNIX or NTFS
+  volume_type: "FlexGroup" # Cache は FlexGroup である前提
+
+network:
+  path_description: "" # 例: Direct Connect 経由、VPN 経由、専用線
+  round_trip_latency_ms: null # ping 等で事前に測定した値
+  mtu: null
+
+client:
+  instance_or_host_type: ""
+  nfs_mount_options: "" # 例: nfsvers=3,actimeo=0
+  smb_mount_options: "" # SMB を測る場合のみ
+
+payload:
+  object_size_bytes: null
+  payload_type: "" # non-compressible (--body random) or compressible
+  iterations: null
+
+pass_fail_criteria:
+  # docs/ja/poc-checklist.md の「測定前の合否基準の決定」で埋めた内容をここにも記録する
+  metric: "" # 例: p50 latency for s3ap_to_fc_nfs direction
+  threshold: null
+  threshold_unit: "" # 例: ms
+  threshold_rationale: ""
+  result: "not_recorded" # pass / fail / not_recorded

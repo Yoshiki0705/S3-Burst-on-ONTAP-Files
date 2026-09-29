@@ -148,6 +148,13 @@ ALLOWED_ANCHORS: dict[str, tuple[str, ...]] = {
     "docs/en/reference/decision-trees/from-your-current-setup.md": (
         "#f-1-iscsi-の実測",
     ),
+    # Decision point 0 and the block-protocol row in Alternatives send the same reader away for the
+    # same reason as from-your-current-setup.md above, and cite the same Japanese-only measurement
+    # record for the same reason: restating the figures in English would put them in a second place.
+    "docs/en/reference/decision-trees/choosing-this-architecture.md": (
+        "#f-1-iscsi-の実測",
+    ),
+    "docs/en/reference/comparison/alternatives.md": ("#f-1-iscsi-の実測",),
     # The English expectations page states, in a note under two measured rows, that above 100% on the
     # first generation is not burst: the denominator is the specified value and no burst-balance
     # metric exists on that configuration. That correction is only safe to state next to the

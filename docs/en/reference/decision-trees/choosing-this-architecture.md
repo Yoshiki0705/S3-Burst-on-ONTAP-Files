@@ -29,6 +29,21 @@ flowchart TD
 
 | # | Question | If yes | If no |
 |---|---|---|---|
+| **0** | **Does the consuming side need iSCSI or NVMe/TCP** (a LUN / namespace served as a block device) | **This architecture is out of scope.** FlexCache serves volumes; it does not serve LUNs or namespaces. Block measurements are [elsewhere](../../../ja/verification/perf-matrix-results.md#f-1-iscsi-の実測) (Japanese), but those are **values from a client attached directly to the same file system**, not values for serving a site. **Where cost is the question, see below** | Go to 1 |
+
+> **For a reader who is out of scope at decision point 0, this repository has nothing further.** A
+> cost comparison for holding data on block storage is in the sibling repository —
+> [VMware-Migration-EC2-ONTAP's TCO comparison](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/en/tco-comparison.md).
+> It checks unit prices with the ap-northeast-1 Price List API, lines them up against every EBS
+> volume type, and concludes that **choosing FSx for ONTAP on capacity price alone does not hold up
+> for block storage.** **This repository does not carry that same comparison and has not checked the
+> arithmetic itself.** The one thing pulled from it here is that single caution, not the figures
+> themselves.
+>
+> **The cost table for the same fork is in [Alternatives](../comparison/alternatives.md#block-protocols-iscsi--nvmetcp).**
+> An article covering how the figures were measured (`iorate=max` saturation points, response time,
+> a 2.64x swing across environments on the same configuration) is
+> [What moves the numbers for block protocols](TODO-LINK-BLOCK-C-EN) (link filled in once published).
 | 1 | Can the consuming side's protocol be changed | Consider S3 alone. This architecture is unnecessary | Go to 2 |
 | 2 | Are the object names NAS friendly (S3 name within 1024 bytes, file name within 255 characters, a hierarchy containing slashes) | Go to 3 | Use an object store alongside. This architecture applies in part |
 | 3 | Are S3-specific features needed (versioning, lifecycle, event notifications) | Consider an architecture with S3 as the source of truth | Go to 4 |

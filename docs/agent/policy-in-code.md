@@ -16,6 +16,7 @@ the prose instead produces a confident answer that the tool then contradicts.
 | Anything about the two languages or the switcher | `docs/i18n-terms.md`, `tools/check_i18n_parity.py` |
 | A number stated in prose | `tools/check_derived_counts.py` — `COUNT_GLOBS` |
 | **Adding a verification section** | `docs/agent/superseded-claims.txt` — **前に、その節が覆す旧記述を探す。** probe は文字列が消えたときにしか鳴らないので、覆された旧記述が残っている限り全ゲートが緑のまま通る。見つけた分を登録すると `make superseded` が注記を保つ |
+| **Adding a new PoC / verification record from 2026-09 onward** | `docs/ja/verification/onprem-cache-poc-environment.example.yaml` — 新規記録はこの雛形をコピーして環境条件を機械可読に残す。既存の実測記録（本文インライン記述）はこの形式へ移行しない |
 | A published article and its draft | `tools/check_blog_draft_sync.py` |
 | The Interconnect Region pairs or a CSP's lifecycle | `tools/check_interconnect_regions.py` — `DOCUMENTS` and `CSP_HEADINGS` |
 
@@ -127,3 +128,19 @@ CI on the commit that added it.
 
 Worked example, with sources and the error-to-cause table:
 [SMB でマウントできる名前と、識別子を読む場所](../ja/reference/limits/smb-share-and-identifier-reading.md).
+
+## An external fetch landing somewhere unexpected is a URL bug first, not a missing source
+
+Fetching a citation URL and getting a profile page, a 404, or a redirect target that clearly is not
+the article is not evidence that the source cannot be confirmed. It is evidence that the URL string
+is wrong, and the two calls for opposite next steps: one is "cite as a lower evidence tier or drop
+the claim", the other is "fix the request and try again before concluding anything."
+
+A citation to `hidekazu-konishi.com` was withdrawn in one review round because the fetch resolved to
+an author bio page, and reinstated in the next round because the URL had one missing underscore
+(`..._stepbystep.html` versus the real `..._step_by_step.html`). The article was there the whole
+time; only the request was wrong. **Before writing "could not confirm this source", re-issue the
+fetch and check that the returned title and opening paragraph match what the citation claims to be.**
+A profile page, an error page, or a page about an unrelated topic is the signal to suspect the URL
+string itself — a missing word separator, a stale slug, a redirect — not to downgrade or withdraw the
+citation on the first attempt.

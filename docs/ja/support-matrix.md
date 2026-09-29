@@ -55,19 +55,14 @@ AWS が明記している FSx for ONTAP の FlexCache 対応構成は次の 3 �
 | FSx for ONTAP | オンプレミス ONTAP | **この構成の主経路** |
 | FSx for ONTAP | FSx for ONTAP | リージョン内 / リージョン間の複製に使える |
 
-FSx for ONTAP を Origin としたときに、Cloud Volumes ONTAP / ONTAP Select /
-Azure NetApp Files / Google Cloud NetApp Volumes を Cache にできるかは、この表に含まれていない。
-**現時点では未確認として扱う。** 「ONTAP ベースだから動く」とまとめない。
-
-逆方向、つまり他クラウドのファイルストレージを Origin として FSx for ONTAP を Cache にする構成も
-この表の外にある。判定の分かれ方は[移植性](portability.md)、接続経路そのものは
-[他クラウドとの接続経路](multi-cloud-connectivity.md)にある。
-
-参考として、Azure NetApp Files には外部 ONTAP / Cloud Volumes ONTAP の Origin を対象とする
-キャッシュボリュームがある（[cache volumes](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-volumes)）。
-FSx for ONTAP を Origin として使えるかは
-[要件](https://learn.microsoft.com/en-us/azure/azure-netapp-files/cache-requirements)の
-文面に明示がないため、検証対象としている。
+**Cloud Volumes ONTAP / ONTAP Select / Azure NetApp Files / Google Cloud NetApp Volumes を
+含めたプラットフォーム別の判定（Origin として / Cache として / 最小バージョン / 一次資料 /
+判定語）は[移植性](portability.md)の表を正とする。** この表はこの構成の主経路だけを示す。
+**判定語は 4 プラットフォームで揺れている** — Cloud Volumes ONTAP は AWS のブログが Origin
+になりうると書いているがサービスのドキュメントではなく、Google Cloud NetApp Volumes は
+ONTAP-mode のときだけ Origin になれると明記されている、といった**プラットフォームごとに
+判定の根拠が異なる**。この違いを 1 語（「未確認」）に潰さないために、詳細は
+[移植性](portability.md)側にだけ書いてある。
 
 ## 収集層に対する制約
 
@@ -141,6 +136,7 @@ FSx for ONTAP を Origin として使えるかは
 | [移植性](portability.md) | 層ごとの置き換えを検討する場合 |
 | [他クラウドとの接続経路](multi-cloud-connectivity.md) | 他クラウドとの接続の選択肢と対応リージョン |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 機構の呼び名と実装元 |
+| [代替案との比較](reference/comparison/alternatives.md) | **この表は収集層・配布層専用。** ブロックプロトコル・S3 Files・EFS の対応バージョン・制約はこちら |
 
 ---
 

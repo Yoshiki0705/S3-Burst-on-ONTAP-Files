@@ -100,16 +100,42 @@ Get Started, so it is kept apart from the other design decisions.
   copy or scheduled replication job between the two. Transfer happens for the range that is read
 - The write path can be consolidated onto the S3 Access Point on the origin (a design statement of
   this repository; the measurements cited below did not verify that consolidation). **Authorization,
-  however, is not a single layer.** A request passes two independent layers in order and has to clear
-  both. Layer 1 (the AWS side) evaluates the calling principal and the `s3:` action, and what
-  restricts it there is an **explicit Deny**: within one account the identity policy and the access
-  point policy are combined, so narrowing the `Allow` is not a restriction. Layer 2 (the file system
-  side) evaluates the file permissions — mode bits or ACLs — held by the one identity fixed on the
-  access point. **Neither layer subtracts from the other.** That the two are combined, and that an
-  `Allow` alone therefore does not restrict, is [stated by AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html);
-  a [measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--what-the-union-implies) confirms it behaves that way, and the
-  [paired measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--file-system-permissions-are-what-narrow-access) for Layer 2 is in
-  the same record
+  however, is not a single layer.** A request passes two independent layers in order and has to
+  clear both (Layer 1: the AWS side; Layer 2: the file system side). **Layer 1 (the AWS side) splits
+  further into five stages, and they are not evaluated in a uniform order**
+  ([configuring network access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)).
+
+  1. **Stage 1: Network origin check** — for a VPC-origin access point, whether the request arrived
+     through an endpoint in the bound VPC is checked **before any policy evaluation**. A mismatch
+     here is denied before the remaining stages are evaluated
+  2. **Stage 2: VPC endpoint policy** — applies only to requests that traverse a VPC endpoint
+  3. **Stage 3: access point policy** — for same-account access, either this or the identity
+     policy granting access is enough; **for cross-account access, both have to grant it**.
+     Narrowing access within one account calls for an explicit **Deny** rather than a narrower
+     `Allow` (an `Allow` alone leaves the identity policy's grant standing, so it does not restrict)
+  4. **Stage 4: IAM identity policy** — evaluates the calling principal and the `s3:` action
+  5. **Stage 5: Service control policies (SCPs)** — under AWS Organizations, an explicit deny
+     reaches every account underneath it
+     ([IAM's policy evaluation logic](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic_policy-eval-denyallow.html))
+
+  **Stages 2 through 5 are evaluated together, and an explicit Deny in any of them overrides an
+  Allow in the others.** Only stage 1 stands ahead of that group in order. **All five stages in
+  Layer 1 being configured correctly does not rule out a denial from a separate cause** — in a
+  centralized VPC endpoint architecture, a mismatch between the VPC origin's bound VPC and the VPC
+  the traffic actually traversed can still deny the request, typically because a Route 53 Resolver
+  forwarding rule redirected DNS to a shared endpoint in another VPC
+  ([documented](https://repost.aws/articles/ARIOhwOHPMSOupacb7AbcdAQ/managing-fsxn-s3-access-points-in-centralized-vpc-endpoint-architectures);
+  diagnose it from CloudTrail's `vpcEndpointId` and `vpcEndpointAccountId`).
+  **This architecture has not measured any of this; the statement rests on the published
+  documentation and the AWS re:Post article.**
+
+  Layer 2 (the file system side) evaluates the file permissions — mode bits or ACLs — held by the
+  one identity fixed on the access point. **Neither layer subtracts from the other.** That the
+  stages inside Layer 1 combine, and that an `Allow` alone therefore does not restrict, is
+  confirmed by a [measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-1--what-the-union-implies) — taken against stage 3's access point policy and stage 4's
+  identity-based policy combined, and not against stage 1's network origin check or stage 2's VPC
+  endpoint policy. The
+  [paired measurement](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/security-governance/notes/access-point-authorization-layers.md#layer-2--file-system-permissions-are-what-narrow-access) confirming Layer 2 is what narrows access is in the same record
 - **Consolidating it collapses the audit subject too.** What ONTAP's file access auditing retains is
   the SID of the identity fixed on the access point: `SubjectUserName` and `SubjectDomainName` are
   `Not Present`, and `SubjectIP` is an AWS service-side address that differed between two consecutive

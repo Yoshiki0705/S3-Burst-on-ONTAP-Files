@@ -103,6 +103,10 @@ VPC ピアリング・サブミリ秒のネットワーク遅延で測ったも�
 クラスタ / SVM ピアを作らない。FlexCache の作成が失敗する最も多い原因がこれなので、
 下の前提を先に潰す（[オンプレミス側のデプロイ](deployment/onprem-terraform.md)）。
 
+**計測手順と合否条件のテンプレートは[主経路 PoC テンプレート](verification/onprem-cache-poc-template.md)
+にまとめてある。** 既存の [`scripts/measure_visibility.py`](../../scripts/measure_visibility.py)
+に拠点側の値を渡すだけで足りるので、新規スクリプトは不要である。
+
 前提（ピアを張る前に確認する）
 
 - [ ] オンプレミス ONTAP のバージョンを確認する（FlexCache は ONTAP 9.5 以降、

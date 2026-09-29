@@ -108,7 +108,17 @@ def iter_links(path: Path):
 
 
 def check_internal(source: Path, target: str) -> str | None:
-    """Return an error message when an internal link does not resolve."""
+    """Return an error message when an internal link does not resolve.
+
+    `TODO-LINK-*` is a deliberate placeholder shared with the `.private/` article drafts (see
+    `AGENTS.md`'s cross-linking convention): the target is a dev.to/hatenablog URL that does not
+    exist until the article is published, so no file resolution is possible or expected. Skipped
+    here rather than added to `SKIP_DIRS`, because the files carrying it (`docs/`, `AGENTS.md`)
+    are otherwise fully checked. Resolving these is tracked as a task in `.private/blog-split-plan.md`
+    rather than by this checker, which cannot know when an article goes live.
+    """
+    if target.startswith("TODO-LINK"):
+        return None
     raw_path, _, fragment = target.partition("#")
     raw_path = unquote(raw_path)
 
