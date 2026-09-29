@@ -245,9 +245,12 @@ LABELS: dict[str, dict[str, str]] = {
     # location rather than a value. The measured figures stay in the prose table beside it: kept in
     # the image they would be maintained by hand in two places, and the image is not searchable,
     # translatable or reachable by a screen reader.
-    "tc_file_server": {
-        "ja": "FSx for ONTAP ファイルサーバー",
-        "en": "FSx for ONTAP file server",
+    "tc_fsx_service": {
+        # Two lines, not one: a single line this wide sits directly over the fork's two vertical
+        # legs, which start at the icon's own left/right edge (the dx=0 touch-point technique) and
+        # therefore run right through the middle of a long centred line.
+        "ja": "FSx for ONTAP\nファイルサーバー",
+        "en": "FSx for ONTAP\nfile server",
     },
     "tc_client": {
         "ja": "NFS / SMB クライアント",
@@ -685,6 +688,10 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "単一 VPC・単一 AZ（ネットワーク的な遠回りが無い状態）",
         "en": "Single VPC, single AZ (no network detour)",
     },
+    "aws_cloud_plain": {
+        "ja": "AWS Cloud",
+        "en": "AWS Cloud",
+    },
     # Block B: the HA pair behind one namespace, and the two paths ANA (multipathing) resolves into
     # one optimized route plus one standby. Drawn as two named paths rather than one link, because
     # the article's entire point is that without ANA in the kernel these look like two independent
@@ -697,17 +704,23 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "FSx for ONTAP HA ペア\n(第二世代 SINGLE_AZ_2)",
         "en": "FSx for ONTAP HA pair\n(second-generation SINGLE_AZ_2)",
     },
-    "bb_ctrl_a": {"ja": "コントローラ A", "en": "Controller A"},
-    "bb_ctrl_b": {"ja": "コントローラ B", "en": "Controller B"},
+    "bb_ctrl_a": {
+        "ja": "FSx for ONTAP\nコントローラ A",
+        "en": "FSx for ONTAP\nController A",
+    },
+    "bb_ctrl_b": {
+        "ja": "FSx for ONTAP\nコントローラ B",
+        "en": "FSx for ONTAP\nController B",
+    },
     "bb_optimized": {
-        "ja": "経路 1: optimized\n(最短経路)",
-        "en": "Path 1: optimized\n(shortest route)",
+        "ja": "経路 1: optimized（最短経路）",
+        "en": "Path 1: optimized (shortest route)",
     },
     "bb_non_optimized": {
-        "ja": "経路 2: non-optimized\n(ANA 無効時は通常経路に見える)",
-        "en": "Path 2: non-optimized\n(looks like a normal route without ANA)",
+        "ja": "経路 2: non-optimized（ANA 無効時は通常経路に見える）",
+        "en": "Path 2: non-optimized (looks like a normal route without ANA)",
     },
-    "bb_namespace": {"ja": "namespace", "en": "namespace"},
+    "bb_namespace": {"ja": "1 つの namespace", "en": "One namespace"},
     # Block C: two deployments built from the same template and the same specified values. The one
     # difference the figure exists to name is the thing no parameter list shows -- layout on disk --
     # so every other row in that list is drawn identical on purpose.
@@ -837,6 +850,12 @@ class Frame:
     # vendor publishes an icon for, where borrowing a mark would attribute the layer to whatever the
     # mark stands for. Set it deliberately; it switches off a real guard.
     label_only: bool = False
+    # Left-aligned title, for a frame two edges pass straight through on their way to a node
+    # inside it. A centred title sits directly over that centre line -- "FSx for ONTAP HA ペア"
+    # over two lines converging on x=440 read as "FSx for ONTAP HÁ ペア" with a line through the
+    # second word. Left alignment moves the words to the frame's own left margin, which nothing
+    # here needs to cross.
+    title_align_left: bool = False
 
 
 @dataclass(frozen=True)
@@ -1458,36 +1477,58 @@ def _two_ceilings() -> Diagram:
 
     The cache layer and the SSD get boxes, not icons. Neither is a service, and borrowing a mark
     would attribute an internal layer to whatever the mark stands for.
+
+    The outer group is "AWS Cloud" -- the account/partition boundary AWS's own reference diagrams
+    use for a group -- not the file server relabelled to carry that job. The file server itself
+    gets its own FSx for ONTAP service icon inside the boundary, between the client and the fork,
+    so the read arrives at a named service before the figure asks which path inside it serves it.
     """
     centre = 440
     return Diagram(
         name="s3burst-two-ceilings",
         diagram_id="s3burst-two-ceilings",
         width=880,
-        height=560,
+        height=720,
         font_size=16,
-        groups=(Group("tc_fs", "tc_file_server", 40, 200, 800, 300),),
+        groups=(Group("tc_aws_cloud", "aws_cloud_plain", 20, 180, 840, 490),),
         frames=(
             # Sized to the two-line label. A frame taller than its text reads as an empty container
             # waiting to be filled, which is a claim about the architecture rather than about layout.
-            # The inner edge of each box sits under the client icon's own edge, so both arms of
+            # The inner edge of each box sits under the FSx icon's own edge, so both arms of
             # the fork drop almost vertically onto a corner instead of running out sideways. A
             # fork is not an inconsistent direction, but an arm that travels 200px to the left
             # before turning down reads as one.
-            Frame("tc_cache", "tc_cache_layer", 90, 270, 330, 64, label_only=True),
-            Frame("tc_disk", "tc_ssd", 460, 270, 330, 64, label_only=True),
+            Frame("tc_cache", "tc_cache_layer", 90, 440, 330, 64, label_only=True),
+            # x=480, not 460: the FSx icon above is 80px wide (fsx_ontap, not the 48px client
+            # icon this frame used to hang off of), so its bottom-right exit point sits at
+            # centre+40=480. A frame starting at 460 put the entry point 20px to the exit's
+            # left, which the flow-direction gate reads as the edge running backwards.
+            Frame("tc_disk", "tc_ssd", 480, 440, 330, 64, label_only=True),
             Frame(
-                "tc_cap_cache", "tc_ceiling_cache", 90, 400, 330, 64, label_only=True
+                "tc_cap_cache", "tc_ceiling_cache", 90, 570, 330, 64, label_only=True
             ),
-            Frame("tc_cap_disk", "tc_ceiling_disk", 460, 400, 330, 64, label_only=True),
+            Frame("tc_cap_disk", "tc_ceiling_disk", 480, 570, 330, 64, label_only=True),
         ),
         nodes=(
+            # The client stays outside the AWS Cloud boundary, matching the app/pipeline actor in
+            # every other figure in this set.
             Node("tc_users", "client", "tc_client", *centred("client", centre, 90)),
+            # cy=270, not 280: the icon's own two-line label (ends ~40px below the icon's own
+            # bottom edge) has to clear the hit/miss labels sitting at the fork's midpoint before
+            # the fork frames start at y=440, and moving the icon up by 10px was the difference
+            # between the two label bands touching and a full clear row between them.
+            Node(
+                "tc_fsx",
+                "fsx_ontap",
+                "tc_fsx_service",
+                *centred("fsx_ontap", centre, 270),
+            ),
         ),
         edges=(
+            Edge("tc_e_in", "tc_users", "tc_fsx"),
             Edge(
                 "tc_e_hit",
-                "tc_users",
+                "tc_fsx",
                 "tc_cache",
                 "tc_hit",
                 exit_at=(0.0, 1.0),
@@ -1496,7 +1537,7 @@ def _two_ceilings() -> Diagram:
             ),
             Edge(
                 "tc_e_miss",
-                "tc_users",
+                "tc_fsx",
                 "tc_disk",
                 "tc_miss",
                 exit_at=(1.0, 1.0),
@@ -1613,26 +1654,24 @@ def _block_a_sessions() -> Diagram:
         name="s3burst-block-a-sessions",
         diagram_id="s3burst-block-a-sessions",
         width=880,
-        height=460,
+        height=680,
         font_size=16,
-        groups=(Group("ba_vpc_group", "ba_vpc", 40, 40, 800, 380),),
+        # Two bands, matching the official AWS reference layout: an outer "AWS Cloud" group (the
+        # cloud-icon group AWS's own decks use for the account/partition boundary) holding an inner
+        # "single VPC, single AZ" frame, rather than one frame relabelled to both jobs at once.
+        groups=(Group("ba_aws_cloud", "aws_cloud_plain", 20, 20, 840, 560),),
+        frames=(
+            Frame("ba_vpc_group", "ba_vpc", 40, 70, 800, 490, label_only=True),
+            Frame("ba_p1", "ba_iscsi", 100, 320, 300, 70, label_only=True),
+            Frame("ba_p2", "ba_nvme", 480, 320, 300, 70, label_only=True),
+        ),
         nodes=(
-            Node("ba_client", "ec2", "ba_ec2", *centred("ec2", centre, 140)),
+            Node("ba_client", "ec2", "ba_ec2", *centred("ec2", centre, 190)),
             Node(
-                "ba_target", "fsx_ontap", "ba_fsx", *centred("fsx_ontap", centre, 400)
+                "ba_target", "fsx_ontap", "ba_fsx", *centred("fsx_ontap", centre, 450)
             ),
         ),
-        # Each frame's inner edge sits exactly on the client's and the target's own edge (100-400
-        # and 480-780, against a client/target span of 400-480), so every fork and merge anchor
-        # below lands at dx=0 rather than a negative offset. The flow-direction gate reads the
-        # fixed anchors, not the routed path, and dx=0 is "downwards", not "leftwards" -- unlike
-        # _two_ceilings, this shape forks *and* rejoins into one target, so there is no frame free
-        # to receive an offset the way _two_ceilings' un-rejoined boxes could.
-        frames=(
-            Frame("ba_p1", "ba_iscsi", 100, 260, 300, 70, label_only=True),
-            Frame("ba_p2", "ba_nvme", 480, 260, 300, 70, label_only=True),
-        ),
-        texts=(TextBox("ba_or_text", "ba_or", 410, 285, 60, 20),),
+        texts=(TextBox("ba_or_text", "ba_or", 410, 345, 60, 20),),
         edges=(
             Edge(
                 "ba_e1", "ba_client", "ba_p1", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)
@@ -1665,35 +1704,59 @@ def _block_b_multipath() -> Diagram:
     centre = 440
     # The client's own left/right edge (400 / 480, from an 80px icon centred at 440) is what every
     # anchor below has to touch at matching x, so the fork's left leg and the merge's left leg both
-    # read as dx=0 -- "downwards", not "leftwards" -- for the flow-direction gate. That forces
-    # ctrl_a's right edge to sit at 400 (centre 320) and ctrl_b's left edge at 480 (centre 560);
-    # the namespace frame spans exactly between those two touch points (360 to 520) so its own
-    # entry anchors match too.
+    # read as dx=0 -- "downwards", not "leftwards" -- for the flow-direction gate (orthogonal
+    # routing turns any non-zero dx into a jog that still counts as sideways motion at the anchor).
+    # That forces ctrl_a's right edge to sit at 400 (centre 360) and ctrl_b's left edge at 480
+    # (centre 520); the namespace frame spans exactly between those two touch points.
     ctrl_a_cx, ctrl_b_cx = 360, 520
     ns_x, ns_w = ctrl_a_cx + 40, (ctrl_b_cx - 40) - (ctrl_a_cx + 40)
+    # Vertical bands, top to bottom, with a full clear row between each so a label's own text
+    # never enters the row above or below it: AWS Cloud title (20-70) / EC2 client icon + its
+    # two-line label (110-290, an 80px icon plus ~100px for two lines of text below it) / path
+    # names in the clear row that follows (300-345) / HA-pair frame title (365-410) / controller
+    # icons + their two-line labels (430-620) / namespace frame (660-730).
+    ec2_cy = 150
+    ctrl_cy = 520
     return Diagram(
         name="s3burst-block-b-multipath",
         diagram_id="s3burst-block-b-multipath",
         width=880,
-        height=640,
+        height=860,
         font_size=16,
-        groups=(Group("bb_pair_group", "bb_ha_pair", 60, 260, 760, 340),),
+        groups=(Group("bb_aws_cloud", "aws_cloud_plain", 20, 20, 840, 820),),
+        frames=(
+            Frame(
+                "bb_pair_group",
+                "bb_ha_pair",
+                40,
+                350,
+                800,
+                450,
+                label_only=True,
+                title_align_left=True,
+            ),
+            Frame("bb_ns", "bb_namespace", ns_x, 720, ns_w, 70, label_only=True),
+        ),
         nodes=(
-            Node("bb_client", "ec2", "bb_ec2", *centred("ec2", centre, 90)),
+            Node("bb_client", "ec2", "bb_ec2", *centred("ec2", centre, ec2_cy)),
             Node(
-                "bb_a", "fsx_ontap", "bb_ctrl_a", *centred("fsx_ontap", ctrl_a_cx, 440)
+                "bb_a",
+                "fsx_ontap",
+                "bb_ctrl_a",
+                *centred("fsx_ontap", ctrl_a_cx, ctrl_cy),
             ),
             Node(
-                "bb_b", "fsx_ontap", "bb_ctrl_b", *centred("fsx_ontap", ctrl_b_cx, 440)
+                "bb_b",
+                "fsx_ontap",
+                "bb_ctrl_b",
+                *centred("fsx_ontap", ctrl_b_cx, ctrl_cy),
             ),
         ),
-        frames=(Frame("bb_ns", "bb_namespace", ns_x, 530, ns_w, 50, label_only=True),),
-        # Placed below the group title's own two lines (fontSize 17, ~50px tall from y=260) rather
-        # than beside it, so the two never occupy the same band the way a title-height text box did
-        # before.
+        # One full clear row below the client's own two-line label, and directly above the
+        # HA-pair frame's title -- never sharing a row with either.
         texts=(
-            TextBox("bb_t1", "bb_optimized", 40, 340, 280, 40),
-            TextBox("bb_t2", "bb_non_optimized", 560, 340, 280, 40),
+            TextBox("bb_t1", "bb_optimized", 20, 300, 400, 40),
+            TextBox("bb_t2", "bb_non_optimized", 460, 300, 400, 40),
         ),
         edges=(
             Edge("bb_e1", "bb_client", "bb_a", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)),
@@ -1720,21 +1783,31 @@ def _block_c_layout() -> Diagram:
         name="s3burst-block-c-layout",
         diagram_id="s3burst-block-c-layout",
         width=880,
-        height=560,
+        height=820,
         font_size=16,
+        # An outer "AWS Cloud" group (the account/partition boundary AWS's own reference
+        # diagrams use) contains the two per-deployment groups side by side, matching the
+        # official two-band layout instead of relabelling one band to do both jobs.
+        #
+        # Each per-deployment group is 480 tall, not 320: the FSx icon's own two-line label
+        # ("Amazon FSx for NetApp ONTAP" / "(same template, same specified values)") runs to
+        # about 50px below the icon's bottom edge, and at 320 the group closed 30px above
+        # that -- the label's second line sat on the group's own border. 480 clears both the
+        # EC2 icon's label and the FSx icon's label with room to spare.
         groups=(
-            Group("bc_g1", "bc_deploy1", 40, 40, 380, 300),
-            Group("bc_g2", "bc_deploy2", 460, 40, 380, 300),
+            Group("bc_aws_cloud", "aws_cloud_plain", 20, 20, 840, 550),
+            Group("bc_g1", "bc_deploy1", 60, 70, 380, 480),
+            Group("bc_g2", "bc_deploy2", 480, 70, 380, 480),
         ),
         nodes=(
-            Node("bc_c1", "ec2", "bc_ec2", *centred("ec2", 230, 130)),
-            Node("bc_f1", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 230, 280)),
-            Node("bc_c2", "ec2", "bc_ec2", *centred("ec2", 650, 130)),
-            Node("bc_f2", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 650, 280)),
+            Node("bc_c1", "ec2", "bc_ec2", *centred("ec2", 250, 180)),
+            Node("bc_f1", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 250, 430)),
+            Node("bc_c2", "ec2", "bc_ec2", *centred("ec2", 670, 180)),
+            Node("bc_f2", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 670, 430)),
         ),
         frames=(
-            Frame("bc_same", "bc_same_conditions", 90, 380, 700, 60, label_only=True),
-            Frame("bc_diff", "bc_hidden_diff", 90, 460, 700, 60, label_only=True),
+            Frame("bc_same", "bc_same_conditions", 40, 620, 800, 70, label_only=True),
+            Frame("bc_diff", "bc_hidden_diff", 40, 710, 800, 70, label_only=True),
         ),
         edges=(
             Edge("bc_e1", "bc_c1", "bc_f1"),
@@ -1877,10 +1950,15 @@ def render(diagram: Diagram, lang: str, uris: dict[str, str]) -> str:
         )
     # Frames before nodes so the icons draw on top of the container they sit in.
     for frame in diagram.frames:
+        frame_style = resized(FRAME_STYLE, diagram.font_size)
+        if frame.title_align_left:
+            frame_style = frame_style.replace(
+                "align=center;spacingTop=6;", "align=left;spacingTop=6;spacingLeft=16;"
+            )
         vertex(
             frame.cid,
             label(frame.label, lang),
-            resized(FRAME_STYLE, diagram.font_size),
+            frame_style,
             frame.x,
             frame.y,
             frame.width,
