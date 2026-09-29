@@ -18,6 +18,7 @@ the prose instead produces a confident answer that the tool then contradicts.
 | **Adding a verification section** | `docs/agent/superseded-claims.txt` — **前に、その節が覆す旧記述を探す。** probe は文字列が消えたときにしか鳴らないので、覆された旧記述が残っている限り全ゲートが緑のまま通る。見つけた分を登録すると `make superseded` が注記を保つ |
 | **Adding a new PoC / verification record from 2026-09 onward** | `docs/ja/verification/onprem-cache-poc-environment.example.yaml` — 新規記録はこの雛形をコピーして環境条件を機械可読に残す。既存の実測記録（本文インライン記述）はこの形式へ移行しない |
 | A published article and its draft | `tools/check_blog_draft_sync.py` |
+| **Editing a `blog-unpublished-*.md` article that might already have a platform draft** | `tools/check_blog_draft_sync.py`'s docstring, "does not touch `blog-unpublished-*.md`" section — open the platform's drafts list directly (never conclude "no draft" from a text-search miss), then diff both directions before editing either copy |
 | The Interconnect Region pairs or a CSP's lifecycle | `tools/check_interconnect_regions.py` — `DOCUMENTS` and `CSP_HEADINGS` |
 
 ## A grep hit count is not a list of things to change
