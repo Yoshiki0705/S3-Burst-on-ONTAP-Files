@@ -103,6 +103,7 @@ MIME_BY_SUFFIX = {".png": "image/png", ".svg": "image/svg+xml"}
 ICONS = {
     "users": "Resource-Icons_{d}/Res_General-Icons/Res_48_Light/Res_Users_48_Light.svg",
     "client": "Resource-Icons_{d}/Res_General-Icons/Res_48_Light/Res_Client_48_Light.svg",
+    "ec2": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_Amazon-EC2_64.svg",
     "s3_access_point": (
         "Resource-Icons_{d}/Res_Storage/"
         "Res_Amazon-Simple-Storage-Service_General-Access-Points_48.svg"
@@ -135,6 +136,7 @@ ICONS = {
 ICON_SIZE = {
     "users": 48,
     "client": 48,
+    "ec2": 80,
     "s3_access_point": 48,
     "s3_bucket": 48,
     "s3": 80,
@@ -656,6 +658,82 @@ LABELS: dict[str, dict[str, str]] = {
             "Another cloud's file storage as the origin with FSx for ONTAP as the cache<br>"
             "(FlexCache) is unconfirmed, or out of scope as a mechanism"
         ),
+    },
+    # --- block protocol articles (A / B / C) -----------------------------------------------------
+    # Shared across the three: what is being measured is the connection count between one EC2
+    # client and one FSx for ONTAP file system, not multiple clients pooled together. Naming the
+    # generation and AZ layout matters here because the divisor in the AWS procedure this article
+    # tests is stated per client, not per file system.
+    "ba_ec2": {
+        "ja": "EC2 クライアント\n(c5n.9xlarge)",
+        "en": "EC2 client\n(c5n.9xlarge)",
+    },
+    "ba_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP\n(第二世代 SINGLE_AZ_2)",
+        "en": "Amazon FSx for NetApp ONTAP\n(second-generation SINGLE_AZ_2)",
+    },
+    "ba_iscsi": {
+        "ja": "iSCSI\n(複数セッション)",
+        "en": "iSCSI\n(multiple sessions)",
+    },
+    "ba_nvme": {
+        "ja": "NVMe/TCP\n(複数キュー)",
+        "en": "NVMe/TCP\n(multiple queues)",
+    },
+    "ba_or": {"ja": "または", "en": "or"},
+    "ba_vpc": {
+        "ja": "単一 VPC・単一 AZ（ネットワーク的な遠回りが無い状態）",
+        "en": "Single VPC, single AZ (no network detour)",
+    },
+    # Block B: the HA pair behind one namespace, and the two paths ANA (multipathing) resolves into
+    # one optimized route plus one standby. Drawn as two named paths rather than one link, because
+    # the article's entire point is that without ANA in the kernel these look like two independent
+    # devices rather than one path plus its standby.
+    "bb_ec2": {
+        "ja": "EC2 クライアント\n(Amazon Linux 2023)",
+        "en": "EC2 client\n(Amazon Linux 2023)",
+    },
+    "bb_ha_pair": {
+        "ja": "FSx for ONTAP HA ペア\n(第二世代 SINGLE_AZ_2)",
+        "en": "FSx for ONTAP HA pair\n(second-generation SINGLE_AZ_2)",
+    },
+    "bb_ctrl_a": {"ja": "コントローラ A", "en": "Controller A"},
+    "bb_ctrl_b": {"ja": "コントローラ B", "en": "Controller B"},
+    "bb_optimized": {
+        "ja": "経路 1: optimized\n(最短経路)",
+        "en": "Path 1: optimized\n(shortest route)",
+    },
+    "bb_non_optimized": {
+        "ja": "経路 2: non-optimized\n(ANA 無効時は通常経路に見える)",
+        "en": "Path 2: non-optimized\n(looks like a normal route without ANA)",
+    },
+    "bb_namespace": {"ja": "namespace", "en": "namespace"},
+    # Block C: two deployments built from the same template and the same specified values. The one
+    # difference the figure exists to name is the thing no parameter list shows -- layout on disk --
+    # so every other row in that list is drawn identical on purpose.
+    "bc_deploy1": {
+        "ja": "デプロイ 1",
+        "en": "Deployment 1",
+    },
+    "bc_deploy2": {
+        "ja": "デプロイ 2",
+        "en": "Deployment 2",
+    },
+    "bc_ec2": {
+        "ja": "EC2 クライアント\n(同じ接続・同じワークロード)",
+        "en": "EC2 client\n(same connection, same workload)",
+    },
+    "bc_fsx_same": {
+        "ja": "Amazon FSx for NetApp ONTAP\n(同じテンプレート・同じ指定値)",
+        "en": "Amazon FSx for NetApp ONTAP\n(same template, same specified values)",
+    },
+    "bc_same_conditions": {
+        "ja": "揃えられる: 経路・接続の作り方・キュー数・<br>ディストリビューション・iopolicy",
+        "en": "Held identical: path, connection setup, queue count,<br>distribution, iopolicy",
+    },
+    "bc_hidden_diff": {
+        "ja": "揃えられない: ディスク上の配置\n(指定値の一覧には出てこない)",
+        "en": "Cannot be held identical: layout on disk\n(does not appear in any specified value)",
     },
 }
 
@@ -1520,6 +1598,151 @@ def _host_count() -> Diagram:
     )
 
 
+def _block_a_sessions() -> Diagram:
+    """What Article A's session/queue-count measurement connects.
+
+    One EC2 client, one FSx for ONTAP file system, and a choice of protocol: iSCSI with multiple
+    sessions, or NVMe/TCP with multiple queues. The article's point is that "single client
+    bandwidth ceiling / 625" does not size either count correctly, and that claim is about this
+    one-to-one connection -- not about pooling multiple clients, which the figure does not draw.
+
+    Vertical, 880px canvas, so font_size=16 clears the readability floor at full width.
+    """
+    centre = 440
+    return Diagram(
+        name="s3burst-block-a-sessions",
+        diagram_id="s3burst-block-a-sessions",
+        width=880,
+        height=460,
+        font_size=16,
+        groups=(Group("ba_vpc_group", "ba_vpc", 40, 40, 800, 380),),
+        nodes=(
+            Node("ba_client", "ec2", "ba_ec2", *centred("ec2", centre, 140)),
+            Node(
+                "ba_target", "fsx_ontap", "ba_fsx", *centred("fsx_ontap", centre, 400)
+            ),
+        ),
+        # Each frame's inner edge sits exactly on the client's and the target's own edge (100-400
+        # and 480-780, against a client/target span of 400-480), so every fork and merge anchor
+        # below lands at dx=0 rather than a negative offset. The flow-direction gate reads the
+        # fixed anchors, not the routed path, and dx=0 is "downwards", not "leftwards" -- unlike
+        # _two_ceilings, this shape forks *and* rejoins into one target, so there is no frame free
+        # to receive an offset the way _two_ceilings' un-rejoined boxes could.
+        frames=(
+            Frame("ba_p1", "ba_iscsi", 100, 260, 300, 70, label_only=True),
+            Frame("ba_p2", "ba_nvme", 480, 260, 300, 70, label_only=True),
+        ),
+        texts=(TextBox("ba_or_text", "ba_or", 410, 285, 60, 20),),
+        edges=(
+            Edge(
+                "ba_e1", "ba_client", "ba_p1", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)
+            ),
+            Edge(
+                "ba_e2", "ba_client", "ba_p2", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)
+            ),
+            Edge(
+                "ba_e3", "ba_p1", "ba_target", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)
+            ),
+            Edge(
+                "ba_e4", "ba_p2", "ba_target", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)
+            ),
+        ),
+    )
+
+
+def _block_b_multipath() -> Diagram:
+    """The two paths behind one namespace, and what ANA (multipathing) does with them.
+
+    An HA pair always presents two paths to one namespace: one to whichever controller is closest
+    (optimized) and one to the other (non-optimized, for failover). ANA is what tells the host
+    which is which. Without it in the kernel, the article's whole finding is that these two paths
+    show up as two independent devices pointing at the same data rather than as a primary route
+    plus its standby -- so the figure draws both paths reaching the same namespace explicitly,
+    rather than one link from the client to the file system.
+
+    Vertical, 880px canvas, font_size=16.
+    """
+    centre = 440
+    # The client's own left/right edge (400 / 480, from an 80px icon centred at 440) is what every
+    # anchor below has to touch at matching x, so the fork's left leg and the merge's left leg both
+    # read as dx=0 -- "downwards", not "leftwards" -- for the flow-direction gate. That forces
+    # ctrl_a's right edge to sit at 400 (centre 320) and ctrl_b's left edge at 480 (centre 560);
+    # the namespace frame spans exactly between those two touch points (360 to 520) so its own
+    # entry anchors match too.
+    ctrl_a_cx, ctrl_b_cx = 360, 520
+    ns_x, ns_w = ctrl_a_cx + 40, (ctrl_b_cx - 40) - (ctrl_a_cx + 40)
+    return Diagram(
+        name="s3burst-block-b-multipath",
+        diagram_id="s3burst-block-b-multipath",
+        width=880,
+        height=640,
+        font_size=16,
+        groups=(Group("bb_pair_group", "bb_ha_pair", 60, 260, 760, 340),),
+        nodes=(
+            Node("bb_client", "ec2", "bb_ec2", *centred("ec2", centre, 90)),
+            Node(
+                "bb_a", "fsx_ontap", "bb_ctrl_a", *centred("fsx_ontap", ctrl_a_cx, 440)
+            ),
+            Node(
+                "bb_b", "fsx_ontap", "bb_ctrl_b", *centred("fsx_ontap", ctrl_b_cx, 440)
+            ),
+        ),
+        frames=(Frame("bb_ns", "bb_namespace", ns_x, 530, ns_w, 50, label_only=True),),
+        # Placed below the group title's own two lines (fontSize 17, ~50px tall from y=260) rather
+        # than beside it, so the two never occupy the same band the way a title-height text box did
+        # before.
+        texts=(
+            TextBox("bb_t1", "bb_optimized", 40, 340, 280, 40),
+            TextBox("bb_t2", "bb_non_optimized", 560, 340, 280, 40),
+        ),
+        edges=(
+            Edge("bb_e1", "bb_client", "bb_a", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)),
+            Edge("bb_e2", "bb_client", "bb_b", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)),
+            Edge("bb_e3", "bb_a", "bb_ns", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)),
+            Edge("bb_e4", "bb_b", "bb_ns", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)),
+        ),
+    )
+
+
+def _block_c_layout() -> Diagram:
+    """Two deployments, identical on paper, one hidden difference.
+
+    Same CloudFormation template, same specified values, same path/connection/queue-count/
+    distribution/iopolicy -- and still a 2.64x swing in sequential-read throughput between them.
+    The figure's entire job is to make one thing visible that no parameter list shows: the layout
+    data lands in on disk, which differs between deployments and is not a configuration knob at
+    all. Drawing the two deployments side by side, both labelled "same template, same values", is
+    what makes that gap legible -- a single deployment box would have nothing to contrast against.
+
+    Vertical, 880px canvas, font_size=16.
+    """
+    return Diagram(
+        name="s3burst-block-c-layout",
+        diagram_id="s3burst-block-c-layout",
+        width=880,
+        height=560,
+        font_size=16,
+        groups=(
+            Group("bc_g1", "bc_deploy1", 40, 40, 380, 300),
+            Group("bc_g2", "bc_deploy2", 460, 40, 380, 300),
+        ),
+        nodes=(
+            Node("bc_c1", "ec2", "bc_ec2", *centred("ec2", 230, 130)),
+            Node("bc_f1", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 230, 280)),
+            Node("bc_c2", "ec2", "bc_ec2", *centred("ec2", 650, 130)),
+            Node("bc_f2", "fsx_ontap", "bc_fsx_same", *centred("fsx_ontap", 650, 280)),
+        ),
+        frames=(
+            Frame("bc_same", "bc_same_conditions", 90, 380, 700, 60, label_only=True),
+            Frame("bc_diff", "bc_hidden_diff", 90, 460, 700, 60, label_only=True),
+        ),
+        edges=(
+            Edge("bc_e1", "bc_c1", "bc_f1"),
+            Edge("bc_e2", "bc_c2", "bc_f2"),
+        ),
+    )
+
+
 DIAGRAMS = (
     _overview(),
     _single_site(),
@@ -1528,6 +1751,9 @@ DIAGRAMS = (
     _protocol_matrix(),
     _two_ceilings(),
     _host_count(),
+    _block_a_sessions(),
+    _block_b_multipath(),
+    _block_c_layout(),
 )
 
 
