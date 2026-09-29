@@ -305,4 +305,6 @@ Generate the `.drawio` XML directly, with each icon embedded as
 `shape=image;image=data:image/svg+xml,<base64>` in the cell's `style`. Several plausible alternatives
 produce a file that exports without its icons, and that is invisible until the PNG is opened, so read
 [docs/agent/diagrams.md](docs/agent/diagrams.md) before touching a diagram or its builder. Export with
-`make diagrams`, and confirm with `make diagrams-check`.
+`make diagrams`, and confirm with `make diagrams-check` and `make diagram-flow` -- the latter also
+rejects a mislabelled AWS Cloud boundary, a label overflowing its container, and a title crossing an
+edge; a `PostToolUse` hook re-runs it after every `--write`. Details in `docs/agent/diagrams.md`.

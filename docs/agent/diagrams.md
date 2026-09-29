@@ -106,6 +106,40 @@ edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeCol
 The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,
 a minimal Python script that generates the XML is enough — see `docs/_assets/diagrams/`.
 
+## Structural checks `make diagram-flow` runs, beyond edge direction
+
+Three defects shipped in one PR that no gate at the time caught -- an "AWS Cloud" boundary
+captioned as something else, an icon's own label running past the group meant to contain it, and a
+frame title sitting on top of a straight edge passing through it. All three are geometry a reader
+sees in the rendered image but that a generator function can get wrong while still looking correct
+on the page. `tools/check_diagram_flow.py` now checks for them directly:
+
+| Rule | Fires when |
+|---|---|
+| `aws-cloud-mislabel` | Exactly one group in the diagram carries `grIcon=mxgraph.aws4.group_aws_cloud`, and its caption is not "AWS Cloud" (optionally with a parenthetical qualifier). Silent when the pictogram is reused more than once as a per-panel card border -- an existing, intentional pattern in several figures here. |
+| `label-overflow` | An icon's own label, estimated from its line count and `fontSize`, would print past the bottom edge of a group or frame that fully contains the icon. |
+| `boundary-title-crossing` | A frame or group's centred title sits on the same horizontal band as a straight vertical edge that passes through the container on its way to a node beyond it. Fix by passing `title_align_left=True` to `Frame`, which moves the title to the corner. |
+
+`--selftest` proves each rule rejects the shape it targets and accepts the same layout once fixed,
+same discipline as the direction and icon-label rules it sits beside.
+
+## The diagram gate hook
+
+`.kiro/hooks/diagram-gate.json` (local, gitignored like every hook file) runs
+`scripts/diagram_gate.py --hook` as a `PostToolUse` hook matched on `execute_bash`. When the
+command that just ran invoked `build_diagrams.py --write`, it re-runs `check_diagram_flow.py` and
+`check_diagram_fonts.py` against the files just written and prints a loud report if either fails.
+
+It cannot block: Kiro's `PostToolUse` contract has no way to undo a write that already landed, so
+this always exits 0. What it buys is not having to remember to run `make diagram-flow` by hand
+before deciding a diagram is done -- the same gap that let the three defects above ship, since the
+checks existed for edge direction and font size but nobody was made to run them until `make all` at
+the end of the session, by which point the images had already been called finished once.
+
+Re-create the hook with `createHook` (or `cat .kiro/hooks/commit-gate.json`-style, by writing the
+JSON directly) if it is missing from a fresh clone; see the module docstring in
+`scripts/diagram_gate.py` for the exact shape.
+
 ## Label size — the floor is what a reader sees, not the attribute
 
 `make diagram-fonts` enforces this and is part of `make all`. The numbers live in
