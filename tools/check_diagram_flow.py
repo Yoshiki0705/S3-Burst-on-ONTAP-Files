@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a diagram makes the reader work out which way to read it.
 
-Six rules, all of them things that are only visible in the rendered image and therefore easy to
+Seven rules, all of them things that are only visible in the rendered image and therefore easy to
 break while every generator function still looks correct.
 
 **Direction.** Every edge must advance rightwards or downwards, never leftwards and never upwards.
@@ -34,6 +34,17 @@ renders forwards. The anchors are in the file, so there is no reason to guess.
 AWS asset guidance puts a service's name under its icon, and every reader of these diagrams has
 learned that convention from every other AWS diagram they have seen. A label beside an icon reads as
 belonging to whatever else is on that row.
+
+**Service names.** A vertex drawn with an official AWS *service* icon must carry that service's full
+official name in its label -- "Amazon FSx for NetApp ONTAP", not the abbreviation "FSx for ONTAP",
+and not a role word alone such as "file server", "controller A" or "SMB SVM". The AWS icon guidance
+is explicit that service icons are labelled with the product's full name; a reader who sees the FSx
+for ONTAP mark under the words "SMB SVM" cannot tell which service it is. The check reads the service
+out of the icon itself -- every AWS SVG embeds its name in a `<title>` -- so it does not depend on
+any project's label keys and travels between repositories unchanged. Put the role in a qualifier
+line: "Amazon FSx for NetApp ONTAP\n(Controller A)". Resource icons (an S3 bucket, an access point,
+the generic client/users marks) name a resource or a role rather than a top-level service and are
+left alone.
 
 **Boundary labels.** A group frame's title must not be pushed sideways with `spacingLeft` past the
 standard offset. Raising it is how a boundary's name ends up sitting next to an icon that is merely
@@ -107,9 +118,12 @@ Run:  python3 tools/check_diagram_flow.py
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import itertools
 import re
 import sys
+import urllib.parse
 import xml.etree.ElementTree as ET  # nosec B405  reads this repository's own committed files
 from dataclasses import dataclass
 from pathlib import Path
@@ -160,6 +174,75 @@ ENTRY_Y = re.compile(r"\bentryY=(-?\d+(?:\.\d+)?)")
 # overflow is the failure mode that ships a broken diagram, and a false positive here just adds a
 # comment explaining why a genuinely tight fit is fine.
 CHAR_WIDTH_AT_16PX = 10.0
+
+# An icon embedded as a data URI carries the official AWS SVG, and that SVG names the service in its
+# own <title>: `Icon-Architecture/64/Arch_Amazon-FSx-for-NetApp-ONTAP_64` for a top-level service,
+# `Icon-Resource/...` for a resource icon. The AWS icon guidance says a *service* icon must be
+# labelled with the service's full official name, not an abbreviation or a role word alone -- so a
+# cell drawn with an `Arch_*` service icon must carry that service's name in its label. Resource
+# icons (`Icon-Resource/...`, e.g. an S3 bucket or the generic client/users marks) name a resource
+# or a role, not a top-level service, and are not held to this.
+IMAGE_DATA_URI = re.compile(r"image=(data:image/svg\+xml[;,][^;\"]+)")
+SVG_TITLE = re.compile(r"<title>\s*([^<]+?)\s*</title>")
+ARCH_TITLE = re.compile(r"(?:^|/)Arch_(.+?)_\d+$")
+
+# The official product name for each architecture-service icon stem (the part between `Arch_` and
+# the trailing size). The stem comes straight from the AWS asset's own title, so a new service is
+# added here once, by name. The check requires the label to *contain* this string, so a qualifier
+# such as "Amazon FSx for NetApp ONTAP (Controller A)" passes while "FSx for ONTAP" alone does not.
+# `Amazon-Simple-Storage-Service` maps to "Amazon S3" because that is the name AWS now uses for it,
+# and "Amazon S3 Files" / "Amazon S3 Access Point" both contain it.
+AWS_SERVICE_NAMES = {
+    "Amazon-EC2": "Amazon EC2",
+    "Amazon-EFS": "Amazon EFS",
+    "Amazon-FSx-for-NetApp-ONTAP": "Amazon FSx for NetApp ONTAP",
+    "Amazon-Simple-Storage-Service": "Amazon S3",
+    "AWS-Direct-Connect": "AWS Direct Connect",
+    "AWS-Interconnect": "AWS Interconnect",
+}
+
+
+def _decode_data_uri(uri: str) -> str | None:
+    """The SVG text inside an `image=data:image/svg+xml,...` value, or None if it is not decodable.
+
+    The payload appears in three forms across draw.io files: `data:image/svg+xml,<base64>` (this
+    repository's generator writes base64 *without* the `;base64` marker, which the AGENTS.md notes
+    are the only form draw.io renders), `data:image/svg+xml;base64,<base64>`, and a URL-encoded
+    form. The marker is therefore not a reliable signal, so this tries base64 first -- an SVG
+    always begins with `<`, and valid base64 that decodes to something starting with `<?xml` or
+    `<svg` is unambiguous -- and falls back to URL-decoding.
+    """
+    if "," not in uri:
+        return None
+    _header, payload = uri.split(",", 1)
+    try:
+        decoded = base64.b64decode(payload, validate=True).decode("utf-8", "replace")
+        if decoded.lstrip().startswith("<"):
+            return decoded
+    except (binascii.Error, ValueError):
+        pass
+    return urllib.parse.unquote(payload)
+
+
+def _service_name(style: str) -> str | None:
+    """The official AWS service name an icon's embedded SVG declares, or None.
+
+    Returns a value only for a top-level architecture-service icon (`Arch_*`); resource icons and
+    non-AWS badges return None and are left unchecked.
+    """
+    match = IMAGE_DATA_URI.search(style)
+    if match is None:
+        return None
+    svg = _decode_data_uri(match.group(1))
+    if svg is None:
+        return None
+    title = SVG_TITLE.search(svg)
+    if title is None:
+        return None
+    arch = ARCH_TITLE.search(title.group(1))
+    if arch is None:
+        return None
+    return AWS_SERVICE_NAMES.get(arch.group(1))
 
 
 @dataclass(frozen=True)
@@ -357,6 +440,21 @@ def inspect(path: Path, text: str) -> list[Finding]:
                         "it -- set verticalLabelPosition=bottom",
                     )
                 )
+            if IMAGE_SHAPE.search(style):
+                service = _service_name(style)
+                if service is not None and service not in value.replace("\n", " "):
+                    findings.append(
+                        Finding(
+                            path,
+                            "service-name",
+                            f"cell {cid} ({value.splitlines()[0] if value else 'unlabelled'}): its "
+                            f"icon is the {service} service icon, but the label does not contain "
+                            f'"{service}". The AWS icon guidance requires the full official service '
+                            "name on a service icon, not an abbreviation or a role word alone -- "
+                            "put the role in a qualifier line, e.g. "
+                            f'"{service}\\n(Controller A)"',
+                        )
+                    )
             if IMAGE_SHAPE.search(style) and rect is not None:
                 icons.append((cid, rect, style, value))
             is_group = bool(GROUP_SHAPE.search(style))
@@ -545,7 +643,10 @@ ADVICE = """
 
   icon-corner-anchor: anchor the edge on the icon's centre (exit_at/entry_at x=0.5) and add
   waypoints so it drops, turns at a branch row, and re-enters the next icon's centre -- the
-  orthogonal tree connector, not a diagonal leg off a corner."""
+  orthogonal tree connector, not a diagonal leg off a corner.
+
+  service-name: put the service's full official name in the label (e.g. "Amazon FSx for NetApp
+  ONTAP"), with any role as a qualifier line -- not an abbreviation and not a role word alone."""
 
 
 def check() -> int:
@@ -638,6 +739,28 @@ def _frame(cid: str, x: int, y: int, w: int, h: int) -> str:
 ICON = "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;fontSize=16;"
 ICON_SIDE = (
     "sketch=0;html=1;shape=image;verticalLabelPosition=middle;verticalAlign=middle;"
+)
+# A minimal SVG carrying only the <title> the service-name rule reads, base64-encoded into the
+# data-URI form this repository's generator uses (comma, no `;base64` marker). Two titles: a
+# top-level service icon (Arch_*) which the rule checks, and a resource icon (Res_*) which it does
+# not. Real AWS assets carry far more, but the rule only reads the title, so this is enough.
+_FSX_SVC_B64 = (
+    "PD94bWwgdmVyc2lvbj0iMS4wIj8+PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmci"
+    "Pjx0aXRsZT5JY29uLUFyY2hpdGVjdHVyZS82NC9BcmNoX0FtYXpvbi1GU3gtZm9yLU5ldEFwcC1PTlRB"
+    "UF82NDwvdGl0bGU+PC9zdmc+"
+)
+_S3_RESOURCE_B64 = (
+    "PD94bWwgdmVyc2lvbj0iMS4wIj8+PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmci"
+    "Pjx0aXRsZT5JY29uLVJlc291cmNlL1N0b3JhZ2UvUmVzX0FtYXpvbi1TaW1wbGUtU3RvcmFnZS1TZXJ2"
+    "aWNlX0J1Y2tldF80ODwvdGl0bGU+PC9zdmc+"
+)
+ICON_FSX = (
+    "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;"
+    f"fontSize=16;image=data:image/svg+xml,{_FSX_SVC_B64};"
+)
+ICON_S3_RESOURCE = (
+    "sketch=0;html=1;shape=image;verticalLabelPosition=bottom;verticalAlign=top;"
+    f"fontSize=16;image=data:image/svg+xml,{_S3_RESOURCE_B64};"
 )
 GROUP = "shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud;align=left;spacingLeft=30;"
 GROUP_WIDE = GROUP.replace("spacingLeft=30", "spacingLeft=160")
@@ -862,6 +985,41 @@ def selftest() -> int:
                 + _node("b", 0, 300)
                 + _edge("e", "a", "b", anchors="exitX=0.5;exitY=1;entryX=1;entryY=0;")
             ),
+            False,
+        ),
+        (
+            "a service icon labelled with the full official name is accepted",
+            _doc(_node("a", 0, 0, style=ICON_FSX, value="Amazon FSx for NetApp ONTAP")),
+            False,
+        ),
+        (
+            "the full name with a role qualifier line is accepted",
+            _doc(
+                _node(
+                    "a",
+                    0,
+                    0,
+                    style=ICON_FSX,
+                    value="Amazon FSx for NetApp ONTAP&#10;(Controller A)",
+                )
+            ),
+            False,
+        ),
+        (
+            "a service icon labelled only with the abbreviation is rejected",
+            _doc(
+                _node("a", 0, 0, style=ICON_FSX, value="FSx for ONTAP&#10;Controller A")
+            ),
+            True,
+        ),
+        (
+            "a service icon labelled only with a role word is rejected",
+            _doc(_node("a", 0, 0, style=ICON_FSX, value="SMB SVM")),
+            True,
+        ),
+        (
+            "a resource icon is not held to the service-name rule",
+            _doc(_node("a", 0, 0, style=ICON_S3_RESOURCE, value="source of truth")),
             False,
         ),
         (

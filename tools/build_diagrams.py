@@ -246,11 +246,11 @@ LABELS: dict[str, dict[str, str]] = {
     # the image they would be maintained by hand in two places, and the image is not searchable,
     # translatable or reachable by a screen reader.
     "tc_fsx_service": {
-        # Two lines, not one: a single line this wide sits directly over the fork's two vertical
-        # legs, which start at the icon's own left/right edge (the dx=0 touch-point technique) and
-        # therefore run right through the middle of a long centred line.
-        "ja": "FSx for ONTAP\nファイルサーバー",
-        "en": "FSx for ONTAP\nfile server",
+        # The AWS icon guidance requires a service icon to carry the service's full official name,
+        # not an abbreviation or a role word alone. So the first line is "Amazon FSx for NetApp
+        # ONTAP" and the role ("file server") drops to a second line as a qualifier.
+        "ja": "Amazon FSx for NetApp ONTAP\n(ファイルサーバー)",
+        "en": "Amazon FSx for NetApp ONTAP\n(file server)",
     },
     "tc_client": {
         "ja": "NFS / SMB クライアント",
@@ -302,7 +302,13 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "CIFS 共有 1 本 (SMB 3.1.1)\nMultichannel 4 チャネル",
         "en": "One CIFS share (SMB 3.1.1)\nMultichannel, 4 channels",
     },
-    "hc_svm": {"ja": "SMB SVM", "en": "SMB SVM"},
+    # The SVM runs on an FSx for ONTAP file system, and the icon is the FSx for ONTAP service
+    # icon, so its label carries the full service name with the SMB-SVM role as a qualifier --
+    # "SMB SVM" alone named a role and no service, which the AWS icon guidance does not allow.
+    "hc_svm": {
+        "ja": "Amazon FSx for NetApp ONTAP\n(SMB SVM)",
+        "en": "Amazon FSx for NetApp ONTAP\n(SMB SVM)",
+    },
     "hc_port": {
         "ja": "1 ノードの物理ポート 1 本\n(クライアント合計と突き合わせる)",
         "en": "One physical port on one node\n(corroborates the client sum)",
@@ -668,8 +674,8 @@ LABELS: dict[str, dict[str, str]] = {
     # generation and AZ layout matters here because the divisor in the AWS procedure this article
     # tests is stated per client, not per file system.
     "ba_ec2": {
-        "ja": "EC2 クライアント\n(c5n.9xlarge)",
-        "en": "EC2 client\n(c5n.9xlarge)",
+        "ja": "Amazon EC2\n(c5n.9xlarge クライアント)",
+        "en": "Amazon EC2\n(c5n.9xlarge client)",
     },
     "ba_fsx": {
         "ja": "Amazon FSx for NetApp ONTAP\n(第二世代 SINGLE_AZ_2)",
@@ -697,20 +703,24 @@ LABELS: dict[str, dict[str, str]] = {
     # the article's entire point is that without ANA in the kernel these look like two independent
     # devices rather than one path plus its standby.
     "bb_ec2": {
-        "ja": "EC2 クライアント\n(Amazon Linux 2023)",
-        "en": "EC2 client\n(Amazon Linux 2023)",
+        "ja": "Amazon EC2\n(Amazon Linux 2023 クライアント)",
+        "en": "Amazon EC2\n(Amazon Linux 2023 client)",
     },
     "bb_ha_pair": {
         "ja": "FSx for ONTAP HA ペア\n(第二世代 SINGLE_AZ_2)",
         "en": "FSx for ONTAP HA pair\n(second-generation SINGLE_AZ_2)",
     },
+    # Each controller is one node of an FSx for ONTAP HA pair, drawn with the FSx for ONTAP
+    # service icon, so the label carries the full service name and the controller identity drops
+    # to a qualifier line -- the abbreviation "FSx for ONTAP" alone is not allowed on a service
+    # icon by the AWS icon guidance.
     "bb_ctrl_a": {
-        "ja": "FSx for ONTAP\nコントローラ A",
-        "en": "FSx for ONTAP\nController A",
+        "ja": "Amazon FSx for NetApp ONTAP\n(コントローラ A)",
+        "en": "Amazon FSx for NetApp ONTAP\n(Controller A)",
     },
     "bb_ctrl_b": {
-        "ja": "FSx for ONTAP\nコントローラ B",
-        "en": "FSx for ONTAP\nController B",
+        "ja": "Amazon FSx for NetApp ONTAP\n(コントローラ B)",
+        "en": "Amazon FSx for NetApp ONTAP\n(Controller B)",
     },
     "bb_optimized": {
         "ja": "経路 1: optimized（最短経路）",
@@ -733,8 +743,8 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "Deployment 2",
     },
     "bc_ec2": {
-        "ja": "EC2 クライアント\n(同じ接続・同じワークロード)",
-        "en": "EC2 client\n(same connection, same workload)",
+        "ja": "Amazon EC2\n(同じ接続・同じワークロードのクライアント)",
+        "en": "Amazon EC2\n(client, same connection and workload)",
     },
     "bc_fsx_same": {
         "ja": "Amazon FSx for NetApp ONTAP\n(同じテンプレート・同じ指定値)",
@@ -1754,31 +1764,35 @@ def _block_b_multipath() -> Diagram:
     # Every edge now enters and leaves on an icon's own centre (x fraction 0.5) and turns at a
     # branch row, so the flow-direction gate sees each arm as a straight vertical drop with a
     # single horizontal branch in a clear band -- no anchor carries sideways motion. The two
-    # controllers sit either side of the client's centre; the namespace frame is centred under the
-    # client so the merge is symmetric. ns spans x=400..480 (centre 440), between the controllers.
-    ctrl_a_cx, ctrl_b_cx = 360, 520
-    ns_x, ns_w = ctrl_a_cx + 40, (ctrl_b_cx - 40) - (ctrl_a_cx + 40)
+    # The controllers sit either side of the client's centre; the namespace frame is centred under
+    # the client so the merge is symmetric. They are spread wide (230 / 650, centre 440) because
+    # each now carries the full "Amazon FSx for NetApp ONTAP" service name -- at the old 160px
+    # centre spacing the two names collided in the middle. ns is centred on 440 between them.
+    ctrl_a_cx, ctrl_b_cx = 230, 650
+    branch_y, merge_y = 340, 680
+    ns_w = 120
+    ns_x = centre - ns_w // 2
     # Vertical bands, top to bottom, with a full clear row between each so a label's own text
     # never enters the row above or below it: AWS Cloud title (20-70) / EC2 client icon + its
-    # two-line label (110-290, an 80px icon plus ~100px for two lines of text below it) / path
-    # names in the clear row that follows (300-345) / HA-pair frame title (365-410) / controller
-    # icons + their two-line labels (430-620) / namespace frame (660-730).
+    # two-line label (110-290) / path names in the clear row that follows (300-345) / HA-pair
+    # frame title (365-410) / controller icons + their two-line labels (480-670) / namespace
+    # frame (720-790).
     ec2_cy = 150
     ctrl_cy = 520
     return Diagram(
         name="s3burst-block-b-multipath",
         diagram_id="s3burst-block-b-multipath",
-        width=880,
+        width=1000,
         height=860,
         font_size=16,
-        groups=(Group("bb_aws_cloud", "aws_cloud_plain", 20, 20, 840, 820),),
+        groups=(Group("bb_aws_cloud", "aws_cloud_plain", 20, 20, 960, 820),),
         frames=(
             Frame(
                 "bb_pair_group",
                 "bb_ha_pair",
                 40,
                 350,
-                800,
+                920,
                 450,
                 label_only=True,
                 title_align_left=True,
@@ -1801,10 +1815,11 @@ def _block_b_multipath() -> Diagram:
             ),
         ),
         # One full clear row below the client's own two-line label, and directly above the
-        # HA-pair frame's title -- never sharing a row with either.
+        # HA-pair frame's title -- never sharing a row with either. Each spans its half of the
+        # 1000px canvas so the path name sits over the controller column it describes.
         texts=(
-            TextBox("bb_t1", "bb_optimized", 20, 300, 400, 40),
-            TextBox("bb_t2", "bb_non_optimized", 460, 300, 400, 40),
+            TextBox("bb_t1", "bb_optimized", 20, 300, 460, 40),
+            TextBox("bb_t2", "bb_non_optimized", 520, 300, 460, 40),
         ),
         # A tree fork from the client down to the two controllers, then a mirror-image merge from
         # the two controllers down into the one namespace. Every arm leaves and enters an icon on
@@ -1814,10 +1829,11 @@ def _block_b_multipath() -> Diagram:
         # vertical entry to each child's centre -- read as one fork and one merge, not four
         # independent diagonal legs.
         #
-        # Branch row y=340 sits between the client's label band (ends ~290) and the HA-pair frame
-        # title (350). Merge row y=680 sits below the controllers' labels (~620) and above the
-        # namespace frame (720). The controllers are centred on 360 and 520; the client and the
-        # namespace frame are both centred on 440.
+        # Branch row (branch_y=340) sits between the client's label band (ends ~290) and the
+        # HA-pair frame title (350). Merge row (merge_y=680) sits below the controllers' labels
+        # (~670) and above the namespace frame (720). The controllers are centred on ctrl_a_cx /
+        # ctrl_b_cx; the client and the namespace frame are both centred on `centre`. Waypoints
+        # are derived from those so the fork stays symmetric when the spacing changes.
         edges=(
             Edge(
                 "bb_e1",
@@ -1825,7 +1841,7 @@ def _block_b_multipath() -> Diagram:
                 "bb_a",
                 exit_at=(0.5, 1.0),
                 entry_at=(0.5, 0.0),
-                points=((440, 340), (360, 340)),
+                points=((centre, branch_y), (ctrl_a_cx, branch_y)),
             ),
             Edge(
                 "bb_e2",
@@ -1833,7 +1849,7 @@ def _block_b_multipath() -> Diagram:
                 "bb_b",
                 exit_at=(0.5, 1.0),
                 entry_at=(0.5, 0.0),
-                points=((440, 340), (520, 340)),
+                points=((centre, branch_y), (ctrl_b_cx, branch_y)),
             ),
             Edge(
                 "bb_e3",
@@ -1841,7 +1857,7 @@ def _block_b_multipath() -> Diagram:
                 "bb_ns",
                 exit_at=(0.5, 1.0),
                 entry_at=(0.5, 0.0),
-                points=((360, 680), (440, 680)),
+                points=((ctrl_a_cx, merge_y), (centre, merge_y)),
             ),
             Edge(
                 "bb_e4",
@@ -1849,7 +1865,7 @@ def _block_b_multipath() -> Diagram:
                 "bb_ns",
                 exit_at=(0.5, 1.0),
                 entry_at=(0.5, 0.0),
-                points=((520, 680), (440, 680)),
+                points=((ctrl_b_cx, merge_y), (centre, merge_y)),
             ),
         ),
     )
