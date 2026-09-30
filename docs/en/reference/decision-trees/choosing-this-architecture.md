@@ -43,7 +43,7 @@ flowchart TD
 > **The cost table for the same fork is in [Alternatives](../comparison/alternatives.md#block-protocols-iscsi--nvmetcp).**
 > An article covering how the figures were measured (`iorate=max` saturation points, response time,
 > a 2.64x swing across environments on the same configuration) is
-> [What moves the numbers for block protocols](TODO-LINK-BLOCK-C-EN) (link filled in once published).
+> [What moves the numbers for block protocols](https://dev.to/aws-builders/why-amazon-fsx-for-netapp-ontap-block-performance-differed-by-about-2x-on-the-same-specified-35pi).
 | 1 | Can the consuming side's protocol be changed | Consider S3 alone. This architecture is unnecessary | Go to 2 |
 | 2 | Are the object names NAS friendly (S3 name within 1024 bytes, file name within 255 characters, a hierarchy containing slashes) | Go to 3 | Use an object store alongside. This architecture applies in part |
 | 3 | Are S3-specific features needed (versioning, lifecycle, event notifications) | Consider an architecture with S3 as the source of truth | Go to 4 |

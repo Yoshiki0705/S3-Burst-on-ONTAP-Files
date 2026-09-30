@@ -123,7 +123,7 @@ Costs are compared in
 For reading large objects from Linux on AWS, it can come out cheaper than this architecture.
 
 An article measuring the FSx for ONTAP S3 Access Point, Amazon S3 and Amazon S3 Files from the same
-host is [Three bottlenecks (S3 Burst Part 2)](TODO-LINK-S3BURST2-EN) (link filled in once published).
+host is [Three bottlenecks (S3 Burst Part 2)](https://dev.to/aws-builders/amazon-s3-files-vs-amazon-fsx-for-netapp-ontap-two-designs-for-using-s3-as-a-file-s3-burst-part-4p9m).
 
 ### Collect over S3, serve with FlexCache (this architecture)
 

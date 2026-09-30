@@ -116,7 +116,7 @@ S3 を正本に保ったまま、ファイルシステムのセマンティク�
 **S3 Files 側は未測定なので表は空である。**
 
 同一ホストから FSx for ONTAP の S3 Access Point・Amazon S3・Amazon S3 Files を測った記事は
-[3 経路のボトルネック（S3 Burst Part 2）](TODO-LINK-S3BURST2)（公開後にリンクを差し替える）。
+[3 経路のボトルネック（S3 Burst Part 2）](https://hakobiya.hatenablog.com/entry/fsxn-s3burst-throughput-ceilings-three-paths)。
 
 ### S3 で収集 → FlexCache で配布（この構成）
 

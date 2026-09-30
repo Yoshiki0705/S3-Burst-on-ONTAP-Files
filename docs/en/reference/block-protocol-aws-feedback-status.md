@@ -1,12 +1,12 @@
-# AWS feedback status for the block protocol articles
+# AWS documentation notes and inquiries for the block protocol articles
 
 <!-- lang-switcher:start -->
 🌐 [日本語](../../ja/reference/block-protocol-aws-feedback-status.md) | [English](block-protocol-aws-feedback-status.md) | [🏠 Repository home](../README.md)
 <!-- lang-switcher:end -->
 
 Collects, in one place, where the three block protocol measurement articles and S3 Burst Part 2
-touch the published documentation. **Each article's own "AWS feedback status" section holds the
-state for that article; this document is an index across articles.** The individual background,
+touch the published documentation. **Each article's own "AWS documentation notes and support
+inquiries" section holds the state for that article; this document is an index across articles.** The individual background,
 verbatim citations, and reproduction steps live in each article and aren't duplicated here.
 
 **Case numbers aren't written here.** They're recorded only in the internal ledger (gitignored).
@@ -19,7 +19,7 @@ What's recorded here is content, category, and status.
 | A | `JunctionPath`'s body and `Required:` column disagree ([API reference](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateOntapVolumeConfiguration.html), propagates into CloudFormation and the CDK) | Self-contradiction in the documentation | The rationale behind `Required: No` was explained (RW requires it, DP disallows it, so the combined attribute reads as not-always-required). No commitment on adopting `Required: Conditional` |
 | B | "Aside from installing packages, valid for other EC2 Linux AMIs" against `cat /etc/nvme/hostnqn` being absent on AL2023 | Counterexample outside the stated scope | Reproduced in the same environment, confirming the file is absent. The two proposed fixes are expected to be shared with the documentation team. No commitment on adoption or timing |
 | B | Same statement against `cat /sys/module/nvme_core/parameters/multipath` being absent on AL2023 (`CONFIG_NVME_MULTIPATH` unset) | Counterexample outside the stated scope | The observation was confirmed and filed. A follow-up question (why AL2023 is excluded) also got a technical answer — proceeding with the procedure unmerged risks data corruption, so the exclusion is technically sound |
-| B | The procedure's `iopolicy` check value (`round-robin`) versus measured (`queue-depth`). The version boundary is `nvme-cli` 2.11->2.12 | Version difference, not a documentation error | The cause was agreed to be a version difference, with a status update promised after internal review |
+| B | The procedure's `iopolicy` check value (`round-robin`) versus measured (`queue-depth`). The version boundary is `nvme-cli` 2.11->2.12 | Version difference, not a documentation error | On 2026-09-30 it was acknowledged that a note is needed stating whether `iopolicy` resolves to `round-robin` or `queue-depth` depends on the environment, and it was fed to the responsible team (NetApp's published documentation carries the same point). The content and timing of any change are not disclosed in advance, so they are unconfirmed |
 | Part 2 | Second-generation sustained writes exceed the published value that should apply to the provisioned value, at both points measured | Gap between published value and measurement | Confirmed that the "up to a third" figure is a sizing indicator, not a hard limit, since writes use bandwidth twice over (active server plus standby sync) and burst capacity can exceed it. For sizing, the original rule of thumb applies: provision three times the required write throughput |
 | Part 2 | ap-northeast-1's NVMe read cache capacity is missing from the table, and the management page is written scoped to second-generation only | Missing content (two places) | No documentation change is planned. Enumerating every corner case was judged impractical; `system node external-cache show` was pointed to for individual checks |
 
