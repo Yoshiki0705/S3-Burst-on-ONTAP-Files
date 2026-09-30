@@ -120,6 +120,7 @@ on the page. `tools/check_diagram_flow.py` now checks for them directly:
 | `label-overflow` | An icon's own label, estimated from its line count and `fontSize`, would print past the bottom edge of a group or frame that fully contains the icon. |
 | `boundary-title-crossing` | A frame or group's centred title sits on the same horizontal band as a straight vertical edge that passes through the container on its way to a node beyond it. Fix by passing `title_align_left=True` to `Frame`, which moves the title to the corner. |
 | `icon-corner-anchor` | An edge anchors on an icon's *corner* (x in {0,1} and y in {0,1} together) with no waypoints, which renders as a diagonal line stabbing into the corner instead of a clean connection to the icon's centre. Fix with the tree-connector shape below. |
+| `service-name` | A cell drawn with an official AWS *service* icon must carry that service's full official name in its label — "Amazon FSx for NetApp ONTAP", not "FSx for ONTAP" and not a role word alone ("file server", "SMB SVM", "controller A"). The check reads the service from the icon's embedded SVG `<title>`, so put the role in a qualifier line: `Amazon FSx for NetApp ONTAP\n(Controller A)`. Resource icons (`Res_*`) are exempt. This rule lives in `global-architecture-diagram-standards.md` section 2 and applies to every Kiro project. |
 
 ### Fork and merge edges: the tree connector
 
