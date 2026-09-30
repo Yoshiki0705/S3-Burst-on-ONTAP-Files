@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a diagram makes the reader work out which way to read it.
 
-Five rules, all of them things that are only visible in the rendered image and therefore easy to
+Six rules, all of them things that are only visible in the rendered image and therefore easy to
 break while every generator function still looks correct.
 
 **Direction.** Every edge must advance rightwards or downwards, never leftwards and never upwards.
@@ -11,10 +11,19 @@ they came for -- which is usually the one claim the figure exists to make. A sin
 enough to cost that, because once one line runs the other way the reader can no longer assume any of
 the others.
 
-The verdict is reached on the two points the edge actually joins: the exit and entry anchors when the
-style fixes them, and the node centres otherwise. Not on the routed path -- draw.io computes
-orthogonal routing at render time and the waypoints are not in the file, so the path cannot be
-recovered here.
+The verdict is reached on the polyline the edge actually follows: the exit anchor, then any explicit
+waypoints the file carries, then the entry anchor. When there are no waypoints this is just the two
+endpoints, and draw.io's own orthogonal router fills in the right-angle path between them -- which is
+why a plain edge is still judged on its endpoints. When the generator gives waypoints (a tree fork:
+one trunk down, a right-angle branch, then a vertical drop into a child's centre), each segment is
+judged in turn.
+
+A purely horizontal segment is allowed: it is the branch of a fork, not a reversal of reading order.
+What is rejected is any segment that goes **upwards**, and -- on the endpoint pair of an edge with no
+waypoints -- any leg that runs leftwards, since without waypoints a leftward endpoint pair is a
+backwards edge rather than a branch. A tree fork therefore passes (its only non-vertical segments are
+horizontal branches), while a diagonal leg off an icon corner that lands left-and-below still fails,
+because its single segment carries both directions at once.
 
 Reading the anchors matters wherever an edge lands on something large. A restore edge dropping onto
 the top-right of a 520px boundary frame advances rightwards for the reader while the frame's *centre*
@@ -64,6 +73,16 @@ for ONTAP controllers passed straight through the centre of the "FSx for ONTAP H
 Left-aligning the title (`title_align_left=True` on `Frame`, tracked in `build_diagrams.py`) moves it
 to the corner nothing else crosses.
 
+**Diagonal line into an icon corner.** An edge that anchors on an icon's *corner* -- x in {0,1} and
+y in {0,1} at the same time -- with no waypoints to route it renders as a slanted line stabbing into
+that corner rather than a clean orthogonal connection to the icon's centre. This is the defect
+reported on the block figures: a fork's legs, anchored (0,1)/(1,0), drew diagonal lines into the FSx
+and controller icons instead of dropping into their centres. The fix is the orthogonal tree
+connector -- anchor on the centre (0.5) and give the edge waypoints so it goes down, turns at a
+branch row, and drops vertically into the child's centre. An edge-*midpoint* anchor such as (1,0.5),
+used elsewhere to leave an icon's side and route around its label, is not a corner and is left alone;
+a waypointed edge routes itself and is exempt.
+
 Crossing edges are otherwise not checked. Whether two arbitrary lines cross depends on the routing,
 which is not in the file, and approximating it with straight centre-to-centre segments reports
 crossings that do not render and misses ones that do. The boundary-title rule above is narrower than
@@ -88,6 +107,7 @@ Run:  python3 tools/check_diagram_flow.py
 from __future__ import annotations
 
 import argparse
+import itertools
 import re
 import sys
 import xml.etree.ElementTree as ET  # nosec B405  reads this repository's own committed files
@@ -189,6 +209,30 @@ def _rect(cell: ET.Element) -> tuple[float, float, float, float] | None:
     return None
 
 
+def _waypoints(cell: ET.Element) -> list[tuple[float, float]]:
+    """The explicit routing points on an edge, in order, or [] when it has none.
+
+    draw.io stores them as `<mxPoint x= y=>` children of an `<Array as="points">` inside the
+    edge's `<mxGeometry>`. A bare `<mxPoint as="offset">` (a label nudge) is not a waypoint and is
+    not inside that array, so scoping to the array keeps the two apart.
+    """
+    for geometry in cell:
+        if geometry.tag != "mxGeometry":
+            continue
+        for child in geometry:
+            if child.tag != "Array" or child.get("as") != "points":
+                continue
+            points: list[tuple[float, float]] = []
+            for point in child:
+                if point.tag != "mxPoint":
+                    continue
+                x, y = point.get("x"), point.get("y")
+                if x is not None and y is not None:
+                    points.append((float(x), float(y)))
+            return points
+    return []
+
+
 def _anchor(
     rect: tuple[float, float, float, float],
     style: str,
@@ -283,7 +327,7 @@ def inspect(path: Path, text: str) -> list[Finding]:
     root = _parse(text)
     for model in root.iter("mxGraphModel"):
         rects: dict[str, tuple[float, float, float, float]] = {}
-        edges: list[tuple[str, str, str, str, str]] = []
+        edges: list[tuple[str, str, str, str, str, list[tuple[float, float]]]] = []
         icons: list[tuple[str, tuple[float, float, float, float], str, str]] = []
         containers: list[_Container] = []
         aws_cloud_groups: list[tuple[str, str]] = []
@@ -294,7 +338,7 @@ def inspect(path: Path, text: str) -> list[Finding]:
             if cell.get("edge") == "1":
                 source, target = cell.get("source"), cell.get("target")
                 if source and target:
-                    edges.append((cid, source, target, value, style))
+                    edges.append((cid, source, target, value, style, _waypoints(cell)))
                 continue
             if cell.get("vertex") != "1":
                 continue
@@ -389,9 +433,11 @@ def inspect(path: Path, text: str) -> list[Finding]:
             band_x0 = cx + (cw - band_width) / 2
             band_x1 = band_x0 + band_width
             band_y1 = cy + TITLE_BAND_HEIGHT
-            for cid, source, target, label, style in edges:
+            for cid, source, target, label, style, waypoints in edges:
                 if source not in rects or target not in rects:
                     continue
+                if waypoints:
+                    continue  # a waypointed edge routes explicitly; it does not free-run through
                 sx, sy = _anchor(rects[source], style, EXIT_X, EXIT_Y)
                 tx, ty = _anchor(rects[target], style, ENTRY_X, ENTRY_Y)
                 if abs(sx - tx) > EPSILON:
@@ -410,15 +456,67 @@ def inspect(path: Path, text: str) -> list[Finding]:
                             "corner nothing crosses",
                         )
                     )
-        for cid, source, target, label, style in edges:
+        icon_cids = {cid for cid, _rect_, _style_, _value_ in icons}
+        for cid, source, target, label, style, waypoints in edges:
             if source not in rects or target not in rects:
                 continue
             sx, sy = _anchor(rects[source], style, EXIT_X, EXIT_Y)
             tx, ty = _anchor(rects[target], style, ENTRY_X, ENTRY_Y)
+            named = f" '{label}'" if label else ""
+            # An edge landing on or leaving an icon at one of the icon's four *corners*, with no
+            # waypoints to route it, renders as a diagonal line stabbing into the corner rather
+            # than a clean orthogonal connection to the icon's centre. That is the exact defect
+            # reported on the block figures: fork legs anchored at (0,1)/(1,0) drew slanted lines
+            # into the FSx and controller icons. A corner is x in {0,1} AND y in {0,1} together; an
+            # edge-midpoint like (1,0.5), used on host-count to leave around a label, is not a
+            # corner and is left alone, and a waypointed edge routes itself so it is exempt too.
+            if not waypoints:
+                for end, node_cid, xr, yr in (
+                    ("exit", source, EXIT_X, EXIT_Y),
+                    ("entry", target, ENTRY_X, ENTRY_Y),
+                ):
+                    if node_cid not in icon_cids:
+                        continue
+                    fx = xr.search(style)
+                    fy = yr.search(style)
+                    if fx is None or fy is None:
+                        continue
+                    fxv, fyv = float(fx.group(1)), float(fy.group(1))
+                    if fxv in (0.0, 1.0) and fyv in (0.0, 1.0):
+                        findings.append(
+                            Finding(
+                                path,
+                                "icon-corner-anchor",
+                                f"edge {cid}{named}: its {end} anchor sits on icon {node_cid}'s "
+                                f"corner ({fxv:g},{fyv:g}), which draws a diagonal line into the "
+                                "corner -- anchor on the centre (0.5) and add waypoints so it "
+                                "connects as an orthogonal tree branch",
+                            )
+                        )
+            if waypoints:
+                # Trace the polyline the file actually draws. Each segment may go down or run
+                # horizontally (a fork branch); a segment that goes up is a backwards read.
+                polyline = [(sx, sy), *waypoints, (tx, ty)]
+                bad = None
+                for (ax, ay), (bx, by) in itertools.pairwise(polyline):
+                    if by - ay < -EPSILON:
+                        bad = (ax, ay, bx, by)
+                        break
+                if bad is None:
+                    continue
+                ax, ay, bx, by = bad
+                findings.append(
+                    Finding(
+                        path,
+                        "flow-direction",
+                        f"edge {cid}{named}: {source} -> {target} has a segment running upwards "
+                        f"({ax:.0f},{ay:.0f} -> {bx:.0f},{by:.0f})",
+                    )
+                )
+                continue
             heading = _heading(tx - sx, ty - sy)
             if heading is None:
                 continue
-            named = f" '{label}'" if label else ""
             findings.append(
                 Finding(
                     path,
@@ -443,7 +541,11 @@ ADVICE = """
   fewer lines -- not both wrong at once.
 
   boundary-title-crossing: pass title_align_left=True to the Frame so the title sits in the corner
-  instead of the centre of the top edge."""
+  instead of the centre of the top edge.
+
+  icon-corner-anchor: anchor the edge on the icon's centre (exit_at/entry_at x=0.5) and add
+  waypoints so it drops, turns at a branch row, and re-enters the next icon's centre -- the
+  orthogonal tree connector, not a diagonal leg off a corner."""
 
 
 def check() -> int:
@@ -504,11 +606,25 @@ def _node(
     )
 
 
-def _edge(cid: str, source: str, target: str, *, anchors: str = "") -> str:
+def _edge(
+    cid: str,
+    source: str,
+    target: str,
+    *,
+    anchors: str = "",
+    waypoints: tuple[tuple[int, int], ...] = (),
+) -> str:
+    if waypoints:
+        pts = "".join(f'<mxPoint x="{x}" y="{y}" />' for x, y in waypoints)
+        geometry = (
+            '<mxGeometry relative="1" as="geometry">'
+            f'<Array as="points">{pts}</Array></mxGeometry>'
+        )
+    else:
+        geometry = '<mxGeometry relative="1" as="geometry" />'
     return (
         f'<mxCell id="{cid}" value="" style="endArrow=open;{anchors}" edge="1" '
-        f'source="{source}" target="{target}" parent="1">'
-        '<mxGeometry relative="1" as="geometry" /></mxCell>'
+        f'source="{source}" target="{target}" parent="1">{geometry}</mxCell>'
     )
 
 
@@ -674,6 +790,78 @@ def selftest() -> int:
         (
             "a different pictogram is not held to the AWS Cloud caption",
             _doc(_node("g", 0, 0, style=GROUP_OTHER, value="Cache Site")),
+            False,
+        ),
+        (
+            "a tree fork -- down, horizontal branch, down into a child's centre -- is accepted",
+            _doc(
+                _node("a", 200, 0)
+                + _node("b", 0, 400)
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=0.5;entryY=0;",
+                    waypoints=((240, 200), (40, 200)),
+                )
+            ),
+            False,
+        ),
+        (
+            "a waypointed edge whose branch then climbs back up is rejected",
+            _doc(
+                _node("a", 0, 200)
+                + _node("b", 400, 400)
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=0.5;entryY=0;",
+                    waypoints=((40, 300), (440, 100)),
+                )
+            ),
+            True,
+        ),
+        (
+            "an edge entering an icon on its corner with no waypoints is rejected",
+            _doc(
+                _node("a", 0, 0)
+                + _node("b", 0, 300, style=ICON)
+                + _edge("e", "a", "b", anchors="exitX=0.5;exitY=1;entryX=1;entryY=0;")
+            ),
+            True,
+        ),
+        (
+            "the same corner anchor with waypoints (a routed tree branch) is accepted",
+            _doc(
+                _node("a", 0, 0)
+                + _node("b", 0, 300, style=ICON)
+                + _edge(
+                    "e",
+                    "a",
+                    "b",
+                    anchors="exitX=0.5;exitY=1;entryX=1;entryY=0;",
+                    waypoints=((40, 150), (40, 150)),
+                )
+            ),
+            False,
+        ),
+        (
+            "an edge leaving an icon's side midpoint to route around its label is accepted",
+            _doc(
+                _node("a", 0, 0, style=ICON)
+                + _node("b", 200, 200)
+                + _edge("e", "a", "b", anchors="exitX=1;exitY=0.5;entryX=0.5;entryY=0;")
+            ),
+            False,
+        ),
+        (
+            "an edge entering a non-icon box on its corner is not judged for this",
+            _doc(
+                _node("a", 0, 0)
+                + _node("b", 0, 300)
+                + _edge("e", "a", "b", anchors="exitX=0.5;exitY=1;entryX=1;entryY=0;")
+            ),
             False,
         ),
         (
