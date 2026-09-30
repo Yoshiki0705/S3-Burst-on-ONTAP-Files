@@ -1498,16 +1498,15 @@ def _two_ceilings() -> Diagram:
             # the fork drop almost vertically onto a corner instead of running out sideways. A
             # fork is not an inconsistent direction, but an arm that travels 200px to the left
             # before turning down reads as one.
-            Frame("tc_cache", "tc_cache_layer", 90, 440, 330, 64, label_only=True),
-            # x=480, not 460: the FSx icon above is 80px wide (fsx_ontap, not the 48px client
-            # icon this frame used to hang off of), so its bottom-right exit point sits at
-            # centre+40=480. A frame starting at 460 put the entry point 20px to the exit's
-            # left, which the flow-direction gate reads as the edge running backwards.
-            Frame("tc_disk", "tc_ssd", 480, 440, 330, 64, label_only=True),
+            Frame("tc_cache", "tc_cache_layer", 90, 460, 330, 64, label_only=True),
+            # x=480: cache frame at 90 (centre 255) and disk frame at 480 (centre 645) sit either
+            # side of the FSx icon's centre column (440), so the fork's two branches are the same
+            # length. The edges enter each frame on its own centre now, not on a corner.
+            Frame("tc_disk", "tc_ssd", 480, 460, 330, 64, label_only=True),
             Frame(
-                "tc_cap_cache", "tc_ceiling_cache", 90, 570, 330, 64, label_only=True
+                "tc_cap_cache", "tc_ceiling_cache", 90, 590, 330, 64, label_only=True
             ),
-            Frame("tc_cap_disk", "tc_ceiling_disk", 480, 570, 330, 64, label_only=True),
+            Frame("tc_cap_disk", "tc_ceiling_disk", 480, 590, 330, 64, label_only=True),
         ),
         nodes=(
             # The client stays outside the AWS Cloud boundary, matching the app/pipeline actor in
@@ -1524,6 +1523,18 @@ def _two_ceilings() -> Diagram:
                 *centred("fsx_ontap", centre, 270),
             ),
         ),
+        # A tree fork from the file server down to the two ceilings. Each arm leaves the FSx
+        # icon's centre going straight down, turns once at the branch row (y=410, the clear band
+        # between the icon's two-line label ~352 and the frames at 460), runs to the target
+        # frame's centre column, then drops vertically into the top of the frame. This is the
+        # orthogonal tree-connector shape (one trunk, right-angle branches, vertical entry to each
+        # child's centre) rather than two diagonal legs off the icon's corners -- the read arrives
+        # at one fork, and the "in cache" / "not in cache" labels sit on the horizontal branch
+        # each names.
+        #
+        # Cache frame: x=90, w=330, centre 255. Disk frame: x=480, w=330, centre 645. The FSx icon
+        # is centred on 440. Each label is pulled onto its own branch's horizontal run and away
+        # from the trunk with label_offset, so neither sits under the FSx service name.
         edges=(
             Edge("tc_e_in", "tc_users", "tc_fsx"),
             Edge(
@@ -1531,18 +1542,20 @@ def _two_ceilings() -> Diagram:
                 "tc_fsx",
                 "tc_cache",
                 "tc_hit",
-                exit_at=(0.0, 1.0),
-                entry_at=(1.0, 0.0),
-                label_offset=(-110, 0),
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 410), (255, 410)),
+                label_offset=(-60, -18),
             ),
             Edge(
                 "tc_e_miss",
                 "tc_fsx",
                 "tc_disk",
                 "tc_miss",
-                exit_at=(1.0, 1.0),
-                entry_at=(0.0, 0.0),
-                label_offset=(110, 0),
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 410), (645, 410)),
+                label_offset=(60, -18),
             ),
             Edge("tc_e_cache_cap", "tc_cache", "tc_cap_cache"),
             Edge("tc_e_disk_cap", "tc_disk", "tc_cap_disk"),
@@ -1654,36 +1667,72 @@ def _block_a_sessions() -> Diagram:
         name="s3burst-block-a-sessions",
         diagram_id="s3burst-block-a-sessions",
         width=880,
-        height=680,
+        height=760,
         font_size=16,
         # Two bands, matching the official AWS reference layout: an outer "AWS Cloud" group (the
         # cloud-icon group AWS's own decks use for the account/partition boundary) holding an inner
         # "single VPC, single AZ" frame, rather than one frame relabelled to both jobs at once.
-        groups=(Group("ba_aws_cloud", "aws_cloud_plain", 20, 20, 840, 560),),
+        groups=(Group("ba_aws_cloud", "aws_cloud_plain", 20, 20, 840, 640),),
         frames=(
-            Frame("ba_vpc_group", "ba_vpc", 40, 70, 800, 490, label_only=True),
+            Frame("ba_vpc_group", "ba_vpc", 40, 70, 800, 570, label_only=True),
             Frame("ba_p1", "ba_iscsi", 100, 320, 300, 70, label_only=True),
             Frame("ba_p2", "ba_nvme", 480, 320, 300, 70, label_only=True),
         ),
         nodes=(
             Node("ba_client", "ec2", "ba_ec2", *centred("ec2", centre, 190)),
+            # cy=510: the merge row where the two protocol branches rejoin sits at y=430, and the
+            # FSx icon's top must clear it -- at the old cy=450 (top 410) the merge line ran
+            # straight through the icon's own body. 510 puts the top at 470, a clear 40px below
+            # the merge, so the single trunk drops into the top edge instead of crossing the icon.
             Node(
-                "ba_target", "fsx_ontap", "ba_fsx", *centred("fsx_ontap", centre, 450)
+                "ba_target", "fsx_ontap", "ba_fsx", *centred("fsx_ontap", centre, 510)
             ),
         ),
         texts=(TextBox("ba_or_text", "ba_or", 410, 345, 60, 20),),
+        # A tree fork, not four diagonal legs. Each arm leaves the icon's own centre going
+        # straight down, turns once at the branch row (y=300, the clear row above the protocol
+        # frames), runs horizontally to the frame's centre column, then drops vertically into the
+        # top of the frame. The return legs mirror it: each leaves a frame's centre, drops to the
+        # merge row (y=430, a clear band below the frames' bottom at 390 and above the FSx icon's
+        # top at 470), runs to the trunk column, then drops as one line into the top of the FSx
+        # icon's centre. This is the orthogonal tree-connector shape (one trunk, right-angle
+        # branches, vertical entry to each child's centre) the connector-routing guidance
+        # converges on, read as a single fork and a single merge rather than four diagonal legs.
+        #
+        # The frame centres are 250 (iSCSI: x=100, w=300) and 630 (NVMe: x=480, w=300); the EC2
+        # and FSx icons are centred on 440.
         edges=(
             Edge(
-                "ba_e1", "ba_client", "ba_p1", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)
+                "ba_e1",
+                "ba_client",
+                "ba_p1",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 300), (250, 300)),
             ),
             Edge(
-                "ba_e2", "ba_client", "ba_p2", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)
+                "ba_e2",
+                "ba_client",
+                "ba_p2",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 300), (630, 300)),
             ),
             Edge(
-                "ba_e3", "ba_p1", "ba_target", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)
+                "ba_e3",
+                "ba_p1",
+                "ba_target",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((250, 430), (440, 430)),
             ),
             Edge(
-                "ba_e4", "ba_p2", "ba_target", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)
+                "ba_e4",
+                "ba_p2",
+                "ba_target",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((630, 430), (440, 430)),
             ),
         ),
     )
@@ -1702,12 +1751,11 @@ def _block_b_multipath() -> Diagram:
     Vertical, 880px canvas, font_size=16.
     """
     centre = 440
-    # The client's own left/right edge (400 / 480, from an 80px icon centred at 440) is what every
-    # anchor below has to touch at matching x, so the fork's left leg and the merge's left leg both
-    # read as dx=0 -- "downwards", not "leftwards" -- for the flow-direction gate (orthogonal
-    # routing turns any non-zero dx into a jog that still counts as sideways motion at the anchor).
-    # That forces ctrl_a's right edge to sit at 400 (centre 360) and ctrl_b's left edge at 480
-    # (centre 520); the namespace frame spans exactly between those two touch points.
+    # Every edge now enters and leaves on an icon's own centre (x fraction 0.5) and turns at a
+    # branch row, so the flow-direction gate sees each arm as a straight vertical drop with a
+    # single horizontal branch in a clear band -- no anchor carries sideways motion. The two
+    # controllers sit either side of the client's centre; the namespace frame is centred under the
+    # client so the merge is symmetric. ns spans x=400..480 (centre 440), between the controllers.
     ctrl_a_cx, ctrl_b_cx = 360, 520
     ns_x, ns_w = ctrl_a_cx + 40, (ctrl_b_cx - 40) - (ctrl_a_cx + 40)
     # Vertical bands, top to bottom, with a full clear row between each so a label's own text
@@ -1758,11 +1806,51 @@ def _block_b_multipath() -> Diagram:
             TextBox("bb_t1", "bb_optimized", 20, 300, 400, 40),
             TextBox("bb_t2", "bb_non_optimized", 460, 300, 400, 40),
         ),
+        # A tree fork from the client down to the two controllers, then a mirror-image merge from
+        # the two controllers down into the one namespace. Every arm leaves and enters an icon on
+        # its centre (x fraction 0.5), going straight down; the single horizontal run happens at a
+        # branch row in a clear band, never at an anchor. This is the orthogonal tree-connector
+        # shape the connector-routing guidance settles on: one trunk, right-angle branches,
+        # vertical entry to each child's centre -- read as one fork and one merge, not four
+        # independent diagonal legs.
+        #
+        # Branch row y=340 sits between the client's label band (ends ~290) and the HA-pair frame
+        # title (350). Merge row y=680 sits below the controllers' labels (~620) and above the
+        # namespace frame (720). The controllers are centred on 360 and 520; the client and the
+        # namespace frame are both centred on 440.
         edges=(
-            Edge("bb_e1", "bb_client", "bb_a", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)),
-            Edge("bb_e2", "bb_client", "bb_b", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)),
-            Edge("bb_e3", "bb_a", "bb_ns", exit_at=(1.0, 1.0), entry_at=(0.0, 0.0)),
-            Edge("bb_e4", "bb_b", "bb_ns", exit_at=(0.0, 1.0), entry_at=(1.0, 0.0)),
+            Edge(
+                "bb_e1",
+                "bb_client",
+                "bb_a",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 340), (360, 340)),
+            ),
+            Edge(
+                "bb_e2",
+                "bb_client",
+                "bb_b",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((440, 340), (520, 340)),
+            ),
+            Edge(
+                "bb_e3",
+                "bb_a",
+                "bb_ns",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((360, 680), (440, 680)),
+            ),
+            Edge(
+                "bb_e4",
+                "bb_b",
+                "bb_ns",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+                points=((520, 680), (440, 680)),
+            ),
         ),
     )
 

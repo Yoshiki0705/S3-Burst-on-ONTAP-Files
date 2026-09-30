@@ -119,6 +119,26 @@ on the page. `tools/check_diagram_flow.py` now checks for them directly:
 | `aws-cloud-mislabel` | Exactly one group in the diagram carries `grIcon=mxgraph.aws4.group_aws_cloud`, and its caption is not "AWS Cloud" (optionally with a parenthetical qualifier). Silent when the pictogram is reused more than once as a per-panel card border -- an existing, intentional pattern in several figures here. |
 | `label-overflow` | An icon's own label, estimated from its line count and `fontSize`, would print past the bottom edge of a group or frame that fully contains the icon. |
 | `boundary-title-crossing` | A frame or group's centred title sits on the same horizontal band as a straight vertical edge that passes through the container on its way to a node beyond it. Fix by passing `title_align_left=True` to `Frame`, which moves the title to the corner. |
+| `icon-corner-anchor` | An edge anchors on an icon's *corner* (x in {0,1} and y in {0,1} together) with no waypoints, which renders as a diagonal line stabbing into the corner instead of a clean connection to the icon's centre. Fix with the tree-connector shape below. |
+
+### Fork and merge edges: the tree connector
+
+When one icon fans out to several children (or several children merge into one), do **not** run a
+separate diagonal leg from each icon corner. Every industry connector-routing guide converges on the
+orthogonal *tree* shape, and it is what the block figures now use:
+
+- anchor every arm on the icon's **centre** — `exit_at=(0.5, 1.0)` and `entry_at=(0.5, 0.0)`;
+- give the edge **waypoints** that go straight down to a branch row in a clear band, run
+  horizontally to the child's centre column, then drop vertically into the child's centre;
+- put the branch row in a gap that no label occupies, and leave a clear ~40px band between the
+  branch row and the icon it enters, so the trunk drops into the icon's top edge rather than
+  crossing its body.
+
+`make diagram-flow` enforces this two ways: `icon-corner-anchor` rejects the old diagonal-leg
+pattern, and the direction rule now traces the waypoint polyline (a horizontal branch is allowed; an
+upward segment is not), so a correctly-built tree fork passes while a leg that climbs back up fails.
+An edge-*midpoint* anchor such as `(1.0, 0.5)`, used to leave an icon's side and route around its own
+label, is not a corner and is allowed.
 
 `--selftest` proves each rule rejects the shape it targets and accepts the same layout once fixed,
 same discipline as the direction and icon-label rules it sits beside.
