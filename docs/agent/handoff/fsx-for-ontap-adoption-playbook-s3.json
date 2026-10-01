@@ -1,0 +1,17 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "S3.pdf",
+  "expected_deliverable": "上限値は既存の Hub ページで足りるので、新しい本体は作らない。docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md に 1 節だけ足す: TR-4814 は ONTAP S3 サーバ (バケット、ユーザー、ポリシー、FabricPool の階層先) の文書で、そこに書かれた上限値と挙動は FSx for ONTAP S3 Access Points には当てはまらない。両者が別の機構であることを同じ行に書き、Spoke の用語整理へリンクする。PDF は 4 ページの索引で、本体は docs.netapp.com の TR-4814 にある。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "S3 Access Points のアップロード上限は二進表記で確定している (単一 PutObject と UploadPart は 5 GiB、全体 50 GiB)。GB と書かない。一部の Spoke 文書の GB 表記は引かない。",
+    "ONTAP の版と S3 Access Points の機能を結びつける記述は、出典が確認できるものだけ書く。",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/glossary/object-access-on-ontap.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/limits/s3-access-point.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-object-size-limits-verification.md"
+  ],
+  "public_output_rules_apply": true
+}

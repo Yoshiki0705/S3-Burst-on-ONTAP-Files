@@ -1,0 +1,14 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "Tiering.pdf",
+  "expected_deliverable": "FabricPool の ONTAP 一般の性質を Hub に置く。docs/ja/reference/comparison/tiering-policies.md に、(1) FlexCache の Cache ボリュームは階層化の対象にならない行と、(2) cooling period と読み戻し (再ヒート) の挙動、階層化とストレージ効率の関係、SnapMirror 宛先での階層化、AUTO が向かないワークロード (TR-4598 / TR-4695) を足す。新規ノートは作らない。PDF は 4 ページの索引で、本体は docs.netapp.com の各 TR にある。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "Cache ボリュームは階層化できないが、FabricPool 上の Origin を Cache すること自体は 9.7 以降で可能 (Spoke の対応表)。この 2 つを 1 文に縮めない。",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/support-matrix.md"
+  ],
+  "public_output_rules_apply": true
+}

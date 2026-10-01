@@ -1,0 +1,18 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "FlexCache_and_FlexGroup_volumes.pdf",
+  "expected_deliverable": "FlexCache と FlexGroup の ONTAP 一般の性質を Hub に置く。(1) FlexCache: 既存の docs/ja/domains/data-utilization/notes/reaching-data-without-copies.md に「無効化と整合」の節を足す (TR-4743 と write-back の TR が扱う delegation・lock・属性キャッシュによる無効化、キャッシュミス時の往復、切断時の振る舞い、サイジングと上限値)。(2) FlexGroup: 一般的な性質 (コンスティチュエントの配置、ingest の分散、FlexVol からの変換、上限値。TR-4571 / TR-4678) を扱う Hub ノートが無いので、performance ドメインに新規ノートを 1 本作る。PDF は 4 ページの索引で、本体は docs.netapp.com の各 TR にある。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "「Cache を FabricPool の階層化アグリゲートに置ける (置かないと作成できない)」と「Cache ボリューム自体が階層化される」を混同しない。Spoke は後者を不可と記録している。",
+    "ONTAP S3 NAS バケット (duality) と FSx for ONTAP S3 Access Points は別の機構で、FlexCache での可否も異なる。両方に触れる行では、別の機構であることを同じ行に書く。",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/support-matrix.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/flexcache-s3ap-visibility.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/flexcache-security-style-inheritance.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations/blob/main/docs/ja/s3ap-flexcache-snapmirror-considerations.md"
+  ],
+  "public_output_rules_apply": true
+}
