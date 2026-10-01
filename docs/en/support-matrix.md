@@ -111,6 +111,7 @@ design constraints.**
 | SnapRestore | Supported | **No** | Nothing to roll back to on the cache |
 | Volume cloning (FlexClone) | Supported (9.6 and later) | **No** | No derived copies from the cache |
 | Tamperproof snapshots | Supported | **No** | Tamper-proof retention on the origin only |
+| Autonomous Ransomware Protection (ARP) | Supported (FlexVol 9.10.1, FlexGroup 9.13.1 and later) | **No** | ARP detection runs on the origin only. Writes in this architecture land on the origin, so writes through the S3 Access Point are detected by the origin's ARP ([verification status](verification-status.md)) |
 | SnapLock | No | No | Unavailable on either side |
 | Quotas and qtrees | Supported | **No** | Per-tenant capacity control belongs to the origin |
 | Asynchronous SnapMirror | Supported | **No** | A cache cannot be a replication source |

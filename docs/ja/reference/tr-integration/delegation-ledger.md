@@ -45,19 +45,24 @@ Spoke に分かれる。知見は TR 単位ではなく、1 本の TR から複�
 | Networking | クラスタ / SVM ピアリングの到達性要件と、FlexCache 配布に必要なネットワーク前提 | Spoke | (c) この構成固有の配布経路に密結合した前提。ピアリングはこの構成の成立条件 | s3-burst-on-ontap-files | —（本体配置後に付与） |
 | Tiering | FabricPool による非アクティブデータの階層化がもたらすコスト設計上の選択肢 | Hub | (b) 採用判断材料であり特定の実装手順ではない | FSx-for-ONTAP-Adoption-Playbook | —（本体配置後に付与） |
 | Data_protection_and_disaster_recovery | SnapMirror / スナップショットによる保護・複製の一般的な設計選択肢 | Hub | (b) 採用判断材料であり特定の実装手順ではない | FSx-for-ONTAP-Adoption-Playbook | —（本体配置後に付与） |
-| Security | NFS / SMB で配布するデータに対するランサムウェア対策 / WORM / FPolicy の適用可否 | 保留 | (a) 一般的性質とも (c) この構成固有の検証とも読め、FPolicy の S3 経路での挙動を含むため一意に決まらない | 未定 | —（判定確定後に付与） |
+| Security | ランサムウェア対策（ARP の世代と学習期間）、SnapLock とスナップショットロックの不可逆性、FPolicy と Vscan が効く範囲、監査に要る ACE という ONTAP 一般の性質と採用判断の材料 | Hub | (a) 構成に依存しない ONTAP の一般的性質と (b) 採用判断材料。S3 Access Point 経由の経路での結果は Hub が本体を書かず、既存の検証記録へリンクする | FSx-for-ONTAP-Adoption-Playbook | —（本体配置後に付与） |
+| Security | この構成の経路での効き方: S3 Access Point 経由の書き込みに対する FPolicy・監査・ARP の結果、Cache 側で FPolicy・監査が発火するか（ARP は Cache 側で非対応と記載）、Origin と Cache のどちらにも SnapLock を置けないことの設計上の帰結 | Spoke | (d) この repo と兄弟 repo で実測した、またはこれから実測する挙動の知見 | s3-burst-on-ontap-files | [検証状況](../../verification-status.md)、[対応状況](../../support-matrix.md#origin-では使えて-cache-では使えない機能) |
 | Security_hardening | origin とキャッシュを載せる ONTAP の管理アカウント / 暗号化の運用セキュリティ指針 | Hub | (a) 構成に依存しない ONTAP の一般的な運用セキュリティ | FSx-for-ONTAP-Adoption-Playbook | —（本体配置後に付与） |
 
 ## 保留の扱い
 
 保留とした知見は、委任先が確定するまで Hub と Spoke のいずれにも本体を記述しない（要件 9.9）。
-確定の判断材料が得られた時点で、この表の委任判定・判定根拠・配置先 repo を更新する。更新時は、
-Security の FPolicy が S3 Access Points 経由の操作で発火するかという既存の検証結果（この repo の
-[検証状況](../../verification-status.md)）と整合させる。
+確定の判断材料が得られた時点で、この表の委任判定・判定根拠・配置先 repo を更新する。
+
+Security は保留から 2 行に分けて確定した。保留の理由は、ONTAP 一般の性質とこの構成の経路での効き方が
+1 つの知見に混ざっていたことで、分けるとそれぞれが基準 (a)(b) と (d) に一意に当たる。Spoke 側の行は、
+S3 Access Points 経由の操作では FPolicy が発火せず `mandatory` でも遮断されず、ARP は検知するという既存の
+検証結果（[検証状況](../../verification-status.md)）をそのまま引き継ぐ。
 
 ## 内訳
 
-- Hub: 11 知見 / Spoke: 5 知見 / 保留: 1 知見（合計 17 知見）
+- 件数は上の表から数える。この節に手で書いた件数は表と食い違ったことがあるので、書かない。
+- 保留の行は残っていない。
 - 判定根拠を持たない知見・観点未分類の知見は残していない（要件 9.2）。
 
 ## 関連ドキュメント
