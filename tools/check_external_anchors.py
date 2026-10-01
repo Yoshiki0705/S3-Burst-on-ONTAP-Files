@@ -13,7 +13,9 @@ rule was checked against theirs once -- it reproduced all 89 anchors -- and this
 the comparison does not depend on having done it.
 
 Needs a local checkout of the sibling repository, so it skips with a message when there is none, the
-way the gitleaks and checkov targets do. Set SIBLING_PLAYBOOK to override the default path.
+way the gitleaks and checkov targets do. Set SIBLING_PLAYBOOK to override the default path. The
+contract is read from that checkout's `origin/main`, not its working tree, so whichever branch is
+open there does not change the verdict; it is only as current as the checkout's last fetch.
 
 Run:  python3 tools/check_external_anchors.py
 """
@@ -94,8 +96,41 @@ def parse_contract(body: str) -> dict[str, set[str]]:
     return entries
 
 
-def contract(base: Path) -> dict[str, set[str]]:
-    return parse_contract((base / CONTRACT).read_text(encoding="utf-8"))
+def committed_contract(base: Path) -> str | None:
+    """The contract at the sibling checkout's `origin/main`, or None when that cannot be read.
+
+    The working tree of a sibling clone is whatever branch someone has open in it, and that is not
+    what readers are served. When a feature branch was checked out there, this gate failed on every
+    citation added since the branch was cut, although the published contract listed all of them.
+    `origin/main` is a local object, so reading it needs no network, and it is the side the
+    sibling's CI and readers see. `tools/check_incoming_probes.py` reads its contract the same way.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(base), "show", f"origin/main:{CONTRACT.as_posix()}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def contract(base: Path) -> tuple[dict[str, set[str]], str]:
+    """Parse the sibling's contract, preferring `origin/main` over the working tree.
+
+    The source is returned with the result, because a run that fell back to the working tree is not
+    the same evidence as one that read what the sibling published.
+    """
+    committed = committed_contract(base)
+    if committed is not None:
+        return parse_contract(committed), f"{base.name} at origin/main"
+    return (
+        parse_contract((base / CONTRACT).read_text(encoding="utf-8")),
+        f"{base.name} working tree -- origin/main was unreadable",
+    )
 
 
 def citations() -> list[tuple[str, str, str | None]]:
@@ -127,7 +162,7 @@ def main() -> int:
                 "SIBLING_PLAYBOOK). The scheduled link-rot workflow runs this with --fetch."
             )
             return 0
-        published, source_name = contract(base), base.name
+        published, source_name = contract(base)
     found = citations()
     if not found:
         print("external-anchors: no citation into the sibling repository")
