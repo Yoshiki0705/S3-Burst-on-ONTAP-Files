@@ -1,0 +1,12 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "High_file_count_NAS_workloads.pdf",
+  "expected_deliverable": "High File Count NAS Workloads の Technical Report から取り出した横断的な採用判断材料を Hub 側に本体として集約する。対象は委任台帳が Hub と判定した 3 知見: (1) inode が 1 件あたり一定容量を占め、ボリュームの最大ファイル数がその容量とボリュームサイズで決まる性質、(2) 単一ディレクトリの最大サイズ (maxdir-size) の上限と超過時の列挙コストの増大、(3) 高ファイル数ワークロードで FSx for ONTAP を選ぶ/選ばないの採用判断材料。構成固有の実測知見 (この構成でのメタデータ操作・列挙の挙動) は Spoke 側に残すため本委任には含めない。",
+  "reference_requirements": [
+    "この Spoke から Hub 側に集約された本体ページへ、repo 跨ぎのため絶対 URL で参照できること (本体配置後にリンクを確定し、HTTP 404 を返さないことを既存のネットワークゲートで確認する)。",
+    "Hub 側本体から、この構成固有の実測知見を持つ Spoke 側ドキュメントへ逆方向リンクを張れること (Hub -> Spoke も絶対 URL)。",
+    "評価段階の定義は各 repo の verification-status.md を単一の出所とし、Hub 側で別定義を作らないこと。"
+  ],
+  "public_output_rules_apply": true
+}

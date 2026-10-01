@@ -192,3 +192,29 @@ FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	docs/s3ap-object-size-limits-ve
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	solutions/amplify-portal/docs/flexgroup-rebalance-verification.md	retraction	REST リファレンスのボリューム側一覧に無い
 FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns	solutions/amplify-portal/docs/flexgroup-rebalance-verification.md	retraction	`idle`（実行中・移動対象なし）
 VMware-Migration-EC2-ONTAP	docs/ja/tco-comparison.md	retraction	容量単価だけで FSx for ONTAP を選ぶ根拠は、ブロックでは成立しません
+
+# ---------------------------------------------------------------------------------------------------
+# A HANDOFF CONTRACT IS NOT A PROBE, AND ITS REFERENCE DOES NOT BELONG HERE AS A ROW YET.
+#
+# docs/agent/handoff/fsx-for-ontap-adoption-playbook-high-file-count-nas-workloads.json hands one unit
+# of work to the Hub (FSx-for-ONTAP-Adoption-Playbook): aggregate the cross-cutting adoption material
+# from the High File Count NAS Workloads TR. That file is a *work request*, not a citation. The two
+# mechanisms
+# are kept apart on purpose (design: ハンドオフ契約の設計 > probe 登録簿とハンドオフ契約は別物): a
+# probe says "do not silently reword this claim I quote", a handoff says "treat this TR as this
+# deliverable". Mixing them would freeze wording nobody cites and lose the distinction on the next
+# edit.
+#
+# No probe row is registered for the handoff because there is nothing to resolve yet. The Hub-side
+# body does not exist until the delegation is actually handed over (an approval-gated step, deferred),
+# so a row added now would resolve against a page that is not there and turn `make outgoing-probes`
+# red for a reason unrelated to a reworded claim. The delegation ledger records the same state as
+# `—（本体配置後に付与）` on every High File Count row.
+#
+# WHAT GETS REGISTERED HERE, AND WHEN. Once the Hub-side body is placed, two things follow, in this
+# order: the handoff JSON's reference_requirements are resolved to the absolute Hub URL (checked for
+# HTTP 404 by the network gate, not by this offline contract), and *then* — only if this repository
+# restates a claim from that Hub page rather than merely pointing at it — a probe row is added here
+# for the restated claim, in both languages if the English pages cite the English Hub page. A pointer
+# with no transcribed claim gets no row, by the same rule the other sections apply: registering a
+# probe there would ask the Hub to freeze wording this repository does not depend on.
