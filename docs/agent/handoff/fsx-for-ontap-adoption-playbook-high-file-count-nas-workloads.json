@@ -6,7 +6,13 @@
   "reference_requirements": [
     "この Spoke から Hub 側に集約された本体ページへ、repo 跨ぎのため絶対 URL で参照できること (本体配置後にリンクを確定し、HTTP 404 を返さないことを既存のネットワークゲートで確認する)。",
     "Hub 側本体から、この構成固有の実測知見を持つ Spoke 側ドキュメントへ逆方向リンクを張れること (Hub -> Spoke も絶対 URL)。",
-    "評価段階の定義は各 repo の単一の定義元に従うこと (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。どちらの側でも新しい段階を作らないこと。"
+    "評価段階の定義は各 repo の単一の定義元に従うこと (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。どちらの側でも新しい段階を作らないこと。",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/playbooks/01-assess/notes/counting-bytes-is-not-counting-files.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/playbooks/01-assess/notes/counting-bytes-is-not-counting-files.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/performance/notes/directory-size-is-capped-separately-from-file-count.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/performance/notes/directory-size-is-capped-separately-from-file-count.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/playbooks/01-assess/notes/file-count-fit-depends-on-namespace-shape.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/playbooks/01-assess/notes/file-count-fit-depends-on-namespace-shape.md"
   ],
   "public_output_rules_apply": true
 }

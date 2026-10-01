@@ -205,11 +205,16 @@ VMware-Migration-EC2-ONTAP	docs/ja/tco-comparison.md	retraction	容量単価だ�
 # deliverable". Mixing them would freeze wording nobody cites and lose the distinction on the next
 # edit.
 #
-# No probe row is registered for the handoff because there is nothing to resolve yet. The Hub-side
-# body does not exist until the delegation is actually handed over (an approval-gated step, deferred),
-# so a row added now would resolve against a page that is not there and turn `make outgoing-probes`
-# red for a reason unrelated to a reworded claim. The delegation ledger records the same state as
-# `—（本体配置後に付与）` on every High File Count row.
+# The Hub has now placed the body (three notes, Japanese and English), and the delegation ledger and
+# the handoff JSON point at them. Still no probe row, and this time the reason is the general rule
+# below rather than a missing page: this repository points at those notes and restates none of their
+# claims. A search of the tracked documents and the published-post copies for the values the Hub
+# listed (the inode size and caps, the maxdir-size default and ceiling, the index threshold) found
+# nothing, with a value known to be here as the control. The Hub suggested the boundary statement --
+# that the TR values are unconfirmed on FSx for ONTAP -- as the claim most worth protecting. That
+# protection belongs to whoever writes the opposite, and this repository does not write it. If a page
+# here starts quoting a TR value or saying FSx for ONTAP behaves like the TR, register that sentence
+# then.
 #
 # WHAT GETS REGISTERED HERE, AND WHEN. Once the Hub-side body is placed, two things follow, in this
 # order: the handoff JSON's reference_requirements are resolved to the absolute Hub URL (checked for
