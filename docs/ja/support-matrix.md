@@ -102,6 +102,7 @@ ONTAP-mode のときだけ Origin になれると明記されている、とい�
 | SnapRestore | 対応 | **不可** | Cache 側で巻き戻せない |
 | ボリュームクローン（FlexClone） | 対応（9.6 以降） | **不可** | Cache からの派生コピーを作れない |
 | Tamperproof snapshot | 対応 | **不可** | 改ざん防止の保持は Origin 側でのみ |
+| ランサムウェア対策（ARP） | 対応（FlexVol 9.10.1、FlexGroup 9.13.1 以降） | **不可** | ARP の検知は Origin 側でのみ。この構成の書き込みは Origin に届くので、S3 Access Point 経由の書き込みは Origin の ARP が検知する（[検証状況](verification-status.md)） |
 | SnapLock | 不可 | 不可 | どちらの側でも使えない |
 | Quota / qtree | 対応 | **不可** | テナント別の容量制御は Origin 側で行う |
 | SnapMirror 非同期 | 対応 | **不可** | Cache を複製元にできない |
