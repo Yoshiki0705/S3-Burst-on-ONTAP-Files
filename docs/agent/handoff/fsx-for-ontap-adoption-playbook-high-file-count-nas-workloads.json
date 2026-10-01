@@ -6,7 +6,7 @@
   "reference_requirements": [
     "この Spoke から Hub 側に集約された本体ページへ、repo 跨ぎのため絶対 URL で参照できること (本体配置後にリンクを確定し、HTTP 404 を返さないことを既存のネットワークゲートで確認する)。",
     "Hub 側本体から、この構成固有の実測知見を持つ Spoke 側ドキュメントへ逆方向リンクを張れること (Hub -> Spoke も絶対 URL)。",
-    "評価段階の定義は各 repo の verification-status.md を単一の出所とし、Hub 側で別定義を作らないこと。"
+    "評価段階の定義は各 repo の単一の定義元に従うこと (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。どちらの側でも新しい段階を作らないこと。"
   ],
   "public_output_rules_apply": true
 }
