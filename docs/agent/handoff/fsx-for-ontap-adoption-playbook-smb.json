@@ -1,0 +1,15 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "SMB.pdf",
+  "expected_deliverable": "SMB の ONTAP 一般の指針を Hub に置く。(1) SMB 署名と sealing、SMB1/2 の無効化と最小版を docs/ja/domains/security-governance/notes/what-the-platform-gives-and-what-stays-yours.md に足す (現状は暗号化の必須化のみ)。(2) Multichannel の推奨設定と RSS の前提 (TR-4740)、continuously available 共有、oplock / lease を docs/ja/reference/comparison/file-storage-options.md の SMB の前提の節に足す。PDF は 4 ページの索引で、本体は docs.netapp.com の各 TR にある。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "SMB Multichannel が ONTAP で既定無効であること、有効化が確立済みの接続に届かないこと、max_connections_per_session を 32 にしても 4 チャネルだったこと (理由は未特定) は Spoke の検証結果。リンクして引き、否定しない。",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/limits/smb-multichannel-enablement.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+  ],
+  "public_output_rules_apply": true
+}

@@ -1,0 +1,18 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "NFS.pdf",
+  "expected_deliverable": "NFS の ONTAP 一般の指針を Hub に置く。数値を持つ docs/ja/domains/performance/notes/a-single-connection-measures-the-client.md と docs/ja/reference/comparison/throughput-levers.md は拡張しない。(1) NFS over TLS と転送時の暗号化の選択肢を docs/ja/domains/security-governance/notes/what-the-platform-gives-and-what-stays-yours.md に足す (現状は Kerberos と IPsec のみ)。(2) NFSv4.x の版の選び方と機能差 (委任、ACL、拡張属性。TR-4067 / TR-4962) を docs/ja/reference/file-protocol-resource-map.md に足す。エクスポートポリシーの評価順とネームサービスの依存も扱ってよい。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "rsize/wsize が 65536 になるのは ONTAP の tcp-max-xfer-size の既定値によるもので、ファイルシステムの上限ではない (Spoke の verification-status.md の該当行は 2026-10-01 に条件を明記した)。上限として引用しない。",
+    "NFS の版はスループットを変えなかったという Spoke の実測、NFSv4.0 でも nconnect が張れたという観測 (サポートの記載ではない)、単一フローの上限は、Spoke の文書へリンクして引く。",
+    "NFS over TLS と nconnect の組み合わせは、AWS の記載か実測で確かめていない限り書かない。",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/protocol-matrix-efs-vs-ontap.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+  ],
+  "public_output_rules_apply": true
+}
