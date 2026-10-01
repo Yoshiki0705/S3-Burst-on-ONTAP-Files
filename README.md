@@ -196,6 +196,7 @@ ONTAP 9.18.1P6、両側 FSx for ONTAP）。**そして Cache 側で選び直す�
 | 対応バージョンと制約を調べる | [サポート状況](docs/ja/support-matrix.md) | 10 分 |
 | 他クラウドとの接続経路を調べる | [他クラウドとの接続経路](docs/ja/multi-cloud-connectivity.md) | 10 分 |
 | 用語の違いを確認する | [用語の整理](docs/ja/reference/glossary/object-access-on-ontap.md) | 5 分 |
+| NetApp の Technical Report をどう反映したかを見る | [TR のスコープ台帳](docs/ja/reference/tr-integration/scope-ledger.md) | 10 分 |
 | 最小構成で 1 回通す | [最初の 1 時間](docs/ja/quickstart.md) | 1 時間 |
 | 検証環境をデプロイする（AWS 側） | [収集側のデプロイ](docs/ja/deployment/aws-cloudformation.md) | 40 分 |
 | パラメータを自分の環境に合わせる | [パラメータの選び方](docs/ja/deployment/choosing-parameters.md) | 10 分 |

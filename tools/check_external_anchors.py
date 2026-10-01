@@ -39,7 +39,12 @@ RAW_CONTRACT = (
     "https://raw.githubusercontent.com/Yoshiki0705/"
     "FSx-for-ONTAP-Adoption-Playbook/main/docs/agent/external-anchor-contract.txt"
 )
-CITATION = re.compile(re.escape(REPO_URL) + r"(docs/[^)#\s]+)(?:#([^)\s]+))?")
+# A citation ends at whitespace, a closing parenthesis (Markdown link), or a quote (a URL held in a
+# JSON or YAML string). Without the quote, a URL in `docs/agent/handoff/*.json` was read with its
+# closing `",` attached, and every such citation was reported as a path the sibling does not track.
+CITATION = re.compile(
+    re.escape(REPO_URL) + r"""(docs/[^)#\s"'<>`]+)(?:#([^)\s"'<>`]+))?"""
+)
 SCAN_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml"}
 
 

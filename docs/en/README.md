@@ -182,6 +182,7 @@ stage. **No figure means anything without the conditions it was measured under.*
 | Look up versions and constraints | [Support matrix](support-matrix.md) | 10 min |
 | Look up cross-cloud connectivity | [Cross-cloud connectivity](multi-cloud-connectivity.md) | 10 min |
 | Tell the mechanisms apart | [Glossary of S3-over-files mechanisms](reference/glossary/object-access-on-ontap.md) | 5 min |
+| See how NetApp's Technical Reports were taken into this repository | [TR scope ledger](../ja/reference/tr-integration/scope-ledger.md) (Japanese) | 10 min |
 | Run it once, in the smallest form | [The first hour](quickstart.md) | 1 hour |
 | Deploy the verification environment (AWS side) | [Deploying the collect side](deployment/aws-cloudformation.md) | 40 min |
 | Fit the parameters to your environment | [Choosing parameters](deployment/choosing-parameters.md) | 10 min |
