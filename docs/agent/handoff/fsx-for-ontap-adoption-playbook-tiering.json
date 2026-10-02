@@ -8,7 +8,8 @@
     "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
     "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
     "Cache ボリュームは階層化できないが、FabricPool 上の Origin を Cache すること自体は 9.7 以降で可能 (Spoke の対応表)。この 2 つを 1 文に縮めない。",
-    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/support-matrix.md"
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/support-matrix.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/tiering-policies.md"
   ],
   "public_output_rules_apply": true
 }
