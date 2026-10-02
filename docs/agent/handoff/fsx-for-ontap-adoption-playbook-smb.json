@@ -9,7 +9,9 @@
     "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
     "SMB Multichannel が ONTAP で既定無効であること、有効化が確立済みの接続に届かないこと、max_connections_per_session を 32 にしても 4 チャネルだったこと (理由は未特定) は Spoke の検証結果。リンクして引き、否定しない。",
     "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/limits/smb-multichannel-enablement.md",
-    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/security-governance/notes/what-the-platform-gives-and-what-stays-yours.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/file-storage-options.md"
   ],
   "public_output_rules_apply": true
 }
