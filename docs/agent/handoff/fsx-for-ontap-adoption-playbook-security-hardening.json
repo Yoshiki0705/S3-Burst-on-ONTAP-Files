@@ -1,0 +1,20 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "Security_hardening.pdf",
+  "expected_deliverable": "ONTAP の管理面の保護設定 (誰がどの経路で管理操作をでき、何が記録されるか) を扱う Hub ノートが無いので、security-governance ドメインに新規ノートを 1 本 (日本語と英語) 作る。対象はマルチ管理者承認 (MAV)、SSH の鍵・MFA・ログインバナー・アカウントのロックアウト方針、証明書 (CA 署名、OCSP) と FIPS / TLS、LDAP の署名と sealing、管理操作の監査、LIF の役割と開くポート、NTP (TR-4569 ほか)。FSx for ONTAP で設定できるかどうかは、項目ごとに documented / 未確認で分けて書く。NFS over TLS と SMB 署名は 1 回目で docs/ja/domains/security-governance/notes/what-the-platform-gives-and-what-stays-yours.md に入っているので重ねない。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "戻せない機能 (SnapLock、SnapLock 監査ログボリューム、PrivilegedDelete、スナップショットロック、Object Lock、Vault Lock、EBS スナップショットロック、マルチ管理者承認) を検証で有効にしない。有効にしてよいのは保持期間を名指しした人間の指示がある場合だけで、短い値で試せるのは API がその値を表現できる場合に限る (監査ログボリュームの保持期間は表現できない)。手順を書くときは、保持期間と最も広い影響範囲 (ボリューム / SVM / ファイルシステム) を同じ節に書く。",
+    "SnapLock を無条件に作る IaC (Cyber-Resilience の templates/storage.yaml、BLEA の cyber-resilience-sample) を実装例としてリンクしない。どちらも Issue で修正を求めている (Cyber-Resilience #36、BLEA-FSx-for-ONTAP-Usecase #6)。",
+    "MAV は撤去を止めうる設定である。volume delete や snapshot delete を承認対象にすると、承認者がそろわない限りボリュームと検証環境を消せなくなる。推奨する場合は、撤去手順への影響を同じ節に書く。",
+    "Cyber-Resilience の mav-configuration.md と fsxadmin-limitations.md は段階を書いておらず、「fsxadmin で MAV を有効化できる」は実測の記録が見当たらない。verified として引かない。",
+    "生成した fsxadmin のパスワードがシークレットの値と一致しなかった事例 (ExcludeCharacters の不足) は Spoke の検証結果。リンクで引く。",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/ontap-native/fsxadmin-limitations.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/ontap-native/mav-configuration.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+  ],
+  "public_output_rules_apply": true
+}

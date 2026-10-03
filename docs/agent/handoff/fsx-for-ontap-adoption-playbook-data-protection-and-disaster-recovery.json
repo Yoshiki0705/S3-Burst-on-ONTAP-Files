@@ -1,0 +1,19 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "Data_protection_and_disaster_recovery.pdf",
+  "expected_deliverable": "SnapMirror と Snapshot による保護・複製の ONTAP 一般の設計選択肢を Hub に置く。既存の docs/ja/reference/comparison/data-protection-methods.md に、SnapMirror のポリシー種別 (MirrorAllSnapshots / Vault / MirrorAndVault) と保持の選び方、転送スケジュールとラグの監視、cascade / fan-out の上限 (TR-4015 ほか) を足す。cyber vault (論理エアギャップ) の考え方は WORM とロックを前提にするので、既存の docs/ja/domains/data-protection/notes/snaplock-and-layered-ransomware-readiness.md の側へ寄せる。新規ノートは作らない。PDF は 5 ページの索引で、本体は docs.netapp.com の各 TR にある。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "戻せない機能 (SnapLock、SnapLock 監査ログボリューム、PrivilegedDelete、スナップショットロック、Object Lock、Vault Lock、EBS スナップショットロック、マルチ管理者承認) を検証で有効にしない。有効にしてよいのは保持期間を名指しした人間の指示がある場合だけで、短い値で試せるのは API がその値を表現できる場合に限る (監査ログボリュームの保持期間は表現できない)。手順を書くときは、保持期間と最も広い影響範囲 (ボリューム / SVM / ファイルシステム) を同じ節に書く。",
+    "SnapLock を無条件に作る IaC (Cyber-Resilience の templates/storage.yaml、BLEA の cyber-resilience-sample) を実装例としてリンクしない。どちらも Issue で修正を求めている (Cyber-Resilience #36、BLEA-FSx-for-ONTAP-Usecase #6)。",
+    "SnapMirror の宛先ボリュームは、稼働中のまま break もクローンもせずに S3 Access Points で読める (Lakehouse の 2026-09-13 の実測。それ以前の逆の記述は同 repo で訂正済み)。Lakehouse の demo-guide-07 は break を前提にした DR 手順で、読み取りに break が要るとは引かない。",
+    "ONTAP の REST で作ったボリュームが AWS の API に現れるまでの時間は、Spoke の実測では FlexGroup 599 秒・FlexClone 1,177 秒・1,258 秒でも現れない回がありで、上限値は分かっていない (AWS の記載は数分)。決まった時間として書かない。",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations/blob/main/docs/ja/s3ap-flexcache-snapmirror-considerations.md",
+    "https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/ja/dr-snapmirror-runbook.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+  ],
+  "public_output_rules_apply": true
+}
