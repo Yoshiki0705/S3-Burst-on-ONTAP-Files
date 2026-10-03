@@ -134,9 +134,10 @@ destination owns them, and a copy in this file would not follow when a stage cha
   the FPolicy and auditing part.
 - Whether an NFS `rsize` / `wsize` of 65536 on FSx for ONTAP is a file-system limit: the
   `rsize/wsize` row under "Current state" in
-  [Verification status](docs/ja/verification-status.md#現在の状態) and the note in
-  [the throughput measurement record](docs/ja/verification/throughput-iops-concurrency.md#rsizewsize-が-65536-で止まることの確認).
-  Both are in Japanese; the English status table has no such row.
+  [Verification status](docs/ja/verification-status.md#現在の状態)
+  ([English](docs/en/verification-status.md#current-state)) and the note in
+  [the throughput measurement record](docs/ja/verification/throughput-iops-concurrency.md#rsizewsize-が-65536-で止まることの確認)
+  (Japanese only).
 - How this architecture behaves with a very high file count — metadata operations, directory
   listing, FlexCache replication cost:
   [Issue #235](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/235), which tracks it.
