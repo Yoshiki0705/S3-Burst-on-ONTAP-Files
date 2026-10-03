@@ -545,7 +545,8 @@ smaller, but **it is not a guarantee that nothing crosses.**
 Verification on each cloud is planned. **The stages originate in
 [verification status](verification-status.md); the table below is an extract.** Where they disagree,
 the verification status document is correct. Raising a stage follows that document's rules, with the
-environment and the procedure stated alongside.
+environment and the procedure stated alongside. Real-environment re-verification is tracked in
+[Issue #245](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/245).
 
 | Item | Current stage | What would raise the stage |
 |---|---|---|

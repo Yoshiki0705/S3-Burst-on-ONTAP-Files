@@ -494,7 +494,7 @@ NVMe リードキャッシュも同じ形で、1,536 では `system/node/externa
 | [プロトコル別の可否](../verification/protocol-matrix-efs-vs-ontap.md) | どの組み合わせがマウントできるか |
 | [プロトコル別スループットの測定計画](../verification/throughput-protocol-matrix-plan.md) | 測定パターンと必要な環境 |
 | [スループット・IOPS・並列度の実測](../verification/throughput-iops-concurrency.md) | 既存の実測と、その限界 |
-| [指定値・バースト・ベースラインの実測](../verification/throughput-capacity-burst-and-baseline.md) | **指定値は読み取りの上限ではないこと。**バースト枠の持続 27 分と回復 30 分、窓の長さで 2.0 倍動くこと |
+| [指定値・バースト・ベースラインの実測](../verification/throughput-capacity-burst-and-baseline.md) | **指定値は読み取りの上限ではないこと**。バースト枠の持続 27 分と回復 30 分、窓の長さで 2.0 倍動くこと |
 | [S3 Files とこの構成の比較](../verification/s3files-vs-flexcache.md) | 設計点の違い |
 | [性能の語の日英対訳](glossary/performance-terms-ja-en.md) | 上限の種別と測定条件の語 |
 | [検証状況](../verification-status.md) | 主張ごとの段階 |

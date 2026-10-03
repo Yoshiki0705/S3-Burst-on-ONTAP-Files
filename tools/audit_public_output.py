@@ -50,6 +50,13 @@ import re
 import sys
 from pathlib import Path
 
+# ai_style_rules is a self-contained stdlib module copied verbatim from the Hub. It is imported by
+# directory, not as `tools.ai_style_rules`, because this validator is also run directly as
+# `python3 tools/audit_public_output.py` — the same single-identity reason conftest.py gives for the
+# tests. The import is additive: nothing in the existing categories or audit_line() depends on it.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ai_style_rules
+
 ROOT = Path(__file__).resolve().parent.parent
 # tools/ and scripts/ hold the validators themselves; their pattern literals are the rules, not
 # violations of them. .kiro/ is never published.
@@ -92,10 +99,22 @@ CATEGORIES = (
     "conflation",
     "hype",
     "coinage",
+    "ai-style",
+    "ai-style-warn",
 )
+# `ai-style-warn` precedes `ai-style` so the alternation matches the longer token first; otherwise
+# `allow:ai-style-warn` would be read as `allow:ai-style` with a trailing `-warn`.
 ALLOW = re.compile(
-    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|hype|coinage|all)"
+    r"allow:(naming|vendor-ref|neutrality|pii|role-label|conflation|hype|coinage"
+    r"|ai-style-warn|ai-style|all)"
 )
+
+# ai-style (D1 / D2 / D5 / D14) now gates the default audit: FEAT-003 fixed the existing D1 corpus
+# and emptied REPORT_ONLY_CATEGORIES to flip the gate on. A category placed back into this set would
+# be counted but not gated again. ai-style-warn is the warning tier (every rule except D1 / D2 / D5
+# / D14) and is counted, never gated.
+REPORT_ONLY_CATEGORIES: frozenset[str] = frozenset()
+WARNING_CATEGORIES: frozenset[str] = frozenset({"ai-style-warn"})
 # Bounded so the trailing "-->" of the HTML comment is not swallowed into the category list.
 FILE_ALLOW = re.compile(r"audit-file-allow:\s*([a-z-]+(?:\s*,\s*[a-z-]+)*)")
 FILE_ALLOW_SCAN_LINES = 40
@@ -561,6 +580,10 @@ def main() -> int:
 
     root = Path(args.path).resolve()
     findings: list[str] = []
+    # ai-style findings do not join `findings`: that list gates (return 1). They are counted and
+    # summarised, never gated, while REPORT_ONLY_CATEGORIES / WARNING_CATEGORIES hold their
+    # categories. FEAT-003 empties REPORT_ONLY_CATEGORIES to flip the gate on.
+    style_counts = {"ai-style": 0, "ai-style-warn": 0}
     scanned = 0
 
     for path in iter_files(root, include_drafts=args.include_drafts):
@@ -575,6 +598,39 @@ def main() -> int:
         for lineno, line in enumerate(lines, start=1):
             for category, message in audit_line(line, file_allowed):
                 findings.append(f"{rel}:{lineno}: [{category}] {message}")
+
+        # ai-style scan: Markdown only and additive. It reuses the existing file_allowances / ALLOW
+        # markers so a line or file already opted out of a style category stays opted out. Every
+        # finding is counted; whether it also gates depends on its category: a category in
+        # REPORT_ONLY_CATEGORIES or WARNING_CATEGORIES is counted only, anything else joins `findings`
+        # and fails the audit. FEAT-003 emptied REPORT_ONLY_CATEGORIES, so ai-style now gates.
+        if path.suffix.lower() == ".md":
+            text = "\n".join(lines)
+            language = ai_style_rules.language_of(rel.as_posix(), text)
+            for found in ai_style_rules.scan_markdown(text, language):
+                category = ai_style_rules.CATEGORY_FOR_LEVEL[found.level]
+                line_markers = {
+                    match.group(1) for match in ALLOW.finditer(lines[found.line - 1])
+                }
+                if (
+                    category in file_allowed
+                    or category in line_markers
+                    or "all" in line_markers
+                ):
+                    continue
+                style_counts[category] += 1
+                if category in REPORT_ONLY_CATEGORIES or category in WARNING_CATEGORIES:
+                    continue
+                findings.append(
+                    f"{rel}:{found.line}: [{category}] {found.rule} {found.message}"
+                )
+
+    # Printed whether or not the gate fails. ai-style now gates (FEAT-003 emptied
+    # REPORT_ONLY_CATEGORIES); ai-style-warn is counted but never gates.
+    print(
+        f"audit: ai-style findings: {style_counts['ai-style']} fail-tier (gated), "
+        f"{style_counts['ai-style-warn']} warning"
+    )
 
     if findings:
         print(f"Audit failed ({len(findings)} finding(s)):", file=sys.stderr)
