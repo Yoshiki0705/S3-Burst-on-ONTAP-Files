@@ -118,8 +118,8 @@ of their own, so the descriptions above do not name them. Each item below gives 
 and where it is answered. The answer and its stage are deliberately not repeated here: the
 destination owns them, and a copy in this file would not follow when a stage changes.
 
-- Which ONTAP features the FlexCache cache volume lacks compared with the origin, and what that
-  leaves to the origin. The table has one row per feature, among them snapshots, SnapRestore,
+- How ONTAP feature support differs between the FlexCache origin and the cache volume, and what
+  that leaves to the origin. The table compares the two per feature, among them snapshots, SnapRestore,
   FlexClone, tamperproof snapshots, Autonomous Ransomware Protection (ARP), SnapLock, quotas and
   qtrees, SnapMirror, FPolicy and auditing:
   [Support matrix](docs/ja/support-matrix.md#origin-では使えて-cache-では使えない機能)
