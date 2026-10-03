@@ -2,7 +2,9 @@
 
 <!-- 雛形。`make new-pattern AXIS=<axis> SLUG=<slug>` がこのディレクトリを複製し、
      __PATTERN_TITLE__ / __PATTERN_SLUG__ / __PATTERN_AXIS__ を置き換えます。
-     置き換えたあと、この HTML コメントと「雛形のまま残っている項目」の節を削除してください。 -->
+     置き換えたあと、この HTML コメントと「雛形のまま残っている項目」の節を削除してください。
+     audit-file-allow: ai-style  雛形のプレースホルダ `__PATTERN_TITLE__` は `__` が強調記号として
+     解釈され D14 を誤検出します。置換後は素のテキストになるため、このコメントごと削除されます。 -->
 
 > 軸: `__PATTERN_AXIS__` — 収集（`collect`）/ 配布（`serve`）/ 組み合わせ（`pipelines`）のいずれか。
 > 全体像は[構成の形](../../../docs/ja/architecture.md)にあります。

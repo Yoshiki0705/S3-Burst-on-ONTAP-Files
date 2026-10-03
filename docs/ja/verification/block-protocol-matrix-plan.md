@@ -149,8 +149,8 @@ iscsiadm --mode node -T <target_iqn> --op update -n node.session.nr_sessions -v 
 | 段 | 何が決めるか | 出典 |
 |---|---|---|
 | ホストの要求 | `nvme connect -i/--nr-io-queues`。man は「Overrides the default number of I/O queues create by the driver」とだけ書き、**既定値も上限も書いていない** | [nvme-connect(1)](https://man.archlinux.org/man/nvme-connect.1.en) |
-| ホストの既定 | キューペア（`io-queue-count`）は**「aligned to host CPU cores」** | [NetApp KB: What are nvme settings regarding io-queue-count and io-queue-depth](https://kb.netapp.com/on-prem/ontap/da/SAN/SAN-KBs/What_are_nvme_settings_regarding_io-queue-count_and_io-queue-depth) |
-| 目標側の継承値 | `-default-io-queue-count` は「IO queue count inherited by hosts」。ただし同じ説明文に**「The actual value used when a connection is established may vary depending on the host and transport protocol used」**と書かれている | [vserver nvme subsystem show (9.16.1)](https://docs.netapp.com/us-en/ontap-cli-9161/vserver-nvme-subsystem-show.html) |
+| ホストの既定 | キューペア（`io-queue-count`）は「**aligned to host CPU cores**」 | [NetApp KB: What are nvme settings regarding io-queue-count and io-queue-depth](https://kb.netapp.com/on-prem/ontap/da/SAN/SAN-KBs/What_are_nvme_settings_regarding_io-queue-count_and_io-queue-depth) |
+| 目標側の継承値 | `-default-io-queue-count` は「IO queue count inherited by hosts」。ただし同じ説明文に「**The actual value used when a connection is established may vary depending on the host and transport protocol used**」と書かれている | [vserver nvme subsystem show (9.16.1)](https://docs.netapp.com/us-en/ontap-cli-9161/vserver-nvme-subsystem-show.html) |
 | 目標側の割り当て | I/O キュー数と深さは**ノード・トランスポート・ホスト優先度の組ごと**に決まる。ONTAP 9.14.1 以降、`high` を与えたホストには多くが割り当てられる。**掲載例の `nvme-tcp` / `regular` は I/O Queue Count が 2、`high` が 4** | [vserver nvme show-host-priority](https://docs.netapp.com/us-en/ontap-cli/vserver-nvme-show-host-priority.html)、[NVMe ホストの優先度の変更](https://docs.netapp.com/us-en/ontap/nvme/change-host-priority-nvme-task.html) |
 | 実際に確立された値 | ホストが読むのは NCQA / NSQA | [NetApp KB: NVME TCP IO Queue count always returns 2 even when set to 15](https://kb.netapp.com/on-prem/ontap/OHW/OHW-KBs/NVME_TCP_IO_Queue_count_always_returns_2_even_when_set_to_15) |
 

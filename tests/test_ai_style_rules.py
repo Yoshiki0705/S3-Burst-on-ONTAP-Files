@@ -8,8 +8,8 @@ The examples live on the rules themselves (`Rule.positive` / `Rule.negative` in
 `tools/ai_style_rules.py`), because the copyable file's `--selftest` needs them too and two copies
 of one example set drift. This file adds what a selftest cannot say about itself: that every rule
 has examples at all, that non-prose spans are excluded, that languages are kept apart, and that the
-audit stages ai-style as a report-only category instead of gating on it (the spoke's current state;
-FEAT-003 flips the gate).
+audit gates on ai-style (D1 / D2 / D5 / D14) and keeps ai-style-warn counted but never gating
+(FEAT-003 fixed the D1 corpus and emptied REPORT_ONLY_CATEGORIES).
 """
 
 from __future__ import annotations
@@ -163,8 +163,9 @@ class CopyableCli(unittest.TestCase):
 
 
 class AuditStagesTheCategory(unittest.TestCase):
-    """The spoke stages ai-style report-only: counted by default, never gated. ai-style-warn is
-    never gated either. FEAT-003 empties REPORT_ONLY_CATEGORIES to flip the gate on."""
+    """ai-style gates the default audit: FEAT-003 fixed the D1 corpus and emptied
+    REPORT_ONLY_CATEGORIES. A fail-tier (D1 / D2 / D5 / D14) finding now fails the audit;
+    ai-style-warn is counted but never gates."""
 
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
@@ -191,58 +192,54 @@ class AuditStagesTheCategory(unittest.TestCase):
             timeout=180,
         )
 
-    def test_default_audit_counts_the_fail_tier_but_does_not_gate(self) -> None:
-        # D1 findings are present (the broken line leaves two literal `**` pairs) but ai-style is
-        # report-only, so the audit still returns 0 and the count appears in the summary rather than
-        # in a gating failure.
+    def test_default_audit_fails_on_a_fail_tier_finding(self) -> None:
+        # D1 findings are present (the broken line leaves two literal `**` pairs). ai-style now
+        # gates, so the audit returns 1, reports the finding on the `[ai-style] D1` channel, and
+        # the summary counts it as fail-tier.
         self.write("note.md", BROKEN)
         result = self.run_audit()
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn(
-            "audit: ai-style findings: 2 report-only (not gated), 0 warning",
+            "audit: ai-style findings: 2 fail-tier (gated), 0 warning",
             result.stdout + result.stderr,
         )
-        self.assertNotIn("Audit failed", result.stdout + result.stderr)
-        self.assertNotIn("[ai-style] D1", result.stderr)
+        self.assertIn("Audit failed", result.stdout + result.stderr)
+        self.assertIn("[ai-style] D1", result.stderr)
 
     def test_a_warning_finding_is_counted_and_does_not_gate(self) -> None:
+        # An em-dash-only (D18) document is ai-style-warn: counted, never gated. With no fail-tier
+        # finding the audit still returns 0 even though ai-style now gates.
         self.write("note.md", JA_LEAD + "転送 — 差分のみ\n")
         result = self.run_audit()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "0 report-only (not gated), 1 warning", result.stdout + result.stderr
-        )
+        self.assertIn("0 fail-tier (gated), 1 warning", result.stdout + result.stderr)
+        self.assertNotIn("Audit failed", result.stdout + result.stderr)
 
     def test_a_line_marker_suppresses_the_style_category(self) -> None:
+        # A line allow marker suppresses the fail-tier finding, so the gated audit returns 0.
         self.write("note.md", BROKEN.strip() + " <!-- allow:ai-style -->\n")
         result = self.run_audit()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "0 report-only (not gated), 0 warning", result.stdout + result.stderr
-        )
+        self.assertIn("0 fail-tier (gated), 0 warning", result.stdout + result.stderr)
 
     def test_a_file_declaration_suppresses_the_style_category(self) -> None:
         self.write("note.md", "<!-- audit-file-allow: ai-style -->\n" + BROKEN)
         result = self.run_audit()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "0 report-only (not gated), 0 warning", result.stdout + result.stderr
-        )
+        self.assertIn("0 fail-tier (gated), 0 warning", result.stdout + result.stderr)
 
     def test_non_markdown_files_are_not_scanned_for_style(self) -> None:
         self.write("notes.txt", "速さが核心です。\n")
         self.write("config.yml", "title: 速さが核心です。\n")
         result = self.run_audit()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "0 report-only (not gated), 0 warning", result.stdout + result.stderr
-        )
+        self.assertIn("0 fail-tier (gated), 0 warning", result.stdout + result.stderr)
 
-    def test_the_staging_constants(self) -> None:
-        # ai-style is report-only in the spoke until FEAT-003 fixes the D1 corpus and empties the
-        # set. ai-style-warn is the warning tier and is never gated.
-        self.assertIn("ai-style", audit.REPORT_ONLY_CATEGORIES)
-        self.assertEqual(audit.REPORT_ONLY_CATEGORIES, frozenset({"ai-style"}))
+    def test_the_gate_constants(self) -> None:
+        # FEAT-003 emptied REPORT_ONLY_CATEGORIES: ai-style is no longer staged and gates the
+        # default audit. ai-style-warn stays the warning tier and is never gated.
+        self.assertEqual(audit.REPORT_ONLY_CATEGORIES, frozenset())
+        self.assertNotIn("ai-style", audit.REPORT_ONLY_CATEGORIES)
         self.assertIn("ai-style-warn", audit.WARNING_CATEGORIES)
         self.assertEqual(
             set(rules.CATEGORY_FOR_LEVEL.values()), {"ai-style", "ai-style-warn"}
