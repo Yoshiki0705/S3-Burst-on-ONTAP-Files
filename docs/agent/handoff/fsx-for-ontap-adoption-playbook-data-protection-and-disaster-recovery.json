@@ -11,6 +11,8 @@
     "SnapLock を無条件に作る IaC (Cyber-Resilience の templates/storage.yaml、BLEA の cyber-resilience-sample) を実装例としてリンクしない。どちらも Issue で修正を求めている (Cyber-Resilience #36、BLEA-FSx-for-ONTAP-Usecase #6)。",
     "SnapMirror の宛先ボリュームは、稼働中のまま break もクローンもせずに S3 Access Points で読める (Lakehouse の 2026-09-13 の実測。それ以前の逆の記述は同 repo で訂正済み)。Lakehouse の demo-guide-07 は break を前提にした DR 手順で、読み取りに break が要るとは引かない。",
     "ONTAP の REST で作ったボリュームが AWS の API に現れるまでの時間は、Spoke の実測では FlexGroup 599 秒・FlexClone 1,177 秒・1,258 秒でも現れない回がありで、上限値は分かっていない (AWS の記載は数分)。決まった時間として書かない。",
+    "Snapshot からのリストアテストの手順は AWS ブログ「そのデータ復旧できますか？」を引用する: snapshot show で被害前の Snapshot を確かめ、volume clone create で FlexClone として別の場所に戻し、恒久利用するなら volume clone show -estimate で必要容量を見てから split し、不要になれば offline と delete で片付ける。被害を受けたボリュームは調査のため上書きリストアしない、という前提も同じブログにある。",
+    "https://aws.amazon.com/jp/blogs/news/feasibility-of-data-recovery-written-by-netapp-2024/",
     "https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations/blob/main/docs/ja/s3ap-flexcache-snapmirror-considerations.md",
     "https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/ja/dr-snapmirror-runbook.md",
     "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
