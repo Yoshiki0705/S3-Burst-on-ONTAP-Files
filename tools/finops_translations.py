@@ -251,7 +251,7 @@ TRANSLATIONS.update(
         "ここまでの試算は利用側が同一リージョンにいることを前提にしていた。"
         "同一リージョン内のデータ転送には課金がないため、比較は保存単価とリクエスト単価の話になる。": "Every estimate so far assumed the consumers sit in the same Region. "
         "Transfer within a Region is not charged, which is why the comparison came down to storage and request rates.",
-        "**利用側がオンプレミスにいると話が変わる。**"
+        "**利用側がオンプレミスにいると話が変わる**。"
         "データ転送はリージョンから出たバイト数に課金されるので、"
         "同じファイルを読み直した回数だけ倍になる。"
         "キャッシュが取り除くのはまさにこの倍数である。": "**With the consumers on premises it is a different question.** "
@@ -325,7 +325,7 @@ TRANSLATIONS.update(
         "残るのはキャッシュ充填時に Origin 側のキャパシティプールから読む分だけで、"
         "FabricPool が {object_mib} MB 単位で扱うためこの操作数で計上している。": "Reading through FlexCache incurs no S3 requests at all, because the consumers read over NFS or SMB. "
         "What remains is the read from the origin's capacity pool while the cache fills, counted in the operation size FabricPool works in, {object_mib} MB.",
-        "S3 Files はこの表に入れていない。**この構成が対象とする利用側では使えない。**"
+        "S3 Files はこの表に入れていない。**この構成が対象とする利用側では使えない**。"
         "対応プロトコルが NFSv4.1 と NFSv4.2 だけで、"
         "NFSv3 と SMB が対象外である ([非対応事項とクォータ]({url}))。"
         "NFSv3 で固定された装置や Windows の工程はこれで外れる。"
@@ -345,7 +345,7 @@ TRANSLATIONS.update(
         "直接読む場合の転送料金に対する比": "As a share of the transfer charge for reading directly",
         "最右列が読みどころである。オブジェクトが数 MiB 以上なら、リクエスト課金は転送料金の 1% に届かない。"
         "一桁 KiB まで小さくすると数十 % に達し、このときは転送とリクエストの両方が問題になる。"
-        "**「S3 の API コールが高額になる」という見立てが成立するのは、この小オブジェクト側の領域である。**"
+        "**「S3 の API コールが高額になる」という見立てが成立するのは、この小オブジェクト側の領域である**。"
         "オブジェクトが大きいワークロードでは、削減対象は転送量に絞ってよい。": "The rightmost column is the one to read. At a few MiB and above, request charges do not reach 1% of the transfer charge. "
         "Down at single-digit KiB they reach tens of percent, and at that point both transfer and requests are problems. "
         '**"S3 API calls get expensive" holds in this small-object region, and only there.** '
@@ -415,7 +415,7 @@ TRANSLATIONS.update(
         "この構成の前提は「利用側が AWS の外にいて、動かせない」ことである。"
         "動かせるなら話は変わるので、参考としてその場合を並べる。": "This architecture assumes the consumers are outside AWS and cannot be moved. "
         "If they can be moved it is a different question, so that case is priced here for reference.",
-        "**同一リージョン内のデータ転送には課金がない。**"
+        "**同一リージョン内のデータ転送には課金がない**。"
         "上の表で {egress} を占めていた転送料金がそのまま消える。"
         "ストレージ層をどう選ぶかで動く金額より、この 1 項目のほうが大きい。": "**Transfer within a Region is not charged.** "
         "The {egress} of transfer in the table above disappears entirely. "
@@ -440,7 +440,7 @@ TRANSLATIONS.update(
         "SMB、NFSv3、ONTAP のデータ管理機能、あるいはオンプレミスとの併用といった要件になる。": "FSx for ONTAP in the same Region is {total}, {ratio}x reading directly, "
         "because with the transfer difference gone the file system floor is what is left. "
         "The reason to choose FSx for ONTAP here is not cost but a requirement: SMB, NFSv3, ONTAP's data management features, or running alongside on-premises systems.",
-        "**読み取り側の費用を下げる手段として、利用側の移設が最も効く。**"
+        "**読み取り側の費用を下げる手段として、利用側の移設が最も効く**。"
         "移設できるなら、まずそれを検討する。"
         "この構成が対象とするのは、装置が現地にある、計測対象との距離が要る、"
         "既存設備の投資が残っている、といった理由で移設できない場合である。": "**Moving the consumers is the most effective way to reduce read-side cost.** "
@@ -484,7 +484,7 @@ TRANSLATIONS.update(
         "All of the cache therefore sits on SSD.",
         "それが成立するのは Cache が疎だからである。FlexCache は Origin の全データを複製せず、"
         "実際に読まれたブロックだけを保持する。"
-        "NetApp のサイジング指針は Origin の**最低 10%**を推奨し、作成時の既定値も 10% である"
+        "NetApp のサイジング指針は Origin の**最低 10%** を推奨し、作成時の既定値も 10% である"
         " ([サイジング指針]({url}))。"
         "読み取り中心のワークロードでは 5〜15% に収める運用が一般的で、"
         "この帯であれば全量 SSD でも費用が成り立つ。": "That works because the cache is sparse. FlexCache does not replicate all of the origin's data; it holds only the blocks actually read. "
@@ -525,7 +525,7 @@ TRANSLATIONS.update(
         "要件を満たさない": "does not meet the requirement",
         "### 3 つの選択肢を並べる — 収集と利用が同じ場所の場合": "### The three options side by side — collection and consumption at the same site",
         "ここでは配布側を足さない。**バケットから DataSync で FSx for ONTAP にコピーすれば、"
-        "その FSx for ONTAP 自体が NFS / SMB で読み書きできるので、Cache を置く理由がない。**"
+        "その FSx for ONTAP 自体が NFS / SMB で読み書きできるので、Cache を置く理由がない**。"
         "Cache が費用に見合うのは、利用側がファイルシステムと別の場所にいる場合だけである。"
         "その場合の比較は Cache と全量コピーの対比（上の表）になる。"
         "この表は 3 案がいずれもファイルシステム 1 つ、または 0 つで済む単一サイトの比較である。": "No distribution side is added here. **Copy from a bucket into FSx for ONTAP with DataSync and that FSx for ONTAP already serves NFS and SMB, so there is nothing for a cache to do.** "
@@ -573,7 +573,7 @@ TRANSLATIONS.update(
         "Reads at 1 MiB and above bypass high-performance storage and stream from the bucket, so no file system data charge arises. "
         "What remains is the S3 GET and a 4 KiB metadata read, and with large objects the count is low enough not to show. "
         "S3 GET and PUT are counted on every row.",
-        "**配布サイトを増やしたときの増え方は 3 案で違う。**"
+        "**配布サイトを増やしたときの増え方は 3 案で違う**。"
         "この構成は Origin 1 つに対してサイトごとに Cache を足すので、"
         "1 サイトあたり Origin 論理の 1 割程度で増える。"
         "DataSync 方式はサイトごとに全量コピーを置くので、1 サイトあたり全量で増える。"
