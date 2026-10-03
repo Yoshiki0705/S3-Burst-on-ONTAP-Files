@@ -44,6 +44,8 @@
 
 ## presigned URL
 
+対応表が `Presign — Not supported` としている 3 つのオペレーションは、この環境ではいずれも成功しました。設計上の依存はまだ置きません。
+
 ### 結果: `PutObject` / `HeadObject` / `GetObject` はいずれも成功
 
 | オペレーション | 署名 | 結果 |
@@ -144,6 +146,8 @@ Expect: 100-continue
 | ONTAP バージョンとの対応 | **バージョンを特定できていないため、この結果をバージョンに紐付けられない** |
 
 ## UploadPartCopy
+
+対応表が同一 AP 内・同一リージョンで対応としている `UploadPartCopy` は、同一 Access Point 内をソースにしても `NoSuchKey` を返しました。同じソースで `CopyObject` は成功します。
 
 ### 結果: 同一 Access Point 内をソースにしても返る `NoSuchKey`
 
