@@ -138,6 +138,7 @@ ONTAP-mode のときだけ Origin になれると明記されている、とい�
 | [他クラウドとの接続経路](multi-cloud-connectivity.md) | 他クラウドとの接続の選択肢と対応リージョン |
 | [用語の整理](reference/glossary/object-access-on-ontap.md) | 機構の呼び名と実装元 |
 | [代替案との比較](reference/comparison/alternatives.md) | **この表は収集層・配布層専用。** ブロックプロトコル・S3 Files・EFS の対応バージョン・制約はこちら |
+| [委任台帳](reference/tr-integration/delegation-ledger.md) | NetApp の Technical Report 由来の知見ごとに、本体を導入プレイブックとこのリポジトリのどちらに置いたかと、プレイブックの該当ノートへのリンク |
 
 ---
 

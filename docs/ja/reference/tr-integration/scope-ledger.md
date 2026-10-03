@@ -73,3 +73,5 @@
 |---|---|
 | [検証状況](../../verification-status.md) | 評価段階の定義（スコープ判定とは別の軸） |
 | [構成の形](../../architecture.md) | この構成が解くこと・解かないこと |
+| [差分論点台帳](divergence-ledger.md) | TR の記載と FSx for ONTAP の実装・公開ドキュメントとの差分 |
+| [評価段階の付与ルール](evidence-stage-rules.md) | TR 由来の記述に評価段階を付けるときの規則 |
