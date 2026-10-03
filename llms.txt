@@ -130,7 +130,8 @@ destination owns them, and a copy in this file would not follow when a stage cha
   ([English](docs/en/verification-status.md#current-state)).
 - Whether FPolicy, auditing and ARP fire on the cache side: the cache-side row under "Current
   state" in [Verification status](docs/ja/verification-status.md#現在の状態), and
-  [Issue #240](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/240), which tracks it.
+  [Issue #240](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/240), which tracks
+  the FPolicy and auditing part.
 - Whether an NFS `rsize` / `wsize` of 65536 on FSx for ONTAP is a file-system limit: the
   `rsize/wsize` row under "Current state" in
   [Verification status](docs/ja/verification-status.md#現在の状態) and the note in
