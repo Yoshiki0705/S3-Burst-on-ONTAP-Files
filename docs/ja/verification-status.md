@@ -54,7 +54,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 |---|---|
 | Cache が **FSx for ONTAP**（同一リージョン、VPC ピアリング）、NFSv3、UNIX、64 B、`actimeo=0` | **検証済み**（2026-08-09、ap-northeast-1、ONTAP 9.18.1P3D1 両クラスタ、n=30）。p50 は 3 回の測定で 7〜14 ms に散り、代表値は 8 ms |
 | 同条件で SMB（AWS Managed AD 参加、`cache=none`） | **検証済み**（2026-08-10、同環境、n=30） |
-| Cache が **オンプレミス ONTAP**（この構成の主経路） | **未検証**。AWS の対応構成に記載はあるが実機で追っていない |
+| Cache が **オンプレミス ONTAP**（この構成の主経路） | **未検証**。AWS の対応構成に記載はあるが実機で追っていない（実環境での再検証は [Issue #244](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/244) で追跡） |
 | 遠隔拠点・高レイテンシ経路 | 未検証。測定はサブミリ秒のネットワーク遅延下 |
 | NTFS セキュリティスタイル、`actimeo=0` 以外のマウント、Cache 複数 | 未検証 |
 
