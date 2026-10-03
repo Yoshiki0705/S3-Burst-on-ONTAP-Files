@@ -128,11 +128,20 @@ import xml.etree.ElementTree as ET  # nosec B405  reads this repository's own co
 from dataclasses import dataclass
 from pathlib import Path
 
+from local_only_dirs import LOCAL_ONLY_DIRS
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Directories that hold copies of other people's files, or build output. Scanning them reports
 # findings nobody in this repository can act on.
-SKIP = {".git", ".venv", "node_modules", "__pycache__", ".private", "site-packages"}
+SKIP = {
+    ".git",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+    ".private",
+    "site-packages",
+} | LOCAL_ONLY_DIRS
 
 # Displacement below this is treated as no movement. It is not a rounding allowance: these figures
 # are laid out on a 10px grid, and a box anchored at 0.5 of its own width lands a few pixels off the

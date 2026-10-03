@@ -5,6 +5,11 @@
 # 非公開の作業メモ・レビュー来歴・MCP のメモリ
 .private/
 
+# エージェントのワークフローが書く計画・レビュー・報告と、リポジトリ内に切られた worktree。
+# どちらも作業の途中経過で、公開しない。
+.agents/
+.worktrees/
+
 # Python
 __pycache__/
 *.py[cod]

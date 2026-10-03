@@ -44,6 +44,10 @@
     "node_modules/**",
     ".private/**", // gitleaks:allow - path pattern, not committed content
     ".kiro/**", // gitleaks:allow - path pattern, not committed content
+    // Untracked agent workflow output and in-repo worktrees (both gitignored). A worktree holds a
+    // full copy of the docs, so linting it would report every finding twice.
+    ".agents/**",
+    ".worktrees/**",
     // Generated caches. A linter whose file count depends on whether tests have run reports a
     // different verdict for the same change.
     ".pytest_cache/**",
