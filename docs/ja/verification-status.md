@@ -81,7 +81,7 @@ NFS / SMB からいつ読めるか」である。**検証済みの範囲と未�
 | S3 Access Point 経由の操作を **FPolicy `mandatory`** で遮断できるか | 検証済み（遮断できないことを確認） | 同記録。同期エンジン + `mandatory=true` の下で NFSv3 書き込みは `Permission denied` になる一方、同一ボリュームの S3 AP で PUT / GET / LIST / DELETE がすべて成功。policy を無効化すると同一の NFS 書き込みが通るため対照が取れている |
 | S3 Access Point 経由の操作が **ONTAP ネイティブ監査ログ**に記録されるか | 検証済み（記録されることを確認） | 同記録。`Source=HTTP`（オブジェクト操作）と `Source=S3`（LIST）で記録される。ただし `SubjectUserName` / `SubjectDomainName` は `Not Present`、`SubjectIP` は AWS のサービス側アドレスで、**要求者は記録されない**。`HeadObject` は 6 回発行して 0 件。監査 ACE（SACL）が必要。**記録を確かめたのは NTFS ボリュームに SACL（`Everyone` / `audit_success`）を付けた条件**で、監査を有効にしただけでは何も記録されない |
 | S3 Access Point 経由の書き込みを **ARP** が検知するか | 検証済み（検知することを確認） | 同記録。ARP 5.0（学習期間不要の世代）。AP 経由で書いた高エントロピーファイル 150 件が suspect として `High Entropy` で記録され `attack_probability` は `moderate`。**`attack_probability` は書き込みから 10 分以上遅れて変わる**ため、短時間の観測で `none` を見て未検知と判断すると偽陰性になる。ARP による**遮断は未測定** |
-| **Cache 側**で FPolicy / 監査 / ARP が発火するか | 未検証 | 上記はすべて Origin 側での観測。この構成の書き込みは Origin に届くため、Cache 側の挙動は別の問いとして残っている。NetApp の FlexCache 対応表では、Cache 側は FPolicy が NFS 9.7・SMB 9.14.1 以降、監査が 9.7 以降で対応、**ARP は非対応**（[対応状況](support-matrix.md#origin-では使えて-cache-では使えない機能)）。実機では確かめていない |
+| **Cache 側**で FPolicy / 監査 / ARP が発火するか | 未検証 | 上記はすべて Origin 側での観測。この構成の書き込みは Origin に届くため、Cache 側の挙動は別の問いとして残っている。NetApp の FlexCache 対応表では、Cache 側は FPolicy が NFS 9.7・SMB 9.14.1 以降、監査が 9.7 以降で対応、**ARP は非対応**（[対応状況](support-matrix.md#origin-では使えて-cache-では使えない機能)）。実機では確かめていない。Cache 側の FPolicy・監査の確認は [Issue #240](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/240) で追跡している |
 | アクセスポイントを取り付けたボリュームで Qtree / Quota / FlexClone / FlexGroup / FlexGroup のクローンが使えるか | 検証済み（すべて使えることを確認） | [相互運用性](reference/limits/s3ap-interoperability.md)。2026-08-26、ap-northeast-1、ONTAP 9.18.1P3D1、SINGLE_AZ_1 / 128 MBps。FlexClone はボリューム単位・ファイル単位の両方。**NetApp が ONTAP S3 について非対応と記載している 4 項目は、この経路では制約として現れない。** 実際の落とし穴は NTFS ボリューム + UNIX identity + CIFS サーバ無し SVM で、取り付けが `AVAILABLE` になったうえで全データ操作が `AccessDenied` になる |
 | ファイル単位 FlexClone（`POST /api/storage/file/clone`）の成否を API 応答から判定できるか | 検証済み（判定できないことを確認） | 同記録。202 とジョブ UUID を返すが UUID は `404 entry doesn't exist` で解決できず、ジョブ一覧 166 件にも現れない。**対照:** 同じ `fsxadmin` でボリューム作成とボリュームクローンのジョブは `state=success` として取得できる。存在しないディレクトリを宛先にした呼び出しも 202 を返し何も作られない。宛先ファイルを見て判定する |
 | ONTAP API で作ったボリュームが AWS 側の API に現れるまでの時間 | 検証済み（範囲のみ。上限は未確定） | 同記録。20 秒間隔・ギャップ無しで FlexGroup 599 秒、FlexClone ボリューム 1,177 秒。別の回は 1,258 秒でまだ未出現（系列に穴あり）。**3 回一致しないため上限値ではない。** AWS の記載は「数分」 |
@@ -306,6 +306,8 @@ S3 Object Lock。**保持期間を名指しした指示がない限り有効化�
 | [サポート状況](support-matrix.md) | 公開ドキュメントに何が書かれているか |
 | [他クラウドとの接続経路](multi-cloud-connectivity.md) | 他クラウドとの接続の選択肢、対応リージョン、暗号化の層 |
 | [最初に決めること](design-first-decisions.md) | 未確認だが後戻りが高い判断 |
+| [委任台帳](reference/tr-integration/delegation-ledger.md) | NetApp の Technical Report 由来の知見ごとに、本体を導入プレイブックとこのリポジトリのどちらに置いたかと、プレイブックの該当ノートへのリンク |
+| [Issue #235](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/235) | 高ファイル数ワークロードのメタデータ操作・列挙・FlexCache 複製コストの計測を追跡する |
 
 ---
 

@@ -111,6 +111,48 @@ page.
   saying "GB", and the whole-object limit is evaluated at `CompleteMultipartUpload`, after the full
   payload has transferred.
 
+## Questions answered by row, not by document
+
+Several findings live in one row of a larger document, or in a ledger, rather than in a document
+of their own, so the descriptions above do not name them. Each item below gives only the question
+and where it is answered. The answer and its stage are deliberately not repeated here: the
+destination owns them, and a copy in this file would not follow when a stage changes.
+
+- How ONTAP feature support differs between the FlexCache origin and the cache volume, and what
+  that leaves to the origin. The table compares the two per feature, among them snapshots, SnapRestore,
+  FlexClone, tamperproof snapshots, Autonomous Ransomware Protection (ARP), SnapLock, quotas and
+  qtrees, SnapMirror, FPolicy and auditing:
+  [Support matrix](docs/ja/support-matrix.md#origin-では使えて-cache-では使えない機能)
+  ([English](docs/en/support-matrix.md#features-available-on-the-origin-but-not-on-the-cache)).
+- Whether FPolicy, ONTAP native auditing and ARP act on writes that arrive through the S3 Access
+  Point, and under which conditions an audit record is written: the FPolicy, audit and ARP rows
+  under "Current state" in [Verification status](docs/ja/verification-status.md#現在の状態)
+  ([English](docs/en/verification-status.md#current-state)).
+- Whether FPolicy, auditing and ARP fire on the cache side: the cache-side row under "Current
+  state" in [Verification status](docs/ja/verification-status.md#現在の状態), and
+  [Issue #240](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/240), which tracks
+  the FPolicy and auditing part.
+- Whether an NFS `rsize` / `wsize` of 65536 on FSx for ONTAP is a file-system limit: the
+  `rsize/wsize` row under "Current state" in
+  [Verification status](docs/ja/verification-status.md#現在の状態) and the note in
+  [the throughput measurement record](docs/ja/verification/throughput-iops-concurrency.md#rsizewsize-が-65536-で止まることの確認).
+  Both are in Japanese; the English status table has no such row.
+- How this architecture behaves with a very high file count — metadata operations, directory
+  listing, FlexCache replication cost:
+  [Issue #235](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/issues/235), which tracks it.
+- How NetApp's ONTAP Technical Reports were taken into this repository, and where an ONTAP-general
+  property they describe is written up — ARP generations and learning period, SnapLock and
+  snapshot locking, SnapMirror policy types, Vscan scope, protection of the administrative plane:
+  [Delegation ledger](docs/ja/reference/tr-integration/delegation-ledger.md). It records, for each
+  finding, whether the FSx for ONTAP adoption playbook or this repository holds it, and links to
+  the playbook note.
+- Where a Technical Report's guidance and FSx for ONTAP's implementation diverge:
+  [Divergence ledger](docs/ja/reference/tr-integration/divergence-ledger.md).
+- How a stage is assigned to a claim taken from a Technical Report:
+  [Stage assignment rules](docs/ja/reference/tr-integration/evidence-stage-rules.md).
+- Which Technical Reports were taken in and which were left out:
+  [Scope ledger](docs/ja/reference/tr-integration/scope-ledger.md).
+
 ## Choosing and comparing
 
 - [Alternatives](docs/ja/reference/comparison/alternatives.md): Seven approaches with their suited

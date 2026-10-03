@@ -147,6 +147,7 @@ design constraints.**
 | [Portability](portability.md) | Considering a replacement one layer at a time |
 | [Glossary](reference/glossary/object-access-on-ontap.md) | The mechanism names and their implementers |
 | [Alternatives](reference/comparison/alternatives.md) | **This table covers the collect and serve layers only.** Supported versions and constraints for block protocols, S3 Files and EFS are there |
+| [Delegation ledger](../ja/reference/tr-integration/delegation-ledger.md) (Japanese) | For each finding taken from a NetApp Technical Report, whether it is written up in the adoption playbook or in this repository, with a link to the playbook note |
 
 ---
 
