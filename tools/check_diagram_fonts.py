@@ -51,12 +51,21 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
+from local_only_dirs import LOCAL_ONLY_DIRS
+
 ROOT = Path(__file__).resolve().parent.parent
 DEBT_FILE = ROOT / "diagram-font-debt.txt"
 
 # Directories that hold copies of other people's files, or build output. Scanning them reports
 # findings nobody in this repository can act on.
-SKIP = {".git", ".venv", "node_modules", "__pycache__", ".private", "site-packages"}
+SKIP = {
+    ".git",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+    ".private",
+    "site-packages",
+} | LOCAL_ONLY_DIRS
 
 # The width a reader's column gives the image. GitHub renders Markdown body content at roughly this;
 # dev.to and hatenablog are close enough that a separate number would be false precision.

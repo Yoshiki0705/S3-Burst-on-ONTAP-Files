@@ -36,6 +36,8 @@ import pathlib
 import re
 import sys
 
+from local_only_dirs import LOCAL_ONLY_DIRS
+
 ALLOWED = set(
     "abcdefghijklmnopqrstuvwxyz"
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -127,7 +129,9 @@ def main() -> int:
             path
             for pattern in ("*.yaml", "*.yml")
             for path in sorted(root.rglob(pattern))
-            if ".git" not in path.parts and "node_modules" not in path.parts
+            if ".git" not in path.parts
+            and "node_modules" not in path.parts
+            and not LOCAL_ONLY_DIRS.intersection(path.parts)
         ]
 
     files = [path for path in targets if path.is_file()]

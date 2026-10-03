@@ -50,6 +50,8 @@ import re
 import sys
 from pathlib import Path
 
+from local_only_dirs import LOCAL_ONLY_DIRS
+
 ROOT = Path(__file__).resolve().parent.parent
 # tools/ and scripts/ hold the validators themselves; their pattern literals are the rules, not
 # violations of them. .kiro/ is never published.
@@ -65,6 +67,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = (
     ".private",
     ".kiro",
+    *sorted(LOCAL_ONLY_DIRS),
     "node_modules",
     ".git",
     "tools",

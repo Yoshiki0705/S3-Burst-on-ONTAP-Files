@@ -24,10 +24,13 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from local_only_dirs import LOCAL_ONLY_DIRS
+
 ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = (
     ".private",
     ".kiro",
+    *sorted(LOCAL_ONLY_DIRS),
     "node_modules",
     ".git",
     # Generated caches; see the note in audit_public_output.py.
