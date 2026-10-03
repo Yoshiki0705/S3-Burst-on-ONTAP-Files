@@ -210,6 +210,7 @@ release the cache, then the SVM peer, then the cluster peer.
   procedure are in [CONTRIBUTING.md](CONTRIBUTING.md#見出しを書くとき).
 - Japanese is the authoring language for documents; code, identifiers and commit messages are
   English.
+- **Prose style**: [Hub criteria](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/agent/writing-quality.md); detector `tools/ai_style_rules.py`, surfaced by `make audit`.
 - **Never hand-write a language switcher.** `make switcher-write` generates it. A new localized file
   needs the marker pair added once, after the H1 and at the end.
 - **Do not write a number that can be derived.** `make counts` recomputes every pattern count from
@@ -256,9 +257,7 @@ Automated checks catch syntax. These catch design-level problems.
   `FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns`. Its README, its stale-claim tests and its
   `pattern-test-dirs.txt` all count that directory; a move breaks `make drift` and `make test`.
 - Copy an asset without recording where it came from and how it diverged.
-- Let this file grow to the budget. It is loaded every turn, and the last 500 B are the expensive
-  ones: at 88 B of headroom the next edit is spent shaving prose instead of writing it. Move a
-  task-conditional section to `docs/` and leave a pointer, as the diagram notes are.
+- Let this file grow to the budget — move a task-conditional section to `docs/` and leave a pointer.
 - Put the body of any knowledge in `.kiro/`. It is not published. Steering holds the load condition
   and a pointer; the body goes in `docs/`. `make budget` checks that every pointer resolves to a
   tracked file.
