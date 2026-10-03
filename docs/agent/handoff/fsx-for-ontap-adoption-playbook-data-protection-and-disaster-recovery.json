@@ -15,7 +15,9 @@
     "https://aws.amazon.com/jp/blogs/news/feasibility-of-data-recovery-written-by-netapp-2024/",
     "https://github.com/Yoshiki0705/FSx-for-ONTAP-Lakehouse-Integrations/blob/main/docs/ja/s3ap-flexcache-snapmirror-considerations.md",
     "https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/blob/main/docs/ja/dr-snapmirror-runbook.md",
-    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md"
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/data-protection-methods.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-protection/notes/snaplock-and-layered-ransomware-readiness.md"
   ],
   "public_output_rules_apply": true
 }
