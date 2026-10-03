@@ -1,0 +1,27 @@
+{
+  "delegator_repo": "s3-burst-on-ontap-files",
+  "delegatee_repo": "FSx-for-ONTAP-Adoption-Playbook",
+  "target_tr": "Security.pdf",
+  "expected_deliverable": "委任台帳の Security の Hub 行 (ONTAP 一般の性質と採用判断の材料) を Hub に置く。新規ノートは作らず、既存の 4 本に足す: docs/ja/domains/data-protection/notes/snaplock-and-layered-ransomware-readiness.md (ARP の世代と学習期間、SnapLock の 3 段階の不可逆性、スナップショットロック、cyber vault)、docs/ja/domains/security-governance/notes/irreversible-operations-need-separate-approval.md (承認の境界、戻せない機能の一覧)、docs/ja/domains/security-governance/notes/vscan-scope-is-bounded-before-the-vendor.md (Vscan の範囲)、docs/ja/domains/data-utilization/notes/fpolicy-fits-by-how-writes-land.md (FPolicy のモードとプロトコル範囲、監査に要る ACE)。S3 Access Points 経由の経路での結果は、Hub が本体を書かず Spoke の検証記録へリンクする。この構成の Cache 側での効き方は Spoke の行で、Hub には書かない。",
+  "reference_requirements": [
+    "既存の検証済みの数値と結論は言い換えて再掲せず、下に挙げた Spoke 側の文書へ絶対 URL でリンクして引く。Spoke の検証結果を否定する記述や、同じ測定のやり直しは行わない。",
+    "評価段階の定義は各 repo の単一の定義元に従う (Spoke は docs/ja/verification-status.md、Hub は docs/ja/evidence-policy.md)。TR の値は ONTAP 一般の documented とし、FSx for ONTAP で同じかは公式記載か実測がない限り未確認と書く。",
+    "既存の Hub ノートで同じ関心を扱うものがあればそこへ足し、扱っていない関心だけ新規ノートにする。既存ノートの言語のまま足す (日本語のみのノートに英語版を新設しない)。新規ノートは日本語と英語で作る。",
+    "戻せない機能 (SnapLock、SnapLock 監査ログボリューム、PrivilegedDelete、スナップショットロック、Object Lock、Vault Lock、EBS スナップショットロック、マルチ管理者承認) を検証で有効にしない。有効にしてよいのは保持期間を名指しした人間の指示がある場合だけで、短い値で試せるのは API がその値を表現できる場合に限る (監査ログボリュームの保持期間は表現できない)。手順を書くときは、保持期間と最も広い影響範囲 (ボリューム / SVM / ファイルシステム) を同じ節に書く。",
+    "SnapLock を無条件に作る IaC (Cyber-Resilience の templates/storage.yaml、BLEA の cyber-resilience-sample) を実装例としてリンクしない。どちらも Issue で修正を求めている (Cyber-Resilience #36、BLEA-FSx-for-ONTAP-Usecase #6)。",
+    "ARP の学習期間は、版とボリューム種別を必ず添えて書く。旧世代 ARP (FlexVol 9.10.1〜9.15.1、FlexGroup 9.13.1〜9.17.1) は NAS FlexVol で 30 日、ARP/AI (9.16.1 以降) は学習期間なしで、有効化の直後から検知した実測がある。条件なしの 30 日は書かない (Cyber-Resilience #37)。",
+    "S3 Access Points 経由の書き込みは FPolicy の通知を発火せず、mandatory でも遮断されない。ONTAP の監査ログには記録され、ARP は検知する。いずれも Spoke の検証結果で、リンクで引く。",
+    "監査ログに残る SubjectUserSid は S3 Access Point に固定した ID で、呼び出し元ではない。名前の欄は Not Present になる。この 2 つを 1 文で書く。記録を確かめた条件は NTFS ボリュームに SACL を付けた場合。",
+    "ARP は FlexCache の Cache 側で非対応 (NetApp の FlexCache 対応表)。Origin と Cache のどちらにも SnapLock は置けない。Spoke の対応表へリンクする。",
+    "Tamperproof snapshot は FSx for ONTAP で別のライセンスを買わずに設定できる (この repo の所有者による確認。ライセンスの扱いを書いた AWS の記載は見つけていないので、出典はその旨を添える)。設定例は AWS ブログ「Amazon FSx for NetApp ONTAP イミュータブルバックアップの利用でランサムウェア対策の強化」にある: fsxadmin で管理エンドポイントに SSH し、volume modify -snapshot-locking-enabled でボリュームに設定し、volume snapshot modify-snaplock-expiry-time で保持期限を付ける。同じブログの注意として、ロックした Snapshot は保持期間が保持数より優先され、保持数を超えて残る (例: 日次・保持数 5・保持期間 1 か月なら 30〜31 個残る) ので、容量の見積りに入れる。手順を書くときはこのブログを引用し、ブログが書いていない影響範囲は未確認と書く。Spoke 側の一部の文書 (Cyber-Resilience の tamperproof-snapshot.md) にある「SnapLock Compliance ライセンスが必要」は引かない。",
+    "https://aws.amazon.com/jp/blogs/news/immutable-backup-written-by-netapp-2024/",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/errata-fpolicy-s3ap-coverage.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/verification-results-fpolicy-s3ap-and-session.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/agent/pitfalls-snaplock.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/ja/snaplock-audit-log-console-guardrails.md",
+    "https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/ontap-native/arp-configuration.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification-status.md",
+    "https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/support-matrix.md"
+  ],
+  "public_output_rules_apply": true
+}
