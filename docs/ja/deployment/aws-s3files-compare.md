@@ -72,7 +72,7 @@ S3 Files 側の前提は AWS のドキュメントに記載があるものです
 
 実機で通した CLI 手順を、冪等にして [`runbook.sh`](../../../environments/s3files-compare/runbook.sh)
 に置いてあります。CloudFormation テンプレートは同じものを宣言的に作りますが、**まだデプロイして
-いません。**根拠があるのはこちらです。
+いません**。根拠があるのはこちらです。
 
 ```bash
 VPC_ID=vpc-0123456789abcdef0 SUBNET_ID=subnet-0123456789abcdef0 \

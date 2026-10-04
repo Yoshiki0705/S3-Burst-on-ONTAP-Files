@@ -38,9 +38,9 @@ CIFS サーバーを作ると管理用の共有が自動で作られる。**デ�
 
 | 共有 | 用途 | 測定に使えるか |
 |---|---|---|
-| `ipc$` | 名前付きパイプ。ONTAP が使う | **使えない。**設定・プロパティ・ACL を変更できず、削除も改名もできない |
+| `ipc$` | 名前付きパイプ。ONTAP が使う | **使えない**。設定・プロパティ・ACL を変更できず、削除も改名もできない |
 | `admin$` | SVM のリモート管理。**ONTAP 9.8 以降は既定で作られない** | 使えない |
-| `c$` | SVM ルートボリュームへの管理アクセス | **推奨しない。**下記 |
+| `c$` | SVM ルートボリュームへの管理アクセス | **推奨しない**。下記 |
 
 出典は
 [Learn about the default administrative ONTAP SMB shares](https://docs.netapp.com/us-en/ontap/smb-admin/default-administrative-shares-concept.html)。
@@ -58,8 +58,8 @@ CIFS サーバーを作ると管理用の共有が自動で作られる。**デ�
 
 | クライアント側のエラー | 実際の原因 | 確認する場所 |
 |---|---|---|
-| `The specified network password is not correct.` | **アカウントがドメインに存在しない。**パスワードは合っている | ディレクトリ側にアカウントがあるか。**シークレットの存在はアカウントの存在ではない** |
-| `The network name cannot be found.` | **共有が存在しない。**パスやアカウントの問題ではない | `GET /api/protocols/cifs/shares` の一覧 |
+| `The specified network password is not correct.` | **アカウントがドメインに存在しない**。パスワードは合っている | ディレクトリ側にアカウントがあるか。**シークレットの存在はアカウントの存在ではない** |
+| `The network name cannot be found.` | **共有が存在しない**。パスやアカウントの問題ではない | `GET /api/protocols/cifs/shares` の一覧 |
 | `System error 53`（`net use`） | UNC のバックスラッシュが JSON → SSM → PowerShell → `cmd` の 4 段で合わなくなった | `New-SmbMapping` に置き換える（パラメータ渡しなので入れ子の引用符が要らない） |
 
 **1 行目がいちばん危険である。** アカウント不在がパスワード誤りとして現れるので、

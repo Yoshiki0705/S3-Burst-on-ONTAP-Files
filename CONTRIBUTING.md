@@ -71,7 +71,7 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 `make interconnect-regions` も同じ扱いです。[他クラウドとの接続経路](docs/ja/multi-cloud-connectivity.md)の
 対応リージョンのペアと CSP ごとのライフサイクルを AWS のページと突き合わせ、毎週
 `.github/workflows/interconnect-regions.yml` が回して差分を Issue に報告します。**ペアの表を
-手で書き換えないでください。**AWS 側が正で、日本語版と英語版を同じコミットで直します。
+手で書き換えないでください**。AWS 側が正で、日本語版と英語版を同じコミットで直します。
 **取得できなかった場合は「差分なし」ではなく取得失敗として落ちます**（理由は
 [検査ツール側にある規約](docs/agent/policy-in-code.md)）。
 
@@ -145,7 +145,7 @@ make ready MSG="docs: ..." && git commit -F <message-file>
 
 ### 見出しを書くとき
 
-`##` 以下の節見出しは**体言止め（名詞句）**にします。動詞終止形・疑問形・述語文は、読者が
+`##` 以下の節見出しは**体言止め**（名詞句）にします。動詞終止形・疑問形・述語文は、読者が
 ラベルを期待する位置に文が来るため読みにくくなります。
 
 | 型 | 避ける | 使う |

@@ -541,8 +541,8 @@ curl -s -k -X POST -u "fsxadmin:$PW" -H 'Content-Type: application/json' \
 
 | クライアントのエラー | 実際の原因 |
 |---|---|
-| `The specified network password is not correct.` | **アカウントがドメインに無い。**パスワードは合っている |
-| `The network name cannot be found.` | **共有が無い。**パスや DNS の問題ではない |
+| `The specified network password is not correct.` | **アカウントがドメインに無い**。パスワードは合っている |
+| `The network name cannot be found.` | **共有が無い**。パスや DNS の問題ではない |
 
 機構と出典は
 [SMB でマウントできる名前と、識別子を読む場所](../../docs/ja/reference/limits/smb-share-and-identifier-reading.md)。

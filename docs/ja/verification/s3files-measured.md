@@ -127,7 +127,7 @@ p90 が 2.04 秒なので、遅いのは一部の試行に限られます。
 | 2 | FSTYPE は `s3files` ではなく `nfs4` | マウントヘルパーがローカルの TLS プロキシ経由でつなぐため、source は `127.0.0.1:/`、port は高位のランダムポートになる。`tls` は NFS オプションとして現れない |
 | 3 | **S3 API で書いたオブジェクトは `root:root` で現れる** | ファイルは 0644、ディレクトリは 0755。アクセスポイントで非 root にマップした利用側は、**S3 で作られたディレクトリに書き込めません**。読み取りは 0644 なので通ります |
 | 4 | `ClientRootAccess` なしでは root でも書けない | スコープを絞った IAM（`ClientMount` + `ClientWrite`）だけでは、マウントルートで root の `mkdir` すら拒否されます。アクセスポイントに POSIX ユーザーを持たせるのが解で、root はその uid にマップされます |
-| 5 | アクセスポイントの root ディレクトリ分だけキーがずれる | root を `/measure` にすると、バケットキー `measure/a/b` はマウント上で `<mount>/a/b` に見えます。**マウントパスとキーを同一視した測定コードは、動いている方向をポーリングし続けます。**失敗がエラーではなくタイムアウトなので、サービスが遅いのと区別できません |
+| 5 | アクセスポイントの root ディレクトリ分だけキーがずれる | root を `/measure` にすると、バケットキー `measure/a/b` はマウント上で `<mount>/a/b` に見えます。**マウントパスとキーを同一視した測定コードは、動いている方向をポーリングし続けます**。失敗がエラーではなくタイムアウトなので、サービスが遅いのと区別できません |
 | 6 | 既定の `python3` は 3.9 | Amazon Linux 2023 の `python3` は 3.9 で、`datetime.UTC`（3.11 以降）を使うスクリプトは動きません。`dnf install python3.12` が必要です |
 | 7 | botocore は `pip3` では入らない | `dnf install python3-botocore` を使います。無くてもマウントは成功しますが、`mount.log` に `Failed to import botocore` が記録され、CloudWatch メトリクスが使えません |
 | 8 | 信頼ポリシーのプリンシパル | `elasticfilesystem.amazonaws.com` が正しい（公式記載どおり）。**対照:** サービスが EventBridge ルール `DO-NOT-DELETE-S3-Files-*` を `ManagedBy: elasticfilesystem.amazonaws.com` で作成したことを確認しています。作成 API が成功したことは根拠になりません |
