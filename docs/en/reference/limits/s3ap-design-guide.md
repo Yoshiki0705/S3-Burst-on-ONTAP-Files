@@ -763,6 +763,14 @@ The 50 GiB whole-object limit is judged at `CompleteMultipartUpload`. That is, *
 part has been transferred**. The time spent transferring and the request charges do not come back.
 Validate the size on the client before sending.
 
+Completion took 2,513 seconds in one observation. In a 2026-10-07 measurement with
+`NetworkOrigin=Internet` on a first-generation 128 MBps file system, the `complete-multipart-upload` call
+for a whole object of exactly 50 GiB (5 GiB × 10 parts) did not return for **2,513 seconds**, the connection
+stayed open, and it then succeeded (a single observation, reproduction unconfirmed). A design
+that sends objects close to 50 GiB includes the wait for completion in the caller's timeouts. The same
+measurement did not reach the over-50 GiB judgement (the part limit rejected it first)
+([measurement record](../../../ja/verification/s3ap-multipart-internet-origin.md) (Japanese)).
+
 ### Snapshot interval and write-back
 
 Taking a snapshot on the Origin **reclaims outstanding dirty data from every write-back Cache tied to

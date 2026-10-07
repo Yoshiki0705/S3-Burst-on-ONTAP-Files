@@ -15,6 +15,17 @@ from what was known.
 
 ### Added
 
+- **Multipart size boundaries and write throughput through an S3 Access Point with
+  `NetworkOrigin=Internet`, recorded as a sample run on one configuration** (2026-10-07, ap-northeast-1,
+  first generation, 128 MBps). Two new claims at verified, each qualified by its run count: a part of
+  exactly 5 GiB passes and 5 GiB + 1 byte fails, the +1 MiB failure surfacing on the client as a
+  connection error rather than an S3 error response; and NFS direct write reached 124.4 to 125.5 MiB/s
+  while `aws s3 cp` through the access point gave 16.4 to 49.1 MiB/s, one run per concurrency. A whole
+  object of exactly 50 GiB succeeded with a 2,513-second `CompleteMultipartUpload`. **The over-50 GiB
+  judgement at `CompleteMultipartUpload` was not observed** — the test was rejected by the part limit
+  first — so the existing 50 GiB row keeps its stage. Record:
+  `docs/ja/verification/s3ap-multipart-internet-origin.md`.
+
 - **What drops the block sequential-read figure is a write, not elapsed time — and the 4 KiB random
   read scales exactly with the provisioned SSD IOPS while the sequential read ignores it.** Three
   claims move to verified and one open item is closed as "not the policy". On one fill: three

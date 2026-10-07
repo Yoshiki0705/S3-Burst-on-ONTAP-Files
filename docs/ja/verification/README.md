@@ -52,6 +52,7 @@
 | 記録 | 答える問い | 段階 |
 |---|---|---|
 | [presigned URL と UploadPartCopy](s3ap-operations.md) | 公式対応表と実際の挙動が一致するか（**2 点とも逆向きだった**） | 検証済み |
+| [マルチパートの境界と Internet origin 経由の書き込み](s3ap-multipart-internet-origin.md) | パート 5 GiB と全体 50 GiB の境界でどう振る舞うか、NFS 直書き込みとどれだけ差があるか。**1 構成・回数限定のサンプル実行** | 検証済み（1 構成・各 1〜2 回）。全体 50 GiB 超の判定は未観測 |
 
 ## 自分で測るときに読むもの
 
