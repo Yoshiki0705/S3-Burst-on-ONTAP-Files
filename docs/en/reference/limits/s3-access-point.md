@@ -23,6 +23,15 @@ Source: the measurements are records in the sibling repository
 [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns).
 The 50 GiB figure is stated in [access point API support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html).
 
+**On 2026-10-07 the part and whole-object boundaries were measured on a different configuration
+(`NetworkOrigin=Internet`, first generation, 128 MBps).** A part of exactly 5 GiB succeeded; 5 GiB + 1 byte
+and 5 GiB + 1 MiB failed. The +1 MiB failure did not come back as an S3 error response: on the client it
+surfaced as a connection error. A whole object of exactly 50 GiB succeeded, and `CompleteMultipartUpload`
+took 2,513 seconds. **That measurement did not observe the over-50 GiB judgement at
+`CompleteMultipartUpload`** (the part limit rejected it first), so the stages in the table above are
+unchanged. Each is a single observation; the limits are in the
+[measurement record](../../../ja/verification/s3ap-multipart-internet-origin.md) (Japanese).
+
 ### The limit is on the upload side only
 
 **The published sentence reads:**

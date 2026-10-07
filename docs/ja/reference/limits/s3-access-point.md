@@ -18,6 +18,13 @@
 [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns)
 の記録。50 GiB の記載は[アクセスポイントの API 対応](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)。
 
+**2026-10-07 に別の構成（`NetworkOrigin=Internet`、第一世代 128 MBps）でパートと全体の境界を測った。**
+パート 5 GiB ちょうどは成功し、5 GiB + 1 バイトと 5 GiB + 1 MiB は失敗した。+1 MiB の失敗は S3 のエラー応答
+ではなく、クライアント側で接続エラーとして現れた。全体 50 GiB ちょうどは成功し、`CompleteMultipartUpload`
+に 2,513 秒かかった。**全体 50 GiB 超を `CompleteMultipartUpload` で判定することは、この測定では観測して
+いない**（パート上限で先に拒否された）ので、上の表の段階は変えていない。いずれも 1 回の観測で、限定は
+[検証記録](../../verification/s3ap-multipart-internet-origin.md#マルチパートアップロードのサイズ境界)にある。
+
 ### 上限がアップロード側にしかないこと
 
 **公開ドキュメントの文はこうである。**
