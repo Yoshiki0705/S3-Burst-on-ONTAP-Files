@@ -175,6 +175,18 @@ from what was known.
 
 ### Changed
 
+- **`Presign` is listed as Supported in AWS's access point compatibility table, and this
+  repository's presigned URL measurement agrees with it.** Opened on 2026-10-08, the table's
+  `Presign` row reads Supported with no condition; the repository had recorded it as
+  `Not supported`, and when it changed was not determined. The documented status moves to Supported
+  (documented). The 2026-08-19 measurement — presigned `PutObject` / `HeadObject` / `GetObject`
+  succeeding under SigV4 and SigV2, 64 B, concurrency 1, n=30 × 4, client outside AWS, ONTAP release
+  unknown — is unchanged and stays verified, so the two no longer disagree. The advice not to depend
+  on presigned URLs was conditional on the table saying `Not supported`; it is withdrawn from the
+  design guide and the limits page, where `Presign` also leaves the out-of-scope table. The
+  measurement record keeps its text and gains a dated section, registered in
+  `docs/agent/superseded-claims.txt`. The `UploadPartCopy` row is unchanged on the table and still
+  disagrees with the measurement.
 - **The measurement records had no route to the adoption guidance, and four findings from the block
   runs now reach it.** The sibling playbook registers **25 probes into `perf-matrix-results.md`** and
   cites this repository from twenty places; **not one measurement record cited anything back.** The

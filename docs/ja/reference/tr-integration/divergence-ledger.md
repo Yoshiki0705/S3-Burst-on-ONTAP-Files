@@ -25,7 +25,7 @@ TR 側の参照と FSx for ONTAP 側の出典の両方がそろう論点のみ�
 | 高ファイル数ワークロードの TR はオンプレミス ONTAP を主な前提に書かれており、FSx for ONTAP 固有のサイジング手順（第一世代/第二世代のスループット構成との関係）が TR 側に明示されていない可能性がある | High File Count NAS Workloads TR（節番号は特定できていない） | FSx for ONTAP の[スループット構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/)側に該当記述があるか未確認 | 未確認 | 利用促進 |
 | FlexCache の対応構成について、AWS は FSx for ONTAP を Origin とする構成を 3 通りに明記しているが、TR 側（FlexCache and FlexGroup volumes）はより広いプラットフォーム組み合わせを前提に記述している可能性があり、FSx for ONTAP で検証されていない組み合わせを区別する必要がある | FlexCache and FlexGroup volumes TR（節番号は特定できていない） | [FSx for ONTAP の FlexCache 対応構成](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)（3 通りを明記） | 確定済み | 利用促進 |
 | S3 Access Points 経由の操作では FPolicy 通知が発火せず、`mandatory` 同期ポリシーでも遮断されない。TR（S3）および Security TR が FPolicy をデータ保護・監視の手段として記述している場合、この収集経路には適用できない点を区別する必要がある | S3 TR / Security TR（節番号は特定できていない） | [FPolicy の S3 Access Point 経路に関する実測](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/errata-fpolicy-s3ap-coverage.md)（この repo の[検証状況](../../verification-status.md)で検証済み） | 確定済み | 改善要望 |
-| S3 Access Points の対応表は `Presign` を非対応としているが、実測では `PutObject` / `HeadObject` / `GetObject` の presigned URL が成功した。対応表と実測が逆向きである | — | [presigned URL の実測記録](../../verification/s3ap-operations.md)（2026-08-19）。TR 側に対応する記述を特定できていない | 未完了 | 改善要望 |
+| S3 Access Points の対応表は `Presign` を Supported と記載しており（2026-10-08 に確認）、実測でも `PutObject` / `HeadObject` / `GetObject` の presigned URL が成功した（2026-08-19）。測定時点では対応表を非対応として記録しており、両者は逆向きだった。TR 側（S3）の presigned URL に関する記述がこの経路と一致するかは未確認 | — | [対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)（2026-10-08）と [presigned URL の実測記録](../../verification/s3ap-operations.md)（2026-08-19）。TR 側に対応する記述を特定できていない | 未完了 | 利用促進 |
 | S3 Access Points のアップロード上限は 50 GiB だがダウンロードは上限なしという非対称性があり、NFS/SMB で書いた 50 GiB 超のファイルを S3 で読める。TR 側（S3）にこの非対称性に対応する記述があるか未確認 | S3 TR（節番号は特定できていない） | [オブジェクトサイズ上限の実測](../limits/s3-access-point.md#上限がアップロード側にしかないこと)（検証済み、2026-09-11） | 未確認 | 利用促進 |
 | FlexCache の Cache 側は Snapshot・SnapRestore・FlexClone・SnapMirror がいずれも不可で、データ保護を Origin 側にしか置けない。TR（FlexCache and FlexGroup volumes / Data protection）がこの制約を Origin/Cache で区別して記述しているか確認が必要 | FlexCache and FlexGroup volumes TR / Data protection TR（節番号は特定できていない） | [Origin/Cache の対応可否一覧](https://docs.netapp.com/us-en/ontap/flexcache/supported-unsupported-features-concept.html)（この repo の[サポート状況](../../support-matrix.md)に転記済み） | 確定済み | 利用促進 |
 
@@ -33,7 +33,7 @@ TR 側の参照と FSx for ONTAP 側の出典の両方がそろう論点のみ�
 
 - 確定済み: 3 件 / 未完了: 1 件 / 未確認: 2 件（合計 6 件）
 - 観点が未分類の論点は残していない（要件 7.4）。
-- 未完了の 1 件（presigned URL）は、FSx for ONTAP 側の実測は存在するが、対応する TR 側の該当箇所を
+- 未完了の 1 件（presigned URL）は、FSx for ONTAP 側の公式記載と実測は存在するが、対応する TR 側の該当箇所を
   特定できていない。TR 側参照が欠落しているため確定済みに分類しない（要件 7.2）。TR 本文で該当節を
   特定できた時点で status を更新する。
 - 未確認の 2 件は、差分の有無を実測も公式記載も確認できていない。断定形を使わず「可能性がある」

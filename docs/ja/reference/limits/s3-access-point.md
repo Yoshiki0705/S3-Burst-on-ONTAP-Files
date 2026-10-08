@@ -151,11 +151,12 @@ AD グループで認可を分けても、監査は AP に紐づく 1 つの識�
 | Static Website Hosting | 対象外 |
 | 多要素認証（MFA delete） | 対象外 |
 | 条件付き書き込み | 対象外 |
-| `Presign` | 対応表では非対応。**実測では `PutObject` / `HeadObject` / `GetObject` の 3 つとも成功**（[検証記録](../../verification/s3ap-operations.md)、2026-08-19。SigV4 / SigV2 の両方）。測定は対応表と逆向きであり、**対応表が非対応としている間は依存させない**（[設計ガイド](s3ap-design-guide.md#presigned-url)） |
 | ACL | `bucket-owner-full-control` 以外は対象外。他の値は `InvalidArgument` |
 | ストレージクラス | `FSX_ONTAP` のみ |
 | サーバー側暗号化 | `SSE-FSX` のみ。`SSE-S3` / `SSE-KMS` は指定できない |
 | Block Public Access | **常に有効で、変更できない**（[アクセス管理](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)） |
+
+`Presign` は対象外ではない。対応表は Supported と記載しており（2026-10-08 に確認）、実測でも `PutObject` / `HeadObject` / `GetObject` の presigned URL が成功した（[検証記録](../../verification/s3ap-operations.md)、2026-08-19。SigV4 / SigV2 の両方）。設計上の扱いは[設計ガイド](s3ap-design-guide.md#presigned-url)にある。
 
 ### 完全性の検証に効く 2 点
 

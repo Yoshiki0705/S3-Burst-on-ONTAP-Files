@@ -53,9 +53,9 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 
 ### Presigned URL
 
-**公式対応表は現時点で `Presign — Not supported` と記載している**（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)）。
+**公式対応表は `Presign` を Supported と記載している**（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)、2026-10-08 に確認）。このリポジトリが測定した 2026-08-19 の時点では、対応表の記載を `Not supported` として記録していた。いつ変わったかは確認していない。
 
-一方で、presigning はクライアント側の署名計算であってサーバーへの API 呼び出しではない。
+presigning はクライアント側の署名計算であってサーバーへの API 呼び出しではない。
 生成された URL が実行するのは通常の `GetObject` で、署名が Authorization ヘッダーではなく
 クエリパラメータに入るだけである。`GetObject` は対応済みなので、`GetObject` 自体を壊さずに
 presigned URL 経由だけを止めることはできない。姉妹リポジトリでは `GetObject` の presigned URL が
@@ -64,14 +64,15 @@ NetApp KB に記載がある（9.11.1 以降で v4、9.16.1 以降で v2 + v4）
 機構の説明、バージョン要件、代替手段の一覧は
 [姉妹リポジトリの互換性ノート](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-compatibility-notes.md)にある。
 
-**公開ドキュメントが `Not supported` としている間は、本番ワークロードを依存させない。**
-非推奨通知なしに挙動が変わる可能性がある。時間制限つきのアクセスが必要なら、
-API Gateway + Lambda、CloudFront signed URL、一時的な STS 認証情報のいずれかを設計する。
 **`PutObject` と `HeadObject` も実測した**（[検証記録](../../verification/s3ap-operations.md)、
 2026-08-19）。`GetObject` を含む 3 つとも成功し、SigV4 と SigV2 の両方で動作した。
-NetApp KB のバージョン別記載（9.11.1 以降で v4、9.16.1 以降で v2 + v4）と整合する。
-**対応表が `Not supported` としている間は依存させないという上記の判断は変えない。**
-動作したことは、非推奨通知なしに挙動が変わらないことの保証ではない。
+NetApp KB のバージョン別記載（9.11.1 以降で v4、9.16.1 以降で v2 + v4）と整合し、
+**対応表の記載とも一致する。**
+
+測定の範囲は 64 B のオブジェクト、AWS 外のクライアント、並列度 1 で、ONTAP バージョンは
+特定できていない。この範囲を超える使い方は自環境で確かめる。時間制限つきのアクセスには、
+presigned URL のほかに API Gateway + Lambda、CloudFront signed URL、一時的な STS 認証情報という
+手段もある。
 
 **SigV2 は Content-Type を署名対象に含めるため、クライアントが自動で付けたヘッダーで署名が
 無効になる。** SigV4 の既定の署名対象は `host` だけなのでこの影響を受けない。

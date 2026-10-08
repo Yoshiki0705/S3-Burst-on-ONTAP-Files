@@ -58,9 +58,9 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 
 ### Presigned URL
 
-**The compatibility table currently states `Presign — Not supported`** ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)).
+**The compatibility table lists `Presign` as Supported** ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html), checked 2026-10-08). When this repository measured it on 2026-08-19, it recorded the table as `Not supported`; when the row changed was not determined.
 
-At the same time, presigning is a client-side signature computation, not an API call to the server.
+Presigning is a client-side signature computation, not an API call to the server.
 The URL it produces executes an ordinary `GetObject`, with the signature in query parameters instead
 of the Authorization header. Since `GetObject` is supported, presigned URL access cannot be blocked
 without breaking `GetObject` itself. A sibling repository has measured a presigned `GetObject`
@@ -68,14 +68,14 @@ succeeding (ONTAP 9.18.1P3D1). The version-dependent scope is stated in NetApp K
 9.11.1, v2 and v4 from 9.16.1). The mechanism, the version requirements and a list of alternatives
 are in the [sibling repository's compatibility notes](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns/blob/main/docs/s3ap-compatibility-notes.md).
 
-**While the public documentation says `Not supported`, do not let a production workload depend on
-it.** The behaviour can change without a deprecation notice. Where time-limited access is needed,
-design for API Gateway plus Lambda, CloudFront signed URLs, or temporary STS credentials. What has
-**`PutObject` and `HeadObject` have now been measured too** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese),
+**`PutObject` and `HeadObject` have been measured too** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese),
 2026-08-19). All three succeed, under SigV4 and under SigV2, which agrees with the
-NetApp KB version scope above. **The guidance not to depend on it while the table says
-`Not supported` is unchanged**: that it works is not a guarantee that it will keep working without a
-deprecation notice.
+NetApp KB version scope above **and with the compatibility table.**
+
+The measurement covers 64 B objects, a client outside AWS and concurrency 1, and the ONTAP release
+was not determined; confirm in your own environment before relying on it beyond that. For
+time-limited access, API Gateway plus Lambda, CloudFront signed URLs and temporary STS credentials
+are other means besides a presigned URL.
 
 **SigV2 includes Content-Type in the string to sign**, so a header the client adds on its own
 invalidates the signature; SigV4 signs only `host` by default and is unaffected. With boto3 the
@@ -84,7 +84,6 @@ signature version has to be set explicitly — `generate_presigned_url` emits Si
 tell you which was generated. That is client-side behaviour, not a property of FSx for ONTAP.
 
 This architecture's path does not use presigned URLs.
-Depending on it in a production workload is not recommended.
 
 ## Authorization design — least-privilege policy examples
 
