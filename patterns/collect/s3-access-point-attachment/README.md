@@ -164,7 +164,8 @@ s3.put_object(Bucket=ALIAS, Key="hello.txt", Body=b"hello")
 | 自作アプリ（boto3 等） | `Bucket=<alias>` または `Bucket=<access point ARN>` | `arn:aws:s3:::<alias>` 形式のバケット ARN は**通らない** |
 
 サポートされる S3 API は Amazon S3 の一部である。条件付き書き込み、バージョニング、
-S3 Event Notifications、Object Lock、presigned URL などは対象外。全項目は
+S3 Event Notifications、Object Lock などは対象外。presigned URL は対応表で Supported と
+記載されている（2026-10-08 に確認）。全項目は
 [上限値](../../../docs/ja/reference/limits/s3-access-point.md)。
 
 ## ONTAP の機能との併用

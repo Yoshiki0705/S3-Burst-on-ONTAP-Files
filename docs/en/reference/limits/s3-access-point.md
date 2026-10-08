@@ -163,11 +163,12 @@ All of these come from the [compatibility table](https://docs.aws.amazon.com/fsx
 | Static website hosting | Out of scope |
 | Multi-factor authentication (MFA delete) | Out of scope |
 | Conditional writes | Out of scope |
-| `Presign` | Listed as not supported. **Measured: `PutObject`, `HeadObject` and `GetObject` all succeed** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19, under both SigV4 and SigV2). The measurement runs opposite to the table, and **while the table says not supported, do not depend on it** ([design guide](s3ap-design-guide.md#presigned-url)) |
 | ACLs | Only `bucket-owner-full-control`. Any other value returns `InvalidArgument` |
 | Storage class | `FSX_ONTAP` only |
 | Server-side encryption | `SSE-FSX` only. `SSE-S3` and `SSE-KMS` cannot be requested |
 | Block Public Access | **Always on and cannot be changed** ([managing access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)) |
+
+`Presign` is not out of scope. The compatibility table lists it as Supported (checked 2026-10-08), and presigned `PutObject`, `HeadObject` and `GetObject` all succeeded when measured ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19, under both SigV4 and SigV2). How to treat it in a design is in the [design guide](s3ap-design-guide.md#presigned-url).
 
 ### Two points that bear on integrity checking
 
