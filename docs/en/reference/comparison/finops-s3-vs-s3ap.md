@@ -1047,6 +1047,85 @@ An S3 Access Point carries no hourly charge of its own, so its increment reduces
 
 <!-- finops-model:end -->
 
+## Cost of S3 Access Point reads with tiering in view
+
+**This section looks at the point where billing changes with the tier (SSD / capacity pool), set
+beside how S3 Files is metered.** The estimates above cover the monthly cost of the collect side.
+Here a single scenario — "write one file over the S3 API, read it N times over the same S3 API
+path" — puts the **items billed per read** side by side for the two approaches. No verdict on which
+is faster or cheaper. What is placed side by side is the billed item, the unit, the unit price
+(where obtained), and the count in that scenario (where known).
+
+**Fixed cost and usage-based cost do not share a column** (the shared-column rule in AGENTS.md). The
+FSx for ONTAP side is dominated by the throughput-capacity and SSD fixed cost; the S3 Files side is
+usage-based. So below, only the **per-read usage cost** is placed side by side, and the fixed cost
+is stated separately.
+
+### Items billed per read (the object is already written over the S3 API)
+
+Unit prices come from the [price table above](#unit-prices); the retrieval date, Region and
+effective date are stated there.
+
+| Approach | Tier the object is on | Items billed on read | Unit price | Count per read |
+|---|---|---|---|---|
+| FSx for ONTAP S3 AP | **SSD (hot)** | GET via S3 AP | $0.000029 / 1,000 | 1 GET |
+| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + **? (measurement needed, S-5)** |
+| S3 Files | High-performance storage (below threshold, ingested) | S3 Files data read | $0.04 / GB | min 32 KiB, rounded up to 1 KiB |
+| S3 Files | Bucket direct (1 MiB or larger, or not ingested) | S3 GET + 4 KiB metadata read | GET at the Amazon S3 price, metadata read $0.04 / GB | 1 GET + 4 KiB |
+
+**The capacity-pool read-request count is left blank.** How many read requests one `GetObject`
+generates against the capacity pool depends on the block-level read granularity and is not in the
+pricing page. **A guessed number would be quoted, so it stays "measurement needed" until the
+[Tiering All measurement](../../../ja/verification/s3files-throughput-matrix-plan.md) (Japanese) is taken.** The
+"4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a count.
+
+### Items billed for storage (the fixed-cost side, monthly)
+
+| Approach | Storage item | Unit price |
+|---|---|---|
+| FSx for ONTAP S3 AP (the part on SSD) | SSD storage Single-AZ | $0.15 / GB-Mo |
+| FSx for ONTAP S3 AP (the part on capacity pool) | Capacity pool storage Single-AZ | $0.0238 / GB-Mo |
+| FSx for ONTAP S3 AP (bandwidth fixed cost) | Throughput capacity Single-AZ gen 1 | $0.906 / MBps-Mo (min 128 MBps) |
+| S3 Files (source of truth) | S3 Standard | $0.025 / GB-Mo (first 50 TiB) |
+| S3 Files (active set only) | High-performance storage | $0.36 / GB-Mo (min billed 10 KiB, expires at 30 days by default) |
+
+**The asymmetry lines up directly.** FSx for ONTAP carries the SSD and throughput-capacity fixed
+cost, and the tiered part moves to the capacity pool (cheaper than S3 Standard). S3 Files adds the
+active-set high-performance storage (14.4x S3 Standard) on top of the S3 Standard source of truth.
+**Which is cheaper depends on the active ratio and the tiering ratio, and cannot be stated from unit
+prices alone.**
+
+### Why Tiering All bills on both
+
+The Observability-side user's point — "with Tiering All, both the S3 request charge and the capacity
+pool read-request charge apply" — matches the pricing page (S3 requests and Capacity pool usage are
+separate items). **Both the GET via S3 AP ($0.000029 / 1,000) and the capacity-pool read that
+fetches the cold block ($0.00037 / 1,000) apply.** The count of the latter is unmeasured, so the
+total per read cannot be written yet.
+
+### How to choose (within this section)
+
+- **Reading only the working set resident on SSD** generates no capacity-pool read; only the GET via
+  S3 AP applies ($0.000029 / 1,000, 1/12.76 of the S3-bucket price).
+- **Reading cold repeatedly under Tiering All** incurs a capacity-pool read on every read (ALL does
+  not promote, so blocks are not written back to SSD). The count is unmeasured. For read-heavy
+  workloads this can dominate the usage cost.
+- **S3 Files drops reads of 1 MiB or larger to bucket-direct**, so for large objects neither the
+  high-performance storage nor its read charge applies — only the S3 GET. Small objects land on
+  high-performance storage and incur the data-read charge ($0.04 / GB, min 32 KiB).
+- The condition for not choosing this architecture (S3 AP + FlexCache) at the same granularity: if
+  the consuming side is satisfied by the S3 API and needs no file protocol, there is no reason to
+  carry the FSx for ONTAP fixed cost. Back to the [how-to-choose](#the-conclusion) table.
+
+### Stage of this section
+
+| Item | Stage |
+|---|---|
+| Unit prices and billing model for SSD / capacity pool / S3 Files | documented (unit prices with the retrieval and effective dates in the [price table](#unit-prices)) |
+| That Tiering All bills both the S3 GET and the capacity-pool read | documented (the pricing page's item structure) |
+| How many capacity-pool reads one `GetObject` generates | **unconfirmed** (measurement attempted 2026-10-10; Cost Explorer had not yet populated and read 0 that day, so a re-check in a few days is needed. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| Latency difference of cold (capacity pool) reads versus SSD | **verified** (2026-10-10; cold is 5-15 ms slower, 1.26x at 1 MiB. Local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+
 ## Value that does not appear in the cost, and its reverse
 
 A FinOps decision does not close on the invoice alone. If the same figure buys different things, the

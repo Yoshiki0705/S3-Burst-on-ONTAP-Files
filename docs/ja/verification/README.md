@@ -44,6 +44,7 @@
 | 記録 | 答える問い | 段階 |
 |---|---|---|
 | [Amazon S3 Files の実測](s3files-measured.md) | S3 Files 単体での反映の速さと意味論 | 検証済み |
+| [S3 Files のファイルシステム性能](s3files-throughput-measured.md) | S3 Files 単体のスループット / IOPS。**頭打ちは efs-proxy の 1 コア** | 検証済み（1 台 1 回のサンプル） |
 | [S3 Files と本構成の比較検証](s3files-vs-flexcache.md) | 同一ホスト・単一クロックで 4 方向を並べた結果 | 検証済み（両側とも実測） |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | Amazon EFS と並べて測れる組み合わせはどこまでか。**可否は実測、性能値は未測定** | 可否は検証済み |
 
@@ -61,6 +62,7 @@
 | [再現の手引き](reproduction-guide.md) | 環境の作り方と合格条件。**測定を無効にする既定値の一覧つき** | 手順 |
 | [ブロック測定の実行手順](block-measurement-runbook.md) | iSCSI / NVMe-TCP を測るときの手順 | 手順 |
 | [性能検証の考慮点](../reference/performance-testing-guide.md) | 測る前に踏む落とし穴（ファイル / S3） | 手順 |
+| [S3 Files のマウントで踏んだ落とし穴](s3files-mount-pitfalls.md) | マウントが無言でハングする原因（CloudWatch Logs）と EFS 由来の経路 | 手順 |
 | [ブロックプロトコルを測るときの考慮点](../reference/block-protocol-testing-guide.md) | 測る前に踏む落とし穴（iSCSI / NVMe-TCP） | 手順 |
 
 **測らずに設計を進められるなら、そのほうが速くて安いです。**
@@ -72,6 +74,7 @@
 |---|---|---|
 | [初期サイジングの測定計画](initial-sizing-measurement-plan.md) | 最初に買う指定値を決めるための測定 | 計画（未実施） |
 | [プロトコル別スループットの測定計画](throughput-protocol-matrix-plan.md) | プロトコルを揃えて並べる測定 | 計画 |
+| [S3 Files のファイルシステム性能の測定計画](s3files-throughput-matrix-plan.md) | S3 Files 単体のスループット・IOPS・並列度・台数 | 計画（未実施） |
 | [ブロックプロトコルの測定計画](block-protocol-matrix-plan.md) | iSCSI / NVMe-TCP の測定 | 計画 |
 
 ## 未検証の範囲

@@ -1,0 +1,68 @@
+**********************************************************************
+* Amazon S3 Files host-count run (S-4 of the S3 Files plan).
+*
+* The question S3 Files makes worth asking: its headline is up to 25,000
+* concurrent connections and "aggregate read throughput of 4 TB/s+", so
+* does the total climb with host count, or does a per-host ceiling cap
+* it the way it did on the FSx for ONTAP S3 Access Point side?
+*
+* Run it as 1, 2, 4, 8 hosts. What changes between points is the number
+* of hosts and nothing else (per-host load held constant).
+*
+*   cd /opt/bench/parm
+*   vdbench -f vdbench-linux-s3files-ladder.txt -o /opt/bench/out-s3files-ladder
+*
+* Started on every host at a shared wall-clock epoch so the steady
+* windows overlap and the per-host figures can be summed. The runbook
+* passes the epoch; each host waits for it before starting.
+*
+* **Two variants, run separately, because they answer different halves:**
+*   same-data    (this file): every host reads the SAME file. High-perf
+*                 storage can serve part of it, so this leans on the
+*                 service's shared read path. If the total holds flat as
+*                 hosts rise, the ceiling is shared (service / proxy-per-
+*                 host does not help here because each host has its own
+*                 proxy -- see below).
+*   non-overlap  (runbook rewrites lun per host): each host reads its own
+*                 file. No shared cache benefit, so this leans on the
+*                 per-host path (efs-proxy CPU, any EFS-style per-client
+*                 quota). If per-host throughput holds constant while the
+*                 total scales linearly, the limit is per-client.
+*
+* **Each host has its own efs-proxy.** Unlike the FSx for ONTAP ladder,
+* where all hosts share one SVM data LIF, here the per-host proxy means
+* a per-host ceiling and a shared-service ceiling are BOTH plausible.
+* That is exactly what the two variants separate. Record the proxy CPU
+* on each host (the runbook does) and compare the summed client figure
+* against CloudWatch AWS/S3/Files and AWS/EFS on the service side.
+**********************************************************************
+hd=default,shell=ssh,jvms=8
+hd=hd1,system=localhost,user=root
+
+**********************************************************************
+* Same file, same size, same flag as the single-host run, so this point
+* is comparable with it. 600 GiB exceeds what stays resident on high-
+* performance storage, so it is not a cache-only measurement.
+*
+* Read-only, so sharing one file across hosts introduces no write
+* contention. The runbook's non-overlap variant replaces this sd line
+* with a per-host file (file-<n>) so no block is shared.
+**********************************************************************
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/s3files/file1
+
+**********************************************************************
+* 1 MiB sequential read, unthrottled. The shape the single-host S3 Files
+* throughput was established with (vdbench-linux-s3files.txt), so the
+* ladder points are directly comparable with it.
+*
+* seekpct=.0 -- sequential, wrapping at end of file. NOT seekpct=eof,
+* which would end the run when the file is reached rather than when
+* `elapsed` is up, making the window length differ between host counts.
+*
+* 180 s steady after 60 s warmup, matching the FSx for ONTAP ladder so
+* the two host-count curves are the same length.
+**********************************************************************
+wd=wd_seq_read_1024k,sd=sd1-1,xfersize=1024k,seekpct=.0,rdpct=100
+
+rd=ladder-seq-read-1024k,wd=wd_seq_read_1024k,iorate=max,elapsed=180,warmup=60,interval=1,threads=64

@@ -11,6 +11,7 @@
 
 | # | 追加が必要なもの | 理由 |
 |---|---|---|
+| 0 | **ホストロールに CloudWatch 権限**（`logs:CreateLogGroup` / `logs:CreateLogStream` / `logs:PutLogEvents`、`cloudwatch:PutMetricData`） | **これが無いとマウントが無言でハングします。** マウントヘルパーは NFS 接続の前に CloudWatch Logs のロググループ `/aws/efs/utils` を作ろうとし、権限不足で失敗すると `efs-proxy` が再起動を繰り返してマウントが返りません。ネットワーク・DNS・2049 到達性がすべて正常でも起きる、最頻の詰まりどころです。原因の詳細は[マウントの落とし穴](../verification/s3files-mount-pitfalls.md)にあります |
 | 1 | **アクセスポイント**（POSIX uid/gid + root ディレクトリ） | スコープを絞った IAM（`ClientMount` + `ClientWrite`）だけでは、マウントルートで root の `mkdir` すら拒否されます。`ClientRootAccess` を足すか、アクセスポイントで POSIX ユーザーにマップするかの二択で、後者が公式の推奨です |
 | 2 | **計測ホストに Python 3.12** | Amazon Linux 2023 の既定 `python3` は 3.9 で、このリポジトリのスクリプト（`datetime.UTC`）は動きません。`dnf install python3.12` を使います |
 | 3 | **botocore は `dnf install python3-botocore`** | `pip3 install` は失敗します。無くてもマウントは成功しますが、`mount.log` に `Failed to import botocore` が記録され CloudWatch メトリクスが使えません |
@@ -210,6 +211,24 @@ Vault Lock はどこにもないので、すべてのオブジェクトとバー
 | ロックの挙動 | S3 Files のロックは advisory のみで、mandatory locking は非対応 |
 | アーカイブ系ストレージクラス | Glacier 系と Intelligent-Tiering のアーカイブ層はファイルシステムから読めない |
 | 費用 | [FinOps の費用構造](../reference/comparison/finops-s3-vs-s3ap.md)側の問い。ここでは測らない |
+
+## スループットと台数を測るには（この環境の先）
+
+**この環境（`runbook.sh`）は反映 / 可視性までです。** スループット（S-1 / S-2）と
+クライアント台数の集約（S-4）は、同じ S3 Files ファイルシステムに対して別のランブックで測ります。
+手順は次のとおりで、どれもこのリポジトリに含まれます。
+
+| 測るもの | ランブック / パラメータ | 結果記録 |
+|---|---|---|
+| 単一マウントのスループット / IOPS（S-1 / S-2） | [`throughput-runbook.sh`](../../../environments/s3files-compare/throughput-runbook.sh)（`prepare` / `s1-s2` / `collect`）＋ [`vdbench-linux-s3files.txt`](../../../environments/perf-matrix/vdbench/vdbench-linux-s3files.txt) | [S3 Files のファイルシステム性能](../verification/s3files-throughput-measured.md) |
+| クライアント台数の集約（S-4） | [`s4-ladder.sh`](../../../environments/s3files-compare/s4-ladder.sh)（`launch` / `run` / `disjoint` / `stop`）＋ [`vdbench-linux-s3files-ladder.txt`](../../../environments/perf-matrix/vdbench/vdbench-linux-s3files-ladder.txt) | 同上 |
+| FSx for ONTAP の階層別読み取り（S-5、SSD vs capacity pool） | [`scripts/measure_s3_throughput.py`](../../../scripts/measure_s3_throughput.py)（S3 Access Point の alias を `--bucket` に渡す） | 同上 |
+
+**VDBENCH は別途入手が必要です。** Oracle のサインインとライセンス同意が要るため自動取得できません。
+`throughput-runbook.sh` と `s4-ladder.sh` は、ステージング用 S3 バケットに置いた `vdbench.zip` を
+ホストへ引き込む形で、この制約を回避しています（詳細は各スクリプト冒頭のコメント）。
+全体の計画と測定条件は[S3 Files のファイルシステム性能の測定計画](../verification/s3files-throughput-matrix-plan.md)に、
+マウントが無言ハングする最頻の原因は[マウントの落とし穴](../verification/s3files-mount-pitfalls.md)にあります。
 
 ## 出典
 

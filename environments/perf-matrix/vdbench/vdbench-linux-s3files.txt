@@ -1,0 +1,59 @@
+**********************************************************************
+* Amazon S3 Files, from the same client and with the same workload
+* definitions as the FSx for ONTAP and EFS runs.
+*
+*   vdbench -f vdbench-linux-s3files.txt -o /opt/bench/report-s3files
+*
+* This file covers S-1 (small-file IOPS) and S-2 (large-file throughput)
+* from docs/ja/verification/s3files-throughput-matrix-plan.md. S-3 (cache
+* temperature) and S-4 (host-count) reuse these workloads with a changed
+* ingest threshold and a changed host list respectively; see the runbook.
+*
+* **The mount is what this file is really about, and it cannot be made
+* identical to the FSx for ONTAP one.** The reasons are the same three as
+* the EFS file (vdbench-linux-efs.txt), plus two that are specific to
+* S3 Files:
+*
+* 1. **The mount helper always inserts a local `efs-proxy --tls`.** The
+*    mount target is 127.0.0.1, not the service. A single stream is slow
+*    and parallel streams scale, because the proxy serialises one stream.
+*    The ceiling found at ~450 MB/s on an earlier run was the proxy's CPU,
+*    not a single-flow or service limit. Record the proxy CPU during the
+*    run (the runbook does).
+* 2. **nconnect is not supported and hangs the mount if requested.** There
+*    is no mount-option lever to raise single-mount throughput; the lever
+*    is a fatter host. Do not add nconnect here.
+*
+* The two EFS-shared reasons: no nconnect, and o_direct still bypasses the
+* client page cache (which a 96 GiB host would otherwise hide behind).
+*
+* Unlike EFS Elastic, S3 Files does NOT bill per GB accessed -- it bills
+* S3 GET/PUT requests plus high-performance storage GB-month. So the full
+* workload set from workloads-common.txt is affordable here, and this file
+* uses it rather than the reduced workloads-efs-core.txt. The cost driver
+* is request count and the EC2 hour, not bytes moved.
+**********************************************************************
+
+hd=default,shell=ssh,jvms=16
+hd=hd1,system=localhost
+
+**********************************************************************
+* 600 GiB, matching the FSx for ONTAP file so the two sit next to each
+* other. S3 Files loads sub-threshold objects onto high-performance
+* storage; a file this size exceeds what stays resident, so a cold read
+* is a real disk/bucket read rather than a cache hit. o_direct bypasses
+* the client page cache.
+*
+* The mount point is deliberately its own path, so a run cannot silently
+* measure whatever was mounted last. The runbook mounts S3 Files at
+* /mnt/bench/s3files.
+*
+* NOTE: S3 Files presents files that already exist in the bucket. VDBENCH
+* SD_format writes this file through the mount, which S3 Files syncs to
+* the bucket (the ~60 s export window applies to the fill, not to the
+* read measurement). Allow the fill to finish before measuring.
+**********************************************************************
+sd=default,openflag=o_direct,size=600g
+sd=sd1-1,host=hd1,lun=/mnt/bench/s3files/file1
+
+include=workloads-common.txt

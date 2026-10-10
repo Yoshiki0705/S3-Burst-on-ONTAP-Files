@@ -156,8 +156,17 @@ EOF
   "Resource":"arn:aws:s3:::${bucket}/*"},
  {"Effect":"Allow","Action":["s3:ListBucket","s3:ListBucketVersions"],"Resource":"arn:aws:s3:::${bucket}"},
  {"Effect":"Allow","Action":["s3files:GetFileSystem","s3files:ListMountTargets",
-  "s3files:GetSynchronizationConfiguration"],"Resource":"*"}]}
+  "s3files:GetSynchronizationConfiguration"],"Resource":"*"},
+ {"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents",
+  "logs:DescribeLogGroups","logs:DescribeLogStreams"],
+  "Resource":"arn:aws:logs:*:*:log-group:/aws/efs/utils*"},
+ {"Effect":"Allow","Action":["cloudwatch:PutMetricData"],"Resource":"*",
+  "Condition":{"StringEquals":{"cloudwatch:namespace":"AWS/EFS"}}}]}
 EOF
+  # The CloudWatch block above is REQUIRED, not optional. The mount helper creates the
+  # /aws/efs/utils log group BEFORE establishing the NFS connection; if that call is denied the
+  # efs-proxy restarts in a loop and the mount hangs with no error. Found the hard way, 2026-10-10
+  # -- see docs/ja/verification/s3files-mount-pitfalls.md.
   aws iam create-role --role-name "${PREFIX}-host-role" \
     --assume-role-policy-document file:///tmp/rb-ec2-trust.json --tags $tags >/dev/null
   aws iam put-role-policy --role-name "${PREFIX}-host-role" --policy-name client --policy-document file:///tmp/rb-host.json

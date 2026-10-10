@@ -57,3 +57,9 @@ tmp-previews/
 # base64 で埋め込んだものだけをコミットする。AWS の Architecture Icons をリポジトリ外の
 # パッケージから読むのと同じ扱い。入手先と配置は tools/build_diagrams.py に書いてある。
 docs/_assets/icons/
+
+# Measurement run state and results (local only; carry real resource IDs / account-specific values).
+# The runbooks write these at deploy time and read them at teardown; they must never be committed.
+environments/s3files-compare/.s3files-run.env*
+environments/s3files-compare/.bench-net.env*
+environments/s3files-compare/results/

@@ -444,6 +444,34 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "Amazon S3 Bucket\n(source of truth)",
     },
     "s3_files": {"ja": "Amazon S3 Files", "en": "Amazon S3 Files"},
+    # --- s3files internals figure ---
+    "sfi_host_1": {"ja": "Linux Client 1", "en": "Linux Client 1"},
+    "sfi_host_n": {"ja": "Linux Client N", "en": "Linux Client N"},
+    "sfi_proxy_1": {
+        "ja": "efs-proxy (TLS)\nホストごと・1 コアが上限",
+        "en": "efs-proxy (TLS)\nper host, capped at one core",
+    },
+    "sfi_proxy_n": {
+        "ja": "efs-proxy (TLS)\nホストごと・1 コアが上限",
+        "en": "efs-proxy (TLS)\nper host, capped at one core",
+    },
+    "sfi_files": {
+        "ja": "Amazon S3 Files\n(built on Amazon EFS)",
+        "en": "Amazon S3 Files\n(built on Amazon EFS)",
+    },
+    "sfi_hps": {
+        "ja": "高性能ストレージ\n(作業セット、しきい値未満)",
+        "en": "High-performance storage\n(working set, below threshold)",
+    },
+    "sfi_bucket": {
+        "ja": "Amazon S3 Bucket\n(正本。1 MiB 以上は直読)",
+        "en": "Amazon S3 Bucket\n(source of truth; 1 MiB+ read direct)",
+    },
+    "sfi_nfs": {"ja": "NFS v4.1 / 4.2", "en": "NFS v4.1 / 4.2"},
+    "sfi_scale": {
+        "ja": "台数を増やすと合計は線形\n(8 台で 8.01x)",
+        "en": "aggregate scales linearly with hosts\n(8.01x at 8 hosts)",
+    },
     "fsx_ontap_volume": {
         "ja": "Amazon FSx for NetApp ONTAP\n(source of truth)",
         "en": "Amazon FSx for NetApp ONTAP\n(source of truth)",
@@ -1920,6 +1948,94 @@ def _block_c_layout() -> Diagram:
     )
 
 
+def _s3files_internals() -> Diagram:
+    """What S3 Files looks like from the inside, and the two things the measurements settled.
+
+    The talk and the blog built on these measurements make one claim about shape: a single mount is
+    capped by one efs-proxy core, and the aggregate scales with host count because each host has its
+    own proxy. No existing figure shows that -- the single-site figure draws S3 Files as one box,
+    and the bottlenecks figure compares three paths without opening S3 Files up. This one opens it:
+    two client hosts, each with its own efs-proxy drawn as a named waypoint (there is no proxy icon,
+    and inventing one would misattribute the component), both reaching the file system, which routes
+    to high-performance storage for the working set and to the bucket direct for large reads.
+
+    No measured number on the canvas: a figure has no room for the environment a number needs. The
+    two findings sit as short labels (per-host proxy cap, linear aggregate); the numbers are in the
+    prose beside the figure and in docs/ja/verification/s3files-throughput-measured.md.
+
+    Vertical, 880px canvas, font_size=16.
+    """
+    return Diagram(
+        name="s3burst-s3files-internals",
+        diagram_id="s3burst-s3files-internals",
+        width=880,
+        height=760,
+        font_size=16,
+        groups=(
+            # The AWS Cloud boundary: everything here is inside one account/VPC.
+            Group("sfi_cloud", "aws_cloud", 30, 30, 820, 700),
+        ),
+        frames=(
+            # Per-host efs-proxy, drawn as named waypoints under each client. The per-host cap is
+            # the first finding, so it is on the proxy label itself.
+            # x set so each frame's horizontal centre is exactly the column it sits in (230 / 630),
+            # so the vertical edges enter and leave dead-centre and the flow check reads them as
+            # straight-down rather than drifting 10px sideways.
+            Frame("sfi_px1", "sfi_proxy_1", 80, 250, 300, 64, label_only=True),
+            Frame("sfi_px2", "sfi_proxy_n", 480, 250, 300, 64, label_only=True),
+            # The two routing targets below the file system.
+            Frame("sfi_hp", "sfi_hps", 65, 600, 330, 72, label_only=True),
+            Frame("sfi_bk", "sfi_bucket", 465, 600, 330, 72, label_only=True),
+        ),
+        nodes=(
+            Node("sfi_c1", "client", "sfi_host_1", *centred("client", 230, 110)),
+            Node("sfi_c2", "client", "sfi_host_n", *centred("client", 630, 110)),
+            # Two file-system nodes, one under each client column, so every edge runs straight down
+            # its own column and nothing crosses sideways. They are the same service -- the shared
+            # S3 Files, made clear by the single AWS Cloud boundary and the identical label; a
+            # single centred hub forced the converging/diverging legs to run leftwards, which is
+            # the direction the flow check (rightly) rejects.
+            Node("sfi_fs1", "efs", "sfi_files", *centred("efs", 230, 440)),
+            Node("sfi_fs2", "efs", "sfi_files", *centred("efs", 630, 440)),
+        ),
+        texts=(
+            # The second finding, placed between the two clients where the eye reads it before
+            # following either path down.
+            TextBox("sfi_scale_note", "sfi_scale", 330, 150, 220, 70),
+        ),
+        edges=(
+            Edge(
+                "sfi_e1",
+                "sfi_c1",
+                "sfi_px1",
+                "sfi_nfs",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+            ),
+            Edge(
+                "sfi_e2",
+                "sfi_c2",
+                "sfi_px2",
+                "sfi_nfs",
+                exit_at=(0.5, 1.0),
+                entry_at=(0.5, 0.0),
+            ),
+            Edge(
+                "sfi_e3", "sfi_px1", "sfi_fs1", exit_at=(0.5, 1.0), entry_at=(0.5, 0.0)
+            ),
+            Edge(
+                "sfi_e4", "sfi_px2", "sfi_fs2", exit_at=(0.5, 1.0), entry_at=(0.5, 0.0)
+            ),
+            Edge(
+                "sfi_e5", "sfi_fs1", "sfi_hp", exit_at=(0.5, 1.0), entry_at=(0.5, 0.0)
+            ),
+            Edge(
+                "sfi_e6", "sfi_fs2", "sfi_bk", exit_at=(0.5, 1.0), entry_at=(0.5, 0.0)
+            ),
+        ),
+    )
+
+
 DIAGRAMS = (
     _overview(),
     _single_site(),
@@ -1928,6 +2044,7 @@ DIAGRAMS = (
     _protocol_matrix(),
     _two_ceilings(),
     _host_count(),
+    _s3files_internals(),
     _block_a_sessions(),
     _block_b_multipath(),
     _block_c_layout(),

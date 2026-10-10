@@ -193,11 +193,18 @@ CSV の列は `プロトコル, マウント方法, p50, p90, max, n, 計測日`
 | 反映（S3 → ファイル） | 「通常数秒」。毎秒 2,400 オブジェクト、700 MB/s まで | [Performance specifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-performance.html) |
 | 反映（ファイル → S3） | 約 60 秒まとめてからコピー。毎秒 800 ファイル、2,700 MB/s まで | 同上 |
 | ディレクトリのリネーム | 10 万ファイルでバケットへの反映は数分。ファイルシステム上は即時 | 同上 |
-| 整合性とセマンティクス | read-after-write の整合性、ファイルロック、POSIX 権限 | [Working with Amazon S3 Files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html) |
+| 整合性とセマンティクス | ファイルロックと POSIX 権限。**整合性の語は AWS 自身がページ間で揃っていない**（下の注） | [Working with Amazon S3 Files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files.html) |
 | 対応プロトコル | NFSv4.1 と NFSv4.2。`nconnect` 非対応、ロックは advisory のみ | [Unsupported features, limits, and quotas](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
 | バージョニング | 必須。同期がバージョン指定の API 操作を使う | [Prerequisites for S3 Files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-prereq-policies.html) |
 | クライアント | `amazon-efs-utils` 3.0.0 以降 | 同上 |
 | マウントターゲット | アベイラビリティーゾーンごとに 1 つ、ファイルシステムごとに VPC 1 つ | [Unsupported features, limits, and quotas](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-quotas.html) |
+
+> **整合性の語がページ間で揃っていません（2026-10-10 に再確認）。** AWS の 3 ページが別の語を
+> 使います。[features ページ](https://aws.amazon.com/s3/features/files/)は
+> **"with NFS close-to-open consistency"**、[サービス説明](https://docs.aws.amazon.com/help-panel/AmazonS3/latest/console/hp-s3-files-page.html)は
+> **"strong data consistency and file locking"**、参照した User Guide 側は
+> **"read-after-write"** です。**3 つは同じ整合性モデルを指す語ではありません。** 整合性を
+> 引用するときは、どのページの語かを出典とともに書き、1 つを代表語として選ばないでください。
 
 > **「約 1 ms」とは書きません。** ドキュメントの記載は「サブミリ秒から 1 桁ミリ秒」で、
 > 対象は高性能ストレージに載った小ファイルです。単一の代表値として引くと、
@@ -257,7 +264,7 @@ Linux の NFS マウントは既定でサーバーごとに TCP 接続を 1 本�
 
 | 項目 | 状態 |
 |---|---|
-| close-to-open 整合性という記述 | **未確認。** 参照したページの記載は「read-after-write の整合性、ファイルロック、POSIX 権限」で、close-to-open という語を見つけられていません。整合性モデルを引用するときはこの語を使いません |
+| 整合性モデルの語 | **確認済み（2026-10-10）。AWS 自身がページ間で 3 つの語を使い分けている**（close-to-open / strong data consistency / read-after-write、上の仕様表の注）。どれが実際の整合性モデルかは実測していません。引用するときは出典ページを明記します |
 | `actimeo=0` がマウントヘルパーで honoured されるか | 未確認。渡したうえで `findmnt` の出力を記録する方針 |
 | ap-northeast-1 が 34 リージョンに含まれるか | 未確認。What's New はリージョン一覧を AWS Capabilities tool 側に置いています。CloudFormation のリソース型は ap-northeast-1 で利用可能（レジストリ確認 2026-09-01） |
 | マルチパートアップロード中の部分オブジェクトがファイル側に見えるか | 未確認。本構成では `CompleteMultipartUpload` まで見えないことを実測済み（[検証記録](s3ap-nfs-visibility.md)） |
