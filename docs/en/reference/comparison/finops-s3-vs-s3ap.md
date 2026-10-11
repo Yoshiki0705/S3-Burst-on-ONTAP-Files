@@ -1069,15 +1069,23 @@ effective date are stated there.
 | Approach | Tier the object is on | Items billed on read | Unit price | Count per read |
 |---|---|---|---|---|
 | FSx for ONTAP S3 AP | **SSD (hot)** | GET via S3 AP | $0.000029 / 1,000 | 1 GET |
-| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + **? (measurement needed, S-5)** |
+| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + **? (not produced by this repository's measurement; see below)** |
 | S3 Files | High-performance storage (below threshold, ingested) | S3 Files data read | $0.04 / GB | min 32 KiB, rounded up to 1 KiB |
 | S3 Files | Bucket direct (1 MiB or larger, or not ingested) | S3 GET + 4 KiB metadata read | GET at the Amazon S3 price, metadata read $0.04 / GB | 1 GET + 4 KiB |
 
 **The capacity-pool read-request count is left blank.** How many read requests one `GetObject`
 generates against the capacity pool depends on the block-level read granularity and is not in the
-pricing page. **A guessed number would be quoted, so it stays "measurement needed" until the
-[Tiering All measurement](../../../ja/verification/s3files-throughput-matrix-plan.md) (Japanese) is taken.** The
-"4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a count.
+pricing page. **A guessed number would be quoted, so it stays blank until this repository has a
+measured count.** The "4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a
+count.
+
+**The measurement was taken, but it produced no count.** In the
+[S-5 measurement](../../../ja/verification/s3files-throughput-measured.md) (Japanese)
+(the section on the capacity-pool read-request count), the volume-level `CapacityPoolReadOperations` was 0 over a window of 33 reads of objects that sat on
+the capacity pool. With a numerator of 0, no per-read count can be derived. That volume was created
+with tiering NONE and changed to ALL afterwards, and **the relation between the 0 in the cold window
+and that path has not been identified.** Because volume-level metrics exist, later measurements can
+count the requests without waiting for Cost Explorer to populate.
 
 ### Items billed for storage (the fixed-cost side, monthly)
 
@@ -1099,17 +1107,21 @@ prices alone.**
 
 The Observability-side user's point — "with Tiering All, both the S3 request charge and the capacity
 pool read-request charge apply" — matches the pricing page (S3 requests and Capacity pool usage are
-separate items). **Both the GET via S3 AP ($0.000029 / 1,000) and the capacity-pool read that
-fetches the cold block ($0.00037 / 1,000) apply.** The count of the latter is unmeasured, so the
-total per read cannot be written yet.
+separate items). **As billing items, both the GET via S3 AP ($0.000029 / 1,000) and the
+capacity-pool read that fetches the cold block ($0.00037 / 1,000) can apply** (documented). When the
+capacity-pool read actually occurs has not been confirmed by this repository's measurement (it was 0
+in the S-5 cold window). The count is not produced, so the total per read cannot be written yet.
 
 ### How to choose (within this section)
 
 - **Reading only the working set resident on SSD** generates no capacity-pool read; only the GET via
   S3 AP applies ($0.000029 / 1,000, 1/12.76 of the S3-bucket price).
-- **Reading cold repeatedly under Tiering All** incurs a capacity-pool read on every read (ALL does
-  not promote, so blocks are not written back to SSD). The count is unmeasured. For read-heavy
-  workloads this can dominate the usage cost.
+- **Reading objects placed on the capacity pool under Tiering All**: whether a capacity-pool read is
+  incurred has not been settled by this repository's measurement. In S-5 (a volume created with
+  NONE and changed to ALL), `CapacityPoolReadOperations` was 0 over 33 reads in the cold window. The
+  behavior of a volume created with ALL and written directly is unmeasured here. Whether this can
+  dominate the usage cost of read-heavy workloads is to be judged once that count exists. This
+  document does not say that a capacity-pool read is incurred on every read.
 - **S3 Files drops reads of 1 MiB or larger to bucket-direct**, so for large objects neither the
   high-performance storage nor its read charge applies — only the S3 GET. Small objects land on
   high-performance storage and incur the data-read charge ($0.04 / GB, min 32 KiB).
@@ -1122,9 +1134,10 @@ total per read cannot be written yet.
 | Item | Stage |
 |---|---|
 | Unit prices and billing model for SSD / capacity pool / S3 Files | documented (unit prices with the retrieval and effective dates in the [price table](#unit-prices)) |
-| That Tiering All bills both the S3 GET and the capacity-pool read | documented (the pricing page's item structure) |
-| How many capacity-pool reads one `GetObject` generates | **unconfirmed** (measurement attempted 2026-10-10; Cost Explorer had not yet populated and read 0 that day, so a re-check in a few days is needed. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
-| Latency difference of cold (capacity pool) reads versus SSD | **verified** (2026-10-10; cold is 5-15 ms slower, 1.26x at 1 MiB. Local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| That the S3 GET and the capacity-pool read can both appear as billing items under Tiering All | documented (the pricing page's item structure) |
+| How many capacity-pool reads one `GetObject` generates | **unconfirmed** (measured, but `CapacityPoolReadOperations` was 0 in the cold window, so no count came out. 2026-10-10, one run. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| p50 measured in S-5 (SSD side 46.5 / 58.6 / 116.0 ms; after the change to ALL 56.4 / 74.0 / 121.3 ms; 64 KiB / 1 MiB / 5 MiB) | **verified (one sample)** (2026-10-10; local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese). The SSD side is 166-407 requests, the ALL side n=10. Not interleaved; the cold-side script and the raw samples were not kept) |
+| That "cold is 5-15 ms slower than SSD" can be read as a delay from reading the capacity pool | **unverified** (the reads did not reach the capacity pool: `CapacityPoolReadOperations` was 0 in the cold window. The 5 MiB difference of +5.3 ms is smaller than the 9.0 ms p50-to-p90 spread on the SSD side, so it is not distinguishable even within the one run) |
 
 ## Value that does not appear in the cost, and its reverse
 
