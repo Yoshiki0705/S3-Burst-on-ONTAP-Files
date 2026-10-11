@@ -222,7 +222,7 @@ Vault Lock はどこにもないので、すべてのオブジェクトとバー
 |---|---|---|
 | 単一マウントのスループット / IOPS（S-1 / S-2） | [`throughput-runbook.sh`](../../../environments/s3files-compare/throughput-runbook.sh)（`prepare` / `s1-s2` / `collect`）＋ [`vdbench-linux-s3files.txt`](../../../environments/perf-matrix/vdbench/vdbench-linux-s3files.txt) | [S3 Files のファイルシステム性能](../verification/s3files-throughput-measured.md) |
 | クライアント台数の集約（S-4） | [`s4-ladder.sh`](../../../environments/s3files-compare/s4-ladder.sh)（`launch` / `run` / `disjoint` / `stop`）＋ [`vdbench-linux-s3files-ladder.txt`](../../../environments/perf-matrix/vdbench/vdbench-linux-s3files-ladder.txt) | 同上 |
-| FSx for ONTAP の階層別読み取り（S-5、SSD と capacity pool） | [`scripts/measure_s3_throughput.py`](../../../scripts/measure_s3_throughput.py)（S3 Access Point の alias を `--bucket` に渡す）。**SSD 側だけ。cold 側の読み取りスクリプトは保存しておらず、この表では再現できない** | 同上 |
+| FSx for ONTAP の階層別読み取り（S-5、SSD と capacity pool） | [`scripts/measure_s3_throughput.py`](../../../scripts/measure_s3_throughput.py)（S3 Access Point の alias を `--bucket` に渡す）。SSD 側だけ。cold 側の読み取りスクリプトは保存しておらず、この表では再現できない | 同上 |
 
 **VDBENCH は別途入手が必要です。** Oracle のサインインとライセンス同意が要るため自動取得できません。
 `throughput-runbook.sh` と `s4-ladder.sh` は、ステージング用 S3 バケットに置いた `vdbench.zip` を

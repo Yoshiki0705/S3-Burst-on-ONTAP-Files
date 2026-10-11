@@ -1050,20 +1050,22 @@ S3 AP はアクセスポイント自体に時間課金がないため、増分�
 | 方式 | オブジェクトのある階層 | 読み取りで課金される項目 | 単価 | 1 回の読み取りでの回数 |
 |---|---|---|---|---|
 | FSx for ONTAP S3 AP | **SSD（hot）** | S3 AP 経由 GET | $0.000029 / 1,000 | 1 GET |
-| FSx for ONTAP S3 AP | **キャパシティプール（cold、Tiering All）** | S3 AP 経由 GET **＋ キャパシティプール読み取りリクエスト** | GET $0.000029 / 1,000、プール読み取り $0.00037 / 1,000 | 1 GET ＋ **?（このリポジトリの測定では出ていない。下の説明）** |
+| FSx for ONTAP S3 AP | **キャパシティプール（cold、Tiering All）** | S3 AP 経由 GET **＋ キャパシティプール読み取りリクエスト** | GET $0.000029 / 1,000、プール読み取り $0.00037 / 1,000 | 1 GET ＋ ?（このリポジトリの測定では出ていない。下の説明） |
 | S3 Files | 高性能ストレージ（しきい値未満、取り込み済み） | S3 Files データ読み取り | $0.04 / GB | 最小 32 KiB、1 KiB 単位で切り上げ |
 | S3 Files | バケット直読（1 MiB 以上、または未取り込み） | S3 GET ＋ 4 KiB メタデータ読み取り | GET は Amazon S3 の単価、メタデータ読み取り $0.04 / GB | 1 GET ＋ 4 KiB |
 
 **キャパシティプール読み取りリクエストの回数は空欄にしてある。** 1 回の `GetObject` が
 キャパシティプールに何回の読み取りリクエストを発生させるかは、ブロック単位の読み取り粒度に依存し、
-料金ページにも記載がない。**推測の数を入れると引用されるので、このリポジトリで測った数が出るまで空欄とする。**
+料金ページにも記載がない。推測の数を入れると引用されるので、このリポジトリで測った数が出るまで空欄とする。
 FabricPool が 4 MB 単位で扱うという記述から見積りの当たりはつけられるが、当たりは数ではない。
 
-**測ったが、回数は出なかった。** [S-5 の測定](../../verification/s3files-throughput-measured.md#capacity-pool-読み取りリクエスト数確認できなかった)では、
+測ったが、回数は出なかった。 [S-5 の測定](../../verification/s3files-throughput-measured.md#capacity-pool-読み取りリクエスト数確認できなかった)では、
 capacity pool に載っているオブジェクトを読んだ窓（33 回）で、ボリューム別の
 `CapacityPoolReadOperations` が 0 回だった。分子が 0 なので、1 回あたりの回数は出せない。この測定の
-ボリュームは tiering NONE で作り、後から ALL に変えた経路で、**cold の窓の 0 とこの経路の関係は特定できていない。**
+ボリュームは tiering NONE で作り、後から ALL に変えた経路で、cold の窓の 0 とこの経路の関係は特定できていない。
 ボリューム別の指標があるので、今後の測定は Cost Explorer の反映を待たずに回数を数えられる。
+
+隣接リポジトリの測定は、ALL で作成したボリュームの初回読み取りで、操作数が立つ例を示している。同型のファイルシステム（別の日、別のボリューム、VPC 外の Lambda）で、`CapacityPoolReadOperations` は 1 オブジェクトあたり、1 MiB で約 5.4〜5.6、5 MiB で約 29.8〜33.2、64 KiB で 0 だった（[呼び出しごとの読み取り](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-throughput-benchmark.md#呼び出しごとのキャパシティプール読み取り導出値)）。**これは CloudWatch の操作数で、請求される件数ではない。** 両者の関係は、その記録でも未確認である。このため、上の表の空欄は埋めない。
 
 ### 保管で課金される項目（固定費側、月額）
 
@@ -1093,10 +1095,13 @@ Observability 側のユーザーが挙げた「Tiering All のとき S3 リク�
 
 - **SSD に載っている作業セットだけを読む**なら、キャパシティプール読み取りは発生せず、S3 AP 経由
   GET だけが立つ（$0.000029 / 1,000、S3 バケット宛の 12.76 分の 1）。
-- **Tiering All で配置された cold を読む**場合、キャパシティプール読み取りが立つかは、このリポジトリの
+- Tiering All で配置された cold を読む場合、キャパシティプール読み取りが立つかは、このリポジトリの
   測定では確定していない。S-5（NONE で作成して ALL に変更したボリューム）では、cold の窓の読み取り 33 回で
-  `CapacityPoolReadOperations` が 0 回だった。ALL で作成して直接書いたボリュームの挙動は、ここでは未測定。
-  読み取りが多いワークロードで従量の支配項になりうるかは、この回数が出てから判断する。「読むたびに立つ」とは
+  `CapacityPoolReadOperations` が 0 回だった。隣接リポジトリの測定では、ALL で作成して直接書いたボリュームの 3 本で、最初の読み取りで
+  立ち、同じ条件の別の 1 本（DIR）では立たなかった。NONE から ALL へ切り替えた 4 本は、最長 60 分後まで立たなかった
+  （1 ファイルシステム、1 日。[裏づけられる範囲](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-throughput-benchmark.md#経路の比較で裏付けられる範囲と裏付けられない範囲)）。書き方は十分条件ではなく、原因も機構も特定されていない。
+  立った K1 の再読みは、約 3 分後に 9 操作、約 8.4 分後以降（30 分、60 分）は 0 操作だった。
+  読み取りが多いワークロードで従量の支配項になりうるかは、請求との対応が決まってから判断する。「読むたびに立つ」とは
   書かない。
 - **S3 Files は 1 MiB 以上をバケット直読に落とす**ので、大きいオブジェクトでは高性能ストレージの
   保管も読み取り課金もかからず、S3 GET だけになる。小さいオブジェクトは高性能ストレージに載り、
@@ -1110,9 +1115,10 @@ Observability 側のユーザーが挙げた「Tiering All のとき S3 リク�
 |---|---|
 | SSD / キャパシティプール / S3 Files の単価と課金モデル | ドキュメント記載（単価は[単価表](#単価表)の取得日・発効日つき） |
 | 請求の項目として、S3 GET とキャパシティプール読み取りの両方が立ちうること | ドキュメント記載（料金ページの項目構成） |
-| 1 回の `GetObject` が発生させるキャパシティプール読み取りの回数 | **未確認**（測定したが、cold の窓で `CapacityPoolReadOperations` が 0 回で、回数が出なかった。2026-10-10、1 回。[実測記録](../../verification/s3files-throughput-measured.md#capacity-pool-読み取りリクエスト数確認できなかった)） |
-| S-5 で測った p50（SSD 側 46.5 / 58.6 / 116.0 ms、ALL へ変更後 56.4 / 74.0 / 121.3 ms。64 KiB / 1 MiB / 5 MiB） | **検証済み（1 回のサンプル）**（2026-10-10、[実測記録](../../verification/s3files-throughput-measured.md#s-5--fsx-for-ontap-s3-access-point-の階層別読み取りssd-と-capacity-pool)。往復遅延込みのローカル測定。SSD 側は 166〜407 リクエスト、ALL へ変更後は n=10。交互でなく、cold 側のスクリプトと生のサンプルは残っていない） |
-| 「cold は SSD より 5〜15 ms 遅い」を、capacity pool から読んだ遅れとして読めること | **未検証**（読み取りが capacity pool に届いていない。cold の窓で `CapacityPoolReadOperations` が 0 回。5 MiB の差 +5.3 ms は、SSD 側の p50〜p90 の幅 9.0 ms より小さく、1 回の中でも区別できない） |
+| 1 回の `GetObject` が発生させるキャパシティプール読み取りの回数 | 未確認（測定したが、cold の窓で `CapacityPoolReadOperations` が 0 回で、回数が出なかった。2026-10-10、1 回。[実測記録](../../verification/s3files-throughput-measured.md#capacity-pool-読み取りリクエスト数確認できなかった)） |
+| ALL で作成して直接書いたボリュームの最初の読み取りで、`CapacityPoolReadOperations` が立つ例と立たない例があること。NONE から ALL へ切り替えたボリュームでは、最長 60 分後まで立たなかったこと | 検証済み（隣接リポジトリの測定。1 ファイルシステム、1 日、ボリューム 8 本）（[根拠区分](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/ja/s3ap-throughput-benchmark.md#階層化の経路に関する主張の根拠区分)。立った 3 本、立たなかった直接 ALL 1 本、切り替え 4 本。CloudWatch の操作数で、請求される件数ではない。書き方・経過時間・他のボリュームの読み取りのいずれも、原因としては示されていない） |
+| S-5 で測った p50（SSD 側 46.5 / 58.6 / 116.0 ms、ALL へ変更後 56.4 / 74.0 / 121.3 ms。64 KiB / 1 MiB / 5 MiB） | 検証済み（1 回のサンプル）（2026-10-10、[実測記録](../../verification/s3files-throughput-measured.md#s-5--fsx-for-ontap-s3-access-point-の階層別読み取りssd-と-capacity-pool)。往復遅延込みのローカル測定。SSD 側は 166〜407 リクエスト、ALL へ変更後は n=10。交互でなく、cold 側のスクリプトと生のサンプルは残っていない） |
+| 「cold は SSD より 5〜15 ms 遅い」を、capacity pool から読んだ遅れとして読めること | 未検証（読み取りが capacity pool に届いていない。cold の窓で `CapacityPoolReadOperations` が 0 回。5 MiB の差 +5.3 ms は、SSD 側の p50〜p90 の幅 9.0 ms より小さく、1 回の中でも区別できない） |
 
 ## 費用に現れない価値と、その裏返し
 
