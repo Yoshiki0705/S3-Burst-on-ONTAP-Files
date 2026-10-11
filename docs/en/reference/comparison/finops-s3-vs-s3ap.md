@@ -1069,7 +1069,7 @@ effective date are stated there.
 | Approach | Tier the object is on | Items billed on read | Unit price | Count per read |
 |---|---|---|---|---|
 | FSx for ONTAP S3 AP | **SSD (hot)** | GET via S3 AP | $0.000029 / 1,000 | 1 GET |
-| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + **? (not produced by this repository's measurement; see below)** |
+| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + ? (not produced by this repository's measurement; see below) |
 | S3 Files | High-performance storage (below threshold, ingested) | S3 Files data read | $0.04 / GB | min 32 KiB, rounded up to 1 KiB |
 | S3 Files | Bucket direct (1 MiB or larger, or not ingested) | S3 GET + 4 KiB metadata read | GET at the Amazon S3 price, metadata read $0.04 / GB | 1 GET + 4 KiB |
 
@@ -1079,13 +1079,15 @@ pricing page. **A guessed number would be quoted, so it stays blank until this r
 measured count.** The "4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a
 count.
 
-**The measurement was taken, but it produced no count.** In the
+The measurement was taken, but it produced no count. In the
 [S-5 measurement](../../../ja/verification/s3files-throughput-measured.md) (Japanese)
 (the section on the capacity-pool read-request count), the volume-level `CapacityPoolReadOperations` was 0 over a window of 33 reads of objects that sat on
 the capacity pool. With a numerator of 0, no per-read count can be derived. That volume was created
 with tiering NONE and changed to ALL afterwards, and **the relation between the 0 in the cold window
 and that path has not been identified.** Because volume-level metrics exist, later measurements can
 count the requests without waiting for Cost Explorer to populate.
+
+A sibling repository's measurement shows capacity-pool read operations on the first read of volumes created with ALL. On a file system of the same type (another day, other volumes, a Lambda outside a VPC), `CapacityPoolReadOperations` was about 5.4 to 5.6 per object at 1 MiB, 29.8 to 33.2 at 5 MiB, and 0 at 64 KiB ([capacity pool reads per invocation](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-throughput-benchmark.md#capacity-pool-reads-per-invocation-derived)). **These are CloudWatch operation counts, not billed requests**, and the relation between the two is unconfirmed in that record as well. The blank in the table above therefore stays blank.
 
 ### Items billed for storage (the fixed-cost side, monthly)
 
@@ -1116,12 +1118,17 @@ in the S-5 cold window). The count is not produced, so the total per read cannot
 
 - **Reading only the working set resident on SSD** generates no capacity-pool read; only the GET via
   S3 AP applies ($0.000029 / 1,000, 1/12.76 of the S3-bucket price).
-- **Reading objects placed on the capacity pool under Tiering All**: whether a capacity-pool read is
+- Reading objects placed on the capacity pool under Tiering All: whether a capacity-pool read is
   incurred has not been settled by this repository's measurement. In S-5 (a volume created with
-  NONE and changed to ALL), `CapacityPoolReadOperations` was 0 over 33 reads in the cold window. The
-  behavior of a volume created with ALL and written directly is unmeasured here. Whether this can
-  dominate the usage cost of read-heavy workloads is to be judged once that count exists. This
-  document does not say that a capacity-pool read is incurred on every read.
+  NONE and changed to ALL), `CapacityPoolReadOperations` was 0 over 33 reads in the cold window. In a
+  sibling repository's measurement, three volumes created with ALL and written directly had capacity-pool
+  reads on the first read, and a fourth volume with the same setup (DIR) had none; four volumes changed from
+  NONE to ALL had none for up to 60 minutes (one file system, one day;
+  [what the numbers support](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-throughput-benchmark.md#what-the-tiering-path-numbers-support-and-what-they-do-not)). The write path is not sufficient, and neither a cause nor a
+  mechanism is identified. The re-reads of the volume that did have reads (K1) caused 9 operations at about
+  3 minutes and none from about 8.4 minutes on. Whether this can dominate the usage cost of read-heavy
+  workloads is to be judged once the relation to billed requests is settled. This document does not say
+  that a capacity-pool read is incurred on every read.
 - **S3 Files drops reads of 1 MiB or larger to bucket-direct**, so for large objects neither the
   high-performance storage nor its read charge applies — only the S3 GET. Small objects land on
   high-performance storage and incur the data-read charge ($0.04 / GB, min 32 KiB).
@@ -1135,9 +1142,10 @@ in the S-5 cold window). The count is not produced, so the total per read cannot
 |---|---|
 | Unit prices and billing model for SSD / capacity pool / S3 Files | documented (unit prices with the retrieval and effective dates in the [price table](#unit-prices)) |
 | That the S3 GET and the capacity-pool read can both appear as billing items under Tiering All | documented (the pricing page's item structure) |
-| How many capacity-pool reads one `GetObject` generates | **unconfirmed** (measured, but `CapacityPoolReadOperations` was 0 in the cold window, so no count came out. 2026-10-10, one run. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
-| p50 measured in S-5 (SSD side 46.5 / 58.6 / 116.0 ms; after the change to ALL 56.4 / 74.0 / 121.3 ms; 64 KiB / 1 MiB / 5 MiB) | **verified (one sample)** (2026-10-10; local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese). The SSD side is 166-407 requests, the ALL side n=10. Not interleaved; the cold-side script and the raw samples were not kept) |
-| That "cold is 5-15 ms slower than SSD" can be read as a delay from reading the capacity pool | **unverified** (the reads did not reach the capacity pool: `CapacityPoolReadOperations` was 0 in the cold window. The 5 MiB difference of +5.3 ms is smaller than the 9.0 ms p50-to-p90 spread on the SSD side, so it is not distinguishable even within the one run) |
+| How many capacity-pool reads one `GetObject` generates | unconfirmed (measured, but `CapacityPoolReadOperations` was 0 in the cold window, so no count came out. 2026-10-10, one run. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| Capacity-pool reads occur on the first read of some volumes created with ALL and not of others; on volumes changed from NONE to ALL they did not occur for up to 60 minutes | verified (a sibling repository's measurement; one file system, one day, eight volumes) ([evidence tiers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-throughput-benchmark.md#evidence-tiers-of-the-tiering-path-statements). Three volumes with reads, one directly written volume without, four switched volumes without. CloudWatch operation counts, not billed requests. Neither the write path, the elapsed time, nor the other volumes' reads is shown to be the cause) |
+| p50 measured in S-5 (SSD side 46.5 / 58.6 / 116.0 ms; after the change to ALL 56.4 / 74.0 / 121.3 ms; 64 KiB / 1 MiB / 5 MiB) | verified (one sample) (2026-10-10; local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese). The SSD side is 166-407 requests, the ALL side n=10. Not interleaved; the cold-side script and the raw samples were not kept) |
+| That "cold is 5-15 ms slower than SSD" can be read as a delay from reading the capacity pool | unverified (the reads did not reach the capacity pool: `CapacityPoolReadOperations` was 0 in the cold window. The 5 MiB difference of +5.3 ms is smaller than the 9.0 ms p50-to-p90 spread on the SSD side, so it is not distinguishable even within the one run) |
 
 ## Value that does not appear in the cost, and its reverse
 
