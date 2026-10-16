@@ -686,22 +686,7 @@ TRANSLATIONS.update(
         "That difference does not narrow as capacity grows.",
         # --- the common 20 TiB baseline grid -------------------------------------------------------
         "### 共通ベースライン — 20 TiB を同じ条件で": "### A common baseline — 20 TiB under the same terms",
-        "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
-        "それぞれが現実のどれかに寄っているぶん、方式そのものの差を同じ土俵で見るには向かない。"
-        "この節は逆に、**論理 20 TiB という 1 つの土俵**を固定し、"
-        "オブジェクトサイズ ({sizes}) と読み書きのパターン (A / B / C) だけを振る。"
-        "両方式に同じ論理ワークロードを与える。": "The use-case estimates above each start from different assumptions. "
-        "Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. "
-        "This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size ({sizes}) and the read/write pattern (A / B / C). "
-        "The same logical workload is presented to both methods.",
-        "保存量 (論理) はどのセルでも 20 TiB で固定である。月間の読み取り量と書き込み量はパターンごとに別に置く。"
-        "**月間書き込み量を平均保持量と同一視しない**。20 TiB の定常保存に対して、月に 1 TiB 書くとはその一部を置き換えることであって、"
-        "積み増すことではない。": "The stored volume (logical) is fixed at 20 TiB in every cell. The monthly read and write volumes are set separately per pattern. "
-        "**The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; "
-        "it does not add to it.",
         "パターン": "Pattern",
-        "月間読み取り": "Read per month",
-        "月間書き込み": "Written per month",
         "各セルは 4 つの量を別々に導く。**保存オブジェクト数** (保存バイト / サイズ)、"
         "**月間書き込みオブジェクト数** (書き込み量 / サイズ、S3 の PUT と NFS の書き込み操作に対応)、"
         "**月間読み取り回数** (読み取り量 / サイズ、S3 の GET と NFS の読み取り操作に対応)、"
@@ -714,10 +699,6 @@ TRANSLATIONS.update(
         "and the **capacity-pool billed request count**. "
         "That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. "
         "These four are not treated as the same number.",
-        "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
-        "capacity pool の読み取りリクエスト数が未確認であること、"
-        "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。": "For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. "
-        "The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted.",
         "項目": "Item",
         "リージョン": "Region",
         "単価スナップショット": "Price snapshot",
@@ -731,11 +712,188 @@ TRANSLATIONS.update(
         "論理 GiB を GB-Mo の単価に当てる": "Logical GiB is priced at the GB-Mo rate",
         "#### パターン {pattern} — オブジェクト {size}": "#### Pattern {pattern} — {size} objects",
         "導出量": "Derived quantity",
-        "保存オブジェクト数": "Stored object count",
-        "月間書き込みオブジェクト数": "Objects written per month",
-        "月間読み取り回数": "Reads per month",
         "capacity pool 課金リクエスト数": "Capacity-pool billed request count",
         "未確認 (GET あたりの回数が未測定)": "unconfirmed (the count per GET is not measured)",
         "**主要費目小計 / major-line-item subtotal**": "**major-line-item subtotal**",
+        # --- working-set patterns P1-P8 ------------------------------------------------------------
+        "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
+        "それぞれが現実のどれかに寄っているぶん、方式そのものの差を同じ土俵で見るには向かない。"
+        "この節は逆に、**論理 20 TiB という 1 つの土俵**を固定し、"
+        "オブジェクトサイズ ({sizes}) と、{count} つの読み書きパターン ({first}〜{last}) だけを振る。"
+        "各パターンは、作業セット比・作業セット内の読み取り回数・チャーン率の 3 つで決まり、"
+        "月間の読み取り量と書き込み量はそこから導く。"
+        "両方式に同じ論理ワークロードを与える。": "The use-case estimates above each start from different assumptions. "
+        "Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. "
+        "This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size ({sizes}) and {count} read/write patterns ({first} to {last}). "
+        "Each pattern is set by three numbers (working-set ratio, reads per working-set object, churn rate), and the monthly read and write volumes are derived from them. "
+        "The same logical workload is presented to both methods.",
+        "保存量 (論理) はどのセルでも 20 TiB で固定である。"
+        "書き込みは既存オブジェクトの置き換えで、月を通して積み増さない。"
+        "**月間書き込み量を平均保持量と同一視しない**。"
+        "20 TiB の定常保存に対して、月に 1 TiB 書くとはその一部を置き換えることであって、"
+        "積み増すことではない。": "The stored volume (logical) is fixed at 20 TiB in every cell. "
+        "Writes replace existing objects; nothing accumulates over the month. "
+        "**The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; "
+        "it does not add to it.",
+        "・": ", ",
+        " と ": " and ",
+        "#### 式と読み方の例": "#### Formulas and a worked example",
+        "各セルの量は、次の 5 本の式で導く。": "Each cell's quantities come from these five formulas.",
+        "月間読み取り量 = 保存量 × 作業セット比 × 作業セット内の読み取り回数": "read per month = stored volume x working-set ratio x reads per working-set object",
+        "月間読み取り回数 = 月間読み取り量 ÷ オブジェクトサイズ": "read requests per month = read per month / object size",
+        "保存量に対する倍数 R = 作業セット比 × 作業セット内の読み取り回数": "multiple of the stored volume, R = working-set ratio x reads per working-set object",
+        "月間書き込み量 = 保存量 × チャーン率": "written per month = stored volume x churn rate",
+        "月間書き込み個数 = 月間書き込み量 ÷ オブジェクトサイズ": "objects written per month = written per month / object size",
+        "例: {key} は、保存量 {stored} のうち {w}% ({ws}) を作業セットとし、"
+        "その各オブジェクトを月 {n} 回読む。"
+        "月間読み取り量は {ws} × {n} = {read} で、保存量の {r} 倍 (R = {r}) になる。"
+        "{size} なら {ws_objects} 個を {n} 回読むので {requests} 回。"
+        "残り {rest_pct}% ({rest}) は月内に一度も読まれない。"
+        "「オブジェクトを月 N 回読む」とだけ書くと、"
+        "N 回の対象が全オブジェクトか作業セットかで総量が {factor:g} 倍変わる。"
+        "この節では対象を作業セットと明記し、総量を保存量との倍数 R でも示す。": "Example: {key} takes {w}% ({ws}) of the {stored} stored volume as its working set and reads each of those objects {n} times a month. "
+        "Monthly read volume is {ws} x {n} = {read}, which is {r}x the stored volume (R = {r}). "
+        "At {size}, that is {ws_objects} objects read {n} times, or {requests} requests. "
+        "The other {rest_pct}% ({rest}) is not read at all within the month. "
+        'Writing only "each object is read N times a month" leaves open whether N applies to every object or only the working set, and the total differs by a factor of {factor:g}. '
+        "This section names the working set as the subject of the count and also states the total as the multiple R of the stored volume.",
+        "作業セット比と回数は、月間読み取り量を分解して示す軸である。"
+        "この表の金額は、月間読み取り量・月間書き込み量・オブジェクトサイズだけで決まり、"
+        "作業セット比には連動しない。"
+        "月間の読み取り量・書き込み量が同じパターン {groups} は、どのサイズでも金額が同じになる。": "The working-set ratio and the read count are axes that break the monthly read volume down. "
+        "The amounts in these tables are set by the monthly read volume, the monthly write volume and the object size alone, and do not follow the working-set ratio. "
+        "Patterns with the same monthly read and write volumes, {groups}, cost the same at every size.",
+        "この表の 3 つの前提は作業セット比と切り離している。"
+        "(a) FSx for ONTAP の capacity pool は全パターンで保存量の {pool}%。"
+        "(b) S3 Files の高性能ストレージ ({threshold} KiB 以下のサイズ) は保存量の全量をアクティブとして計上。"
+        "(c) 書き込みのないセルの S3 Files ({threshold} KiB 以下) は、"
+        "初回読み出しのストリームを計上せず、読み取りをすべて高性能ストレージの読み取りとして計上。"
+        "{small_groups} は、作業セット比とチャーン率の和が 100% 未満で、保存量の全体には触れられない。"
+        "(a)(b) を触れられる量に合わせる前提に置き換えると、小計は下がる向きになる。"
+        "{large_groups} は和が 100% 以上で、保存量の全体に及びうる。"
+        "全体に及ぶと置いて (a) を置き換えると、FSx for ONTAP の小計は上がる向きになる。"
+        "どちらの向きも試算上の感度で、測定ではない。": "These three premises are held apart from the working-set ratio. "
+        "(a) The FSx for ONTAP capacity pool is {pool}% of the stored volume in every pattern. "
+        "(b) S3 Files high-performance storage (the row that appears for sizes of {threshold} KiB or smaller) books the whole stored volume as active. "
+        "(c) In a cell with no writes, S3 Files ({threshold} KiB or smaller) books no first-read stream and books every read as a high-performance-storage read. "
+        "For {small_groups}, the working-set ratio plus the churn rate is below 100%, so not all of the stored volume can be touched; replacing (a) and (b) with premises that follow the touched volume would lower the subtotals. "
+        "For {large_groups}, the sum is 100% or more and the whole volume may be touched; if it is, replacing (a) would raise the FSx for ONTAP subtotal. "
+        "Both directions are sensitivities on the model, not measurements.",
+        "#### パターンの一覧": "#### The patterns",
+        "名前": "Name",
+        "作業セット比": "Working-set ratio",
+        "作業セット内の回数": "Reads per working-set object",
+        "月間読み取り量 (R)": "Read per month (R)",
+        "月間書き込み量 (チャーン率)": "Written per month (churn rate)",
+        "読み : 書き (バイト比)": "Read : write (byte ratio)",
+        "位置づけ": "Where it comes from",
+        "{n} 回": "{n}",
+        "{gib} (R = {r} 倍)": "{gib} (R = {r}x)",
+        "0 GiB (書き込みなし)": "0 GiB (no writes)",
+        "{gib} (チャーン率 {pct}%)": "{gib} (churn rate {pct}%)",
+        "コールド保管": "Cold archive",
+        "全件を 1 回読む": "Read everything once",
+        "ホット 20% を再読": "Re-read a hot 20%",
+        "小さい作業セットを強く再読": "Re-read a small working set heavily",
+        "読み多めに少量取り込み": "Read-mostly with light ingest",
+        "読み書き混在": "Mixed read and write",
+        "小オブジェクトの大量書き込み": "High-volume small-object writes",
+        "書き込み中心": "Write-centred",
+        "**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
+        "作業セット {w}%、回数 {n}、書き込みなし": "**Placeholder.** Not a sourced value; placed to make the arithmetic work. "
+        "Working set {w}%, reads per object {n}, no writes",
+        "書き込みのない読み取り専用の形。データセット全体を読む点が MLPerf Storage の "
+        "Unet3D に近い（[MLPerf Storage]({mlperf_url})）。"
+        "YCSB C は読み取りのみだが Zipf 分布で偏って読むため、"
+        "全件を 1 回ずつ読む形とは違う（[YCSB]({ycsb_url})）": "A read-only shape with no writes. Reading the whole dataset resembles MLPerf Storage's Unet3D ([MLPerf Storage]({mlperf_url})). "
+        "YCSB C is read-only but Zipf-skewed, so it is not one pass over every object ([YCSB]({ycsb_url}))",
+        "作業セット比 {w}% は、データの 2 割がホット、8 割がコールドという比を述べる "
+        "2 つのブログによる（[EFS ブログ]({efs_url})、"
+        "[FSx for ONTAP サイジングブログ]({sizing_url})）。"
+        "どちらも算出方法とデータセットを示していない。"
+        "**回数 {n} は出典がなく**、R を 1 倍に揃えるために置いた": "The {w}% working set follows two blogs that describe a 20% hot / 80% cold split ([EFS blog]({efs_url}), [FSx for ONTAP sizing blog]({sizing_url})); neither gives its method or dataset. "
+        "**The read count of {n} has no source**; it was chosen to make R equal 1",
+        "作業セット {w}% ({ws_gib}) は、本文の「読み取りが繰り返されるとき」の節の"
+        "作業セットと同じ大きさ。月 {n} 回は、その節の「読み取り回数に対する感度」表にある行の 1 つ。"
+        "その節の本表は月 30 回で、capacity pool の割合も 70%"
+        "（この節の固定は {pool_pct}%）と違う。"
+        "いずれも本リポジトリの試算前提であり、測定値ではない": "The {w}% working set ({ws_gib}) is the same size as the working set in the repeated-read section of this document. "
+        "{n} reads a month is one row of that section's read-count sensitivity table; its main table uses 30 reads, and its capacity-pool share is 70% (this section fixes {pool_pct}%). "
+        "All of these are repository assumptions, not measurements",
+        "読み取りは P4 と同じ（本リポジトリの試算前提）。"
+        "書き込みを保存量の {c}%（{write_tib} TiB）とした。"
+        "読み : 書きのバイト比は {read_share} : {write_share} で、"
+        "YCSB B の読み 95 : 更新 5 に近い形だが、"
+        "YCSB B はオペレーション数の比であり同じ量ではない（[YCSB]({ycsb_url})）。"
+        "チャーン率 {c}% は置いた値": "Reads as in P4 (repository assumptions), with writes at {c}% of the stored volume ({write_tib} TiB). "
+        "The byte ratio {read_share} : {write_share} is close in form to YCSB B's 95 reads : 5 updates, which is an operation-count ratio and not the same quantity ([YCSB]({ycsb_url})). "
+        "The {c}% churn rate is a chosen value",
+        "**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
+        "作業セット {w}%、回数 {n}、保存量と同量の書き込み": "**Placeholder.** Not a sourced value; placed to make the arithmetic work. "
+        "Working set {w}%, reads per object {n}, writes equal to the stored volume",
+        "全オブジェクトを月に 1 回置き換え、各オブジェクトを {n} 回読む形。"
+        "「車載 / IoT テレメトリ」の前提（{auto_objects} 個 / 月、64 KiB、読み出し "
+        "{auto_reads} 回、保持 1 か月）に沿った形で、本リポジトリの試算前提。"
+        "違う点が 3 つある。保存量はその節の {auto_stored} ではなく {stored_tib} TiB に揃える。"
+        "capacity pool の割合はその節の {auto_pool_pct}% ではなくこの節の {pool_pct}%、"
+        "SSD の圧縮率はその節の {auto_eff_pct}% ではなくこの節の {eff_pct}%。"
+        "64 KiB のとき書き込みは {objs_64k} 個（その節は {auto_objects} 個）": "Every object replaced once a month and read {n} times. "
+        "The shape follows the automotive / IoT telemetry scenario ({auto_objects} objects a month at 64 KiB, {auto_reads} reads, one month retention), a repository assumption. "
+        "Three things differ: the stored volume is {stored_tib} TiB, not that scenario's {auto_stored}; "
+        "the capacity-pool share is this section's {pool_pct}%, not {auto_pool_pct}%; "
+        "and the SSD efficiency is this section's {eff_pct}%, not {auto_eff_pct}%. "
+        "At 64 KiB this is {objs_64k} objects written (that scenario writes {auto_objects})",
+        "{key} の作業セット比": "{key} working-set ratio",
+        "{key} の回数": "{key} read count",
+        "{key} のチャーン率": "{key} churn rate",
+        "{placeholders} の値は出典がなく、算術を通すために置いた。"
+        "{repo_assumed} の値のうち表の位置づけで「試算前提」と書いたものは、"
+        "本リポジトリの試算前提であって測定値ではない。"
+        "{unsourced}は、出典も試算前提もなく置いた値である。": "{placeholders} have no source; the values were placed to make the arithmetic work. "
+        "Of the values in {repo_assumed}, those marked as repository assumptions in the table are assumptions of this repository, not measurements. "
+        "{unsourced} have neither a source nor a repository assumption behind them.",
+        "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
+        "capacity pool の読み取りリクエスト数が未確認であること、"
+        "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
+        "S3 Files の内訳は、4 KiB × 操作のメタデータ課金を取り込み側と読み取り側の別行で示し、"
+        "どちらも小計に算入している。"
+        "S3 Files のメタデータ行 (4 KiB × 操作) は、1 MiB 以上の読み取りにも立つかを未確認のまま小計に算入している。"
+        "除いた場合の小計は、`python3 tools/finops_model.py --baseline-json` の "
+        "`subtotal_excluding_metadata_usd` で読める。": "For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. "
+        "The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted. "
+        "The S3 Files breakdown shows the 4 KiB-per-operation metadata charges as separate import-side and read-side lines, and counts both in the subtotal. "
+        "Whether the metadata lines also apply to reads of 1 MiB or larger is unconfirmed, and they are counted in the subtotal as they are. "
+        "The subtotal without them is available as `subtotal_excluding_metadata_usd` in the output of `python3 tools/finops_model.py --baseline-json`.",
+        "S3 単独の内訳表は、書き込みのないパターン ({read_only}) にだけ置く。"
+        "方式ごとに書き込みの経路 (S3 API の PUT、NFS の書き込みと同期、S3 Access Points 経由の PUT) が違い、"
+        "同じ表に並べると書き込みの前提が混ざるためである。"
+        "範囲の決めであって、書き込みを含む S3 単独の構成が成り立たないという主張ではない。": "The S3-alone breakdown appears only for the patterns with no writes ({read_only}). "
+        "The write path differs by method (an S3 API PUT, an NFS write plus a sync, a PUT through S3 Access Points), and putting them in one table would mix the write assumptions. "
+        "This is a choice of scope, not a claim that an S3-alone configuration with writes cannot work.",
+        "S3 Files 読み取り (取り込み後の読み出し)": "S3 Files read (reads after import)",
+        "S3 Files メタデータ取り込み ({ops} 操作 × 4 KiB)": "S3 Files metadata import ({ops} operations x 4 KiB)",
+        "S3 Files メタデータ読み取り ({ops} 操作 × 4 KiB)": "S3 Files metadata read ({ops} operations x 4 KiB)",
+        "{pct}% = {gib} ({tib} TiB) / {count} 個。残り {rest_pct}% ({rest_gib}) は月内に読まれない": "{pct}% = {gib} ({tib} TiB) / {count} objects. The other {rest_pct}% ({rest_gib}) is not read within the month",
+        "100% = 保存量の全体 ({gib}) / {count} 個。月内に全件が読まれる": "100% = the whole stored volume ({gib}) / {count} objects. Every object is read within the month",
+        "0 GiB / 0 個 / チャーン率 0% (書き込みなし)": "0 GiB / 0 objects / churn rate 0% (no writes)",
+        "{gib} ({tib} TiB) / {count} 個 / チャーン率 {pct}% (保存量の {ratio} 倍)": "{gib} ({tib} TiB) / {count} objects / churn rate {pct}% ({ratio}x the stored volume)",
+        "書き込みなし。保存量は {gib} のまま一定。"
+        "書き込みがあるパターンでも、書き込みは既存オブジェクトの置き換えで保存量は変わらない": "No writes. The stored volume stays at {gib}. "
+        "Where a pattern does write, the writes replace existing objects and the stored volume does not change",
+        "書き込みは既存オブジェクトの置き換えで、保存量は {gib} のまま一定。月を通して積み増さない": "Writes replace existing objects, so the stored volume stays at {gib}. Nothing accumulates over the month",
+        "1. 保存量 (論理) と保存オブジェクト数": "1. Stored volume (logical) and stored object count",
+        "{gib} ({tib} TiB) / {count} 個": "{gib} ({tib} TiB) / {count} objects",
+        "2. オブジェクトサイズ": "2. Object size",
+        "3. 作業セット (月内に読まれる部分)": "3. Working set (the part read within the month)",
+        "4. 作業セット内の読み取り回数": "4. Reads per working-set object",
+        "作業セットの各オブジェクトを月 {n} 回": "Each working-set object is read {n} times a month",
+        "5. 月間読み取り (バイト / 回数 / 保存量に対する倍数 R)": "5. Read per month (bytes / requests / multiple of stored volume, R)",
+        "{gib} ({tib} TiB) = {ws_gib} × {n} 回 / {requests} 回 / R = {r} 倍": "{gib} ({tib} TiB) = {ws_gib} x {n} reads / {requests} requests / R = {r}x",
+        "6. 月間書き込み (バイト / 個数 / 保存量に対する比 = チャーン率)": "6. Written per month (bytes / objects / ratio to stored volume = churn rate)",
+        "7. 読み : 書き (バイト比。操作数の比ではない)": "7. Read : write (byte ratio, not an operation-count ratio)",
+        "8. リテンション": "8. Retention",
+        "書き込みがないセルの S3 Files ({threshold} KiB 以下) は、"
+        "初回読み出しのストリームを計上しない。"
+        "読み取りはすべて高性能ストレージの読み取りとして計上している": "In a cell with no writes, S3 Files ({threshold} KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read",
     }
 )

@@ -1,15 +1,28 @@
-"""Tests for the cost model's language handling.
+"""Tests for the cost model's language handling and the common baseline grid.
 
-The arithmetic is not tested here — `make finops` already compares every total against the committed
-document, which is a stronger check than any assertion about a single figure would be. What is tested
-is the part that has no such backstop: that adding a language cannot quietly change the Japanese
-output, and that a partially translated model cannot produce a half-Japanese English document.
+For the use-case sections the arithmetic is not tested here: `make finops` already compares every
+total against the committed document, which is a stronger check than any assertion about a single
+figure would be. What is tested for them is the part that has no such backstop: that adding a
+language cannot quietly change the Japanese output, and that a partially translated model cannot
+produce a half-Japanese English document.
+
+The baseline grid is tested for its arithmetic as well. It is generated from the same model as the
+document it is compared with, so a misreading of a formula would be copied into both and `make
+finops` would pass. The baseline tests therefore recompute from the stated formulas, with exact
+fractions for the quantities and a second implementation for the amounts, and fix the cells a
+figure reads as literals.
 """
 
 from __future__ import annotations
 
 import ast
+import json
+import math
 import pathlib
+import re
+import sys
+from decimal import Decimal
+from fractions import Fraction
 
 import finops_model as fm
 import pytest
@@ -126,85 +139,519 @@ def test_every_scenario_title_keeps_the_separator_the_short_name_needs() -> None
 
 
 # --- the common 20 TiB baseline grid ------------------------------------------------------------
+#
+# The patterns are held as working-set ratio w, reads per working-set object n and churn rate c.
+# The tests below fix three things: the patterns are exactly the agreed eight, every derived
+# quantity follows from (w, n, c, size) by the stated formulas, and the amounts match a second
+# implementation written here from the formulas rather than from the model.
+
+BASELINE_EXPECTED = {
+    # key: (w %, n, c %)
+    "P1": (5, 1, 0),
+    "P2": (100, 1, 0),
+    "P3": (20, 5, 0),
+    "P4": (10, 10, 0),
+    "P5": (10, 10, 5),
+    "P6": (50, 4, 100),
+    "P7": (100, 2, 100),
+    "P8": (10, 1, 100),
+}
+STORED_GIB = 20480
 
 
-def test_the_baseline_grid_has_twelve_cells() -> None:
-    """Four object sizes crossed with three read/write patterns."""
+def _baseline_section(lang: str = "ja") -> str:
+    head = "### 共通ベースライン" if lang == "ja" else "### A common baseline"
+    block = fm.render(lang)
+    fm.render("ja")  # restore module state
+    return block.split(head)[1].split("\n### ")[0]
+
+
+def _cell_sections(section: str, lang: str = "ja") -> dict[tuple[str, str], str]:
+    marker = (
+        r"^#### パターン (P\d+) — オブジェクト (.+)$"
+        if lang == "ja"
+        else r"^#### Pattern (P\d+) — (.+) objects$"
+    )
+    matches = list(re.finditer(marker, section, flags=re.MULTILINE))
+    cells = {}
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(section)
+        key = (m.group(1), m.group(2))
+        assert key not in cells, key
+        cells[key] = section[m.start() : end]
+    return cells
+
+
+def test_the_patterns_are_exactly_the_agreed_eight() -> None:
+    got = {
+        p.key: (p.working_set_pct, p.reads_per_object, p.churn_pct)
+        for p in fm.BASELINE_PATTERNS
+    }
+    assert got == BASELINE_EXPECTED
+    assert [p.key for p in fm.BASELINE_PATTERNS] == list(BASELINE_EXPECTED)
+
+
+def test_only_p1_p6_and_p8_are_placeholders() -> None:
+    assert {p.key for p in fm.BASELINE_PATTERNS if p.placeholder} == {"P1", "P6", "P8"}
+
+
+def test_the_basis_of_every_value_is_recorded() -> None:
+    basis = {p.key: p.basis for p in fm.BASELINE_PATTERNS}
+    assert basis == {
+        "P1": ("placeholder", "placeholder", "sourced"),
+        "P2": ("sourced", "sourced", "sourced"),
+        "P3": ("sourced", "placeholder", "sourced"),
+        "P4": ("repository", "repository", "sourced"),
+        "P5": ("repository", "repository", "placeholder"),
+        "P6": ("placeholder", "placeholder", "placeholder"),
+        "P7": ("repository", "repository", "repository"),
+        "P8": ("placeholder", "placeholder", "placeholder"),
+    }
+
+
+def test_the_baseline_grid_is_eight_patterns_by_four_sizes() -> None:
     cells = fm.baseline_cells()
-    assert len(cells) == 12
-    assert len(fm.BASELINE_SIZES_KIB) == 4
-    assert len(fm.BASELINE_PATTERNS) == 3
+    assert len(cells) == 32
+    assert fm.BASELINE_SIZES_KIB == (64, 1024, 4096, 16384)
+    assert {c.pattern.key for c in cells} == set(BASELINE_EXPECTED)
+    for pattern in fm.BASELINE_PATTERNS:
+        sizes = [c.object_kib for c in cells if c.pattern is pattern]
+        assert sizes == [64, 1024, 4096, 16384], pattern.key
 
 
-def test_every_cell_stores_the_common_20_tib() -> None:
-    """The whole point of the grid is one fixed footing; a cell that drifted off it would make the
-    cross-size comparison meaningless."""
-    expected = fm.BASELINE_STORED_TIB * fm.GIB_PER_TIB
+def test_every_cell_stores_the_common_20_tib_whatever_the_pattern_writes() -> None:
+    """One fixed footing. A pattern that writes 20 TiB a month replaces what is stored; it does not
+    enlarge it, so the stored volume is the same in the cell that writes nothing and the one that
+    writes as much as is stored."""
     for cell in fm.baseline_cells():
-        assert cell.stored_gib == expected, cell.pattern
+        assert cell.stored_gib == STORED_GIB == fm.BASELINE_STORED_TIB * fm.GIB_PER_TIB
+        assert cell.retention_months == 1.0
+        assert cell.file_protocol_required is False
 
 
-def test_size_times_count_equals_total_bytes_for_each_cell() -> None:
-    """The counts are derived as volume / size, so size x count must return the volume. This is the
-    check that object count is not quietly conflated with a volume figure."""
+def test_derived_quantities_follow_the_stated_formulas_in_every_cell() -> None:
+    """Computed with exact fractions from (w, n, c, size), not from the model's own arithmetic."""
     for cell in fm.baseline_cells():
-        gib_per_object = cell.object_mib / 1024
-        # Stored object count x size == stored volume.
-        assert cell.objects_stored * gib_per_object == pytest.approx(cell.stored_gib)
-        # Written object count x size == monthly write volume.
-        assert cell.objects_per_month * gib_per_object == pytest.approx(
-            cell.write_gib_per_month
-        )
-        # Read count x size == monthly read volume.
-        assert cell.reads_per_month * gib_per_object == pytest.approx(
-            cell.read_gib_per_month
-        )
+        w, n, c = BASELINE_EXPECTED[cell.pattern.key]
+        kib = Fraction(cell.object_kib)
+        stored = Fraction(STORED_GIB)
+        working_set = stored * w / 100
+        read = working_set * n
+        write = stored * c / 100
+        per_gib = Fraction(1024 * 1024) / kib  # objects per GiB at this size
+        where = (cell.pattern.key, cell.object_kib)
+
+        assert Fraction(cell.working_set_gib) == working_set, where
+        assert Fraction(cell.read_gib_per_month) == read == stored * w * n / 100, where
+        assert Fraction(cell.write_gib_per_month) == write, where
+        assert Fraction(cell.unread_gib) == stored - working_set, where
+        assert Fraction(cell.objects_stored) == stored * per_gib, where
+        assert Fraction(cell.working_set_objects) == working_set * per_gib, where
+        assert Fraction(cell.reads_per_month) == read * per_gib, where
+        assert Fraction(cell.objects_per_month) == write * per_gib, where
+        assert cell.pattern.read_multiple == pytest.approx(float(read / stored)), where
+        # size x count returns the bytes, so no count is quietly a volume
+        assert Fraction(cell.reads_per_month) * kib / (1024 * 1024) == read, where
+        assert Fraction(cell.objects_per_month) * kib / (1024 * 1024) == write, where
+        assert Fraction(cell.objects_stored) * kib / (1024 * 1024) == stored, where
+        assert cell.working_set_objects <= cell.objects_stored, where
+        assert cell.read_gib_per_month + cell.write_gib_per_month > 0, where
 
 
-def test_pattern_read_and_write_volumes_equal_the_declared_inputs() -> None:
-    """A (read 20, write 0), B (read 20, write 1), C (read 40, write 20), in TiB per month."""
-    declared = {"A": (20.0, 0.0), "B": (20.0, 1.0), "C": (40.0, 20.0)}
+def test_the_byte_ratio_is_a_share_of_bytes_moved() -> None:
+    expected = {
+        "P1": (100.0, 0.0),
+        "P2": (100.0, 0.0),
+        "P5": (95.2, 4.8),
+        "P6": (66.7, 33.3),
+        "P8": (9.1, 90.9),
+    }
     for cell in fm.baseline_cells():
-        read_tib, write_tib = declared[cell.pattern]
-        assert cell.read_gib_per_month == pytest.approx(read_tib * fm.GIB_PER_TIB)
-        assert cell.write_gib_per_month == pytest.approx(write_tib * fm.GIB_PER_TIB)
+        if cell.pattern.key in expected:
+            read, write = expected[cell.pattern.key]
+            assert round(cell.read_share_pct, 1) == read, cell.pattern.key
+            assert round(cell.write_share_pct, 1) == write, cell.pattern.key
 
 
-def test_write_volume_is_not_equated_with_stored_volume() -> None:
-    """Design section 3.3: writing 1 TiB/month into a 20 TiB resident set replaces part of it; the
-    monthly write count must stay smaller than the resident object count, never equal to it."""
-    for cell in fm.baseline_cells():
-        if cell.write_gib_per_month < cell.stored_gib:
-            assert cell.objects_per_month < cell.objects_stored, cell.pattern
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"churn_pct": 101},
+        {"churn_pct": -1},
+        {"working_set_pct": 0},
+        {"working_set_pct": 101},
+        {"reads_per_object": 0},
+        {"basis": ("sourced", "sourced")},
+        {"basis": ("sourced", "sourced", "guess")},
+        {"key": "Q1"},
+        {"key": "P"},
+    ],
+)
+def test_a_pattern_that_cannot_be_read_as_a_replacement_is_refused(
+    overrides: dict[str, object],
+) -> None:
+    fields: dict[str, object] = {
+        "key": "P9",
+        "name": "x",
+        "working_set_pct": 10,
+        "reads_per_object": 1,
+        "churn_pct": 0,
+        "placeholder": False,
+        "basis": ("sourced", "sourced", "sourced"),
+        "position": "x",
+    }
+    fields.update(overrides)
+    with pytest.raises(ValueError):
+        fm.BaselinePattern(**fields)  # type: ignore[arg-type]
+
+
+def test_a_pattern_touches_the_whole_volume_when_w_plus_c_reaches_100() -> None:
+    touching = {p.key for p in fm.BASELINE_PATTERNS if p.touches_whole_volume}
+    assert touching == {"P2", "P6", "P7", "P8"}
+    for p in fm.BASELINE_PATTERNS:
+        assert p.touches_whole_volume == (p.working_set_pct + p.churn_pct >= 100)
 
 
 def test_the_baseline_has_no_industry_field() -> None:
     """A dedicated dataclass was chosen over reusing Scenario precisely so the grid carries no
     industry; this guards that choice against a later field creeping back in."""
-    assert not hasattr(fm.BaselineCell("A", 1.0, 1.0, 1.0, 1.0), "industry")
+    assert not hasattr(fm.baseline_cells()[0], "industry")
 
 
-def test_every_baseline_subtotal_is_a_major_line_item_subtotal() -> None:
+# --- amounts: a second implementation, then literals ---------------------------------------------
+
+
+def _dec(value: float) -> Decimal:
+    return Decimal(str(value))
+
+
+def _independent_subtotals(
+    w: int, n: int, c: int, size_kib: int
+) -> tuple[Decimal, Decimal, Decimal | None]:
+    """FSx for ONTAP, S3 Files and (if there are no writes) S3-alone subtotals.
+
+    Written from the pricing description and the unit prices, with Decimal. It shares the unit
+    prices with the model and nothing else: not the helpers, not the cell class, not the rounding.
+    """
+    stored = Decimal(STORED_GIB)
+    read = stored * w * n / 100
+    write = stored * c / 100
+    kib = Decimal(size_kib)
+    gib_per_kib = Decimal(1) / Decimal(1024 * 1024)
+    reads = read / (kib * gib_per_kib)
+    writes = write / (kib * gib_per_kib)
+    s3_storage = stored * _dec(
+        0.025
+    )  # 20,480 GiB sits inside the first S3 Standard tier
+    put = writes * _dec(fm.S3["tier1"].usd)
+    get = reads * _dec(fm.S3["tier2"].usd)
+
+    # FSx for ONTAP, Single-AZ gen 1, 30 % capacity pool, 40 % SSD / 20 % pool efficiency
+    ssd_gib = max(
+        1024,
+        math.ceil(float(stored * Decimal("0.7") * Decimal("0.6") * Decimal("1.2"))),
+    )
+    pool_gib = stored * Decimal("0.3") * Decimal("0.8")
+    mbps = (read + write) * 1024 / 2_592_000
+    target = mbps * 5
+    tput = next((o for o in (128, 256, 512, 1024, 2048, 4096) if o >= target), 4096)
+    fsx = (
+        ssd_gib * _dec(fm.FSX["ssd_saz"].usd)
+        + tput * _dec(fm.FSX["tput_saz1"].usd)
+        + pool_gib * _dec(fm.FSX["pool_saz"].usd)
+        + reads * Decimal("0.3") * _dec(fm.FSX["pool_read"].usd)
+        + writes * _dec(fm.S3["ap_tier1"].usd)
+    )
+
+    meta_gib = Decimal(4) * gib_per_kib
+    meta_in = writes * meta_gib * _dec(fm.S3FILES["write"].usd)
+    meta_rd = reads * meta_gib * _dec(fm.S3FILES["read"].usd)
+    if size_kib <= 128:
+        floor_factor = max(Decimal(1), Decimal(10) / kib)
+        hps = stored * floor_factor * _dec(fm.S3FILES["storage"].usd)
+        io_kib = max(kib, Decimal(32))
+        streamed = writes
+        files_get = streamed * _dec(fm.S3["tier2"].usd)
+        imp = writes * io_kib * gib_per_kib * _dec(fm.S3FILES["write"].usd)
+        hps_reads = max(Decimal(0), reads - streamed)
+        rd = hps_reads * io_kib * gib_per_kib * _dec(fm.S3FILES["read"].usd)
+        files = s3_storage + put + hps + files_get + imp + rd + meta_in + meta_rd
+    else:
+        files = s3_storage + put + get + meta_in + meta_rd
+
+    direct = s3_storage + put + get if c == 0 else None
+    return fsx, files, direct
+
+
+def test_every_subtotal_matches_an_independent_calculation() -> None:
+    for cell in fm.baseline_cells():
+        w, n, c = BASELINE_EXPECTED[cell.pattern.key]
+        fsx, files, direct = _independent_subtotals(w, n, c, int(cell.object_kib))
+        files_lines = fm.s3_files_option(cell, split_metadata=True)
+        assert files_lines is not None
+        where = (cell.pattern.key, cell.object_kib)
+        assert abs(_dec(sum(fm.fsx_s3ap(cell).values())) - fsx) < Decimal("0.01"), where
+        assert abs(_dec(sum(files_lines.values())) - files) < Decimal("0.01"), where
+        solo = fm.s3_only(cell)
+        if direct is None:
+            assert solo is None or c > 0, where
+        else:
+            assert solo is not None
+            assert abs(_dec(sum(solo.values())) - direct) < Decimal("0.01"), where
+
+
+# Literals from the independent calculation, fixed so that the second implementation and the model
+# cannot share a misreading unnoticed. They are the cells the cost figure reads (P1, P3, P4, P6, P8
+# at 64 KiB and 4 MiB); P3 and P4 price the same as P2.
+FIGURE_SUBTOTALS = {
+    # (pattern, size KiB): (FSx for ONTAP, S3 Files)
+    ("P1", 64): ("$1,783.11", "$7,928.32"),
+    ("P1", 4096): ("$1,781.28", "$512.14"),
+    ("P3", 64): ("$1,818.50", "$8,755.20"),
+    ("P3", 4096): ("$1,781.83", "$514.74"),
+    ("P4", 64): ("$1,818.50", "$8,755.20"),
+    ("P4", 4096): ("$1,781.83", "$514.74"),
+    ("P6", 64): ("$2,218.13", "$12,030.81"),
+    ("P6", 4096): ("$1,788.08", "$543.52"),
+    ("P8", 64): ("$2,147.36", "$11,114.33"),
+    ("P8", 4096): ("$1,786.97", "$538.32"),
+}
+DIRECT_SUBTOTALS = {
+    ("P1", 64): "$518.21",
+    ("P1", 4096): "$512.10",
+    ("P3", 64): "$636.15",
+    ("P3", 4096): "$513.94",
+    ("P4", 64): "$636.15",
+    ("P4", 4096): "$513.94",
+}
+METADATA_USD = {
+    # (pattern, size KiB): (import side, read side)
+    ("P4", 4096): ("$0.00", "$0.80"),
+    ("P5", 4096): ("$0.07", "$0.80"),
+    ("P7", 64): ("$89.60", "$102.40"),
+    ("P8", 64): ("$89.60", "$5.12"),
+}
+
+
+def _cell(key: str, kib: int) -> fm.BaselineCell:
+    return next(
+        c for c in fm.baseline_cells() if c.pattern.key == key and c.object_kib == kib
+    )
+
+
+def test_the_figure_cells_have_the_recorded_subtotals() -> None:
+    for (key, kib), (fsx, files) in FIGURE_SUBTOTALS.items():
+        cell = _cell(key, kib)
+        files_lines = fm.s3_files_option(cell, split_metadata=True)
+        assert files_lines is not None
+        assert fm.usd(sum(fm.fsx_s3ap(cell).values())) == fsx, (key, kib)
+        assert fm.usd(sum(files_lines.values())) == files, (key, kib)
+    for (key, kib), expected in DIRECT_SUBTOTALS.items():
+        solo = fm.s3_only(_cell(key, kib))
+        assert solo is not None
+        assert fm.usd(sum(solo.values())) == expected, (key, kib)
+
+
+def test_the_metadata_charges_are_their_own_lines_with_the_recorded_amounts() -> None:
+    for (key, kib), (ingest, read) in METADATA_USD.items():
+        cell = _cell(key, kib)
+        ingest_usd, read_usd = fm.s3_files_metadata_usd(cell)
+        assert (fm.usd(ingest_usd), fm.usd(read_usd)) == (ingest, read), (key, kib)
+        lines = fm.s3_files_option(cell, split_metadata=True)
+        assert lines is not None
+        shown = {
+            label: value
+            for label, value in lines.items()
+            if label.startswith("S3 Files メタデータ")
+        }
+        assert sorted(shown.values()) == sorted([ingest_usd, read_usd]), (key, kib)
+
+
+# --- the amounts do not follow the working-set ratio ---------------------------------------------
+
+
+def test_patterns_with_the_same_read_and_write_volumes_price_the_same() -> None:
+    """P2, P3 and P4 read 20 TiB and write nothing; P6 and P7 read 40 and write 20. Their working
+    sets differ, their amounts do not. If this starts failing, the price has begun to follow the
+    working-set ratio, which the document says it does not."""
+    groups = sorted(sorted(p.key for p in g) for g in fm.baseline_same_price_groups())
+    assert groups == [["P2", "P3", "P4"], ["P6", "P7"]]
+    singles = {p.key for p in fm.BASELINE_PATTERNS} - {k for g in groups for k in g}
+    assert singles == {"P1", "P5", "P8"}
+
+
+def test_the_json_states_that_price_does_not_depend_on_the_working_set() -> None:
+    data = fm.baseline_json("ja")
+    assert data["pricing_depends_on_working_set"] is False
+    assert data["price_inputs"] == ["object_size", "read_bytes", "write_bytes"]
+
+
+# --- the metadata lines and the first-read stream ------------------------------------------------
+
+
+def test_the_default_lines_of_s3_files_are_unchanged() -> None:
+    """The use-case sections call it without the flag; their labels and amounts must not move."""
+    by_branch = {
+        "small": next(
+            s for s in fm.SCENARIOS if s.s3files_viable and s.object_mib * 1024 <= 128
+        ),
+        "large": next(
+            s for s in fm.SCENARIOS if s.s3files_viable and s.object_mib * 1024 > 128
+        ),
+    }
+    small = fm.s3_files_option(by_branch["small"])
+    large = fm.s3_files_option(by_branch["large"])
+    assert small is not None and large is not None
+    assert "S3 Files 読み取り (取り込み後の読み出しとメタデータ)" in small
+    assert "GET リクエスト (初回読み出しはバケットからストリーム)" in small
+    assert "S3 Files 読み取り (メタデータ)" in large
+    assert "S3 Files 書き込み (メタデータの取り込み)" in large
+
+
+def test_splitting_the_metadata_does_not_change_any_subtotal() -> None:
+    """Every baseline cell and every scenario: the same sum, split into different lines."""
+    for item in [*fm.baseline_cells(), *fm.SCENARIOS]:
+        plain = fm.s3_files_option(item)
+        split = fm.s3_files_option(item, split_metadata=True)
+        assert (plain is None) == (split is None)
+        if plain is not None and split is not None:
+            assert abs(sum(plain.values()) - sum(split.values())) < 1e-9
+
+
+def test_both_metadata_lines_exist_in_both_branches_of_a_baseline_cell() -> None:
+    for kib in (64, 4096):
+        lines = fm.s3_files_option(_cell("P5", kib), split_metadata=True)
+        assert lines is not None
+        labels = list(lines)
+        assert (
+            sum(label.startswith("S3 Files メタデータ取り込み") for label in labels)
+            == 1
+        )
+        assert (
+            sum(label.startswith("S3 Files メタデータ読み取り") for label in labels)
+            == 1
+        )
+
+
+def test_a_cell_with_no_writes_books_no_first_read_stream_line() -> None:
+    stream = "GET リクエスト (初回読み出しはバケットからストリーム)"
+    for pattern in fm.BASELINE_PATTERNS:
+        lines = fm.s3_files_option(_cell(pattern.key, 64), split_metadata=True)
+        assert lines is not None
+        assert (stream in lines) == (pattern.churn_pct > 0), pattern.key
+        # dropping a zero-valued line leaves the total where the default call puts it
+        plain = fm.s3_files_option(_cell(pattern.key, 64))
+        assert plain is not None
+        assert abs(sum(lines.values()) - sum(plain.values())) < 1e-9, pattern.key
+
+
+# --- the generated section -------------------------------------------------------------------
+
+
+def test_the_section_has_one_heading_per_cell_and_no_repeats() -> None:
+    cells = _cell_sections(_baseline_section("ja"))
+    assert len(cells) == 32
+    assert {k for k, _ in cells} == set(BASELINE_EXPECTED)
+    assert {s for _, s in cells} == {"64 KiB", "1 MiB", "4 MiB", "16 MiB"}
+
+
+def test_every_cell_shows_all_eight_items_and_says_writes_replace() -> None:
+    section = _baseline_section("ja")
+    cells = _cell_sections(section)
+    labels = [
+        "| 1. 保存量 (論理) と保存オブジェクト数 |",
+        "| 2. オブジェクトサイズ |",
+        "| 3. 作業セット (月内に読まれる部分) |",
+        "| 4. 作業セット内の読み取り回数 |",
+        "| 5. 月間読み取り (バイト / 回数 / 保存量に対する倍数 R) |",
+        "| 6. 月間書き込み (バイト / 個数 / 保存量に対する比 = チャーン率) |",
+        "| 7. 読み : 書き (バイト比。操作数の比ではない) |",
+        "| 8. リテンション |",
+    ]
+    for key, body in cells.items():
+        for label in labels:
+            assert body.count(label) == 1, (key, label)
+        retention = next(
+            line for line in body.split("\n") if line.startswith("| 8. リテンション")
+        )
+        assert "置き換え" in retention, key
+
+
+def test_placeholders_are_marked_in_the_pattern_table_and_nowhere_else() -> None:
+    section = _baseline_section("ja")
+    phrase = "出典のある値ではなく、算術を通すための仮置き"
+    rows = [line for line in section.split("\n") if phrase in line]
+    assert sorted(line.split(" | ")[0].lstrip("| ") for line in rows) == [
+        "P1",
+        "P6",
+        "P8",
+    ]
+    en = _baseline_section("en")
+    en_rows = [
+        line
+        for line in en.split("\n")
+        if "Not a sourced value; placed to make the arithmetic work" in line
+    ]
+    assert sorted(line.split(" | ")[0].lstrip("| ") for line in en_rows) == [
+        "P1",
+        "P6",
+        "P8",
+    ]
+
+
+def test_every_subtotal_is_a_major_line_item_subtotal() -> None:
     """Each total has an uncounted line item (the UNCONFIRMED capacity-pool read requests), so it
-    must be labelled a 主要費目小計, never a 月額総額."""
-    block = fm.render("ja")
-    section = block.split("### 共通ベースライン")[1].split("\n### ")[0]
-    # Twelve cells, two methods each: twenty-four subtotal rows, every one a 主要費目小計.
-    assert section.count("**主要費目小計 / major-line-item subtotal**") == 24
-    # No subtotal row is labelled 月額総額. The phrase appears once in the intro prose explaining
-    # the distinction ("a subtotal, not a 月額総額"), so guard the table-row label, not the word.
+    must be labelled a 主要費目小計, never a 月額総額. FSx for ONTAP and S3 Files in all 32 cells,
+    plus S3 alone in the 16 cells that have no writes."""
+    section = _baseline_section("ja")
+    assert section.count("**主要費目小計 / major-line-item subtotal**") == 32 * 2 + 16
     assert "| **月額総額" not in section
+
+
+def test_s3_alone_appears_only_where_there_are_no_writes() -> None:
+    cells = _cell_sections(_baseline_section("ja"))
+    for (key, _), body in cells.items():
+        has_direct = "**S3 単独 (利用側も S3 API)**" in body
+        assert has_direct == (BASELINE_EXPECTED[key][2] == 0), key
+
+
+def test_the_first_read_stream_note_is_in_exactly_the_four_cells_it_applies_to() -> (
+    None
+):
+    section = _baseline_section("ja")
+    cells = _cell_sections(section)
+    stream = "GET リクエスト (初回読み出しはバケットからストリーム)"
+    note = "は、初回読み出しのストリームを計上しない。"
+    for (key, size), body in cells.items():
+        no_writes_small = BASELINE_EXPECTED[key][2] == 0 and size == "64 KiB"
+        assert (note in body) == no_writes_small, (key, size)
+        if size == "64 KiB":
+            assert (stream in body) == (not no_writes_small), (key, size)
+        else:
+            assert stream not in body, (key, size)
+
+
+def test_the_fixed_premises_are_stated_once_with_the_groups_derived() -> None:
+    section = _baseline_section("ja")
+    assert section.count("この表の 3 つの前提は作業セット比と切り離している。") == 1
+    assert "P1・P3・P4・P5 は、作業セット比とチャーン率の和が 100% 未満" in section
+    assert "P2・P6・P7・P8 は和が 100% 以上" in section
+    assert "(P2・P3・P4) と (P6・P7) は" in section
 
 
 def test_the_baseline_leaves_capacity_pool_requests_unconfirmed() -> None:
     """The count per GET is not measured; the grid must say so rather than guess a number."""
-    block = fm.render("ja")
-    section = block.split("### 共通ベースライン")[1].split("\n### ")[0]
-    assert "未確認" in section
-    en = fm.render("en")
-    fm.render("ja")  # restore module state
-    en_section = en.split("### A common baseline")[1].split("\n### ")[0]
+    assert "未確認" in _baseline_section("ja")
+    en_section = _baseline_section("en")
     assert "UNCONFIRMED" in en_section or "unconfirmed" in en_section
+
+
+def test_the_metadata_lines_are_counted_in_the_subtotal_and_the_doubt_is_stated() -> (
+    None
+):
+    section = _baseline_section("ja")
+    assert "1 MiB 以上の読み取りにも立つかを未確認のまま小計に算入している" in section
+    assert "subtotal_excluding_metadata_usd" in section
 
 
 def test_every_generated_string_now_has_english() -> None:
@@ -213,6 +660,103 @@ def test_every_generated_string_now_has_english() -> None:
     missing, residue = fm.translation_gaps()
     assert missing == []
     assert residue == []
+
+
+def test_the_english_section_has_the_same_cells_as_the_japanese() -> None:
+    ja = _cell_sections(_baseline_section("ja"))
+    en = _cell_sections(_baseline_section("en"), "en")
+    assert [k for k in ja] == [k for k in en]
+
+
+# --- machine-readable output ---------------------------------------------------------------------
+
+
+def test_the_json_carries_every_pattern_and_size() -> None:
+    data = fm.baseline_json("ja")
+    assert data["stored_gib"] == STORED_GIB
+    patterns = data["patterns"]
+    assert [p["id"] for p in patterns] == list(BASELINE_EXPECTED)  # type: ignore[index]
+    for p in patterns:  # type: ignore[attr-defined]
+        assert [c["size_kib"] for c in p["cells"]] == [64, 1024, 4096, 16384]
+
+
+def test_the_json_amounts_are_the_ones_printed_in_the_document() -> None:
+    section = _baseline_section("ja")
+    cells = _cell_sections(section)
+    size_label = {64: "64 KiB", 1024: "1 MiB", 4096: "4 MiB", 16384: "16 MiB"}
+    data = fm.baseline_json("ja")
+    for p in data["patterns"]:  # type: ignore[attr-defined]
+        for c in p["cells"]:
+            body = cells[(p["id"], size_label[c["size_kib"]])]
+            for method in ("fsx_s3ap", "s3_files", "s3_direct"):
+                m = c["methods"][method]
+                if m is None:
+                    assert p["churn_pct"] > 0
+                    continue
+                assert f"**{m['subtotal_display']}**" in body, (p["id"], c["size_kib"])
+                assert abs(m["subtotal_usd"] - sum(x["usd"] for x in m["lines"])) < 1e-9
+            files = c["methods"]["s3_files"]
+            md = files["metadata_usd"]
+            assert files["subtotal_excluding_metadata_usd"] == pytest.approx(
+                files["subtotal_usd"] - md["ingest"] - md["read"]
+            )
+
+
+def test_the_json_counts_are_integers_and_s3_alone_is_absent_with_writes() -> None:
+    for p in fm.baseline_json("ja")["patterns"]:  # type: ignore[attr-defined]
+        for c in p["cells"]:
+            for key in (
+                "stored_objects",
+                "working_set_objects",
+                "read_requests",
+                "write_objects",
+            ):
+                assert isinstance(c[key], int), (p["id"], key)
+            assert (c["methods"]["s3_direct"] is None) == (p["churn_pct"] > 0)
+
+
+def test_the_json_is_the_same_bytes_every_time() -> None:
+    first = json.dumps(fm.baseline_json("ja"), ensure_ascii=False, indent=2)
+    assert first == json.dumps(fm.baseline_json("ja"), ensure_ascii=False, indent=2)
+
+
+def test_the_english_json_has_no_japanese_in_labels_or_positions() -> None:
+    data = fm.baseline_json("en")
+    for p in data["patterns"]:  # type: ignore[attr-defined]
+        assert not fm.CJK.search(p["position"]), p["id"]
+        assert fm.CJK.search(p["name_ja"]) and not fm.CJK.search(p["name_en"])
+        for c in p["cells"]:
+            for m in c["methods"].values():
+                for line in (m or {}).get("lines", []):
+                    assert not fm.CJK.search(line["label"]), line["label"]
+    assert fm._LANG == "ja"
+
+
+def test_the_json_option_cannot_be_combined_with_the_document_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for other in ("--check", "--write", "--show-prices", "--translation-gaps"):
+        monkeypatch.setattr(sys, "argv", ["finops_model.py", "--baseline-json", other])
+        with pytest.raises(SystemExit) as exit_info:
+            fm.main()
+        assert exit_info.value.code == 2, other
+    monkeypatch.setattr(sys, "argv", ["finops_model.py", "--lang", "en"])
+    with pytest.raises(SystemExit) as exit_info:
+        fm.main()
+    assert exit_info.value.code == 2
+
+
+def test_the_json_option_prints_json_and_leaves_the_documents_alone(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before = {lang: fm.doc_for(lang).read_bytes() for lang in fm.LANGS}
+    monkeypatch.setattr(
+        sys, "argv", ["finops_model.py", "--baseline-json", "--lang", "en"]
+    )
+    assert fm.main() == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["schema_version"] == 1
+    assert {lang: fm.doc_for(lang).read_bytes() for lang in fm.LANGS} == before
 
 
 # --- documents ----------------------------------------------------------------------------------

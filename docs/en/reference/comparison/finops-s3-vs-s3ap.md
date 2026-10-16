@@ -754,19 +754,48 @@ This architecture is $300.96 (6%) a month cheaper than the one with a sync job i
 
 ### A common baseline — 20 TiB under the same terms
 
-The use-case estimates above each start from different assumptions. Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size (64 KiB, 1 MiB, 4 MiB, 16 MiB) and the read/write pattern (A / B / C). The same logical workload is presented to both methods.
+The use-case estimates above each start from different assumptions. Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size (64 KiB, 1 MiB, 4 MiB, 16 MiB) and 8 read/write patterns (P1 to P8). Each pattern is set by three numbers (working-set ratio, reads per working-set object, churn rate), and the monthly read and write volumes are derived from them. The same logical workload is presented to both methods.
 
-The stored volume (logical) is fixed at 20 TiB in every cell. The monthly read and write volumes are set separately per pattern. **The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; it does not add to it.
-
-| Pattern | Read per month | Written per month |
-|---|---|---|
-| A | 20 TiB | 0 TiB |
-| B | 20 TiB | 1 TiB |
-| C | 40 TiB | 20 TiB |
+The stored volume (logical) is fixed at 20 TiB in every cell. Writes replace existing objects; nothing accumulates over the month. **The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; it does not add to it.
 
 Each cell derives four quantities separately: the **stored object count** (stored bytes / size), the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), and the **capacity-pool billed request count**. That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. These four are not treated as the same number.
 
-For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted.
+#### Formulas and a worked example
+
+Each cell's quantities come from these five formulas.
+
+```text
+read per month = stored volume x working-set ratio x reads per working-set object
+read requests per month = read per month / object size
+multiple of the stored volume, R = working-set ratio x reads per working-set object
+written per month = stored volume x churn rate
+objects written per month = written per month / object size
+```
+
+Example: P4 takes 10% (2,048 GiB) of the 20,480 GiB stored volume as its working set and reads each of those objects 10 times a month. Monthly read volume is 2,048 GiB x 10 = 20,480 GiB, which is 1x the stored volume (R = 1). At 4 MiB, that is 524,288 objects read 10 times, or 5,242,880 requests. The other 90% (18,432 GiB) is not read at all within the month. Writing only "each object is read N times a month" leaves open whether N applies to every object or only the working set, and the total differs by a factor of 10. This section names the working set as the subject of the count and also states the total as the multiple R of the stored volume.
+
+The working-set ratio and the read count are axes that break the monthly read volume down. The amounts in these tables are set by the monthly read volume, the monthly write volume and the object size alone, and do not follow the working-set ratio. Patterns with the same monthly read and write volumes, (P2, P3, P4) and (P6, P7), cost the same at every size.
+
+These three premises are held apart from the working-set ratio. (a) The FSx for ONTAP capacity pool is 30% of the stored volume in every pattern. (b) S3 Files high-performance storage (the row that appears for sizes of 128 KiB or smaller) books the whole stored volume as active. (c) In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stream and books every read as a high-performance-storage read. For P1, P3, P4, P5, the working-set ratio plus the churn rate is below 100%, so not all of the stored volume can be touched; replacing (a) and (b) with premises that follow the touched volume would lower the subtotals. For P2, P6, P7, P8, the sum is 100% or more and the whole volume may be touched; if it is, replacing (a) would raise the FSx for ONTAP subtotal. Both directions are sensitivities on the model, not measurements.
+
+#### The patterns
+
+| Pattern | Name | Working-set ratio | Reads per working-set object | Read per month (R) | Written per month (churn rate) | Read : write (byte ratio) | Where it comes from |
+|---|---|---|---|---|---|---|---|
+| P1 | Cold archive | 5% | 1 | 1,024 GiB (R = 0.05x) | 0 GiB (no writes) | 100.0 : 0.0 | **Placeholder.** Not a sourced value; placed to make the arithmetic work. Working set 5%, reads per object 1, no writes |
+| P2 | Read everything once | 100% | 1 | 20,480 GiB (R = 1x) | 0 GiB (no writes) | 100.0 : 0.0 | A read-only shape with no writes. Reading the whole dataset resembles MLPerf Storage's Unet3D ([MLPerf Storage](https://mlcommons.org/benchmarks/storage/)). YCSB C is read-only but Zipf-skewed, so it is not one pass over every object ([YCSB](https://github.com/brianfrankcooper/YCSB/wiki/Core-Workloads)) |
+| P3 | Re-read a hot 20% | 20% | 5 | 20,480 GiB (R = 1x) | 0 GiB (no writes) | 100.0 : 0.0 | The 20% working set follows two blogs that describe a 20% hot / 80% cold split ([EFS blog](https://aws.amazon.com/blogs/storage/scalable-cloud-native-file-storage-at-pennies-per-gb-month-with-amazon-efs/), [FSx for ONTAP sizing blog](https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/)); neither gives its method or dataset. **The read count of 5 has no source**; it was chosen to make R equal 1 |
+| P4 | Re-read a small working set heavily | 10% | 10 | 20,480 GiB (R = 1x) | 0 GiB (no writes) | 100.0 : 0.0 | The 10% working set (2,048 GiB) is the same size as the working set in the repeated-read section of this document. 10 reads a month is one row of that section's read-count sensitivity table; its main table uses 30 reads, and its capacity-pool share is 70% (this section fixes 30%). All of these are repository assumptions, not measurements |
+| P5 | Read-mostly with light ingest | 10% | 10 | 20,480 GiB (R = 1x) | 1,024 GiB (churn rate 5%) | 95.2 : 4.8 | Reads as in P4 (repository assumptions), with writes at 5% of the stored volume (1 TiB). The byte ratio 95.2 : 4.8 is close in form to YCSB B's 95 reads : 5 updates, which is an operation-count ratio and not the same quantity ([YCSB](https://github.com/brianfrankcooper/YCSB/wiki/Core-Workloads)). The 5% churn rate is a chosen value |
+| P6 | Mixed read and write | 50% | 4 | 40,960 GiB (R = 2x) | 20,480 GiB (churn rate 100%) | 66.7 : 33.3 | **Placeholder.** Not a sourced value; placed to make the arithmetic work. Working set 50%, reads per object 4, writes equal to the stored volume |
+| P7 | High-volume small-object writes | 100% | 2 | 40,960 GiB (R = 2x) | 20,480 GiB (churn rate 100%) | 66.7 : 33.3 | Every object replaced once a month and read 2 times. The shape follows the automotive / IoT telemetry scenario (300,000,000 objects a month at 64 KiB, 2 reads, one month retention), a repository assumption. Three things differ: the stored volume is 20 TiB, not that scenario's 18,311 GiB; the capacity-pool share is this section's 30%, not 0%; and the SSD efficiency is this section's 40%, not 50%. At 64 KiB this is 335,544,320 objects written (that scenario writes 300,000,000) |
+| P8 | Write-centred | 10% | 1 | 2,048 GiB (R = 0.1x) | 20,480 GiB (churn rate 100%) | 9.1 : 90.9 | **Placeholder.** Not a sourced value; placed to make the arithmetic work. Working set 10%, reads per object 1, writes equal to the stored volume |
+
+P1, P6, P8 have no source; the values were placed to make the arithmetic work. Of the values in P4, P5, P7, those marked as repository assumptions in the table are assumptions of this repository, not measurements. P3 read count, P5 churn rate have neither a source nor a repository assumption behind them.
+
+For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted. The S3 Files breakdown shows the 4 KiB-per-operation metadata charges as separate import-side and read-side lines, and counts both in the subtotal. Whether the metadata lines also apply to reads of 1 MiB or larger is unconfirmed, and they are counted in the subtotal as they are. The subtotal without them is available as `subtotal_excluding_metadata_usd` in the output of `python3 tools/finops_model.py --baseline-json`.
+
+The S3-alone breakdown appears only for the patterns with no writes (P1, P2, P3, P4). The write path differs by method (an S3 API PUT, an NFS write plus a sync, a PUT through S3 Access Points), and putting them in one table would mix the write assumptions. This is a choice of scope, not a claim that an S3-alone configuration with writes cannot work.
 
 | Item | Value |
 |---|---|
@@ -780,13 +809,206 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Seconds in a month | 2,592,000 s (30 x 24 x 3600) |
 | GiB / GB-Mo conversion | Logical GiB is priced at the GB-Mo rate |
 
-#### Pattern A — 64 KiB objects
+#### Pattern P1 — 64 KiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 335,544,320 |
-| Objects written per month | 0 |
-| Reads per month | 335,544,320 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 5% = 1,024 GiB (1 TiB) / 16,777,216 objects. The other 95% (19,456 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 1,024 GiB (1 TiB) = 1,024 GiB x 1 reads / 16,777,216 requests / R = 0.05x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 0.4 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $1.86 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,783.11** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| S3 Files write (import onto high-performance storage) | $0.00 |
+| S3 Files read (reads after import) | $40.96 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (16,777,216 operations x 4 KiB) | $2.56 |
+| **major-line-item subtotal** | **$7,928.32** |
+
+In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $6.21 |
+| **major-line-item subtotal** | **$518.21** |
+
+#### Pattern P1 — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 5% = 1,024 GiB (1 TiB) / 1,048,576 objects. The other 95% (19,456 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 1,024 GiB (1 TiB) = 1,024 GiB x 1 reads / 1,048,576 requests / R = 0.05x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 0.4 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.12 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.37** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.39 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (1,048,576 operations x 4 KiB) | $0.16 |
+| **major-line-item subtotal** | **$512.55** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.39 |
+| **major-line-item subtotal** | **$512.39** |
+
+#### Pattern P1 — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 5% = 1,024 GiB (1 TiB) / 262,144 objects. The other 95% (19,456 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 1,024 GiB (1 TiB) = 1,024 GiB x 1 reads / 262,144 requests / R = 0.05x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 0.4 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.03 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.28** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.10 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (262,144 operations x 4 KiB) | $0.04 |
+| **major-line-item subtotal** | **$512.14** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.10 |
+| **major-line-item subtotal** | **$512.10** |
+
+#### Pattern P1 — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 5% = 1,024 GiB (1 TiB) / 65,536 objects. The other 95% (19,456 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 1,024 GiB (1 TiB) = 1,024 GiB x 1 reads / 65,536 requests / R = 0.05x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 0.4 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.01 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.26** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.02 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (65,536 operations x 4 KiB) | $0.01 |
+| **major-line-item subtotal** | **$512.03** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.02 |
+| **major-line-item subtotal** | **$512.02** |
+
+#### Pattern P2 — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 335,544,320 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 20,480 GiB x 1 reads / 335,544,320 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.1 MB/s |
 
@@ -808,18 +1030,35 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $0.00 |
 | S3 Files high-performance storage (100% active) | $7,372.80 |
-| GET requests (the first read is streamed from the bucket) | $0.00 |
 | S3 Files write (import onto high-performance storage) | $0.00 |
-| S3 Files read (reads after import, plus metadata) | $870.40 |
+| S3 Files read (reads after import) | $819.20 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (335,544,320 operations x 4 KiB) | $51.20 |
 | **major-line-item subtotal** | **$8,755.20** |
 
-#### Pattern A — 1 MiB objects
+In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $124.15 |
+| **major-line-item subtotal** | **$636.15** |
+
+#### Pattern P2 — 1 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 20,971,520 |
-| Objects written per month | 0 |
-| Reads per month | 20,971,520 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 20,971,520 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 20,480 GiB x 1 reads / 20,971,520 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.1 MB/s |
 
@@ -841,17 +1080,31 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $0.00 |
 | GET requests (streamed straight from the bucket) | $7.76 |
-| S3 Files write (metadata import) | $0.00 |
-| S3 Files read (metadata) | $3.20 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (20,971,520 operations x 4 KiB) | $3.20 |
 | **major-line-item subtotal** | **$522.96** |
 
-#### Pattern A — 4 MiB objects
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $7.76 |
+| **major-line-item subtotal** | **$519.76** |
+
+#### Pattern P2 — 4 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 5,242,880 |
-| Objects written per month | 0 |
-| Reads per month | 5,242,880 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 5,242,880 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 20,480 GiB x 1 reads / 5,242,880 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.1 MB/s |
 
@@ -873,17 +1126,31 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $0.00 |
 | GET requests (streamed straight from the bucket) | $1.94 |
-| S3 Files write (metadata import) | $0.00 |
-| S3 Files read (metadata) | $0.80 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (5,242,880 operations x 4 KiB) | $0.80 |
 | **major-line-item subtotal** | **$514.74** |
 
-#### Pattern A — 16 MiB objects
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $1.94 |
+| **major-line-item subtotal** | **$513.94** |
+
+#### Pattern P2 — 16 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 1,310,720 |
-| Objects written per month | 0 |
-| Reads per month | 1,310,720 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 1,310,720 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 20,480 GiB x 1 reads / 1,310,720 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.1 MB/s |
 
@@ -905,17 +1172,407 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $0.00 |
 | GET requests (streamed straight from the bucket) | $0.48 |
-| S3 Files write (metadata import) | $0.00 |
-| S3 Files read (metadata) | $0.20 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (1,310,720 operations x 4 KiB) | $0.20 |
 | **major-line-item subtotal** | **$512.68** |
 
-#### Pattern B — 64 KiB objects
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.48 |
+| **major-line-item subtotal** | **$512.48** |
+
+#### Pattern P3 — 64 KiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 335,544,320 |
-| Objects written per month | 16,777,216 |
-| Reads per month | 335,544,320 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 20% = 4,096 GiB (4 TiB) / 67,108,864 objects. The other 80% (16,384 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 5 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 4,096 GiB x 5 reads / 335,544,320 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $37.25 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,818.50** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| S3 Files write (import onto high-performance storage) | $0.00 |
+| S3 Files read (reads after import) | $819.20 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (335,544,320 operations x 4 KiB) | $51.20 |
+| **major-line-item subtotal** | **$8,755.20** |
+
+In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $124.15 |
+| **major-line-item subtotal** | **$636.15** |
+
+#### Pattern P3 — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 20% = 4,096 GiB (4 TiB) / 4,194,304 objects. The other 80% (16,384 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 5 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 4,096 GiB x 5 reads / 20,971,520 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $2.33 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,783.58** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $7.76 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (20,971,520 operations x 4 KiB) | $3.20 |
+| **major-line-item subtotal** | **$522.96** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $7.76 |
+| **major-line-item subtotal** | **$519.76** |
+
+#### Pattern P3 — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 20% = 4,096 GiB (4 TiB) / 1,048,576 objects. The other 80% (16,384 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 5 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 4,096 GiB x 5 reads / 5,242,880 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.58 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.83** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $1.94 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (5,242,880 operations x 4 KiB) | $0.80 |
+| **major-line-item subtotal** | **$514.74** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $1.94 |
+| **major-line-item subtotal** | **$513.94** |
+
+#### Pattern P3 — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 20% = 4,096 GiB (4 TiB) / 262,144 objects. The other 80% (16,384 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 5 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 4,096 GiB x 5 reads / 1,310,720 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.15 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.40** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.48 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (1,310,720 operations x 4 KiB) | $0.20 |
+| **major-line-item subtotal** | **$512.68** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.48 |
+| **major-line-item subtotal** | **$512.48** |
+
+#### Pattern P4 — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 33,554,432 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 335,544,320 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $37.25 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,818.50** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| S3 Files write (import onto high-performance storage) | $0.00 |
+| S3 Files read (reads after import) | $819.20 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (335,544,320 operations x 4 KiB) | $51.20 |
+| **major-line-item subtotal** | **$8,755.20** |
+
+In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $124.15 |
+| **major-line-item subtotal** | **$636.15** |
+
+#### Pattern P4 — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 2,097,152 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 20,971,520 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $2.33 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,783.58** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $7.76 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (20,971,520 operations x 4 KiB) | $3.20 |
+| **major-line-item subtotal** | **$522.96** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $7.76 |
+| **major-line-item subtotal** | **$519.76** |
+
+#### Pattern P4 — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 524,288 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 5,242,880 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.58 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.83** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $1.94 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (5,242,880 operations x 4 KiB) | $0.80 |
+| **major-line-item subtotal** | **$514.74** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $1.94 |
+| **major-line-item subtotal** | **$513.94** |
+
+#### Pattern P4 — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 131,072 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 1,310,720 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
+| 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.15 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.40** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.48 |
+| S3 Files metadata import (0 operations x 4 KiB) | $0.00 |
+| S3 Files metadata read (1,310,720 operations x 4 KiB) | $0.20 |
+| **major-line-item subtotal** | **$512.68** |
+
+**S3 alone (consumers also speak the S3 API)**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard) | $512.00 |
+| PUT requests | $0.00 |
+| GET requests | $0.48 |
+| **major-line-item subtotal** | **$512.48** |
+
+#### Pattern P5 — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 33,554,432 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 335,544,320 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 16,777,216 objects / churn rate 5% (0.05x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.5 MB/s |
 
@@ -938,17 +1595,24 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | PUT requests (to an S3 bucket) | $78.85 |
 | S3 Files high-performance storage (100% active) | $7,372.80 |
 | GET requests (the first read is streamed from the bucket) | $6.21 |
-| S3 Files write (import onto high-performance storage) | $76.16 |
-| S3 Files read (reads after import, plus metadata) | $829.44 |
+| S3 Files write (import onto high-performance storage) | $71.68 |
+| S3 Files read (reads after import) | $778.24 |
+| S3 Files metadata import (16,777,216 operations x 4 KiB) | $4.48 |
+| S3 Files metadata read (335,544,320 operations x 4 KiB) | $51.20 |
 | **major-line-item subtotal** | **$8,875.46** |
 
-#### Pattern B — 1 MiB objects
+#### Pattern P5 — 1 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 20,971,520 |
-| Objects written per month | 1,048,576 |
-| Reads per month | 20,971,520 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 2,097,152 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 20,971,520 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 1,048,576 objects / churn rate 5% (0.05x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.5 MB/s |
 
@@ -970,17 +1634,22 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $4.93 |
 | GET requests (streamed straight from the bucket) | $7.76 |
-| S3 Files write (metadata import) | $0.28 |
-| S3 Files read (metadata) | $3.20 |
+| S3 Files metadata import (1,048,576 operations x 4 KiB) | $0.28 |
+| S3 Files metadata read (20,971,520 operations x 4 KiB) | $3.20 |
 | **major-line-item subtotal** | **$528.17** |
 
-#### Pattern B — 4 MiB objects
+#### Pattern P5 — 4 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 5,242,880 |
-| Objects written per month | 262,144 |
-| Reads per month | 5,242,880 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 524,288 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 5,242,880 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 262,144 objects / churn rate 5% (0.05x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.5 MB/s |
 
@@ -1002,17 +1671,22 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $1.23 |
 | GET requests (streamed straight from the bucket) | $1.94 |
-| S3 Files write (metadata import) | $0.07 |
-| S3 Files read (metadata) | $0.80 |
+| S3 Files metadata import (262,144 operations x 4 KiB) | $0.07 |
+| S3 Files metadata read (5,242,880 operations x 4 KiB) | $0.80 |
 | **major-line-item subtotal** | **$516.04** |
 
-#### Pattern B — 16 MiB objects
+#### Pattern P5 — 16 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 1,310,720 |
-| Objects written per month | 65,536 |
-| Reads per month | 1,310,720 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 131,072 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 10 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 20,480 GiB (20 TiB) = 2,048 GiB x 10 reads / 1,310,720 requests / R = 1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 65,536 objects / churn rate 5% (0.05x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 8.5 MB/s |
 
@@ -1034,17 +1708,22 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $0.31 |
 | GET requests (streamed straight from the bucket) | $0.48 |
-| S3 Files write (metadata import) | $0.02 |
-| S3 Files read (metadata) | $0.20 |
+| S3 Files metadata import (65,536 operations x 4 KiB) | $0.02 |
+| S3 Files metadata read (1,310,720 operations x 4 KiB) | $0.20 |
 | **major-line-item subtotal** | **$513.01** |
 
-#### Pattern C — 64 KiB objects
+#### Pattern P6 — 64 KiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 335,544,320 |
-| Objects written per month | 335,544,320 |
-| Reads per month | 671,088,640 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 50% = 10,240 GiB (10 TiB) / 167,772,160 objects. The other 50% (10,240 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 4 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 10,240 GiB x 4 reads / 671,088,640 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 24.3 MB/s |
 
@@ -1067,17 +1746,24 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | PUT requests (to an S3 bucket) | $1,577.06 |
 | S3 Files high-performance storage (100% active) | $7,372.80 |
 | GET requests (the first read is streamed from the bucket) | $124.15 |
-| S3 Files write (import onto high-performance storage) | $1,523.20 |
-| S3 Files read (reads after import, plus metadata) | $921.60 |
+| S3 Files write (import onto high-performance storage) | $1,433.60 |
+| S3 Files read (reads after import) | $819.20 |
+| S3 Files metadata import (335,544,320 operations x 4 KiB) | $89.60 |
+| S3 Files metadata read (671,088,640 operations x 4 KiB) | $102.40 |
 | **major-line-item subtotal** | **$12,030.81** |
 
-#### Pattern C — 1 MiB objects
+#### Pattern P6 — 1 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 20,971,520 |
-| Objects written per month | 20,971,520 |
-| Reads per month | 41,943,040 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 50% = 10,240 GiB (10 TiB) / 10,485,760 objects. The other 50% (10,240 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 4 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 10,240 GiB x 4 reads / 41,943,040 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 24.3 MB/s |
 
@@ -1099,17 +1785,22 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $98.57 |
 | GET requests (streamed straight from the bucket) | $15.52 |
-| S3 Files write (metadata import) | $5.60 |
-| S3 Files read (metadata) | $6.40 |
+| S3 Files metadata import (20,971,520 operations x 4 KiB) | $5.60 |
+| S3 Files metadata read (41,943,040 operations x 4 KiB) | $6.40 |
 | **major-line-item subtotal** | **$638.09** |
 
-#### Pattern C — 4 MiB objects
+#### Pattern P6 — 4 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 5,242,880 |
-| Objects written per month | 5,242,880 |
-| Reads per month | 10,485,760 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 50% = 10,240 GiB (10 TiB) / 2,621,440 objects. The other 50% (10,240 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 4 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 10,240 GiB x 4 reads / 10,485,760 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 24.3 MB/s |
 
@@ -1131,17 +1822,22 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $24.64 |
 | GET requests (streamed straight from the bucket) | $3.88 |
-| S3 Files write (metadata import) | $1.40 |
-| S3 Files read (metadata) | $1.60 |
+| S3 Files metadata import (5,242,880 operations x 4 KiB) | $1.40 |
+| S3 Files metadata read (10,485,760 operations x 4 KiB) | $1.60 |
 | **major-line-item subtotal** | **$543.52** |
 
-#### Pattern C — 16 MiB objects
+#### Pattern P6 — 16 MiB objects
 
 | Derived quantity | Value |
 |---|---|
-| Stored object count | 1,310,720 |
-| Objects written per month | 1,310,720 |
-| Reads per month | 2,621,440 |
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 50% = 10,240 GiB (10 TiB) / 655,360 objects. The other 50% (10,240 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 4 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 10,240 GiB x 4 reads / 2,621,440 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
 | Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
 | Average throughput required | 24.3 MB/s |
 
@@ -1163,9 +1859,311 @@ For both methods, each breakdown below is a **major-line-item subtotal**, not a 
 | Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
 | PUT requests (to an S3 bucket) | $6.16 |
 | GET requests (streamed straight from the bucket) | $0.97 |
-| S3 Files write (metadata import) | $0.35 |
-| S3 Files read (metadata) | $0.40 |
+| S3 Files metadata import (1,310,720 operations x 4 KiB) | $0.35 |
+| S3 Files metadata read (2,621,440 operations x 4 KiB) | $0.40 |
 | **major-line-item subtotal** | **$519.88** |
+
+#### Pattern P7 — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 335,544,320 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 2 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 20,480 GiB x 2 reads / 671,088,640 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $74.49 |
+| PUT requests (through an S3 AP) | $362.39 |
+| **major-line-item subtotal** | **$2,218.13** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $1,577.06 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| GET requests (the first read is streamed from the bucket) | $124.15 |
+| S3 Files write (import onto high-performance storage) | $1,433.60 |
+| S3 Files read (reads after import) | $819.20 |
+| S3 Files metadata import (335,544,320 operations x 4 KiB) | $89.60 |
+| S3 Files metadata read (671,088,640 operations x 4 KiB) | $102.40 |
+| **major-line-item subtotal** | **$12,030.81** |
+
+#### Pattern P7 — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 20,971,520 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 2 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 20,480 GiB x 2 reads / 41,943,040 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $4.66 |
+| PUT requests (through an S3 AP) | $22.65 |
+| **major-line-item subtotal** | **$1,808.55** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $98.57 |
+| GET requests (streamed straight from the bucket) | $15.52 |
+| S3 Files metadata import (20,971,520 operations x 4 KiB) | $5.60 |
+| S3 Files metadata read (41,943,040 operations x 4 KiB) | $6.40 |
+| **major-line-item subtotal** | **$638.09** |
+
+#### Pattern P7 — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 5,242,880 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 2 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 20,480 GiB x 2 reads / 10,485,760 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $1.16 |
+| PUT requests (through an S3 AP) | $5.66 |
+| **major-line-item subtotal** | **$1,788.08** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $24.64 |
+| GET requests (streamed straight from the bucket) | $3.88 |
+| S3 Files metadata import (5,242,880 operations x 4 KiB) | $1.40 |
+| S3 Files metadata read (10,485,760 operations x 4 KiB) | $1.60 |
+| **major-line-item subtotal** | **$543.52** |
+
+#### Pattern P7 — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 100% = the whole stored volume (20,480 GiB) / 1,310,720 objects. Every object is read within the month |
+| 4. Reads per working-set object | Each working-set object is read 2 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 40,960 GiB (40 TiB) = 20,480 GiB x 2 reads / 2,621,440 requests / R = 2x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.29 |
+| PUT requests (through an S3 AP) | $1.42 |
+| **major-line-item subtotal** | **$1,782.96** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $6.16 |
+| GET requests (streamed straight from the bucket) | $0.97 |
+| S3 Files metadata import (1,310,720 operations x 4 KiB) | $0.35 |
+| S3 Files metadata read (2,621,440 operations x 4 KiB) | $0.40 |
+| **major-line-item subtotal** | **$519.88** |
+
+#### Pattern P8 — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 335,544,320 objects |
+| 2. Object size | 64 KiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 33,554,432 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 2,048 GiB (2 TiB) = 2,048 GiB x 1 reads / 33,554,432 requests / R = 0.1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.9 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $3.72 |
+| PUT requests (through an S3 AP) | $362.39 |
+| **major-line-item subtotal** | **$2,147.36** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $1,577.06 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| GET requests (the first read is streamed from the bucket) | $124.15 |
+| S3 Files write (import onto high-performance storage) | $1,433.60 |
+| S3 Files read (reads after import) | $0.00 |
+| S3 Files metadata import (335,544,320 operations x 4 KiB) | $89.60 |
+| S3 Files metadata read (33,554,432 operations x 4 KiB) | $5.12 |
+| **major-line-item subtotal** | **$11,114.33** |
+
+#### Pattern P8 — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 20,971,520 objects |
+| 2. Object size | 1 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 2,097,152 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 2,048 GiB (2 TiB) = 2,048 GiB x 1 reads / 2,097,152 requests / R = 0.1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.9 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.23 |
+| PUT requests (through an S3 AP) | $22.65 |
+| **major-line-item subtotal** | **$1,804.13** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $98.57 |
+| GET requests (streamed straight from the bucket) | $0.78 |
+| S3 Files metadata import (20,971,520 operations x 4 KiB) | $5.60 |
+| S3 Files metadata read (2,097,152 operations x 4 KiB) | $0.32 |
+| **major-line-item subtotal** | **$617.26** |
+
+#### Pattern P8 — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 5,242,880 objects |
+| 2. Object size | 4 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 524,288 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 2,048 GiB (2 TiB) = 2,048 GiB x 1 reads / 524,288 requests / R = 0.1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.9 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.06 |
+| PUT requests (through an S3 AP) | $5.66 |
+| **major-line-item subtotal** | **$1,786.97** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $24.64 |
+| GET requests (streamed straight from the bucket) | $0.19 |
+| S3 Files metadata import (5,242,880 operations x 4 KiB) | $1.40 |
+| S3 Files metadata read (524,288 operations x 4 KiB) | $0.08 |
+| **major-line-item subtotal** | **$538.32** |
+
+#### Pattern P8 — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| 1. Stored volume (logical) and stored object count | 20,480 GiB (20 TiB) / 1,310,720 objects |
+| 2. Object size | 16 MiB |
+| 3. Working set (the part read within the month) | 10% = 2,048 GiB (2 TiB) / 131,072 objects. The other 90% (18,432 GiB) is not read within the month |
+| 4. Reads per working-set object | Each working-set object is read 1 times a month |
+| 5. Read per month (bytes / requests / multiple of stored volume, R) | 2,048 GiB (2 TiB) = 2,048 GiB x 1 reads / 131,072 requests / R = 0.1x |
+| 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
+| 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
+| 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.9 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.01 |
+| PUT requests (through an S3 AP) | $1.42 |
+| **major-line-item subtotal** | **$1,782.68** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $6.16 |
+| GET requests (streamed straight from the bucket) | $0.05 |
+| S3 Files metadata import (1,310,720 operations x 4 KiB) | $0.35 |
+| S3 Files metadata read (131,072 operations x 4 KiB) | $0.02 |
+| **major-line-item subtotal** | **$518.58** |
 
 ### When the same data is read repeatedly — egress is what decides it
 
