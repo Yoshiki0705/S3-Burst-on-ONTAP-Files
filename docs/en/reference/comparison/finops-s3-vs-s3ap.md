@@ -752,6 +752,421 @@ Industries this fits: Life sciences, research
 
 This architecture is $300.96 (6%) a month cheaper than the one with a sync job in the middle. The largest term in the difference is "DataSync transfer", which accounts for 65% of it.
 
+### A common baseline — 20 TiB under the same terms
+
+The use-case estimates above each start from different assumptions. Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size (64 KiB, 1 MiB, 4 MiB, 16 MiB) and the read/write pattern (A / B / C). The same logical workload is presented to both methods.
+
+The stored volume (logical) is fixed at 20 TiB in every cell. The monthly read and write volumes are set separately per pattern. **The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; it does not add to it.
+
+| Pattern | Read per month | Written per month |
+|---|---|---|
+| A | 20 TiB | 0 TiB |
+| B | 20 TiB | 1 TiB |
+| C | 40 TiB | 20 TiB |
+
+Each cell derives four quantities separately: the **stored object count** (stored bytes / size), the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), and the **capacity-pool billed request count**. That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. These four are not treated as the same number.
+
+For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted.
+
+| Item | Value |
+|---|---|
+| Region | `ap-northeast-1` (Asia Pacific (Tokyo)) |
+| Price snapshot | 2026-08-09 |
+| Currency | USD, excluding tax |
+| Stored volume (logical, common to every cell) | 20,480 GiB |
+| Deployment | Single-AZ, first generation (`SINGLE_AZ_1`) |
+| Assumed storage efficiency (SSD / pool tier) | 40% / 20% |
+| Fraction tiered to the capacity pool | 30% |
+| Seconds in a month | 2,592,000 s (30 x 24 x 3600) |
+| GiB / GB-Mo conversion | Logical GiB is priced at the GB-Mo rate |
+
+#### Pattern A — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 335,544,320 |
+| Objects written per month | 0 |
+| Reads per month | 335,544,320 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $37.25 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,818.50** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| GET requests (the first read is streamed from the bucket) | $0.00 |
+| S3 Files write (import onto high-performance storage) | $0.00 |
+| S3 Files read (reads after import, plus metadata) | $870.40 |
+| **major-line-item subtotal** | **$8,755.20** |
+
+#### Pattern A — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 20,971,520 |
+| Objects written per month | 0 |
+| Reads per month | 20,971,520 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $2.33 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,783.58** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $7.76 |
+| S3 Files write (metadata import) | $0.00 |
+| S3 Files read (metadata) | $3.20 |
+| **major-line-item subtotal** | **$522.96** |
+
+#### Pattern A — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 5,242,880 |
+| Objects written per month | 0 |
+| Reads per month | 5,242,880 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.58 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.83** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $1.94 |
+| S3 Files write (metadata import) | $0.00 |
+| S3 Files read (metadata) | $0.80 |
+| **major-line-item subtotal** | **$514.74** |
+
+#### Pattern A — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 1,310,720 |
+| Objects written per month | 0 |
+| Reads per month | 1,310,720 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.1 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.15 |
+| PUT requests (through an S3 AP) | $0.00 |
+| **major-line-item subtotal** | **$1,781.40** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.00 |
+| GET requests (streamed straight from the bucket) | $0.48 |
+| S3 Files write (metadata import) | $0.00 |
+| S3 Files read (metadata) | $0.20 |
+| **major-line-item subtotal** | **$512.68** |
+
+#### Pattern B — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 335,544,320 |
+| Objects written per month | 16,777,216 |
+| Reads per month | 335,544,320 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.5 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $37.25 |
+| PUT requests (through an S3 AP) | $18.12 |
+| **major-line-item subtotal** | **$1,836.61** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $78.85 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| GET requests (the first read is streamed from the bucket) | $6.21 |
+| S3 Files write (import onto high-performance storage) | $76.16 |
+| S3 Files read (reads after import, plus metadata) | $829.44 |
+| **major-line-item subtotal** | **$8,875.46** |
+
+#### Pattern B — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 20,971,520 |
+| Objects written per month | 1,048,576 |
+| Reads per month | 20,971,520 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.5 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $2.33 |
+| PUT requests (through an S3 AP) | $1.13 |
+| **major-line-item subtotal** | **$1,784.71** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $4.93 |
+| GET requests (streamed straight from the bucket) | $7.76 |
+| S3 Files write (metadata import) | $0.28 |
+| S3 Files read (metadata) | $3.20 |
+| **major-line-item subtotal** | **$528.17** |
+
+#### Pattern B — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 5,242,880 |
+| Objects written per month | 262,144 |
+| Reads per month | 5,242,880 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.5 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.58 |
+| PUT requests (through an S3 AP) | $0.28 |
+| **major-line-item subtotal** | **$1,782.11** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $1.23 |
+| GET requests (streamed straight from the bucket) | $1.94 |
+| S3 Files write (metadata import) | $0.07 |
+| S3 Files read (metadata) | $0.80 |
+| **major-line-item subtotal** | **$516.04** |
+
+#### Pattern B — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 1,310,720 |
+| Objects written per month | 65,536 |
+| Reads per month | 1,310,720 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 8.5 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.15 |
+| PUT requests (through an S3 AP) | $0.07 |
+| **major-line-item subtotal** | **$1,781.47** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $0.31 |
+| GET requests (streamed straight from the bucket) | $0.48 |
+| S3 Files write (metadata import) | $0.02 |
+| S3 Files read (metadata) | $0.20 |
+| **major-line-item subtotal** | **$513.01** |
+
+#### Pattern C — 64 KiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 335,544,320 |
+| Objects written per month | 335,544,320 |
+| Reads per month | 671,088,640 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $74.49 |
+| PUT requests (through an S3 AP) | $362.39 |
+| **major-line-item subtotal** | **$2,218.13** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $1,577.06 |
+| S3 Files high-performance storage (100% active) | $7,372.80 |
+| GET requests (the first read is streamed from the bucket) | $124.15 |
+| S3 Files write (import onto high-performance storage) | $1,523.20 |
+| S3 Files read (reads after import, plus metadata) | $921.60 |
+| **major-line-item subtotal** | **$12,030.81** |
+
+#### Pattern C — 1 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 20,971,520 |
+| Objects written per month | 20,971,520 |
+| Reads per month | 41,943,040 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $4.66 |
+| PUT requests (through an S3 AP) | $22.65 |
+| **major-line-item subtotal** | **$1,808.55** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $98.57 |
+| GET requests (streamed straight from the bucket) | $15.52 |
+| S3 Files write (metadata import) | $5.60 |
+| S3 Files read (metadata) | $6.40 |
+| **major-line-item subtotal** | **$638.09** |
+
+#### Pattern C — 4 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 5,242,880 |
+| Objects written per month | 5,242,880 |
+| Reads per month | 10,485,760 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $1.16 |
+| PUT requests (through an S3 AP) | $5.66 |
+| **major-line-item subtotal** | **$1,788.08** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $24.64 |
+| GET requests (streamed straight from the bucket) | $3.88 |
+| S3 Files write (metadata import) | $1.40 |
+| S3 Files read (metadata) | $1.60 |
+| **major-line-item subtotal** | **$543.52** |
+
+#### Pattern C — 16 MiB objects
+
+| Derived quantity | Value |
+|---|---|
+| Stored object count | 1,310,720 |
+| Objects written per month | 1,310,720 |
+| Reads per month | 2,621,440 |
+| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Average throughput required | 24.3 MB/s |
+
+**FSx for ONTAP S3 AP (this architecture)**
+
+| Line item | Monthly |
+|---|---|
+| SSD storage (10,322 GiB) | $1,548.30 |
+| Throughput capacity (128 MBps) | $115.97 |
+| Capacity pool storage (4,915 GiB) | $116.98 |
+| Capacity pool read requests | $0.29 |
+| PUT requests (through an S3 AP) | $1.42 |
+| **major-line-item subtotal** | **$1,782.96** |
+
+**S3 bucket + S3 Files**
+
+| Line item | Monthly |
+|---|---|
+| Storage (S3 Standard; the authoritative copy stays in the bucket) | $512.00 |
+| PUT requests (to an S3 bucket) | $6.16 |
+| GET requests (streamed straight from the bucket) | $0.97 |
+| S3 Files write (metadata import) | $0.35 |
+| S3 Files read (metadata) | $0.40 |
+| **major-line-item subtotal** | **$519.88** |
+
 ### When the same data is read repeatedly — egress is what decides it
 
 Every estimate so far assumed the consumers sit in the same Region. Transfer within a Region is not charged, which is why the comparison came down to storage and request rates.

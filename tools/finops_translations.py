@@ -684,5 +684,58 @@ TRANSLATIONS.update(
         "この差は容量が増えても縮まらない。": "An S3 Access Point carries no hourly charge of its own, so its increment reduces to request charges. "
         "The sync job's increment includes storage for holding the same bytes in two places. "
         "That difference does not narrow as capacity grows.",
+        # --- the common 20 TiB baseline grid -------------------------------------------------------
+        "### 共通ベースライン — 20 TiB を同じ条件で": "### A common baseline — 20 TiB under the same terms",
+        "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
+        "それぞれが現実のどれかに寄っているぶん、方式そのものの差を同じ土俵で見るには向かない。"
+        "この節は逆に、**論理 20 TiB という 1 つの土俵**を固定し、"
+        "オブジェクトサイズ ({sizes}) と読み書きのパターン (A / B / C) だけを振る。"
+        "両方式に同じ論理ワークロードを与える。": "The use-case estimates above each start from different assumptions. "
+        "Each leans toward one real workload, which is what makes them concrete and also what makes them a poor place to see the difference between the methods on equal footing. "
+        "This section does the opposite: it fixes **one footing, 20 TiB of logical data**, and varies only the object size ({sizes}) and the read/write pattern (A / B / C). "
+        "The same logical workload is presented to both methods.",
+        "保存量 (論理) はどのセルでも 20 TiB で固定である。月間の読み取り量と書き込み量はパターンごとに別に置く。"
+        "**月間書き込み量を平均保持量と同一視しない**。20 TiB の定常保存に対して、月に 1 TiB 書くとはその一部を置き換えることであって、"
+        "積み増すことではない。": "The stored volume (logical) is fixed at 20 TiB in every cell. The monthly read and write volumes are set separately per pattern. "
+        "**The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; "
+        "it does not add to it.",
+        "パターン": "Pattern",
+        "月間読み取り": "Read per month",
+        "月間書き込み": "Written per month",
+        "各セルは 4 つの量を別々に導く。**保存オブジェクト数** (保存バイト / サイズ)、"
+        "**月間書き込みオブジェクト数** (書き込み量 / サイズ、S3 の PUT と NFS の書き込み操作に対応)、"
+        "**月間読み取り回数** (読み取り量 / サイズ、S3 の GET と NFS の読み取り操作に対応)、"
+        "そして **capacity pool の課金リクエスト数** である。"
+        "最後の 1 つは FabricPool の 4 MiB 単位の読み取り操作数で、"
+        "GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+        "この 4 つを同じ数として扱わない。": "Each cell derives four quantities separately: the **stored object count** (stored bytes / size), "
+        "the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), "
+        "the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), "
+        "and the **capacity-pool billed request count**. "
+        "That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. "
+        "These four are not treated as the same number.",
+        "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
+        "capacity pool の読み取りリクエスト数が未確認であること、"
+        "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。": "For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. "
+        "The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted.",
+        "項目": "Item",
+        "リージョン": "Region",
+        "単価スナップショット": "Price snapshot",
+        "通貨": "Currency",
+        "USD、税別": "USD, excluding tax",
+        "保存量 (論理、全セル共通)": "Stored volume (logical, common to every cell)",
+        "ストレージ効率の仮定 (SSD / プール層)": "Assumed storage efficiency (SSD / pool tier)",
+        "1 か月の秒数": "Seconds in a month",
+        "{seconds} 秒 (30 × 24 × 3600)": "{seconds} s (30 x 24 x 3600)",
+        "GiB / GB-Mo の換算": "GiB / GB-Mo conversion",
+        "論理 GiB を GB-Mo の単価に当てる": "Logical GiB is priced at the GB-Mo rate",
+        "#### パターン {pattern} — オブジェクト {size}": "#### Pattern {pattern} — {size} objects",
+        "導出量": "Derived quantity",
+        "保存オブジェクト数": "Stored object count",
+        "月間書き込みオブジェクト数": "Objects written per month",
+        "月間読み取り回数": "Reads per month",
+        "capacity pool 課金リクエスト数": "Capacity-pool billed request count",
+        "未確認 (GET あたりの回数が未測定)": "unconfirmed (the count per GET is not measured)",
+        "**主要費目小計 / major-line-item subtotal**": "**major-line-item subtotal**",
     }
 )

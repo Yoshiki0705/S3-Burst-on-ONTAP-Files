@@ -2396,6 +2396,265 @@ def render_marginal_cost() -> list[str]:
     ]
 
 
+# --------------------------------------------------------------------------- baseline grid
+#
+# A dedicated dataclass rather than a reused `Scenario`. The scenarios couple the stored volume to
+# the ingest: `stored_gib = ingest_gib * retention_months`, so stored follows from what is written.
+# This grid does the opposite — it fixes the stored logical volume at a common 20 TiB and varies the
+# read and write volumes independently, which is the whole point of a like-for-like baseline. Forcing
+# that onto `Scenario` would make the monthly write volume set the retained volume, which is exactly
+# the conflation design section 3.3 forbids. `BaselineCell` therefore carries read and write volume
+# as their own inputs, and has no `industry` field — the grid is deliberately workload-agnostic, so
+# the design-review NIT about an empty 想定業種 row does not arise here.
+#
+# The pricing still runs through the existing derivation helpers (`fsx_component`, `fsx_s3ap`,
+# `s3_files_option`): `BaselineCell` exposes the same attribute and property names those functions
+# read, so object-count, NFS-ops, S3-requests and capacity-pool-billed-requests stay the separate
+# quantities they already are in the model rather than being recomputed here.
+
+
+@dataclass(frozen=True)
+class BaselineCell:
+    """One cell of the common 20 TiB baseline grid: a size crossed with a read/write pattern.
+
+    Stored volume is fixed and logical. Read and write volumes are independent monthly figures, so
+    the object count written and the object count read are derived separately and never equated with
+    the retained volume. Everything a pricing helper reads off a `Scenario` is provided here under
+    the same name.
+    """
+
+    pattern: str  # "A" / "B" / "C"
+    object_mib: float
+    stored_gib: float  # common 20 TiB logical, fixed across the grid
+    read_gib_per_month: float
+    write_gib_per_month: float
+
+    # Fixed modelling assumptions, held constant across the grid so the only variables are size and
+    # pattern. Stated here, not buried in the render function.
+    efficiency_ssd: float = 0.40
+    pool_fraction: float = 0.30
+    deployment: str = "saz1"
+    tput_headroom: float = 4.0
+    ssd_headroom: float = 0.20
+    retention_months: float = 1.0  # steady state: the 20 TiB is resident for the month
+    s3files_viable: bool = True
+    s3files_threshold_kib: float = S3FILES_DEFAULT_THRESHOLD_KIB
+    s3files_expiration_days: float = S3FILES_DEFAULT_EXPIRY_DAYS
+
+    @property
+    def object_kib(self) -> float:
+        return self.object_mib * 1024
+
+    @property
+    def objects_stored(self) -> float:
+        """Object count = stored bytes / size. Separate from the read and write counts below."""
+        return self.stored_gib / self.object_mib * 1024
+
+    @property
+    def objects_per_month(self) -> float:
+        """Objects written per month = write volume / size. The S3 PUT / NFS-write count.
+
+        Distinct from `objects_stored`: writing 1 TiB/month into a 20 TiB resident set replaces part
+        of it, it does not add to it.
+        """
+        return self.write_gib_per_month / self.object_mib * 1024
+
+    @property
+    def reads_per_month(self) -> float:
+        """Objects read per month = read volume / size. The S3 GET / NFS-read count.
+
+        Not the same quantity as the capacity-pool billed request count, which the pricing helper
+        derives separately in FabricPool 4 MiB units and which stays UNCONFIRMED (see below).
+        """
+        return self.read_gib_per_month / self.object_mib * 1024
+
+    @property
+    def ingest_gib(self) -> float:
+        """Bytes written per month. Used only by the sync landing-area helper if ever called."""
+        return self.write_gib_per_month
+
+    @property
+    def efficiency_pool(self) -> float:
+        return self.efficiency_ssd * POOL_EFFICIENCY_RETENTION
+
+    @property
+    def required_mbps(self) -> float:
+        """Sustained throughput from read + write volume, in MB/s averaged over the month."""
+        moved_mib = (self.read_gib_per_month + self.write_gib_per_month) * 1024
+        return moved_mib / SECONDS_PER_MONTH
+
+
+# Common input: 20 TiB logical, the same logical workload presented to both methods. Four object
+# sizes crossed with three read/write patterns. The patterns name monthly read and write volume in
+# TiB; the stored volume is the same 20 TiB in every cell.
+BASELINE_STORED_TIB = 20
+BASELINE_SIZES_KIB = (64, 1024, 4096, 16384)  # 64 KiB, 1 MiB, 4 MiB, 16 MiB
+BASELINE_PATTERNS: tuple[tuple[str, float, float], ...] = (
+    # (pattern, read TiB/month, write TiB/month)
+    ("A", 20.0, 0.0),
+    ("B", 20.0, 1.0),
+    ("C", 40.0, 20.0),
+)
+
+
+def baseline_cells() -> list[BaselineCell]:
+    stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+    cells = []
+    for pattern, read_tib, write_tib in BASELINE_PATTERNS:
+        for kib in BASELINE_SIZES_KIB:
+            cells.append(
+                BaselineCell(
+                    pattern=pattern,
+                    object_mib=kib / 1024,
+                    stored_gib=stored_gib,
+                    read_gib_per_month=read_tib * GIB_PER_TIB,
+                    write_gib_per_month=write_tib * GIB_PER_TIB,
+                )
+            )
+    return cells
+
+
+def render_baseline_grid() -> list[str]:
+    """The common 20 TiB baseline: 4 object sizes x 3 read/write patterns, both methods per cell.
+
+    Twelve cells, each giving the S3-Files-path breakdown and the FSx-for-ONTAP breakdown with a
+    subtotal. Every subtotal is a 主要費目小計, not a 月額総額: the capacity-pool read-request count is
+    left UNCONFIRMED, so neither total is complete and neither is labelled as if it were.
+    """
+    sizes = ", ".join(
+        f"{k} KiB" if k < 1024 else f"{k // 1024} MiB" for k in BASELINE_SIZES_KIB
+    )
+    out = [
+        t("### 共通ベースライン — 20 TiB を同じ条件で"),
+        "",
+        t(
+            "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
+            "それぞれが現実のどれかに寄っているぶん、方式そのものの差を同じ土俵で見るには向かない。"
+            "この節は逆に、**論理 20 TiB という 1 つの土俵**を固定し、"
+            "オブジェクトサイズ ({sizes}) と読み書きのパターン (A / B / C) だけを振る。"
+            "両方式に同じ論理ワークロードを与える。",
+            sizes=sizes,
+        ),
+        "",
+        t(
+            "保存量 (論理) はどのセルでも 20 TiB で固定である。"
+            "月間の読み取り量と書き込み量はパターンごとに別に置く。"
+            "**月間書き込み量を平均保持量と同一視しない**。"
+            "20 TiB の定常保存に対して、月に 1 TiB 書くとはその一部を置き換えることであって、"
+            "積み増すことではない。",
+        ),
+        "",
+        *table(
+            [t("パターン"), t("月間読み取り"), t("月間書き込み")],
+            [
+                [
+                    pattern,
+                    t("{tib} TiB", tib=f"{read_tib:g}"),
+                    t("{tib} TiB", tib=f"{write_tib:g}"),
+                ]
+                for pattern, read_tib, write_tib in BASELINE_PATTERNS
+            ],
+        ),
+        "",
+        t(
+            "各セルは 4 つの量を別々に導く。"
+            "**保存オブジェクト数** (保存バイト / サイズ)、"
+            "**月間書き込みオブジェクト数** (書き込み量 / サイズ、S3 の PUT と NFS の書き込み操作に対応)、"
+            "**月間読み取り回数** (読み取り量 / サイズ、S3 の GET と NFS の読み取り操作に対応)、"
+            "そして **capacity pool の課金リクエスト数** である。"
+            "最後の 1 つは FabricPool の 4 MiB 単位の読み取り操作数で、"
+            "GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+            "この 4 つを同じ数として扱わない。"
+        ),
+        "",
+        t(
+            "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
+            "capacity pool の読み取りリクエスト数が未確認であること、"
+            "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
+        ),
+        "",
+    ]
+
+    # Metadata block: the same provenance every cost table in this document carries.
+    dep = DEPLOYMENTS["saz1"]
+    out += [
+        *table(
+            [t("項目"), t("値")],
+            [
+                [t("リージョン"), f"`{REGION}` ({t(REGION_LABEL)})"],
+                [t("単価スナップショット"), PRICE_SNAPSHOT],
+                [t("通貨"), t("USD、税別")],
+                [
+                    t("保存量 (論理、全セル共通)"),
+                    gib(BASELINE_STORED_TIB * GIB_PER_TIB),
+                ],
+                [t("デプロイ"), f"{t(dep['label'])} (`{dep['api']}`)"],
+                [
+                    t("ストレージ効率の仮定 (SSD / プール層)"),
+                    f"{0.40:.0%} / {0.40 * POOL_EFFICIENCY_RETENTION:.0%}",
+                ],
+                [t("キャパシティプールへ落とす割合"), f"{0.30:.0%}"],
+                [
+                    t("1 か月の秒数"),
+                    t(
+                        "{seconds} 秒 (30 × 24 × 3600)",
+                        seconds=f"{SECONDS_PER_MONTH:,}",
+                    ),
+                ],
+                [t("GiB / GB-Mo の換算"), t("論理 GiB を GB-Mo の単価に当てる")],
+            ],
+        ),
+        "",
+    ]
+
+    for cell in baseline_cells():
+        size_label = (
+            f"{cell.object_kib:,.0f} KiB"
+            if cell.object_kib < 1024
+            else f"{cell.object_kib / 1024:,.0f} MiB"
+        )
+        out += [
+            t(
+                "#### パターン {pattern} — オブジェクト {size}",
+                pattern=cell.pattern,
+                size=size_label,
+            ),
+            "",
+            *table(
+                [t("導出量"), t("値")],
+                [
+                    [t("保存オブジェクト数"), f"{cell.objects_stored:,.0f}"],
+                    [t("月間書き込みオブジェクト数"), f"{cell.objects_per_month:,.0f}"],
+                    [t("月間読み取り回数"), f"{cell.reads_per_month:,.0f}"],
+                    [
+                        t("capacity pool 課金リクエスト数"),
+                        t("未確認 (GET あたりの回数が未測定)"),
+                    ],
+                    [t("平均所要スループット"), f"{cell.required_mbps:,.1f} MB/s"],
+                ],
+            ),
+            "",
+        ]
+
+        for label, lines in (
+            (t("FSx for ONTAP S3 AP (この構成)"), fsx_s3ap(cell)),
+            (t("S3 バケット + S3 Files"), s3_files_option(cell)),
+        ):
+            if lines is None:
+                continue
+            subtotal = sum(lines.values())
+            rows = [[item, usd(cost)] for item, cost in lines.items()]
+            rows.append(
+                [
+                    t("**主要費目小計 / major-line-item subtotal**"),
+                    f"**{usd(subtotal)}**",
+                ]
+            )
+            out += [f"**{label}**", "", *table([t("内訳"), t("月額")], rows), ""]
+
+    return out
+
+
 def render(lang: str = "ja") -> str:
     global _LANG
     if lang not in LANGS:
@@ -2423,6 +2682,7 @@ def render(lang: str = "ja") -> str:
     ]
     for sc in SCENARIOS:
         out += render_scenario(sc)
+    out += render_baseline_grid()
     out += render_read_heavy()
     out += render_cache_site()
     out += render_whole_system()

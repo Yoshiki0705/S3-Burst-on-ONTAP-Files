@@ -125,6 +125,88 @@ def test_every_scenario_title_keeps_the_separator_the_short_name_needs() -> None
         assert " — " in fm.TRANSLATIONS[scenario.title], scenario.key
 
 
+# --- the common 20 TiB baseline grid ------------------------------------------------------------
+
+
+def test_the_baseline_grid_has_twelve_cells() -> None:
+    """Four object sizes crossed with three read/write patterns."""
+    cells = fm.baseline_cells()
+    assert len(cells) == 12
+    assert len(fm.BASELINE_SIZES_KIB) == 4
+    assert len(fm.BASELINE_PATTERNS) == 3
+
+
+def test_every_cell_stores_the_common_20_tib() -> None:
+    """The whole point of the grid is one fixed footing; a cell that drifted off it would make the
+    cross-size comparison meaningless."""
+    expected = fm.BASELINE_STORED_TIB * fm.GIB_PER_TIB
+    for cell in fm.baseline_cells():
+        assert cell.stored_gib == expected, cell.pattern
+
+
+def test_size_times_count_equals_total_bytes_for_each_cell() -> None:
+    """The counts are derived as volume / size, so size x count must return the volume. This is the
+    check that object count is not quietly conflated with a volume figure."""
+    for cell in fm.baseline_cells():
+        gib_per_object = cell.object_mib / 1024
+        # Stored object count x size == stored volume.
+        assert cell.objects_stored * gib_per_object == pytest.approx(cell.stored_gib)
+        # Written object count x size == monthly write volume.
+        assert cell.objects_per_month * gib_per_object == pytest.approx(
+            cell.write_gib_per_month
+        )
+        # Read count x size == monthly read volume.
+        assert cell.reads_per_month * gib_per_object == pytest.approx(
+            cell.read_gib_per_month
+        )
+
+
+def test_pattern_read_and_write_volumes_equal_the_declared_inputs() -> None:
+    """A (read 20, write 0), B (read 20, write 1), C (read 40, write 20), in TiB per month."""
+    declared = {"A": (20.0, 0.0), "B": (20.0, 1.0), "C": (40.0, 20.0)}
+    for cell in fm.baseline_cells():
+        read_tib, write_tib = declared[cell.pattern]
+        assert cell.read_gib_per_month == pytest.approx(read_tib * fm.GIB_PER_TIB)
+        assert cell.write_gib_per_month == pytest.approx(write_tib * fm.GIB_PER_TIB)
+
+
+def test_write_volume_is_not_equated_with_stored_volume() -> None:
+    """Design section 3.3: writing 1 TiB/month into a 20 TiB resident set replaces part of it; the
+    monthly write count must stay smaller than the resident object count, never equal to it."""
+    for cell in fm.baseline_cells():
+        if cell.write_gib_per_month < cell.stored_gib:
+            assert cell.objects_per_month < cell.objects_stored, cell.pattern
+
+
+def test_the_baseline_has_no_industry_field() -> None:
+    """A dedicated dataclass was chosen over reusing Scenario precisely so the grid carries no
+    industry; this guards that choice against a later field creeping back in."""
+    assert not hasattr(fm.BaselineCell("A", 1.0, 1.0, 1.0, 1.0), "industry")
+
+
+def test_every_baseline_subtotal_is_a_major_line_item_subtotal() -> None:
+    """Each total has an uncounted line item (the UNCONFIRMED capacity-pool read requests), so it
+    must be labelled a 主要費目小計, never a 月額総額."""
+    block = fm.render("ja")
+    section = block.split("### 共通ベースライン")[1].split("\n### ")[0]
+    # Twelve cells, two methods each: twenty-four subtotal rows, every one a 主要費目小計.
+    assert section.count("**主要費目小計 / major-line-item subtotal**") == 24
+    # No subtotal row is labelled 月額総額. The phrase appears once in the intro prose explaining
+    # the distinction ("a subtotal, not a 月額総額"), so guard the table-row label, not the word.
+    assert "| **月額総額" not in section
+
+
+def test_the_baseline_leaves_capacity_pool_requests_unconfirmed() -> None:
+    """The count per GET is not measured; the grid must say so rather than guess a number."""
+    block = fm.render("ja")
+    section = block.split("### 共通ベースライン")[1].split("\n### ")[0]
+    assert "未確認" in section
+    en = fm.render("en")
+    fm.render("ja")  # restore module state
+    en_section = en.split("### A common baseline")[1].split("\n### ")[0]
+    assert "UNCONFIRMED" in en_section or "unconfirmed" in en_section
+
+
 def test_every_generated_string_now_has_english() -> None:
     """The document is promoted only once this holds, and it has to keep holding afterwards: a new
     gap makes the script skip English rather than fail, which would freeze the English tables."""
