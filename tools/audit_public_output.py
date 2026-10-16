@@ -449,7 +449,9 @@ def iter_files(root: Path, include_drafts: bool = False):
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRS for part in path.parts):
+        # Match parts relative to root: the root itself may live under a local-only directory
+        # (a .worktrees/ cut), and matching absolute parts would then skip every file.
+        if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
             continue
         if path.suffix.lower() in SCAN_SUFFIXES:
             yield path
