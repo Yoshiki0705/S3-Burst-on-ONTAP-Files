@@ -101,6 +101,10 @@ edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeCol
 /Applications/draw.io.app/Contents/MacOS/draw.io --export --format svg --embed-svg-images --border 12 --output out.svg src.drawio
 ```
 
+## Cost-structure figures
+
+`s3burst-s3files-cost-structure*` are generated from the cost model, not drawn: run `python3 tools/build_cost_figures.py --recheck-date YYYY-MM-DD [--export]` after the model's output changes, and never edit those `.drawio` files by hand. Their only numeric input is `finops_model.baseline_json()`.
+
 ## Reference implementation
 
 The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,

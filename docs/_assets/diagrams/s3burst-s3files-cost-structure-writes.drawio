@@ -1,117 +1,117 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net">
   <diagram id="cost" name="s3files-cost-structure-2">
-    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="1718" math="0" shadow="0" background="#FFFFFF">
+    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="1762" math="0" shadow="0" background="#FFFFFF">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="grid-0-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-0-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-0-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-0-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-0-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-0-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="270.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="292.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-1-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="414.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="436.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-2-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="644.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="666.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-3-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="788.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="810.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-4-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="1018.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="1040.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="169.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="169.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-2500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="281.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="281.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-5000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="393.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="393.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-7500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="505.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="505.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-10000" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="617.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="617.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="grid-5-12500" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#D5DBDB;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="729.50" y="1162.00" width="1.00" height="108.00" as="geometry" />
+          <mxGeometry x="729.50" y="1184.00" width="1.00" height="108.00" as="geometry" />
         </mxCell>
         <mxCell id="legend-sw-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="4.00" width="20.00" height="20.00" as="geometry" />
@@ -134,320 +134,320 @@
         <mxCell id="legend-sw-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="430.00" y="32.00" width="20.00" height="20.00" as="geometry" />
         </mxCell>
-        <mxCell id="legend-req" value="リクエストと S3 Files の読み書き課金※5" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+        <mxCell id="legend-req" value="リクエストと S3 Files の読み書き課金※4" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="458.00" y="28.00" width="398.00" height="28.00" as="geometry" />
         </mxCell>
-        <mxCell id="route-note" value="FSx for ONTAP の棒: 読み取りはファイルシステムから。&lt;br&gt;書き込みは S3 Access Points 経由の PUT 課金を算入する。※4" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+        <mxCell id="route-note" value="FSx for ONTAP の棒は、読み取りをファイルシステムから行います。&lt;br&gt;書き込みは S3 Access Points 経由の PUT 課金を算入します。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="66.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
-        <mxCell id="axis-note" value="月額（ドル）。横軸は 0〜$12,500 で、図 1・図 2 と全パターンに共通" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="118.00" width="860.00" height="22.00" as="geometry" />
+        <mxCell id="direct-note" value="書き込みがあるパターンでは S3 API 直読みを比較対象にしないため、この図に S3 API 直読みの棒はありません。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="110.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="axis-note" value="月額（ドル）。横軸は 0〜$12,500 で、図 1・図 2 と全パターンに共通です" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="140.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-0" value="$0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="130.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="130.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-2500" value="$2,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="242.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="242.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-5000" value="$5,000" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="354.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="354.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-7500" value="$7,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="466.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="466.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-10000" value="$10,000" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="578.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="578.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-top-12500" value="$12,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="690.00" y="140.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="690.00" y="162.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="head-P5" value="&lt;b&gt;P5 読み多めに少量取り込み&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="168.00" width="860.00" height="28.00" as="geometry" />
+          <mxGeometry x="0.00" y="190.00" width="860.00" height="28.00" as="geometry" />
         </mxCell>
-        <mxCell id="prem-P5" value="保存 20 TiB のうち作業セット 10%（2 TiB）を、各オブジェクト月 10 回読む&lt;br&gt;月間の読み取り 20 TiB（保存量の 1.0 倍）、書き込み※3 1 TiB（保存量の 5%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="196.00" width="860.00" height="44.00" as="geometry" />
+        <mxCell id="prem-P5" value="保存 20 TiB のうち作業セット 10%（2 TiB）を、各オブジェクト月 10 回読みます&lt;br&gt;月間の読み取り 20 TiB（保存量の 1.0 倍）、書き込み※3 1 TiB（保存量の 5%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="218.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P5-64" value="64 KiB: 保存 335,544,320 個 / 読み取り 335,544,320 回 / 書き込み 16,777,216 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="246.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="268.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P5-64-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="270.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="292.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="270.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="292.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-s3_files-hps" value="$7,372.80" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#B34A0A;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="270.00" width="330.30" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="292.00" width="330.30" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-s3_files-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="523.24" y="270.00" width="44.38" height="26.00" as="geometry" />
+          <mxGeometry x="523.24" y="292.00" width="44.38" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P5-64-s3_files" value="&lt;b&gt;$8,875.46&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="575.62" y="270.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="575.62" y="292.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P5-64-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#B34A0A'&gt;■&lt;/font&gt;高性能ストレージ $7,372.80&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $990.66" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="298.00" width="538.24" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="320.00" width="538.24" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P5-64-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="328.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="350.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="328.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="350.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="328.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="350.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-64-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="328.00" width="2.48" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="350.00" width="2.48" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P5-64-fsx_s3ap" value="&lt;b&gt;$1,836.61&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="260.28" y="328.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="260.28" y="350.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P5-64-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $55.36" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="356.00" width="433.28" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="378.00" width="433.28" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P5-4096" value="4 MiB: 保存 5,242,880 個 / 読み取り 5,242,880 回 / 書き込み 262,144 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="390.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="412.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P5-4096-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="414.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="436.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-4096-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="414.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="436.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-4096-s3_files-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="414.00" width="0.18" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="436.00" width="0.18" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P5-4096-s3_files" value="&lt;b&gt;$516.04&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="201.12" y="414.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="201.12" y="436.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P5-4096-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $4.04" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="442.00" width="288.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="464.00" width="288.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P5-4096-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="472.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="494.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-4096-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="472.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="494.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-4096-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="472.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="494.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P5-4096-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="472.00" width="0.04" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="494.00" width="0.04" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P5-4096-fsx_s3ap" value="&lt;b&gt;$1,782.11&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="257.84" y="472.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="257.84" y="494.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P5-4096-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $0.87" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="500.00" width="424.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="522.00" width="424.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="head-P6" value="&lt;b&gt;P6 読み書き混在※1&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="542.00" width="860.00" height="28.00" as="geometry" />
+          <mxGeometry x="0.00" y="564.00" width="860.00" height="28.00" as="geometry" />
         </mxCell>
-        <mxCell id="prem-P6" value="保存 20 TiB のうち作業セット 50%（10 TiB）を、各オブジェクト月 4 回読む（仮置き※2）&lt;br&gt;月間の読み取り 40 TiB（保存量の 2.0 倍）、書き込み※3 20 TiB（保存量の 100%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="570.00" width="860.00" height="44.00" as="geometry" />
+        <mxCell id="prem-P6" value="保存 20 TiB のうち作業セット 50%（10 TiB）を、各オブジェクト月 4 回読みます（仮置き※2）&lt;br&gt;月間の読み取り 40 TiB（保存量の 2.0 倍）、書き込み※3 20 TiB（保存量の 100%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="592.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P6-64" value="64 KiB: 保存 335,544,320 個 / 読み取り 671,088,640 回 / 書き込み 335,544,320 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="620.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="642.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P6-64-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="644.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="666.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="644.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="666.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-s3_files-hps" value="$7,372.80" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#B34A0A;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="644.00" width="330.30" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="666.00" width="330.30" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-s3_files-req" value="$4,146.01" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="523.24" y="644.00" width="185.74" height="26.00" as="geometry" />
+          <mxGeometry x="523.24" y="666.00" width="185.74" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P6-64-s3_files" value="&lt;b&gt;$12,030.81&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="716.98" y="644.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="716.98" y="666.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P6-64-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#B34A0A'&gt;■&lt;/font&gt;高性能ストレージ $7,372.80&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $4,146.01" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="672.00" width="552.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="694.00" width="552.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P6-64-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="702.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="724.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="702.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="724.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="702.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="724.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-64-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="702.00" width="19.57" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="724.00" width="19.57" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P6-64-fsx_s3ap" value="&lt;b&gt;$2,218.13&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="277.37" y="702.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="277.37" y="724.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P6-64-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $436.88" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="730.00" width="442.24" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="752.00" width="442.24" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P6-4096" value="4 MiB: 保存 5,242,880 個 / 読み取り 10,485,760 回 / 書き込み 5,242,880 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="764.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="786.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P6-4096-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="788.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="810.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-4096-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="788.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="810.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-4096-s3_files-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="788.00" width="1.41" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="810.00" width="1.41" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P6-4096-s3_files" value="&lt;b&gt;$543.52&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="202.35" y="788.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="202.35" y="810.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P6-4096-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $31.52" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="816.00" width="297.28" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="838.00" width="297.28" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P6-4096-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="846.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="868.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-4096-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="846.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="868.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-4096-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="846.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="868.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P6-4096-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="846.00" width="0.31" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="868.00" width="0.31" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P6-4096-fsx_s3ap" value="&lt;b&gt;$1,788.08&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="258.11" y="846.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="258.11" y="868.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P6-4096-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $6.83" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="874.00" width="424.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="896.00" width="424.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="head-P8" value="&lt;b&gt;P8 書き込み中心&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="916.00" width="860.00" height="28.00" as="geometry" />
+          <mxGeometry x="0.00" y="938.00" width="860.00" height="28.00" as="geometry" />
         </mxCell>
-        <mxCell id="prem-P8" value="保存 20 TiB のうち作業セット 10%（2 TiB）を、各オブジェクト月 1 回読む（仮置き※2）&lt;br&gt;月間の読み取り 2 TiB（保存量の 0.1 倍）、書き込み※3 20 TiB（保存量の 100%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="944.00" width="860.00" height="44.00" as="geometry" />
+        <mxCell id="prem-P8" value="保存 20 TiB のうち作業セット 10%（2 TiB）を、各オブジェクト月 1 回読みます（仮置き※2）&lt;br&gt;月間の読み取り 2 TiB（保存量の 0.1 倍）、書き込み※3 20 TiB（保存量の 100%）（仮置き※2）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="966.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P8-64" value="64 KiB: 保存 335,544,320 個 / 読み取り 33,554,432 回 / 書き込み 335,544,320 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="994.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="1016.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P8-64-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1018.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="1040.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1018.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="1040.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-s3_files-hps" value="$7,372.80" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#B34A0A;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="1018.00" width="330.30" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="1040.00" width="330.30" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-s3_files-req" value="$3,229.53" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="523.24" y="1018.00" width="144.68" height="26.00" as="geometry" />
+          <mxGeometry x="523.24" y="1040.00" width="144.68" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P8-64-s3_files" value="&lt;b&gt;$11,114.33&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="675.92" y="1018.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="675.92" y="1040.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P8-64-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#B34A0A'&gt;■&lt;/font&gt;高性能ストレージ $7,372.80&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $3,229.53" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1046.00" width="552.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="1068.00" width="552.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P8-64-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1076.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="1098.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1076.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="1098.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="1076.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="1098.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-64-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="1076.00" width="16.40" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="1098.00" width="16.40" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P8-64-fsx_s3ap" value="&lt;b&gt;$2,147.36&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="274.20" y="1076.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="274.20" y="1098.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P8-64-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $366.11" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1104.00" width="442.24" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="1126.00" width="442.24" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="size-P8-4096" value="4 MiB: 保存 5,242,880 個 / 読み取り 524,288 回 / 書き込み 5,242,880 個" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1138.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="1160.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P8-4096-s3_files" value="S3 Files 経由" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1162.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="1184.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-4096-s3_files-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1162.00" width="22.94" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="1184.00" width="22.94" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-4096-s3_files-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="192.94" y="1162.00" width="1.18" height="26.00" as="geometry" />
+          <mxGeometry x="192.94" y="1184.00" width="1.18" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P8-4096-s3_files" value="&lt;b&gt;$538.32&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="202.12" y="1162.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="202.12" y="1184.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P8-4096-s3_files" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $26.32" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1190.00" width="297.28" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="1212.00" width="297.28" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P8-4096-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1220.00" width="160.00" height="50.00" as="geometry" />
+          <mxGeometry x="0.00" y="1242.00" width="160.00" height="50.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-4096-fsx_s3ap-storage" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#1D6FA3;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1220.00" width="74.60" height="26.00" as="geometry" />
+          <mxGeometry x="170.00" y="1242.00" width="74.60" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-4096-fsx_s3ap-tput" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#4C7A0F;strokeColor=#FFFFFF;strokeWidth=1;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="244.60" y="1220.00" width="5.20" height="26.00" as="geometry" />
+          <mxGeometry x="244.60" y="1242.00" width="5.20" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="bar-P8-4096-fsx_s3ap-req" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#6B3FB5;strokeColor=none;fontSize=16;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="249.80" y="1220.00" width="0.26" height="26.00" as="geometry" />
+          <mxGeometry x="249.80" y="1242.00" width="0.26" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="total-P8-4096-fsx_s3ap" value="&lt;b&gt;$1,786.97&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="258.06" y="1220.00" width="112.00" height="26.00" as="geometry" />
+          <mxGeometry x="258.06" y="1242.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
         <mxCell id="brk-P8-4096-fsx_s3ap" value="&lt;font color='#1D6FA3'&gt;■&lt;/font&gt;保管 $1,665.28&amp;nbsp;&amp;nbsp;&lt;font color='#4C7A0F'&gt;■&lt;/font&gt;帯域 $115.97&amp;nbsp;&amp;nbsp;&lt;font color='#6B3FB5'&gt;■&lt;/font&gt;リクエスト等 $5.72" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="170.00" y="1248.00" width="424.32" height="22.00" as="geometry" />
+          <mxGeometry x="170.00" y="1270.00" width="424.32" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-0" value="$0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="130.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="130.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-2500" value="$2,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="242.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="242.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-5000" value="$5,000" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="354.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="354.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-7500" value="$7,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="466.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="466.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-10000" value="$10,000" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="578.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="578.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="tick-bot-12500" value="$12,500" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="690.00" y="1290.00" width="80.00" height="22.00" as="geometry" />
+          <mxGeometry x="690.00" y="1312.00" width="80.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="notes-head" value="&lt;b&gt;補足&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1324.00" width="860.00" height="22.00" as="geometry" />
-        </mxCell>
-        <mxCell id="note-1" value="&lt;b&gt;※1 同額のパターン:&lt;/b&gt; P6 は P7 と同額。価格は作業セット比に連動しない" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="1346.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
-        <mxCell id="note-2" value="&lt;b&gt;※2 仮置きの値:&lt;/b&gt; P5 の書き込み量、P6・P8 の作業セット比、回数、書き込み量は出典のない仮置き" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1368.00" width="860.00" height="22.00" as="geometry" />
+        <mxCell id="note-1" value="&lt;b&gt;※1 同額のパターン:&lt;/b&gt; P6 は P7 と同額です。価格は作業セット比に連動しません。&lt;br&gt;P7 小オブジェクトの大量書き込み: 作業セット 100% を各 2 回読み、書き込みは保存量の 100% です。&lt;br&gt;作業セット比・回数・書き込み量はリポジトリの試算前提です。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1368.00" width="860.00" height="66.00" as="geometry" />
         </mxCell>
-        <mxCell id="note-3" value="&lt;b&gt;※3 書き込みは置き換え:&lt;/b&gt; 書き込みは既存データの置き換えで、保存量は 20 TiB のまま一定" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1390.00" width="860.00" height="22.00" as="geometry" />
-        </mxCell>
-        <mxCell id="note-4" value="&lt;b&gt;※4 S3 API 直読みの棒:&lt;/b&gt; 書き込みを含むため該当なし（モデルの定義）" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1412.00" width="860.00" height="22.00" as="geometry" />
-        </mxCell>
-        <mxCell id="note-5" value="&lt;b&gt;※5 S3 Files のメタデータ課金:&lt;/b&gt; 図 1 の※4 と同じ" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+        <mxCell id="note-2" value="&lt;b&gt;※2 仮置きの値:&lt;/b&gt; P5 の書き込み量、P6・P8 の作業セット比、回数、書き込み量は出典のない仮置きです。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="1434.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
+        <mxCell id="note-3" value="&lt;b&gt;※3 書き込みは置き換え:&lt;/b&gt; 書き込みは既存データの置き換えで、保存量は 20 TiB のまま一定です。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1456.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-4" value="&lt;b&gt;※4 S3 Files のメタデータ課金:&lt;/b&gt; 図 1 の※4 と同じです。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1478.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
         <mxCell id="warn-head" value="&lt;b&gt;前提についての注意&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1466.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="1510.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
-        <mxCell id="warn" value="この金額は固定の前提による試算です。主な前提は、capacity pool の割合（30%）、SSD 層の効率（40%）、&lt;br&gt;S3 Files の高性能ストレージのアクティブ割合（100%）、取り込みしきい値（128 KiB）、&lt;br&gt;デプロイ形態（Single-AZ 第一世代）です。前提を変えると金額と順序が大きく動きます。&lt;br&gt;64 KiB は FSx for ONTAP が安く、4 MiB は S3 Files が安いという向きも、この前提での結果で、&lt;br&gt;前提で入れ替わりえます。自分の環境の値に置き換えて選定してください。前提の一覧と感度は、&lt;br&gt;別の節・別の PR で整理する予定です。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1488.00" width="860.00" height="132.00" as="geometry" />
+        <mxCell id="warn" value="この金額は固定の前提による試算です。主な前提は、capacity pool の割合（30%）、SSD 層の効率（40%）、&lt;br&gt;S3 Files の高性能ストレージのアクティブ割合（100%）、取り込みしきい値（128 KiB）、&lt;br&gt;デプロイ形態（Single-AZ 第一世代）です。前提を変えると金額と順序が大きく動きます。&lt;br&gt;S3 Files 経由と FSx for ONTAP を比べると、64 KiB は FSx for ONTAP が安く、4 MiB は S3 Files 経由が安い&lt;br&gt;という向きですが、これは基準の前提での結果で、前提で入れ替わりえます。自分の環境の値に置き換えて選定してく&lt;br&gt;ださい。前提の一覧と感度は、別の節・別の PR で整理する予定です。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1532.00" width="860.00" height="132.00" as="geometry" />
         </mxCell>
-        <mxCell id="foot" value="各棒は主要費目小計で、月額総額ではない。capacity pool の読み取りリクエスト数が未確認で、&lt;br&gt;S3 のバージョニング非現行版・バックアップ・通信費を算入していない。&lt;br&gt;リスト価格 × 数量の計算で、請求額ではありません。ap-northeast-1、単価は 2026-08-09 に取得し 2026-10-16 に&lt;br&gt;読み直しました。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="1630.00" width="860.00" height="88.00" as="geometry" />
+        <mxCell id="foot" value="各棒は主要費目小計で、月額総額ではありません。capacity pool の読み取りリクエスト数が未確認で、&lt;br&gt;S3 のバージョニング非現行版・バックアップ・通信費を算入していません。&lt;br&gt;リスト価格 × 数量の計算で、請求額ではありません。ap-northeast-1、単価は 2026-08-09 に取得し 2026-10-16 に&lt;br&gt;読み直しました。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1674.00" width="860.00" height="88.00" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
