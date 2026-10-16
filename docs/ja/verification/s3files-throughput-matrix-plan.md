@@ -32,17 +32,18 @@ S3 Files に適用する（[プロトコル別測定の結果](perf-matrix-resul
 意味論しか測っていない**。一方、ファイルプロトコル側（NFS / SMB / EFS）では
 スループット曲線・IOPS 掃引・キャッシュ温度の分離・台数試験の手法が確立している。
 **公式が S3 Files に与える価値（AI / ML のデータ準備、多数の小ファイル、協調ワークロード、
-集約 4 TB/s+）は、いずれもこの面の裏取りを必要とする。**
+集約読み取り “up to terabytes per second”）は、いずれもこの面の裏取りを必要とする。**
 
 | 公式が挙げる価値 | 裏取りに要る測定 | いまの状態 |
 |---|---|---|
 | 多数の小ファイルを扱う ML / AI のデータ準備 | 4 KiB / 64 KiB の IOPS を並列度で掃引 | **未測定**（レイテンシ 1 点のみ） |
-| 集約読み取り 4 TB/s+ | 大ファイルのスループット曲線、台数で積み上げ | **未測定**（約 450 MB/s の 1 点のみ） |
+| 集約読み取り “up to terabytes per second” | 大ファイルのスループット曲線、台数で積み上げ | **未測定**（約 450 MB/s の 1 点のみ） |
 | 作業セットだけ低遅延 | 高性能ストレージ上を warm / cold で分離 | **未分離**（経路差 5.1 倍は測ったが温度は振っていない） |
 | 最大 25,000 の同時接続で協調 | クライアント 1 → N 台で共有 / 非共有 | **未測定** |
 
 出どころ: [Amazon S3 Files features](https://aws.amazon.com/s3/features/files/)、
-[What's New](https://aws.amazon.com/about-aws/whats-new/2026/04/amazon-s3-files/)。
+[What's New](https://aws.amazon.com/about-aws/whats-new/2026/04/amazon-s3-files/)、
+[Performance specifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-performance.html)。
 
 ## 測定パターン
 
@@ -185,7 +186,7 @@ S3 Files のマウントは `environments/s3files-compare/mount-s3files.sh` が�
 | 1 MiB 以上の読み取りはバケット直読 | 高性能ストレージに載っていても、大きい読み取りはバケットから | 大ブロックだけレイテンシが跳ねる | 経路の違いとして記録する（S-2 の論点そのもの） |
 
 **共通するのは「もっともらしい数値が出る」こと。** ファイルプロトコル側と同じく、実測値は
-公称上限（4 TB/s+ は集約値、クライアント単位は EFS クォータ）に対する割合として書き、
+公称上限（集約読み取りは “up to terabytes per second” で数値でないため割合の分母にしない。クライアント単位は EFS クォータ）に対する割合として書き、
 100% を大きく外れたら測定を疑う。
 
 ## 不可逆操作と破棄の順序

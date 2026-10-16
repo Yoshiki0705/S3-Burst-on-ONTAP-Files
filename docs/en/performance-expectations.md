@@ -85,7 +85,7 @@ overlapping regions**. Settle that before counting clients.
 |---|---|---|---|
 | Second-generation 1,536 (NFS) | **1,333 MB/s** | **2.60x** the 512 the general rule gives | None observed |
 | Second-generation 6,144 (NFS) | **2,063 / 2,097 MB/s** | **2.05x** the 1,024 in the exception table | None observed, at 900 s and at 1,800 s |
-| Second-generation 6,144 (SMB) | **1,488.03 MB/s** | — | None observed, but 12.4% below the 1,698.42 of a 300 s window. **The 12.4% gap against the 300 s window's 1,698.42 does not reproduce** (re-measured 2026-09-20: the long window came out 4.0% higher, so the original pair reads as a one-off) |
+| Second-generation 6,144 (SMB) | **1,488.03 MB/s** | — | None observed, but 12.4% below the 1,698.42 of a 300 s window. **The 12.4% gap against the 300 s window's 1,698.42 does not reproduce** (re-measured 2026-09-20: the long window came out 4.0% higher, so the original pair reads as a one-off; the long run stopped at about 480 s, so there is no 900 s point) |
 
 **The design consequence is over-provisioning, not under.** Working backwards from the published
 figure buys more throughput capacity than the measurement needs (second-generation capacity is
@@ -157,7 +157,7 @@ than the value of the ceiling.
 | About 300 MB/s on first-generation 128 | Neither the disk nor the network burst ceiling is reached, and the burst balance is not exhausted |
 | Why first-generation 2048 writes stop at 55% of the HA-pair ceiling | Two candidates (writes consuming twice the network, per-request fixed cost) are not separated |
 | Why the block amplification splits between 0.8 and 1.5 | Neither layout nor write history. **One remaining candidate, the ONTAP patch release, cannot be selected on FSx for ONTAP, so no controlled experiment is available** |
-| The 12.4% between SMB at 300 s and at 900 s | **The window ladder was run, but on the single-channel path** (2026-09-18, flat to 0.07%). **The four-channel path, where the gap appeared, is unmeasured.** The remaining candidate is that the channel count fell during the run, which is a hypothesis |
+| ~~The 12.4% between SMB at 300 s and at 900 s~~ | **Closed (2026-09-20). It does not reproduce.** Re-measured on four channels, the longer window came out 4.0% higher (short 300 s: 1,375.4; long, about 480 s: 1,430.3 MB/s). The long run stopped at about 480 s, so there is no 900 s point. The hypothesis that the channel count fell during the run was also measured and ruled out (4 at all 31 points over a 900 s window). **The size of the original 1,698.42 / 1,488.03 pair remains unexplained.** [Evidence](../ja/verification/throughput-iops-concurrency.md) (Japanese), in the section on the 12.4% window-length gap not reproducing (2026-09-20) |
 
 Stages and the full list are in [verification status](verification-status.md).
 
