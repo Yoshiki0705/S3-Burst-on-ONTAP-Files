@@ -125,13 +125,16 @@ def main() -> int:
         targets = [pathlib.Path(argument) for argument in sys.argv[1:]]
     else:
         root = pathlib.Path(__file__).resolve().parent.parent
+        # Match parts relative to the scan root. The root itself may sit under a local-only
+        # directory (a .worktrees/ cut is a full second copy of the tree), and intersecting
+        # LOCAL_ONLY_DIRS with the absolute parts would then exclude every file and fail closed.
         targets = [
             path
             for pattern in ("*.yaml", "*.yml")
             for path in sorted(root.rglob(pattern))
-            if ".git" not in path.parts
-            and "node_modules" not in path.parts
-            and not LOCAL_ONLY_DIRS.intersection(path.parts)
+            if ".git" not in path.relative_to(root).parts
+            and "node_modules" not in path.relative_to(root).parts
+            and not LOCAL_ONLY_DIRS.intersection(path.relative_to(root).parts)
         ]
 
     files = [path for path in targets if path.is_file()]

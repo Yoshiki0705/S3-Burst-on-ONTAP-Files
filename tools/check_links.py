@@ -56,8 +56,10 @@ USER_AGENT = "s3-burst-on-ontap-files-link-check"
 
 def iter_markdown(root: Path):
     """Yield every Markdown file under root, skipping unpublished directories."""
+    # Match parts relative to root: the root itself may live under a local-only directory
+    # (a .worktrees/ cut), and matching absolute parts would then skip every file.
     for path in sorted(root.rglob("*.md")):
-        if any(part in SKIP_DIRS for part in path.parts):
+        if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
             continue
         yield path
 
