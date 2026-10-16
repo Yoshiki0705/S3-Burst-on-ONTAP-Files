@@ -2676,8 +2676,8 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
         reads_per_object=1,
         churn_pct=0,
         placeholder=False,
-        basis=("sourced", "sourced", "sourced"),
-        position="書き込みのない読み取り専用の形。データセット全体を読む点が MLPerf Storage の "
+        basis=("placeholder", "placeholder", "sourced"),
+        position="書き込みのない読み取り専用の形。大きいファイルを順次読み、書き込みがない点が MLPerf Storage の "
         "Unet3D に近い（[MLPerf Storage]({mlperf_url})）。"
         "YCSB C は読み取りのみだが Zipf 分布で偏って読むため、"
         "全件を 1 回ずつ読む形とは違う（[YCSB]({ycsb_url})）",

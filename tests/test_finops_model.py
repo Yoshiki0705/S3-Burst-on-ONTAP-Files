@@ -199,7 +199,7 @@ def test_the_basis_of_every_value_is_recorded() -> None:
     basis = {p.key: p.basis for p in fm.BASELINE_PATTERNS}
     assert basis == {
         "P1": ("placeholder", "placeholder", "sourced"),
-        "P2": ("sourced", "sourced", "sourced"),
+        "P2": ("placeholder", "placeholder", "sourced"),
         "P3": ("sourced", "placeholder", "sourced"),
         "P4": ("repository", "repository", "sourced"),
         "P5": ("repository", "repository", "placeholder"),

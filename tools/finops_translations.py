@@ -802,10 +802,10 @@ TRANSLATIONS.update(
         "**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
         "作業セット {w}%、回数 {n}、書き込みなし": "**Placeholder.** Not a sourced value; placed to make the arithmetic work. "
         "Working set {w}%, reads per object {n}, no writes",
-        "書き込みのない読み取り専用の形。データセット全体を読む点が MLPerf Storage の "
+        "書き込みのない読み取り専用の形。大きいファイルを順次読み、書き込みがない点が MLPerf Storage の "
         "Unet3D に近い（[MLPerf Storage]({mlperf_url})）。"
         "YCSB C は読み取りのみだが Zipf 分布で偏って読むため、"
-        "全件を 1 回ずつ読む形とは違う（[YCSB]({ycsb_url})）": "A read-only shape with no writes. Reading the whole dataset resembles MLPerf Storage's Unet3D ([MLPerf Storage]({mlperf_url})). "
+        "全件を 1 回ずつ読む形とは違う（[YCSB]({ycsb_url})）": "A read-only shape with no writes. Sequential reads of large files with no writes resemble MLPerf Storage's Unet3D ([MLPerf Storage]({mlperf_url})). "
         "YCSB C is read-only but Zipf-skewed, so it is not one pass over every object ([YCSB]({ycsb_url}))",
         "作業セット比 {w}% は、データの 2 割がホット、8 割がコールドという比を述べる "
         "2 つのブログによる（[EFS ブログ]({efs_url})、"
