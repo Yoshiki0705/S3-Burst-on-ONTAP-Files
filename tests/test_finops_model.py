@@ -198,15 +198,29 @@ def test_only_p1_p6_and_p8_are_placeholders() -> None:
 def test_the_basis_of_every_value_is_recorded() -> None:
     basis = {p.key: p.basis for p in fm.BASELINE_PATTERNS}
     assert basis == {
-        "P1": ("placeholder", "placeholder", "sourced"),
-        "P2": ("placeholder", "placeholder", "sourced"),
-        "P3": ("sourced", "placeholder", "sourced"),
-        "P4": ("repository", "repository", "sourced"),
+        "P1": ("placeholder", "placeholder", "definition"),
+        "P2": ("placeholder", "placeholder", "definition"),
+        "P3": ("sourced", "placeholder", "definition"),
+        "P4": ("repository", "repository", "definition"),
         "P5": ("repository", "repository", "placeholder"),
         "P6": ("placeholder", "placeholder", "placeholder"),
         "P7": ("repository", "repository", "repository"),
         "P8": ("placeholder", "placeholder", "placeholder"),
     }
+
+
+def test_a_zero_churn_is_a_definition_and_nothing_else_is() -> None:
+    """No writes is true by construction, so it has no source to cite and no assumption to make. The
+    JSON carries the same classification, so a reader of it does not see P1 as partly sourced."""
+    for p in fm.BASELINE_PATTERNS:
+        assert (p.basis[2] == "definition") == (p.churn_pct == 0), p.key
+        assert "definition" not in p.basis[:2], p.key
+    for entry in fm.baseline_json("ja")["patterns"]:  # type: ignore[attr-defined]
+        basis = entry["basis"]
+        assert (basis["churn"] == "definition") == (entry["churn_pct"] == 0), entry[
+            "id"
+        ]
+        assert "definition" not in (basis["working_set"], basis["reads_per_object"])
 
 
 def test_the_baseline_grid_is_eight_patterns_by_four_sizes() -> None:
@@ -283,6 +297,8 @@ def test_the_byte_ratio_is_a_share_of_bytes_moved() -> None:
         {"reads_per_object": 0},
         {"basis": ("sourced", "sourced")},
         {"basis": ("sourced", "sourced", "guess")},
+        {"basis": ("definition", "sourced", "sourced")},
+        {"basis": ("sourced", "sourced", "definition"), "churn_pct": 5},
         {"key": "Q1"},
         {"key": "P"},
     ],
@@ -654,6 +670,84 @@ def test_the_metadata_lines_are_counted_in_the_subtotal_and_the_doubt_is_stated(
     # The delta in the note is the model's own figure for the cell that moves most (P6, 1 MiB).
     assert "最大 $12.00 (そのセルの小計の 1.9%) 下がる" in section
     assert "subtotal_excluding_metadata_usd" in section
+
+
+def test_the_metadata_note_also_states_the_directions_that_raise_the_subtotal() -> None:
+    """The increase is derived from the formula: stored objects x 4 KiB x the write price, once."""
+    prices = fm.S3FILES["write"].usd
+    expected = {}
+    for kib in fm.BASELINE_SIZES_KIB:
+        objects = Fraction(fm.BASELINE_STORED_TIB * 1024 * 1024 * 1024, kib)
+        expected[kib] = float(objects * 4 / (1024 * 1024) * Fraction(str(prices)))
+    ja = _baseline_section("ja")
+    assert "増える方向もある。" in ja
+    assert "読み取り側の行が k 倍になる" in ja
+    assert "ファイル 1 個ごとに 4 KiB の書き込みを計量する" in ja
+    sized = [
+        f"{label} で ${expected[kib]:,.2f}"
+        for kib, label in zip(
+            fm.BASELINE_SIZES_KIB, ("64 KiB", "1 MiB", "4 MiB", "16 MiB"), strict=True
+        )
+    ]
+    assert "、".join(sized) in ja
+    en = _baseline_section("en")
+    assert "If each read carries k metadata operations" in en
+    en_sized = [
+        f"${expected[kib]:,.2f} for {label}"
+        for kib, label in zip(
+            fm.BASELINE_SIZES_KIB, ("64 KiB", "1 MiB", "4 MiB", "16 MiB"), strict=True
+        )
+    ]
+    assert ", ".join(en_sized) in en
+
+
+def test_counting_the_first_read_stream_lowers_every_cell_it_applies_to() -> None:
+    """Premise (c) leaves the stream out; the note says counting it lowers the subtotal. The direction
+    is checked in each of the four cells, not only the one the note quotes."""
+    cells = [c for c in fm.baseline_cells() if fm._books_no_first_read_stream(c)]
+    assert [(c.pattern.key, c.object_kib) for c in cells] == [
+        (k, 64) for k in ("P1", "P2", "P3", "P4")
+    ]
+    for cell in cells:
+        before, after = fm._first_read_stream_sensitivity(cell)
+        assert after < before, cell.pattern.key
+        # the default is unchanged: passing nothing is passing the objects written
+        default = fm.s3_files_option(cell, split_metadata=True)
+        explicit = fm.s3_files_option(
+            cell, split_metadata=True, first_read_objects=cell.objects_per_month
+        )
+        assert default == explicit
+
+
+def test_the_first_read_stream_sensitivity_is_stated_with_its_derived_size() -> None:
+    ja = _baseline_section("ja")
+    # P2 at 64 KiB moves most: 335,544,320 GETs at the tier-2 price replace the same reads at the
+    # S3 Files read price. The amounts are pinned as literals, like the metadata figure above.
+    assert (
+        "差し引きで S3 Files の小計は下がり、(c) が当てはまる 4 セルの中では "
+        "P2 の 64 KiB が最大で、$8,755.20 から $8,060.15 へ、$695.05 (7.9%) 下がる。"
+    ) in ja
+    assert "いずれの向きも試算上の感度で、測定ではない。" in ja
+    en = _baseline_section("en")
+    assert (
+        "by at most $695.05 (7.9%) among the 4 cells where (c) applies, in P2 at 64 KiB, "
+        "from $8,755.20 to $8,060.15."
+    ) in en
+
+
+def test_p3_says_the_blogs_give_a_hot_share_and_not_a_share_read_in_a_month() -> None:
+    ja = _baseline_section("ja")
+    assert (
+        ja.count(
+            "ブログが述べるのはホットなデータの容量比で、月内に読まれる割合とは述べていない。"
+        )
+        == 1
+    )
+    en = _baseline_section("en")
+    assert en.count("they do not say what share is read within a month") == 1
+    for lang in ("ja", "en"):
+        p3 = next(p for p in fm.baseline_json(lang)["patterns"] if p["id"] == "P3")  # type: ignore[attr-defined]
+        assert ("月内に読まれる割合" in p3["position"]) == (lang == "ja")
 
 
 def test_every_generated_string_now_has_english() -> None:

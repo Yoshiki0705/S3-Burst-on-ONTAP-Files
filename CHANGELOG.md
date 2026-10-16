@@ -175,6 +175,20 @@ from what was known.
 
 ### Changed
 
+- **The common cost baseline in `finops-s3-vs-s3ap.md` is defined by three values instead of two
+  volumes, and patterns A, B and C are replaced by eight patterns, P1 to P8.** A, B and C fixed a
+  monthly read volume and a monthly write volume (20 / 0, 20 / 1 and 40 / 20 TiB). Each new pattern
+  is a working-set ratio, a number of reads per working-set object, and a replacement rate (churn),
+  and the volumes follow from them, so a reader can tell 20 TiB read once from a tenth of it read ten
+  times. P2, P3 and P4 read and write the volumes of A, P5 those of B, and P6 and P7 those of C; P1
+  and P8 have no counterpart among the old three. Prices do not follow the working-set ratio; the section states the
+  three premises held fixed and the direction each would move the result.
+  **Twelve Japanese anchors (`#パターン-a--オブジェクト-64-kib` and the B and C forms at four sizes)
+  and the twelve English ones (`#pattern-a--64-kib-objects` and the rest) no longer exist**, replaced
+  by 32 headings of the form `#パターン-p4--オブジェクト-4-mib`; a link from outside this repository to
+  an old anchor now opens the top of the page, because GitHub serves an unknown fragment that way,
+  and none was found in this repository or three sibling repositories while links elsewhere were not
+  searched.
 - **`Presign` is listed as Supported in AWS's access point compatibility table, and this
   repository's presigned URL measurement agrees with it.** Opened on 2026-10-08, the table's
   `Presign` row reads Supported with no condition; the repository had recorded it as

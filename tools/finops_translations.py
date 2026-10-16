@@ -772,13 +772,20 @@ TRANSLATIONS.update(
         "(a)(b) を触れられる量に合わせる前提に置き換えると、小計は下がる向きになる。"
         "{large_groups} は和が 100% 以上で、保存量の全体に及びうる。"
         "全体に及ぶと置いて (a) を置き換えると、FSx for ONTAP の小計は上がる向きになる。"
-        "どちらの向きも試算上の感度で、測定ではない。": "These three premises are held apart from the working-set ratio. "
+        "(c) を置き換え、作業セットの各オブジェクトの初回読み出しを計上すると、"
+        "バケットからの GET の分が増え、高性能ストレージの読み取りが減る。"
+        "差し引きで S3 Files の小計は下がり、(c) が当てはまる {stream_cells} セルの中では "
+        "{stream_pattern} の {stream_size} が最大で、{stream_before} から {stream_after} へ、"
+        "{stream_delta} ({stream_pct}%) 下がる。"
+        "いずれの向きも試算上の感度で、測定ではない。": "These three premises are held apart from the working-set ratio. "
         "(a) The FSx for ONTAP capacity pool is {pool}% of the stored volume in every pattern. "
         "(b) S3 Files high-performance storage (the row that appears for sizes of {threshold} KiB or smaller) books the whole stored volume as active. "
         "(c) In a cell with no writes, S3 Files ({threshold} KiB or smaller) books no first-read stream and books every read as a high-performance-storage read. "
         "For {small_groups}, the working-set ratio plus the churn rate is below 100%, so not all of the stored volume can be touched; replacing (a) and (b) with premises that follow the touched volume would lower the subtotals. "
         "For {large_groups}, the sum is 100% or more and the whole volume may be touched; if it is, replacing (a) would raise the FSx for ONTAP subtotal. "
-        "Both directions are sensitivities on the model, not measurements.",
+        "Replacing (c) so that the first read of each working-set object is counted adds the GET requests to the bucket and removes the same reads from high-performance storage; "
+        "the S3 Files subtotal falls on balance, by at most {stream_delta} ({stream_pct}%) among the {stream_cells} cells where (c) applies, in {stream_pattern} at {stream_size}, from {stream_before} to {stream_after}. "
+        "Every one of these directions is a sensitivity on the model, not a measurement.",
         "#### パターンの一覧": "#### The patterns",
         "名前": "Name",
         "作業セット比": "Working-set ratio",
@@ -811,7 +818,9 @@ TRANSLATIONS.update(
         "2 つのブログによる（[EFS ブログ]({efs_url})、"
         "[FSx for ONTAP サイジングブログ]({sizing_url})）。"
         "どちらも算出方法とデータセットを示していない。"
+        "ブログが述べるのはホットなデータの容量比で、月内に読まれる割合とは述べていない。"
         "**回数 {n} は出典がなく**、R を 1 倍に揃えるために置いた": "The {w}% working set follows two blogs that describe a 20% hot / 80% cold split ([EFS blog]({efs_url}), [FSx for ONTAP sizing blog]({sizing_url})); neither gives its method or dataset. "
+        "What the blogs give is the hot share of the data by capacity; they do not say what share is read within a month. "
         "**The read count of {n} has no source**; it was chosen to make R equal 1",
         "作業セット {w}% ({ws_gib}) は、本文の「読み取りが繰り返されるとき」の節の"
         "作業セットと同じ大きさ。月 {n} 回は、その節の「読み取り回数に対する感度」表にある行の 1 つ。"
@@ -846,6 +855,7 @@ TRANSLATIONS.update(
         "{key} の作業セット比": "{key} working-set ratio",
         "{key} の回数": "{key} read count",
         "{key} のチャーン率": "{key} churn rate",
+        "{size} で {amount}": "{amount} for {size}",
         "{placeholders} の値は出典がなく、算術を通すために置いた。"
         "{repo_assumed} の値のうち表の位置づけで「試算前提」と書いたものは、"
         "本リポジトリの試算前提であって測定値ではない。"
@@ -863,6 +873,11 @@ TRANSLATIONS.update(
         "[料金ページ](https://aws.amazon.com/s3/pricing/)は同じ読み取りに S3 の GET 課金だけが付くと書いている。"
         "2 ページの文面が揃わず、実測もないため、小計には算入したままにしている。"
         "除くと、1 MiB 以上のセルの小計は最大 {delta} (そのセルの小計の {pct}%) 下がる。"
+        "増える方向もある。"
+        "1 回の読み取りにメタデータ操作が k 回付く場合は、読み取り側の行が k 倍になる。"
+        "ディレクトリの初回列挙は、ファイル 1 個ごとに 4 KiB の書き込みを計量する。"
+        "{stored_tib} TiB を列挙した場合の 1 回限りの額は {enumeration} で、モデルは算入していない。"
+        "どちらも測っていない。"
         "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
         "`subtotal_excluding_metadata_usd` で読める。": "For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. "
         "The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted. "
@@ -872,6 +887,10 @@ TRANSLATIONS.update(
         "while the [pricing page](https://aws.amazon.com/s3/pricing/) says the same read carries only the S3 GET charge. "
         "The two pages do not agree and there is no measurement, so the lines stay in the subtotal. "
         "Without them, the subtotal of a cell of 1 MiB or larger falls by at most {delta} ({pct}% of that cell's subtotal). "
+        "The amount can also rise. "
+        "If each read carries k metadata operations, the read-side line is k times as large. "
+        "The first listing of a directory meters a 4 KiB write for each file in it, and listing {stored_tib} TiB once costs {enumeration}, which the model does not count. "
+        "Neither has been measured. "
         "The subtotal without them, cell by cell, is available as `subtotal_excluding_metadata_usd` in the output of `python3 tools/finops_model.py --baseline-json`.",
         "S3 単独の内訳表は、書き込みのないパターン ({read_only}) にだけ置く。"
         "方式ごとに書き込みの経路 (S3 API の PUT、NFS の書き込みと同期、S3 Access Points 経由の PUT) が違い、"

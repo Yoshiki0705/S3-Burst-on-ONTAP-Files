@@ -677,7 +677,9 @@ def s3_files_metadata_usd(sc: Scenario | BaselineCell) -> tuple[float, float]:
 
 
 def s3_files_option(
-    sc: Scenario | BaselineCell, split_metadata: bool = False
+    sc: Scenario | BaselineCell,
+    split_metadata: bool = False,
+    first_read_objects: float | None = None,
 ) -> dict[str, float] | None:
     """An S3 bucket read as a file system through S3 Files, with no FSx for ONTAP at all.
 
@@ -695,7 +697,13 @@ def s3_files_option(
     both branches, instead of folding them into the data lines at or below the threshold. The
     subtotal is the same either way; only how it is split into lines changes. The default keeps
     every existing caller's lines exactly as they were. With it set, a branch that streams nothing
-    on first read (no writes, so no first reads) does not emit the zero-valued stream line.
+    on first read does not emit the zero-valued stream line.
+
+    `first_read_objects` is how many objects are read for the first time, and so streamed from the
+    bucket, in the month. The default is the objects written in the month: the model counts a first
+    read only for an object it has just written, so a scenario with no writes streams nothing. An
+    object that already sits in the bucket is also read for the first time through the file system,
+    and the model does not count that. A caller can pass the number to see what counting it does.
     """
     if not sc.s3files_viable:
         return None
@@ -722,7 +730,9 @@ def s3_files_option(
         # and carries an S3 GET plus a metadata read, with no file read charge. It is that read
         # which triggers the asynchronous import. Only the reads after it are served from
         # high-performance storage and metered as file reads.
-        streamed_reads = float(sc.objects_per_month)
+        streamed_reads = float(
+            sc.objects_per_month if first_read_objects is None else first_read_objects
+        )
         hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
         read_gib = hps_reads * io_kib / (1024 * 1024)
 
@@ -2480,7 +2490,9 @@ def render_marginal_cost() -> list[str]:
 # How a number in a pattern is known. "sourced": a public document gives the figure or its form.
 # "repository": reused from an assumption elsewhere in this repository; not a measurement.
 # "placeholder": no source and no repository assumption; placed to make the arithmetic work.
-BASELINE_BASES = ("sourced", "repository", "placeholder")
+# "definition": true by definition, so there is nothing to source or to assume. It is the churn
+# rate of a pattern with no writes (0%), and nothing else.
+BASELINE_BASES = ("sourced", "repository", "placeholder", "definition")
 
 BASELINE_SOURCE_URLS = {
     "efs_url": "https://aws.amazon.com/blogs/storage/scalable-cloud-native-file-storage-at-pennies-per-gb-month-with-amazon-efs/",
@@ -2523,6 +2535,14 @@ class BaselinePattern:
             raise ValueError(f"{self.key}: churn_pct must be in [0, 100]")
         if len(self.basis) != 3 or any(b not in BASELINE_BASES for b in self.basis):
             raise ValueError(f"{self.key}: basis must be 3 values of {BASELINE_BASES}")
+        # "definition" says the value is zero by construction, so it can only be the churn of a
+        # pattern that writes nothing. Anywhere else it would pass a chosen value off as a given.
+        if ("definition" in self.basis[:2]) or (
+            self.basis[2] == "definition" and self.churn_pct != 0
+        ):
+            raise ValueError(
+                f"{self.key}: 'definition' is only the basis of a 0% churn"
+            )
 
     @property
     def read_multiple(self) -> float:
@@ -2665,7 +2685,7 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
         reads_per_object=1,
         churn_pct=0,
         placeholder=True,
-        basis=("placeholder", "placeholder", "sourced"),
+        basis=("placeholder", "placeholder", "definition"),
         position="**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
         "作業セット {w}%、回数 {n}、書き込みなし",
     ),
@@ -2676,7 +2696,7 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
         reads_per_object=1,
         churn_pct=0,
         placeholder=False,
-        basis=("placeholder", "placeholder", "sourced"),
+        basis=("placeholder", "placeholder", "definition"),
         position="書き込みのない読み取り専用の形。大きいファイルを順次読み、書き込みがない点が MLPerf Storage の "
         "Unet3D に近い（[MLPerf Storage]({mlperf_url})）。"
         "YCSB C は読み取りのみだが Zipf 分布で偏って読むため、"
@@ -2689,11 +2709,12 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
         reads_per_object=5,
         churn_pct=0,
         placeholder=False,
-        basis=("sourced", "placeholder", "sourced"),
+        basis=("sourced", "placeholder", "definition"),
         position="作業セット比 {w}% は、データの 2 割がホット、8 割がコールドという比を述べる "
         "2 つのブログによる（[EFS ブログ]({efs_url})、"
         "[FSx for ONTAP サイジングブログ]({sizing_url})）。"
         "どちらも算出方法とデータセットを示していない。"
+        "ブログが述べるのはホットなデータの容量比で、月内に読まれる割合とは述べていない。"
         "**回数 {n} は出典がなく**、R を 1 倍に揃えるために置いた",
     ),
     BaselinePattern(
@@ -2703,7 +2724,7 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
         reads_per_object=10,
         churn_pct=0,
         placeholder=False,
-        basis=("repository", "repository", "sourced"),
+        basis=("repository", "repository", "definition"),
         position="作業セット {w}% ({ws_gib}) は、本文の「読み取りが繰り返されるとき」の節の"
         "作業セットと同じ大きさ。月 {n} 回は、その節の「読み取り回数に対する感度」表にある行の 1 つ。"
         "その節の本表は月 30 回で、capacity pool の割合も 70%"
@@ -2806,6 +2827,30 @@ def baseline_s3_only(cell: BaselineCell) -> dict[str, float] | None:
     of scope for the grid, not a statement that S3 alone cannot take writes.
     """
     return s3_only(cell) if cell.pattern.churn_pct == 0 else None
+
+
+def _books_no_first_read_stream(cell: BaselineCell) -> bool:
+    """A cell with no writes at or below the S3 Files threshold: the model streams no first read."""
+    return cell.pattern.churn_pct == 0 and cell.object_kib <= cell.s3files_threshold_kib
+
+
+def _first_read_stream_sensitivity(cell: BaselineCell) -> tuple[float, float]:
+    """S3 Files subtotal as modelled, and with every working-set object streamed once on first read."""
+    modelled = s3_files_option(cell, split_metadata=True)
+    counted = s3_files_option(
+        cell, split_metadata=True, first_read_objects=cell.working_set_objects
+    )
+    assert modelled is not None and counted is not None
+    return sum(modelled.values()), sum(counted.values())
+
+
+def _enumeration_usd(cell: BaselineCell) -> float:
+    """First listing of the whole stored volume: a 4 KiB metadata write per stored object, once."""
+    return (
+        cell.objects_stored
+        * (S3FILES_METADATA_KIB / (1024 * 1024))
+        * S3FILES["write"].usd
+    )
 
 
 def _size_label(kib: float) -> str:
@@ -2994,6 +3039,36 @@ def render_baseline_grid() -> list[str]:
     metadata_delta_max = _metadata_delta(delta_cell)
     metadata_share_max = 100 * metadata_delta_max / sum(delta_lines.values())
 
+    # Counting the first-read stream that premise (c) leaves out, in the cells where (c) applies.
+    # The note says the subtotal goes down, so a cell where it does not stops the render.
+    no_stream_cells = [c for c in baseline_cells() if _books_no_first_read_stream(c)]
+    stream_changes = {id(c): _first_read_stream_sensitivity(c) for c in no_stream_cells}
+    if any(after >= before for before, after in stream_changes.values()):
+        raise ValueError("counting the first-read stream no longer lowers the subtotal")
+    stream_cell = min(
+        no_stream_cells,
+        key=lambda c: stream_changes[id(c)][1] - stream_changes[id(c)][0],
+    )
+    stream_before, stream_after = stream_changes[id(stream_cell)]
+
+    # The one-off cost of the first listing of the whole stored volume, at each size.
+    enumeration = t("、").join(
+        t(
+            "{size} で {amount}",
+            size=_size_label(kib),
+            amount=usd(
+                _enumeration_usd(
+                    BaselineCell(
+                        pattern=patterns[0],
+                        object_mib=kib / 1024,
+                        stored_gib=stored_gib,
+                    )
+                )
+            ),
+        )
+        for kib in BASELINE_SIZES_KIB
+    )
+
     out = [
         t("### 共通ベースライン — 20 TiB を同じ条件で"),
         "",
@@ -3084,11 +3159,23 @@ def render_baseline_grid() -> list[str]:
             "(a)(b) を触れられる量に合わせる前提に置き換えると、小計は下がる向きになる。"
             "{large_groups} は和が 100% 以上で、保存量の全体に及びうる。"
             "全体に及ぶと置いて (a) を置き換えると、FSx for ONTAP の小計は上がる向きになる。"
-            "どちらの向きも試算上の感度で、測定ではない。",
+            "(c) を置き換え、作業セットの各オブジェクトの初回読み出しを計上すると、"
+            "バケットからの GET の分が増え、高性能ストレージの読み取りが減る。"
+            "差し引きで S3 Files の小計は下がり、(c) が当てはまる {stream_cells} セルの中では "
+            "{stream_pattern} の {stream_size} が最大で、{stream_before} から {stream_after} へ、"
+            "{stream_delta} ({stream_pct}%) 下がる。"
+            "いずれの向きも試算上の感度で、測定ではない。",
             pool=f"{BASELINE_POOL_FRACTION:.0%}".rstrip("%"),
             threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
             small_groups=_keys(small),
             large_groups=_keys(large),
+            stream_cells=len(no_stream_cells),
+            stream_pattern=stream_cell.pattern.key,
+            stream_size=_size_label(stream_cell.object_kib),
+            stream_before=usd(stream_before),
+            stream_after=usd(stream_after),
+            stream_delta=usd(stream_before - stream_after),
+            stream_pct=f"{100 * (stream_before - stream_after) / stream_before:.1f}",
         ),
         "",
         t("#### パターンの一覧"),
@@ -3153,10 +3240,17 @@ def render_baseline_grid() -> list[str]:
             "[料金ページ](https://aws.amazon.com/s3/pricing/)は同じ読み取りに S3 の GET 課金だけが付くと書いている。"
             "2 ページの文面が揃わず、実測もないため、小計には算入したままにしている。"
             "除くと、1 MiB 以上のセルの小計は最大 {delta} (そのセルの小計の {pct}%) 下がる。"
+            "増える方向もある。"
+            "1 回の読み取りにメタデータ操作が k 回付く場合は、読み取り側の行が k 倍になる。"
+            "ディレクトリの初回列挙は、ファイル 1 個ごとに 4 KiB の書き込みを計量する。"
+            "{stored_tib} TiB を列挙した場合の 1 回限りの額は {enumeration} で、モデルは算入していない。"
+            "どちらも測っていない。"
             "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
             "`subtotal_excluding_metadata_usd` で読める。",
             delta=usd(metadata_delta_max),
             pct=f"{metadata_share_max:.1f}",
+            stored_tib=BASELINE_STORED_TIB,
+            enumeration=enumeration,
         ),
         "",
         t(
@@ -3211,10 +3305,7 @@ def render_baseline_grid() -> list[str]:
             "",
         ]
 
-        no_first_read_stream = (
-            cell.pattern.churn_pct == 0
-            and cell.object_kib <= cell.s3files_threshold_kib
-        )
+        no_first_read_stream = _books_no_first_read_stream(cell)
         for label, lines, note in (
             (t("FSx for ONTAP S3 AP (この構成)"), fsx_s3ap(cell), None),
             (
