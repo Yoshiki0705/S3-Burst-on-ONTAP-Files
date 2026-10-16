@@ -353,6 +353,24 @@ from what was known.
 
 ### Fixed
 
+- **The S3 Files throughput record disagreed with its own sections, and two of its comparisons named
+  the wrong path.** `s3files-throughput-measured.md` called S-3 and S-4 "not run" above a section
+  holding the S-4 result (1 to 8 hosts, 8.01x); the header, the limits table and the related-documents
+  row now say S-4 ran and S-3 ran in part. Its client-count comparison was labelled "S3 AP +
+  FlexCache", but the measurement that went flat is the FSx for ONTAP S3 Access Points path (writes
+  1.01x at four hosts, reads flat at about 600 MB/s, 128 MBps configuration), and the linked NFS
+  scale-out section measured a different path; both are now named and stated as not a like-for-like
+  comparison. The figure "4 TB/s+" carried no source note; it is replaced with the Performance
+  specifications wording, "up to terabytes per second" of aggregate read throughput
+  (checked 2026-10-16). Nothing was newly measured and no evidence stage changed.
+- **The SMB 300 s versus 900 s gap (12.4%) was open in some documents and closed in others.** The
+  re-measurement of 2026-09-20 on four channels showed the longer window 4.0% higher, so it does not
+  reproduce; the long run stopped at about 480 s, so there is no 900 s point, and the size of the
+  original pair is still unexplained. `performance-expectations.md` (JA and EN), `perf-matrix-results.md`
+  and `throughput-iops-concurrency.md` now agree. In the latter, two "not read" items that were
+  measured later (the 16% gap against a different configuration, and FlexCache with the origin at
+  2048 MBps) point to their sections, and the SMB item no longer says every measurement is NFS.
+
 - **The physical-link encryption of AWS Interconnect – multicloud was stated more definitely than the
   sources support.** The product page names no standard. MACsec is named only by an AWS executive
   quoted on a Microsoft blog, which is a public statement but not service documentation, so the two
