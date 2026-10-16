@@ -182,7 +182,10 @@ from what was known.
   and the volumes follow from them, so a reader can tell 20 TiB read once from a tenth of it read ten
   times. P2, P3 and P4 read and write the volumes of A, P5 those of B, and P6 and P7 those of C; P1
   and P8 have no counterpart among the old three. Prices do not follow the working-set ratio; the section states the
-  three premises held fixed and the direction each would move the result.
+  three premises held fixed and what would change if each were replaced. For the first-read stream
+  in premise (c) it lists the items that rise (GET requests, import write) and the one that falls
+  (high-performance-storage reads), and states that the net direction is not determined by the
+  model. The 64 KiB first-listing figure is stated as metadata only, without the data import.
   **Twelve Japanese anchors (`#パターン-a--オブジェクト-64-kib` and the B and C forms at four sizes)
   and the twelve English ones (`#pattern-a--64-kib-objects` and the rest) no longer exist**, replaced
   by 32 headings of the form `#パターン-p4--オブジェクト-4-mib`; a link from outside this repository to

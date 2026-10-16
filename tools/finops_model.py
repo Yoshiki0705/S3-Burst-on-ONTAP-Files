@@ -703,7 +703,13 @@ def s3_files_option(
     bucket, in the month. The default is the objects written in the month: the model counts a first
     read only for an object it has just written, so a scenario with no writes streams nothing. An
     object that already sits in the bucket is also read for the first time through the file system,
-    and the model does not count that. A caller can pass the number to see what counting it does.
+    and the model does not count that. A caller can pass the number to see what counting it does,
+    and what it sees is partial: passing it adds the GET requests and removes the same reads from
+    high-performance storage, and leaves out the import write (`S3FILES["write"]`, at least
+    `S3FILES_MIN_IO_KIB`) that a first read also brings. That write is not derived from the read
+    count: the default trigger imports the data of every file at or below the threshold when a
+    directory is first accessed, so its size depends on which directories are touched. The net
+    direction of counting the first read is therefore not determined by this model.
     """
     if not sc.s3files_viable:
         return None
@@ -2835,7 +2841,11 @@ def _books_no_first_read_stream(cell: BaselineCell) -> bool:
 
 
 def _first_read_stream_sensitivity(cell: BaselineCell) -> tuple[float, float]:
-    """S3 Files subtotal as modelled, and with every working-set object streamed once on first read."""
+    """S3 Files subtotal as modelled, and with every working-set object streamed once on first read.
+
+    Only the GET requests and the reads they remove are counted; the import write is not (see
+    `s3_files_option`), so the second value is not the subtotal of counting the first read.
+    """
     modelled = s3_files_option(cell, split_metadata=True)
     counted = s3_files_option(
         cell, split_metadata=True, first_read_objects=cell.working_set_objects
@@ -3040,33 +3050,46 @@ def render_baseline_grid() -> list[str]:
     metadata_share_max = 100 * metadata_delta_max / sum(delta_lines.values())
 
     # Counting the first-read stream that premise (c) leaves out, in the cells where (c) applies.
-    # The note says the subtotal goes down, so a cell where it does not stops the render.
+    # The note quotes the GET-and-read change only, and words it as a decrease, so a cell where that
+    # change is not a decrease stops the render. The net direction is not claimed.
     no_stream_cells = [c for c in baseline_cells() if _books_no_first_read_stream(c)]
     stream_changes = {id(c): _first_read_stream_sensitivity(c) for c in no_stream_cells}
     if any(after >= before for before, after in stream_changes.values()):
-        raise ValueError("counting the first-read stream no longer lowers the subtotal")
+        raise ValueError(
+            "the GET and read change of the first-read stream is no longer a decrease"
+        )
     stream_cell = min(
         no_stream_cells,
         key=lambda c: stream_changes[id(c)][1] - stream_changes[id(c)][0],
     )
     stream_before, stream_after = stream_changes[id(stream_cell)]
 
-    # The one-off cost of the first listing of the whole stored volume, at each size.
-    enumeration = t("、").join(
-        t(
-            "{size} で {amount}",
-            size=_size_label(kib),
-            amount=usd(
-                _enumeration_usd(
-                    BaselineCell(
-                        pattern=patterns[0],
-                        object_mib=kib / 1024,
-                        stored_gib=stored_gib,
+    # The one-off cost of the first listing of the whole stored volume, at each size. It is the
+    # metadata write only. At or below the import threshold the default trigger also imports the
+    # data, which this figure does not include, so the two ranges of sizes are written apart.
+    def _enumeration_at(sizes_kib: list[float]) -> str:
+        return t("、").join(
+            t(
+                "{size} で {amount}",
+                size=_size_label(kib),
+                amount=usd(
+                    _enumeration_usd(
+                        BaselineCell(
+                            pattern=patterns[0],
+                            object_mib=kib / 1024,
+                            stored_gib=stored_gib,
+                        )
                     )
-                )
-            ),
+                ),
+            )
+            for kib in sizes_kib
         )
-        for kib in BASELINE_SIZES_KIB
+
+    enumeration_small = _enumeration_at(
+        [k for k in BASELINE_SIZES_KIB if k <= S3FILES_DEFAULT_THRESHOLD_KIB]
+    )
+    enumeration_large = _enumeration_at(
+        [k for k in BASELINE_SIZES_KIB if k > S3FILES_DEFAULT_THRESHOLD_KIB]
     )
 
     out = [
@@ -3160,13 +3183,21 @@ def render_baseline_grid() -> list[str]:
             "{large_groups} は和が 100% 以上で、保存量の全体に及びうる。"
             "全体に及ぶと置いて (a) を置き換えると、FSx for ONTAP の小計は上がる向きになる。"
             "(c) を置き換え、作業セットの各オブジェクトの初回読み出しを計上すると、"
-            "バケットからの GET の分が増え、高性能ストレージの読み取りが減る。"
-            "差し引きで S3 Files の小計は下がり、(c) が当てはまる {stream_cells} セルの中では "
-            "{stream_pattern} の {stream_size} が最大で、{stream_before} から {stream_after} へ、"
-            "{stream_delta} ({stream_pct}%) 下がる。"
-            "いずれの向きも試算上の感度で、測定ではない。",
+            "増える項目は、バケットからの GET と、高性能ストレージへの取り込み書き込み "
+            "(${write_price} / GB、最小 {min_io} KiB)、減る項目は、高性能ストレージの読み取りである。"
+            "取り込み書き込みは、ディレクトリを最初にたどったとき "
+            "{threshold} KiB 以下のファイルのデータをまとめて取り込む既定の挙動に従い、"
+            "読まれたオブジェクトの数とは対応しないので、このモデルは数えていない。"
+            "差し引きの向きは、このモデルでは確定していない。"
+            "取り込み書き込みを含めず、GET の増加と読み取りの減少だけを見ると、"
+            "(c) が当てはまる {stream_cells} セルの中では "
+            "{stream_pattern} の {stream_size} の変化が最大で、{stream_before} から {stream_after} へ、"
+            "{stream_delta} ({stream_pct}%) 下がる。この額に取り込み書き込みは入っていない。"
+            "示した向きと金額はいずれも試算上の感度で、測定ではない。",
             pool=f"{BASELINE_POOL_FRACTION:.0%}".rstrip("%"),
             threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
+            write_price=f"{S3FILES['write'].usd:g}",
+            min_io=f"{S3FILES_MIN_IO_KIB:g}",
             small_groups=_keys(small),
             large_groups=_keys(large),
             stream_cells=len(no_stream_cells),
@@ -3243,14 +3274,23 @@ def render_baseline_grid() -> list[str]:
             "増える方向もある。"
             "1 回の読み取りにメタデータ操作が k 回付く場合は、読み取り側の行が k 倍になる。"
             "ディレクトリの初回列挙は、ファイル 1 個ごとに 4 KiB の書き込みを計量する。"
-            "{stored_tib} TiB を列挙した場合の 1 回限りの額は {enumeration} で、モデルは算入していない。"
+            "{stored_tib} TiB を列挙した場合の 1 回限りの額 ({enumeration_small}) は、"
+            "メタデータ分だけの額で、{threshold} KiB 以下のファイルのデータの取り込み書き込み "
+            "(${write_price} / GB) は含まない。"
+            "既定のトリガ (ディレクトリの初回アクセス) は、このサイズのファイルのデータも取り込むためである。"
+            "{threshold} KiB を超えるサイズ ({enumeration_large}) では、"
+            "データは取り込まれず直接読まれるので、この額はメタデータ分のみである。"
+            "モデルはどちらも算入していない。"
             "どちらも測っていない。"
             "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
             "`subtotal_excluding_metadata_usd` で読める。",
             delta=usd(metadata_delta_max),
             pct=f"{metadata_share_max:.1f}",
             stored_tib=BASELINE_STORED_TIB,
-            enumeration=enumeration,
+            enumeration_small=enumeration_small,
+            enumeration_large=enumeration_large,
+            threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
+            write_price=f"{S3FILES['write'].usd:g}",
         ),
         "",
         t(

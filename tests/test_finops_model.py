@@ -689,7 +689,17 @@ def test_the_metadata_note_also_states_the_directions_that_raise_the_subtotal() 
             fm.BASELINE_SIZES_KIB, ("64 KiB", "1 MiB", "4 MiB", "16 MiB"), strict=True
         )
     ]
-    assert "、".join(sized) in ja
+    # The 64 KiB figure is the metadata alone and leaves out the data import (the default trigger
+    # imports files at or below the threshold); the larger sizes stream the data and are written apart.
+    assert (
+        f"1 回限りの額 ({sized[0]}) は、メタデータ分だけの額で、128 KiB 以下のファイルのデータの取り込み書き込み"
+        in ja
+    )
+    assert "は含まない。" in ja
+    assert (
+        f"128 KiB を超えるサイズ ({'、'.join(sized[1:])}) では、データは取り込まれず直接読まれるので、この額はメタデータ分のみである。"
+        in ja
+    )
     en = _baseline_section("en")
     assert "If each read carries k metadata operations" in en
     en_sized = [
@@ -698,12 +708,22 @@ def test_the_metadata_note_also_states_the_directions_that_raise_the_subtotal() 
             fm.BASELINE_SIZES_KIB, ("64 KiB", "1 MiB", "4 MiB", "16 MiB"), strict=True
         )
     ]
-    assert ", ".join(en_sized) in en
+    assert (
+        f"({en_sized[0]}) is for the metadata alone; it does not include the import write"
+        in en
+    )
+    assert (
+        f"For sizes above 128 KiB ({', '.join(en_sized[1:])}) the data is not imported but read directly"
+        in en
+    )
 
 
-def test_counting_the_first_read_stream_lowers_every_cell_it_applies_to() -> None:
-    """Premise (c) leaves the stream out; the note says counting it lowers the subtotal. The direction
-    is checked in each of the four cells, not only the one the note quotes."""
+def test_the_get_and_read_change_of_the_first_read_stream_is_a_decrease_in_every_cell() -> (
+    None
+):
+    """The note quotes the GET-and-read change alone, as a decrease, and says the import write is not in
+    it. The decrease is checked in each of the four cells, not only the one the note quotes. This is
+    not the net direction of counting the first read, which the note says the model does not determine."""
     cells = [c for c in fm.baseline_cells() if fm._books_no_first_read_stream(c)]
     assert [(c.pattern.key, c.object_kib) for c in cells] == [
         (k, 64) for k in ("P1", "P2", "P3", "P4")
@@ -719,20 +739,29 @@ def test_counting_the_first_read_stream_lowers_every_cell_it_applies_to() -> Non
         assert default == explicit
 
 
-def test_the_first_read_stream_sensitivity_is_stated_with_its_derived_size() -> None:
+def test_the_first_read_stream_note_lists_what_rises_and_falls_and_asserts_no_net_direction() -> (
+    None
+):
     ja = _baseline_section("ja")
-    # P2 at 64 KiB moves most: 335,544,320 GETs at the tier-2 price replace the same reads at the
-    # S3 Files read price. The amounts are pinned as literals, like the metadata figure above.
+    # P2 at 64 KiB moves most on GET and reads alone: 335,544,320 GETs at the tier-2 price replace the
+    # same reads at the S3 Files read price. The amounts are pinned as literals, like the metadata figure.
     assert (
-        "差し引きで S3 Files の小計は下がり、(c) が当てはまる 4 セルの中では "
-        "P2 の 64 KiB が最大で、$8,755.20 から $8,060.15 へ、$695.05 (7.9%) 下がる。"
+        "増える項目は、バケットからの GET と、高性能ストレージへの取り込み書き込み "
+        "($0.07 / GB、最小 32 KiB)、減る項目は、高性能ストレージの読み取りである。"
     ) in ja
-    assert "いずれの向きも試算上の感度で、測定ではない。" in ja
-    en = _baseline_section("en")
+    assert "差し引きの向きは、このモデルでは確定していない。" in ja
     assert (
-        "by at most $695.05 (7.9%) among the 4 cells where (c) applies, in P2 at 64 KiB, "
-        "from $8,755.20 to $8,060.15."
+        "P2 の 64 KiB の変化が最大で、$8,755.20 から $8,060.15 へ、$695.05 (7.9%) 下がる。"
+        "この額に取り込み書き込みは入っていない。"
+    ) in ja
+    assert "差し引きで S3 Files の小計は下がり" not in ja
+    en = _baseline_section("en")
+    assert "The net direction is not determined by this model." in en
+    assert (
+        "in P2 at 64 KiB, from $8,755.20 to $8,060.15, a decrease of $695.05 (7.9%); "
+        "that figure does not include the import write."
     ) in en
+    assert "falls on balance" not in en
 
 
 def test_p3_says_the_blogs_give_a_hot_share_and_not_a_share_read_in_a_month() -> None:
