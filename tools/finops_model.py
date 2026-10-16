@@ -37,9 +37,11 @@ Run:
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -660,7 +662,25 @@ def fsx_s3ap(sc: Scenario) -> dict[str, float]:
     return lines
 
 
-def s3_files_option(sc: Scenario) -> dict[str, float] | None:
+def s3_files_metadata_usd(sc: Scenario | BaselineCell) -> tuple[float, float]:
+    """The two S3 Files metadata charges, in USD: (import side, read side).
+
+    Four KiB per operation on each side, the same quantity `s3_files_option` books in both of its
+    branches. Exposed so a caller can show the two amounts apart from the data lines without
+    reading them back out of a label.
+    """
+    metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+    return (
+        sc.objects_per_month * metadata_gib * S3FILES["write"].usd,
+        sc.reads_per_month * metadata_gib * S3FILES["read"].usd,
+    )
+
+
+def s3_files_option(
+    sc: Scenario | BaselineCell,
+    split_metadata: bool = False,
+    first_read_objects: float | None = None,
+) -> dict[str, float] | None:
     """An S3 bucket read as a file system through S3 Files, with no FSx for ONTAP at all.
 
     The authoritative copy stays in the bucket, so S3 Standard is still paid in full. On top of
@@ -672,6 +692,24 @@ def s3_files_option(sc: Scenario) -> dict[str, float] | None:
     object workloads very cheap here. Files at or below it are imported onto high-performance
     storage at 0.36 USD per GB-month, which makes small object workloads expensive unless the
     expiration window is shortened. Both branches are modelled rather than assuming one.
+
+    `split_metadata` shows the two 4 KiB-per-operation metadata charges as lines of their own in
+    both branches, instead of folding them into the data lines at or below the threshold. The
+    subtotal is the same either way; only how it is split into lines changes. The default keeps
+    every existing caller's lines exactly as they were. With it set, a branch that streams nothing
+    on first read does not emit the zero-valued stream line.
+
+    `first_read_objects` is how many objects are read for the first time, and so streamed from the
+    bucket, in the month. The default is the objects written in the month: the model counts a first
+    read only for an object it has just written, so a scenario with no writes streams nothing. An
+    object that already sits in the bucket is also read for the first time through the file system,
+    and the model does not count that. A caller can pass the number to see what counting it does,
+    and what it sees is partial: passing it adds the GET requests and removes the same reads from
+    high-performance storage, and leaves out the import write (`S3FILES["write"]`, at least
+    `S3FILES_MIN_IO_KIB`) that a first read also brings. That write is not derived from the read
+    count: the default trigger imports the data of every file at or below the threshold when a
+    directory is first accessed, so its size depends on which directories are touched. The net
+    direction of counting the first read is therefore not determined by this model.
     """
     if not sc.s3files_viable:
         return None
@@ -698,32 +736,59 @@ def s3_files_option(sc: Scenario) -> dict[str, float] | None:
         # and carries an S3 GET plus a metadata read, with no file read charge. It is that read
         # which triggers the asynchronous import. Only the reads after it are served from
         # high-performance storage and metered as file reads.
-        streamed_reads = float(sc.objects_per_month)
+        streamed_reads = float(
+            sc.objects_per_month if first_read_objects is None else first_read_objects
+        )
         hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
         read_gib = hps_reads * io_kib / (1024 * 1024)
 
         lines[
             t("S3 Files 高性能ストレージ (アクティブ {share})", share=f"{active:.0%}")
         ] = hps_gib * S3FILES["storage"].usd
-        lines[t("GET リクエスト (初回読み出しはバケットからストリーム)")] = (
-            streamed_reads * S3["tier2"].usd
-        )
-        lines[t("S3 Files 書き込み (高性能ストレージへの取り込み)")] = (
-            import_gib + sc.objects_per_month * metadata_gib
-        ) * S3FILES["write"].usd
-        lines[t("S3 Files 読み取り (取り込み後の読み出しとメタデータ)")] = (
-            read_gib + sc.reads_per_month * metadata_gib
-        ) * S3FILES["read"].usd
+        if not split_metadata or streamed_reads > 0:
+            lines[t("GET リクエスト (初回読み出しはバケットからストリーム)")] = (
+                streamed_reads * S3["tier2"].usd
+            )
+        if split_metadata:
+            lines[t("S3 Files 書き込み (高性能ストレージへの取り込み)")] = (
+                import_gib * S3FILES["write"].usd
+            )
+            lines[t("S3 Files 読み取り (取り込み後の読み出し)")] = (
+                read_gib * S3FILES["read"].usd
+            )
+        else:
+            lines[t("S3 Files 書き込み (高性能ストレージへの取り込み)")] = (
+                import_gib + sc.objects_per_month * metadata_gib
+            ) * S3FILES["write"].usd
+            lines[t("S3 Files 読み取り (取り込み後の読み出しとメタデータ)")] = (
+                read_gib + sc.reads_per_month * metadata_gib
+            ) * S3FILES["read"].usd
     else:
         lines[t("GET リクエスト (バケットから直接ストリーム)")] = (
             sc.reads_per_month * S3["tier2"].usd
         )
-        lines[t("S3 Files 書き込み (メタデータの取り込み)")] = (
-            sc.objects_per_month * metadata_gib * S3FILES["write"].usd
-        )
-        lines[t("S3 Files 読み取り (メタデータ)")] = (
-            sc.reads_per_month * metadata_gib * S3FILES["read"].usd
-        )
+        if not split_metadata:
+            lines[t("S3 Files 書き込み (メタデータの取り込み)")] = (
+                sc.objects_per_month * metadata_gib * S3FILES["write"].usd
+            )
+            lines[t("S3 Files 読み取り (メタデータ)")] = (
+                sc.reads_per_month * metadata_gib * S3FILES["read"].usd
+            )
+
+    if split_metadata:
+        ingest_usd, read_usd = s3_files_metadata_usd(sc)
+        lines[
+            t(
+                "S3 Files メタデータ取り込み ({ops} 操作 × 4 KiB)",
+                ops=f"{sc.objects_per_month:,.0f}",
+            )
+        ] = ingest_usd
+        lines[
+            t(
+                "S3 Files メタデータ読み取り ({ops} 操作 × 4 KiB)",
+                ops=f"{sc.reads_per_month:,.0f}",
+            )
+        ] = read_usd
 
     return lines
 
@@ -2400,39 +2465,124 @@ def render_marginal_cost() -> list[str]:
 #
 # A dedicated dataclass rather than a reused `Scenario`. The scenarios couple the stored volume to
 # the ingest: `stored_gib = ingest_gib * retention_months`, so stored follows from what is written.
-# This grid does the opposite — it fixes the stored logical volume at a common 20 TiB and varies the
-# read and write volumes independently, which is the whole point of a like-for-like baseline. Forcing
-# that onto `Scenario` would make the monthly write volume set the retained volume, which is exactly
-# the conflation design section 3.3 forbids. `BaselineCell` therefore carries read and write volume
-# as their own inputs, and has no `industry` field — the grid is deliberately workload-agnostic, so
-# the design-review NIT about an empty 想定業種 row does not arise here.
+# This grid does the opposite — it fixes the stored logical volume at a common 20 TiB and derives the
+# read and write volumes from three ratios, which is the whole point of a like-for-like baseline.
+# Forcing that onto `Scenario` would make the monthly write volume set the retained volume, which is
+# exactly the conflation design section 3.3 forbids. `BaselineCell` has no `industry` field — the
+# grid is deliberately workload-agnostic.
+#
+# A pattern is held as three numbers, not as two volumes:
+#
+#   working-set ratio w   the share of the stored objects that are read within the month
+#   reads per object n    how many times each working-set object is read
+#   churn rate c          bytes written per month / stored bytes
+#
+# and the volumes follow: read = stored x w x n, write = stored x c. Stating a read volume alone
+# ("20 TiB a month") hides whether it is the whole data set once or a tenth of it ten times, and
+# those two are not interchangeable once tiering is in play. The ratios are integer percentages so
+# `stored x pct x n / 100` is an exact integer for every pattern held here.
+#
+# Pricing is deliberately NOT a function of w. `fsx_component` and `s3_files_option` read only the
+# stored volume, the read and write volumes and the object size, so two patterns with the same read
+# and write volumes price identically at every size. Making the price follow w would mean rewriting
+# the capacity-pool share and the S3 Files active share from the working set, and neither is
+# measured here; see the three "fixed premises" the generated section states.
 #
 # The pricing still runs through the existing derivation helpers (`fsx_component`, `fsx_s3ap`,
 # `s3_files_option`): `BaselineCell` exposes the same attribute and property names those functions
 # read, so object-count, NFS-ops, S3-requests and capacity-pool-billed-requests stay the separate
 # quantities they already are in the model rather than being recomputed here.
 
+# How a number in a pattern is known. "sourced": a public document gives the figure or its form.
+# "repository": reused from an assumption elsewhere in this repository; not a measurement.
+# "placeholder": no source and no repository assumption; placed to make the arithmetic work.
+# "definition": true by definition, so there is nothing to source or to assume. It is the churn
+# rate of a pattern with no writes (0%), and nothing else.
+BASELINE_BASES = ("sourced", "repository", "placeholder", "definition")
+
+BASELINE_SOURCE_URLS = {
+    "efs_url": "https://aws.amazon.com/blogs/storage/scalable-cloud-native-file-storage-at-pennies-per-gb-month-with-amazon-efs/",
+    "sizing_url": "https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/",
+    "ycsb_url": "https://github.com/brianfrankcooper/YCSB/wiki/Core-Workloads",
+    "mlperf_url": "https://mlcommons.org/benchmarks/storage/",
+}
+
+# Fixed modelling assumptions of the grid, held constant so the only variables are size and pattern.
+BASELINE_EFFICIENCY_SSD = 0.40
+BASELINE_POOL_FRACTION = 0.30
+
+
+@dataclass(frozen=True)
+class BaselinePattern:
+    """A read/write pattern held as working-set ratio, reads per object and churn rate."""
+
+    key: str  # "P1" ... "P8"
+    name: str  # Japanese source text; `t()` supplies the English
+    working_set_pct: int  # w: share of stored objects read within the month, in percent
+    reads_per_object: int  # n: reads of each working-set object per month
+    churn_pct: int  # c: bytes written per month / stored bytes, in percent
+    placeholder: (
+        bool  # True: no source for the values; placed to make the arithmetic work
+    )
+    basis: tuple[str, str, str]  # how (w, n, c) are known; each one of BASELINE_BASES
+    position: (
+        str  # Japanese source text, may carry {w} {n} {c} and the URL placeholders
+    )
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"P\d+", self.key):
+            raise ValueError(f"pattern key must be 'P' and digits: {self.key!r}")
+        if not 0 < self.working_set_pct <= 100:
+            raise ValueError(f"{self.key}: working_set_pct must be in (0, 100]")
+        if not isinstance(self.reads_per_object, int) or self.reads_per_object < 1:
+            raise ValueError(f"{self.key}: reads_per_object must be an integer >= 1")
+        if not 0 <= self.churn_pct <= 100:
+            # Above 100 the writes are no longer replacements of what is stored.
+            raise ValueError(f"{self.key}: churn_pct must be in [0, 100]")
+        if len(self.basis) != 3 or any(b not in BASELINE_BASES for b in self.basis):
+            raise ValueError(f"{self.key}: basis must be 3 values of {BASELINE_BASES}")
+        # "definition" says the value is zero by construction, so it can only be the churn of a
+        # pattern that writes nothing. Anywhere else it would pass a chosen value off as a given.
+        if ("definition" in self.basis[:2]) or (
+            self.basis[2] == "definition" and self.churn_pct != 0
+        ):
+            raise ValueError(
+                f"{self.key}: 'definition' is only the basis of a 0% churn"
+            )
+
+    @property
+    def read_multiple(self) -> float:
+        """R: monthly read volume / stored volume."""
+        return self.working_set_pct * self.reads_per_object / 100
+
+    @property
+    def touches_whole_volume(self) -> bool:
+        """w + c >= 100: reads and writes together may reach every stored object.
+
+        The reads and the writes can overlap, so the sum is only an upper bound on the share
+        touched. Below 100 the whole volume cannot be touched; at or above it, it may be.
+        """
+        return self.working_set_pct + self.churn_pct >= 100
+
 
 @dataclass(frozen=True)
 class BaselineCell:
-    """One cell of the common 20 TiB baseline grid: a size crossed with a read/write pattern.
+    """One cell of the common 20 TiB baseline grid: a size crossed with a pattern.
 
-    Stored volume is fixed and logical. Read and write volumes are independent monthly figures, so
-    the object count written and the object count read are derived separately and never equated with
-    the retained volume. Everything a pricing helper reads off a `Scenario` is provided here under
-    the same name.
+    Stored volume is fixed and logical. The read and write volumes are derived from the pattern, so
+    the object count written and the object count read are derived separately and never equated
+    with the retained volume. Everything a pricing helper reads off a `Scenario` is provided here
+    under the same name.
     """
 
-    pattern: str  # "A" / "B" / "C"
+    pattern: BaselinePattern
     object_mib: float
     stored_gib: float  # common 20 TiB logical, fixed across the grid
-    read_gib_per_month: float
-    write_gib_per_month: float
 
     # Fixed modelling assumptions, held constant across the grid so the only variables are size and
     # pattern. Stated here, not buried in the render function.
-    efficiency_ssd: float = 0.40
-    pool_fraction: float = 0.30
+    efficiency_ssd: float = BASELINE_EFFICIENCY_SSD
+    pool_fraction: float = BASELINE_POOL_FRACTION
     deployment: str = "saz1"
     tput_headroom: float = 4.0
     ssd_headroom: float = 0.20
@@ -2442,13 +2592,46 @@ class BaselineCell:
     s3files_expiration_days: float = S3FILES_DEFAULT_EXPIRY_DAYS
 
     @property
+    def file_protocol_required(self) -> bool:
+        """The grid is workload-agnostic, so no cell requires NFS/SMB. `s3_only` reads this."""
+        return False
+
+    @property
     def object_kib(self) -> float:
         return self.object_mib * 1024
+
+    @property
+    def working_set_gib(self) -> float:
+        """Bytes read at least once in the month: stored x w."""
+        return self.stored_gib * self.pattern.working_set_pct / 100
+
+    @property
+    def unread_gib(self) -> float:
+        """Bytes not read at all within the month: stored x (1 - w)."""
+        return self.stored_gib * (100 - self.pattern.working_set_pct) / 100
+
+    @property
+    def read_gib_per_month(self) -> float:
+        """Monthly read volume = stored x w x n."""
+        return (
+            self.stored_gib
+            * (self.pattern.working_set_pct * self.pattern.reads_per_object)
+            / 100
+        )
+
+    @property
+    def write_gib_per_month(self) -> float:
+        """Monthly write volume = stored x churn rate."""
+        return self.stored_gib * self.pattern.churn_pct / 100
 
     @property
     def objects_stored(self) -> float:
         """Object count = stored bytes / size. Separate from the read and write counts below."""
         return self.stored_gib / self.object_mib * 1024
+
+    @property
+    def working_set_objects(self) -> float:
+        return self.objects_stored * self.pattern.working_set_pct / 100
 
     @property
     def objects_per_month(self) -> float:
@@ -2469,6 +2652,19 @@ class BaselineCell:
         return self.read_gib_per_month / self.object_mib * 1024
 
     @property
+    def read_share_pct(self) -> float:
+        """Read bytes as a share of read + write bytes. A byte ratio, not an operation-count ratio."""
+        return 100 * self.read_gib_per_month / self._moved_gib
+
+    @property
+    def write_share_pct(self) -> float:
+        return 100 * self.write_gib_per_month / self._moved_gib
+
+    @property
+    def _moved_gib(self) -> float:
+        return self.read_gib_per_month + self.write_gib_per_month
+
+    @property
     def ingest_gib(self) -> float:
         """Bytes written per month. Used only by the sync landing-area helper if ever called."""
         return self.write_gib_per_month
@@ -2480,50 +2676,422 @@ class BaselineCell:
     @property
     def required_mbps(self) -> float:
         """Sustained throughput from read + write volume, in MB/s averaged over the month."""
-        moved_mib = (self.read_gib_per_month + self.write_gib_per_month) * 1024
-        return moved_mib / SECONDS_PER_MONTH
+        return self._moved_gib * 1024 / SECONDS_PER_MONTH
 
 
 # Common input: 20 TiB logical, the same logical workload presented to both methods. Four object
-# sizes crossed with three read/write patterns. The patterns name monthly read and write volume in
-# TiB; the stored volume is the same 20 TiB in every cell.
+# sizes crossed with eight patterns; the stored volume is the same 20 TiB in every cell.
 BASELINE_STORED_TIB = 20
 BASELINE_SIZES_KIB = (64, 1024, 4096, 16384)  # 64 KiB, 1 MiB, 4 MiB, 16 MiB
-BASELINE_PATTERNS: tuple[tuple[str, float, float], ...] = (
-    # (pattern, read TiB/month, write TiB/month)
-    ("A", 20.0, 0.0),
-    ("B", 20.0, 1.0),
-    ("C", 40.0, 20.0),
+BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
+    BaselinePattern(
+        key="P1",
+        name="コールド保管",
+        working_set_pct=5,
+        reads_per_object=1,
+        churn_pct=0,
+        placeholder=True,
+        basis=("placeholder", "placeholder", "definition"),
+        position="**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
+        "作業セット {w}%、回数 {n}、書き込みなし",
+    ),
+    BaselinePattern(
+        key="P2",
+        name="全件を 1 回読む",
+        working_set_pct=100,
+        reads_per_object=1,
+        churn_pct=0,
+        placeholder=False,
+        basis=("placeholder", "placeholder", "definition"),
+        position="書き込みのない読み取り専用の形。大きいファイルを順次読み、書き込みがない点が MLPerf Storage の "
+        "Unet3D に近い（[MLPerf Storage]({mlperf_url})）。"
+        "YCSB C は読み取りのみだが Zipf 分布で偏って読むため、"
+        "全件を 1 回ずつ読む形とは違う（[YCSB]({ycsb_url})）",
+    ),
+    BaselinePattern(
+        key="P3",
+        name="ホット 20% を再読",
+        working_set_pct=20,
+        reads_per_object=5,
+        churn_pct=0,
+        placeholder=False,
+        basis=("sourced", "placeholder", "definition"),
+        position="作業セット比 {w}% は、データの 2 割がホット、8 割がコールドという比を述べる "
+        "2 つのブログによる（[EFS ブログ]({efs_url})、"
+        "[FSx for ONTAP サイジングブログ]({sizing_url})）。"
+        "どちらも算出方法とデータセットを示していない。"
+        "ブログが述べるのはホットなデータの容量比で、月内に読まれる割合とは述べていない。"
+        "**回数 {n} は出典がなく**、R を 1 倍に揃えるために置いた",
+    ),
+    BaselinePattern(
+        key="P4",
+        name="小さい作業セットを強く再読",
+        working_set_pct=10,
+        reads_per_object=10,
+        churn_pct=0,
+        placeholder=False,
+        basis=("repository", "repository", "definition"),
+        position="作業セット {w}% ({ws_gib}) は、本文の「読み取りが繰り返されるとき」の節の"
+        "作業セットと同じ大きさ。月 {n} 回は、その節の「読み取り回数に対する感度」表にある行の 1 つ。"
+        "その節の本表は月 30 回で、capacity pool の割合も 70%"
+        "（この節の固定は {pool_pct}%）と違う。"
+        "いずれも本リポジトリの試算前提であり、測定値ではない",
+    ),
+    BaselinePattern(
+        key="P5",
+        name="読み多めに少量取り込み",
+        working_set_pct=10,
+        reads_per_object=10,
+        churn_pct=5,
+        placeholder=False,
+        basis=("repository", "repository", "placeholder"),
+        position="読み取りは P4 と同じ（本リポジトリの試算前提）。"
+        "書き込みを保存量の {c}%（{write_tib} TiB）とした。"
+        "読み : 書きのバイト比は {read_share} : {write_share} で、"
+        "YCSB B の読み 95 : 更新 5 に近い形だが、"
+        "YCSB B はオペレーション数の比であり同じ量ではない（[YCSB]({ycsb_url})）。"
+        "チャーン率 {c}% は置いた値",
+    ),
+    BaselinePattern(
+        key="P6",
+        name="読み書き混在",
+        working_set_pct=50,
+        reads_per_object=4,
+        churn_pct=100,
+        placeholder=True,
+        basis=("placeholder", "placeholder", "placeholder"),
+        position="**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
+        "作業セット {w}%、回数 {n}、保存量と同量の書き込み",
+    ),
+    BaselinePattern(
+        key="P7",
+        name="小オブジェクトの大量書き込み",
+        working_set_pct=100,
+        reads_per_object=2,
+        churn_pct=100,
+        placeholder=False,
+        basis=("repository", "repository", "repository"),
+        position="全オブジェクトを月に 1 回置き換え、各オブジェクトを {n} 回読む形。"
+        "「車載 / IoT テレメトリ」の前提（{auto_objects} 個 / 月、64 KiB、読み出し "
+        "{auto_reads} 回、保持 1 か月）に沿った形で、本リポジトリの試算前提。"
+        "違う点が 3 つある。保存量はその節の {auto_stored} ではなく {stored_tib} TiB に揃える。"
+        "capacity pool の割合はその節の {auto_pool_pct}% ではなくこの節の {pool_pct}%、"
+        "SSD の圧縮率はその節の {auto_eff_pct}% ではなくこの節の {eff_pct}%。"
+        "64 KiB のとき書き込みは {objs_64k} 個（その節は {auto_objects} 個）",
+    ),
+    BaselinePattern(
+        key="P8",
+        name="書き込み中心",
+        working_set_pct=10,
+        reads_per_object=1,
+        churn_pct=100,
+        placeholder=True,
+        basis=("placeholder", "placeholder", "placeholder"),
+        position="**仮置き**。出典のある値ではなく、算術を通すための仮置き。"
+        "作業セット {w}%、回数 {n}、保存量と同量の書き込み",
+    ),
 )
 
 
 def baseline_cells() -> list[BaselineCell]:
     stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
-    cells = []
-    for pattern, read_tib, write_tib in BASELINE_PATTERNS:
-        for kib in BASELINE_SIZES_KIB:
-            cells.append(
-                BaselineCell(
-                    pattern=pattern,
-                    object_mib=kib / 1024,
-                    stored_gib=stored_gib,
-                    read_gib_per_month=read_tib * GIB_PER_TIB,
-                    write_gib_per_month=write_tib * GIB_PER_TIB,
-                )
-            )
-    return cells
+    return [
+        BaselineCell(pattern=pattern, object_mib=kib / 1024, stored_gib=stored_gib)
+        for pattern in BASELINE_PATTERNS
+        for kib in BASELINE_SIZES_KIB
+    ]
+
+
+def baseline_same_price_groups() -> list[list[BaselinePattern]]:
+    """Patterns whose subtotals are identical at every size, for both priced methods.
+
+    Derived from the prices themselves rather than from the inputs, so it stays true if the pricing
+    ever starts to depend on the working-set ratio: the group then disappears instead of the
+    document going on to claim it.
+    """
+    by_signature: dict[tuple[float, ...], list[BaselinePattern]] = {}
+    for pattern in BASELINE_PATTERNS:
+        signature: list[float] = []
+        for cell in baseline_cells():
+            if cell.pattern is not pattern:
+                continue
+            files = s3_files_option(cell, split_metadata=True)
+            assert files is not None  # the grid is always viable for S3 Files
+            signature += [
+                round(sum(fsx_s3ap(cell).values()), 6),
+                round(sum(files.values()), 6),
+            ]
+        by_signature.setdefault(tuple(signature), []).append(pattern)
+    return [group for group in by_signature.values() if len(group) > 1]
+
+
+def baseline_s3_only(cell: BaselineCell) -> dict[str, float] | None:
+    """S3 alone, for the patterns with no writes only.
+
+    The write path differs by method (an S3 API PUT, an NFS write plus a sync, a PUT through S3
+    Access Points), and one table for all of them would mix the write assumptions. This is a choice
+    of scope for the grid, not a statement that S3 alone cannot take writes.
+    """
+    return s3_only(cell) if cell.pattern.churn_pct == 0 else None
+
+
+def _books_no_first_read_stream(cell: BaselineCell) -> bool:
+    """A cell with no writes at or below the S3 Files threshold: the model streams no first read."""
+    return cell.pattern.churn_pct == 0 and cell.object_kib <= cell.s3files_threshold_kib
+
+
+def _first_read_stream_sensitivity(cell: BaselineCell) -> tuple[float, float]:
+    """S3 Files subtotal as modelled, and with every working-set object streamed once on first read.
+
+    Only the GET requests and the reads they remove are counted; the import write is not (see
+    `s3_files_option`), so the second value is not the subtotal of counting the first read.
+    """
+    modelled = s3_files_option(cell, split_metadata=True)
+    counted = s3_files_option(
+        cell, split_metadata=True, first_read_objects=cell.working_set_objects
+    )
+    assert modelled is not None and counted is not None
+    return sum(modelled.values()), sum(counted.values())
+
+
+def _enumeration_usd(cell: BaselineCell) -> float:
+    """First listing of the whole stored volume: a 4 KiB metadata write per stored object, once."""
+    return (
+        cell.objects_stored
+        * (S3FILES_METADATA_KIB / (1024 * 1024))
+        * S3FILES["write"].usd
+    )
+
+
+def _size_label(kib: float) -> str:
+    return f"{kib:,.0f} KiB" if kib < 1024 else f"{kib / 1024:,.0f} MiB"
+
+
+def _tib(value_gib: float) -> str:
+    return f"{value_gib / GIB_PER_TIB:g}"
+
+
+def _keys(patterns: list[BaselinePattern]) -> str:
+    return t("・").join(p.key for p in patterns)
+
+
+def _whole(value: float) -> int:
+    """An object count is a whole number; refuse to round away a fraction."""
+    rounded = round(value)
+    if abs(value - rounded) > 1e-6:
+        raise ValueError(f"expected a whole number, got {value!r}")
+    return int(rounded)
+
+
+def _position_fields(pattern: BaselinePattern) -> dict[str, object]:
+    """Values a pattern's `position` text may interpolate, all derived from the model."""
+    telemetry = next(sc for sc in SCENARIOS if sc.key == "telemetry")
+    stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+    probe = BaselineCell(pattern=pattern, object_mib=64 / 1024, stored_gib=stored_gib)
+    return {
+        "w": pattern.working_set_pct,
+        "n": pattern.reads_per_object,
+        "c": pattern.churn_pct,
+        "ws_gib": gib(probe.working_set_gib),
+        "write_tib": _tib(probe.write_gib_per_month),
+        "read_share": f"{probe.read_share_pct:.1f}",
+        "write_share": f"{probe.write_share_pct:.1f}",
+        "objs_64k": f"{probe.objects_per_month:,.0f}",
+        "stored_tib": BASELINE_STORED_TIB,
+        "pool_pct": f"{BASELINE_POOL_FRACTION:.0%}".rstrip("%"),
+        "eff_pct": f"{BASELINE_EFFICIENCY_SSD:.0%}".rstrip("%"),
+        "auto_objects": f"{telemetry.objects_per_month:,}",
+        "auto_reads": f"{telemetry.reads_per_object:g}",
+        "auto_stored": gib(telemetry.stored_gib),
+        "auto_pool_pct": f"{telemetry.pool_fraction:.0%}".rstrip("%"),
+        "auto_eff_pct": f"{telemetry.efficiency_ssd:.0%}".rstrip("%"),
+    }
+
+
+def baseline_position(pattern: BaselinePattern) -> str:
+    return t(pattern.position, **BASELINE_SOURCE_URLS, **_position_fields(pattern))
+
+
+def _baseline_cell_rows(cell: BaselineCell) -> list[list[str]]:
+    """The ten rows of a cell's derived-quantity table. Rows 1-8 are the items every cell shows."""
+    p = cell.pattern
+    stored = gib(cell.stored_gib)
+    ws = gib(cell.working_set_gib)
+    written = gib(cell.write_gib_per_month)
+
+    if p.working_set_pct == 100:
+        working_set = t(
+            "100% = 保存量の全体 ({gib}) / {count} 個。月内に全件が読まれる",
+            gib=stored,
+            count=f"{cell.working_set_objects:,.0f}",
+        )
+    else:
+        working_set = t(
+            "{pct}% = {gib} ({tib} TiB) / {count} 個。残り {rest_pct}% ({rest_gib}) は月内に読まれない",
+            pct=p.working_set_pct,
+            gib=ws,
+            tib=_tib(cell.working_set_gib),
+            count=f"{cell.working_set_objects:,.0f}",
+            rest_pct=100 - p.working_set_pct,
+            rest_gib=gib(cell.unread_gib),
+        )
+
+    if p.churn_pct == 0:
+        write_row = t("0 GiB / 0 個 / チャーン率 0% (書き込みなし)")
+        retention = t(
+            "書き込みなし。保存量は {gib} のまま一定。"
+            "書き込みがあるパターンでも、書き込みは既存オブジェクトの置き換えで保存量は変わらない",
+            gib=stored,
+        )
+    else:
+        write_row = t(
+            "{gib} ({tib} TiB) / {count} 個 / チャーン率 {pct}% (保存量の {ratio} 倍)",
+            gib=written,
+            tib=_tib(cell.write_gib_per_month),
+            count=f"{cell.objects_per_month:,.0f}",
+            pct=p.churn_pct,
+            ratio=f"{p.churn_pct / 100:g}",
+        )
+        retention = t(
+            "書き込みは既存オブジェクトの置き換えで、保存量は {gib} のまま一定。月を通して積み増さない",
+            gib=stored,
+        )
+
+    return [
+        [
+            t("1. 保存量 (論理) と保存オブジェクト数"),
+            t(
+                "{gib} ({tib} TiB) / {count} 個",
+                gib=stored,
+                tib=_tib(cell.stored_gib),
+                count=f"{cell.objects_stored:,.0f}",
+            ),
+        ],
+        [t("2. オブジェクトサイズ"), _size_label(cell.object_kib)],
+        [t("3. 作業セット (月内に読まれる部分)"), working_set],
+        [
+            t("4. 作業セット内の読み取り回数"),
+            t("作業セットの各オブジェクトを月 {n} 回", n=p.reads_per_object),
+        ],
+        [
+            t("5. 月間読み取り (バイト / 回数 / 保存量に対する倍数 R)"),
+            t(
+                "{gib} ({tib} TiB) = {ws_gib} × {n} 回 / {requests} 回 / R = {r} 倍",
+                gib=gib(cell.read_gib_per_month),
+                tib=_tib(cell.read_gib_per_month),
+                ws_gib=ws,
+                n=p.reads_per_object,
+                requests=f"{cell.reads_per_month:,.0f}",
+                r=f"{p.read_multiple:g}",
+            ),
+        ],
+        [
+            t("6. 月間書き込み (バイト / 個数 / 保存量に対する比 = チャーン率)"),
+            write_row,
+        ],
+        [
+            t("7. 読み : 書き (バイト比。操作数の比ではない)"),
+            f"{cell.read_share_pct:.1f} : {cell.write_share_pct:.1f}",
+        ],
+        [t("8. リテンション"), retention],
+        [
+            t("capacity pool 課金リクエスト数"),
+            t("未確認 (GET あたりの回数が未測定)"),
+        ],
+        [t("平均所要スループット"), f"{cell.required_mbps:,.1f} MB/s"],
+    ]
 
 
 def render_baseline_grid() -> list[str]:
-    """The common 20 TiB baseline: 4 object sizes x 3 read/write patterns, both methods per cell.
+    """The common 20 TiB baseline: 4 object sizes x 8 patterns, both methods per cell.
 
-    Twelve cells, each giving the S3-Files-path breakdown and the FSx-for-ONTAP breakdown with a
-    subtotal. Every subtotal is a 主要費目小計, not a 月額総額: the capacity-pool read-request count is
-    left UNCONFIRMED, so neither total is complete and neither is labelled as if it were.
+    Thirty-two cells, each giving the FSx-for-ONTAP and S3-Files breakdowns (and S3 alone where the
+    pattern has no writes) with a subtotal. Every subtotal is a 主要費目小計, not a 月額総額: the
+    capacity-pool read-request count is left UNCONFIRMED, so no total is complete and none is
+    labelled as if it were.
     """
-    sizes = ", ".join(
-        f"{k} KiB" if k < 1024 else f"{k // 1024} MiB" for k in BASELINE_SIZES_KIB
+    patterns = BASELINE_PATTERNS
+    sizes = ", ".join(_size_label(k) for k in BASELINE_SIZES_KIB)
+    stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+    groups = baseline_same_price_groups()
+    same_price = t(" と ").join(f"({_keys(group)})" for group in groups)
+    small = [p for p in patterns if not p.touches_whole_volume]
+    large = [p for p in patterns if p.touches_whole_volume]
+    placeholders = [p for p in patterns if p.placeholder]
+    repo_based = [p for p in patterns if "repository" in p.basis]
+    read_only = [p for p in patterns if p.churn_pct == 0]
+    parameter_names = (
+        t("{key} の作業セット比"),
+        t("{key} の回数"),
+        t("{key} のチャーン率"),
     )
+    unsourced = [
+        parameter_names[i].format(key=p.key)
+        for p in patterns
+        if not p.placeholder
+        for i, basis in enumerate(p.basis)
+        if basis == "placeholder"
+    ]
+    example = next(p for p in patterns if p.key == "P4")
+    example_cell = next(
+        c for c in baseline_cells() if c.pattern is example and c.object_kib == 4096
+    )
+
+    # The largest amount the unconfirmed metadata lines could add among the cells of 1 MiB or more,
+    # and what share of that cell's S3 Files subtotal it is. Derived, so it follows the prices.
+    def _metadata_delta(cell: BaselineCell) -> float:
+        return sum(s3_files_metadata_usd(cell))
+
+    large_object_cells = [c for c in baseline_cells() if c.object_kib >= 1024]
+    delta_cell = max(large_object_cells, key=_metadata_delta)
+    delta_lines = s3_files_option(delta_cell, split_metadata=True)
+    assert delta_lines is not None
+    metadata_delta_max = _metadata_delta(delta_cell)
+    metadata_share_max = 100 * metadata_delta_max / sum(delta_lines.values())
+
+    # Counting the first-read stream that premise (c) leaves out, in the cells where (c) applies.
+    # The note quotes the GET-and-read change only, and words it as a decrease, so a cell where that
+    # change is not a decrease stops the render. The net direction is not claimed.
+    no_stream_cells = [c for c in baseline_cells() if _books_no_first_read_stream(c)]
+    stream_changes = {id(c): _first_read_stream_sensitivity(c) for c in no_stream_cells}
+    if any(after >= before for before, after in stream_changes.values()):
+        raise ValueError(
+            "the GET and read change of the first-read stream is no longer a decrease"
+        )
+    stream_cell = min(
+        no_stream_cells,
+        key=lambda c: stream_changes[id(c)][1] - stream_changes[id(c)][0],
+    )
+    stream_before, stream_after = stream_changes[id(stream_cell)]
+
+    # The one-off cost of the first listing of the whole stored volume, at each size. It is the
+    # metadata write only. At or below the import threshold the default trigger also imports the
+    # data, which this figure does not include, so the two ranges of sizes are written apart.
+    def _enumeration_at(sizes_kib: list[float]) -> str:
+        return t("、").join(
+            t(
+                "{size} で {amount}",
+                size=_size_label(kib),
+                amount=usd(
+                    _enumeration_usd(
+                        BaselineCell(
+                            pattern=patterns[0],
+                            object_mib=kib / 1024,
+                            stored_gib=stored_gib,
+                        )
+                    )
+                ),
+            )
+            for kib in sizes_kib
+        )
+
+    enumeration_small = _enumeration_at(
+        [k for k in BASELINE_SIZES_KIB if k <= S3FILES_DEFAULT_THRESHOLD_KIB]
+    )
+    enumeration_large = _enumeration_at(
+        [k for k in BASELINE_SIZES_KIB if k > S3FILES_DEFAULT_THRESHOLD_KIB]
+    )
+
     out = [
         t("### 共通ベースライン — 20 TiB を同じ条件で"),
         "",
@@ -2531,29 +3099,22 @@ def render_baseline_grid() -> list[str]:
             "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
             "それぞれが現実のどれかに寄っているぶん、方式そのものの差を同じ土俵で見るには向かない。"
             "この節は逆に、**論理 20 TiB という 1 つの土俵**を固定し、"
-            "オブジェクトサイズ ({sizes}) と読み書きのパターン (A / B / C) だけを振る。"
+            "オブジェクトサイズ ({sizes}) と、{count} つの読み書きパターン ({first}〜{last}) だけを振る。"
+            "各パターンは、作業セット比・作業セット内の読み取り回数・チャーン率の 3 つで決まり、"
+            "月間の読み取り量と書き込み量はそこから導く。"
             "両方式に同じ論理ワークロードを与える。",
             sizes=sizes,
+            count=len(patterns),
+            first=patterns[0].key,
+            last=patterns[-1].key,
         ),
         "",
         t(
             "保存量 (論理) はどのセルでも 20 TiB で固定である。"
-            "月間の読み取り量と書き込み量はパターンごとに別に置く。"
+            "書き込みは既存オブジェクトの置き換えで、月を通して積み増さない。"
             "**月間書き込み量を平均保持量と同一視しない**。"
             "20 TiB の定常保存に対して、月に 1 TiB 書くとはその一部を置き換えることであって、"
             "積み増すことではない。",
-        ),
-        "",
-        *table(
-            [t("パターン"), t("月間読み取り"), t("月間書き込み")],
-            [
-                [
-                    pattern,
-                    t("{tib} TiB", tib=f"{read_tib:g}"),
-                    t("{tib} TiB", tib=f"{write_tib:g}"),
-                ]
-                for pattern, read_tib, write_tib in BASELINE_PATTERNS
-            ],
         ),
         "",
         t(
@@ -2567,10 +3128,177 @@ def render_baseline_grid() -> list[str]:
             "この 4 つを同じ数として扱わない。"
         ),
         "",
+        t("#### 式と読み方の例"),
+        "",
+        t("各セルの量は、次の 5 本の式で導く。"),
+        "",
+        "```text",
+        t("月間読み取り量 = 保存量 × 作業セット比 × 作業セット内の読み取り回数"),
+        t("月間読み取り回数 = 月間読み取り量 ÷ オブジェクトサイズ"),
+        t("保存量に対する倍数 R = 作業セット比 × 作業セット内の読み取り回数"),
+        t("月間書き込み量 = 保存量 × チャーン率"),
+        t("月間書き込み個数 = 月間書き込み量 ÷ オブジェクトサイズ"),
+        "```",
+        "",
+        t(
+            "例: {key} は、保存量 {stored} のうち {w}% ({ws}) を作業セットとし、"
+            "その各オブジェクトを月 {n} 回読む。"
+            "月間読み取り量は {ws} × {n} = {read} で、保存量の {r} 倍 (R = {r}) になる。"
+            "{size} なら {ws_objects} 個を {n} 回読むので {requests} 回。"
+            "残り {rest_pct}% ({rest}) は月内に一度も読まれない。"
+            "「オブジェクトを月 N 回読む」とだけ書くと、"
+            "N 回の対象が全オブジェクトか作業セットかで総量が {factor:g} 倍変わる。"
+            "この節では対象を作業セットと明記し、総量を保存量との倍数 R でも示す。",
+            key=example.key,
+            stored=gib(stored_gib),
+            w=example.working_set_pct,
+            ws=gib(example_cell.working_set_gib),
+            n=example.reads_per_object,
+            read=gib(example_cell.read_gib_per_month),
+            r=f"{example.read_multiple:g}",
+            size=_size_label(example_cell.object_kib),
+            ws_objects=f"{example_cell.working_set_objects:,.0f}",
+            requests=f"{example_cell.reads_per_month:,.0f}",
+            rest_pct=100 - example.working_set_pct,
+            rest=gib(example_cell.unread_gib),
+            factor=100 / example.working_set_pct,
+        ),
+        "",
+        t(
+            "作業セット比と回数は、月間読み取り量を分解して示す軸である。"
+            "この表の金額は、月間読み取り量・月間書き込み量・オブジェクトサイズだけで決まり、"
+            "作業セット比には連動しない。"
+            "月間の読み取り量・書き込み量が同じパターン {groups} は、どのサイズでも金額が同じになる。",
+            groups=same_price,
+        ),
+        "",
+        t(
+            "この表の 3 つの前提は作業セット比と切り離している。"
+            "(a) FSx for ONTAP の capacity pool は全パターンで保存量の {pool}%。"
+            "(b) S3 Files の高性能ストレージ ({threshold} KiB 以下のサイズ) は保存量の全量をアクティブとして計上。"
+            "(c) 書き込みのないセルの S3 Files ({threshold} KiB 以下) は、"
+            "初回読み出しのストリームを計上せず、読み取りをすべて高性能ストレージの読み取りとして計上。"
+            "{small_groups} は、作業セット比とチャーン率の和が 100% 未満で、保存量の全体には触れられない。"
+            "(a)(b) を触れられる量に合わせる前提に置き換えると、小計は下がる向きになる。"
+            "{large_groups} は和が 100% 以上で、保存量の全体に及びうる。"
+            "全体に及ぶと置いて (a) を置き換えると、FSx for ONTAP の小計は上がる向きになる。"
+            "(c) を置き換え、作業セットの各オブジェクトの初回読み出しを計上すると、"
+            "増える項目は、バケットからの GET と、高性能ストレージへの取り込み書き込み "
+            "(${write_price} / GB、最小 {min_io} KiB)、減る項目は、高性能ストレージの読み取りである。"
+            "取り込み書き込みは、ディレクトリを最初にたどったとき "
+            "{threshold} KiB 以下のファイルのデータをまとめて取り込む既定の挙動に従い、"
+            "読まれたオブジェクトの数とは対応しないので、このモデルは数えていない。"
+            "差し引きの向きは、このモデルでは確定していない。"
+            "取り込み書き込みを含めず、GET の増加と読み取りの減少だけを見ると、"
+            "(c) が当てはまる {stream_cells} セルの中では "
+            "{stream_pattern} の {stream_size} の変化が最大で、{stream_before} から {stream_after} へ、"
+            "{stream_delta} ({stream_pct}%) 下がる。この額に取り込み書き込みは入っていない。"
+            "示した向きと金額はいずれも試算上の感度で、測定ではない。",
+            pool=f"{BASELINE_POOL_FRACTION:.0%}".rstrip("%"),
+            threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
+            write_price=f"{S3FILES['write'].usd:g}",
+            min_io=f"{S3FILES_MIN_IO_KIB:g}",
+            small_groups=_keys(small),
+            large_groups=_keys(large),
+            stream_cells=len(no_stream_cells),
+            stream_pattern=stream_cell.pattern.key,
+            stream_size=_size_label(stream_cell.object_kib),
+            stream_before=usd(stream_before),
+            stream_after=usd(stream_after),
+            stream_delta=usd(stream_before - stream_after),
+            stream_pct=f"{100 * (stream_before - stream_after) / stream_before:.1f}",
+        ),
+        "",
+        t("#### パターンの一覧"),
+        "",
+        *table(
+            [
+                t("パターン"),
+                t("名前"),
+                t("作業セット比"),
+                t("作業セット内の回数"),
+                t("月間読み取り量 (R)"),
+                t("月間書き込み量 (チャーン率)"),
+                t("読み : 書き (バイト比)"),
+                t("位置づけ"),
+            ],
+            [
+                [
+                    p.key,
+                    t(p.name),
+                    f"{p.working_set_pct}%",
+                    t("{n} 回", n=p.reads_per_object),
+                    t(
+                        "{gib} (R = {r} 倍)",
+                        gib=gib(
+                            stored_gib * p.working_set_pct * p.reads_per_object / 100
+                        ),
+                        r=f"{p.read_multiple:g}",
+                    ),
+                    t("0 GiB (書き込みなし)")
+                    if p.churn_pct == 0
+                    else t(
+                        "{gib} (チャーン率 {pct}%)",
+                        gib=gib(stored_gib * p.churn_pct / 100),
+                        pct=p.churn_pct,
+                    ),
+                    _ratio_text(stored_gib, p),
+                    baseline_position(p),
+                ]
+                for p in patterns
+            ],
+        ),
+        "",
+        t(
+            "{placeholders} の値は出典がなく、算術を通すために置いた。"
+            "{repo_assumed} の値のうち表の位置づけで「試算前提」と書いたものは、"
+            "本リポジトリの試算前提であって測定値ではない。"
+            "{unsourced}は、出典も試算前提もなく置いた値である。",
+            placeholders=_keys(placeholders),
+            repo_assumed=_keys(repo_based),
+            unsourced=t("、").join(unsourced),
+        ),
+        "",
         t(
             "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
             "capacity pool の読み取りリクエスト数が未確認であること、"
             "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
+            "S3 Files の内訳は、4 KiB × 操作のメタデータ課金を取り込み側と読み取り側の別行で示し、"
+            "どちらも小計に算入している。"
+            "S3 Files のメタデータ行 (4 KiB × 操作) が 1 MiB 以上の読み取りと取り込みにも立つかは、未確認である。"
+            "[計量ページ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html)は"
+            "バケットからの直接読み取りに 4 KiB のメタデータ読み取りが付くと書き、"
+            "[料金ページ](https://aws.amazon.com/s3/pricing/)は同じ読み取りに S3 の GET 課金だけが付くと書いている。"
+            "2 ページの文面が揃わず、実測もないため、小計には算入したままにしている。"
+            "除くと、1 MiB 以上のセルの小計は最大 {delta} (そのセルの小計の {pct}%) 下がる。"
+            "増える方向もある。"
+            "1 回の読み取りにメタデータ操作が k 回付く場合は、読み取り側の行が k 倍になる。"
+            "ディレクトリの初回列挙は、ファイル 1 個ごとに 4 KiB の書き込みを計量する。"
+            "{stored_tib} TiB を列挙した場合の 1 回限りの額 ({enumeration_small}) は、"
+            "メタデータ分だけの額で、{threshold} KiB 以下のファイルのデータの取り込み書き込み "
+            "(${write_price} / GB) は含まない。"
+            "既定のトリガ (ディレクトリの初回アクセス) は、このサイズのファイルのデータも取り込むためである。"
+            "{threshold} KiB を超えるサイズ ({enumeration_large}) では、"
+            "データは取り込まれず直接読まれるので、この額はメタデータ分のみである。"
+            "モデルはどちらも算入していない。"
+            "どちらも測っていない。"
+            "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
+            "`subtotal_excluding_metadata_usd` で読める。",
+            delta=usd(metadata_delta_max),
+            pct=f"{metadata_share_max:.1f}",
+            stored_tib=BASELINE_STORED_TIB,
+            enumeration_small=enumeration_small,
+            enumeration_large=enumeration_large,
+            threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
+            write_price=f"{S3FILES['write'].usd:g}",
+        ),
+        "",
+        t(
+            "S3 単独の内訳表は、書き込みのないパターン ({read_only}) にだけ置く。"
+            "方式ごとに書き込みの経路 (S3 API の PUT、NFS の書き込みと同期、S3 Access Points 経由の PUT) が違い、"
+            "同じ表に並べると書き込みの前提が混ざるためである。"
+            "範囲の決めであって、書き込みを含む S3 単独の構成が成り立たないという主張ではない。",
+            read_only=_keys(read_only),
         ),
         "",
     ]
@@ -2584,16 +3312,14 @@ def render_baseline_grid() -> list[str]:
                 [t("リージョン"), f"`{REGION}` ({t(REGION_LABEL)})"],
                 [t("単価スナップショット"), PRICE_SNAPSHOT],
                 [t("通貨"), t("USD、税別")],
-                [
-                    t("保存量 (論理、全セル共通)"),
-                    gib(BASELINE_STORED_TIB * GIB_PER_TIB),
-                ],
+                [t("保存量 (論理、全セル共通)"), gib(stored_gib)],
                 [t("デプロイ"), f"{t(dep['label'])} (`{dep['api']}`)"],
                 [
                     t("ストレージ効率の仮定 (SSD / プール層)"),
-                    f"{0.40:.0%} / {0.40 * POOL_EFFICIENCY_RETENTION:.0%}",
+                    f"{BASELINE_EFFICIENCY_SSD:.0%} / "
+                    f"{BASELINE_EFFICIENCY_SSD * POOL_EFFICIENCY_RETENTION:.0%}",
                 ],
-                [t("キャパシティプールへ落とす割合"), f"{0.30:.0%}"],
+                [t("キャパシティプールへ落とす割合"), f"{BASELINE_POOL_FRACTION:.0%}"],
                 [
                     t("1 か月の秒数"),
                     t(
@@ -2608,37 +3334,37 @@ def render_baseline_grid() -> list[str]:
     ]
 
     for cell in baseline_cells():
-        size_label = (
-            f"{cell.object_kib:,.0f} KiB"
-            if cell.object_kib < 1024
-            else f"{cell.object_kib / 1024:,.0f} MiB"
-        )
         out += [
             t(
                 "#### パターン {pattern} — オブジェクト {size}",
-                pattern=cell.pattern,
-                size=size_label,
+                pattern=cell.pattern.key,
+                size=_size_label(cell.object_kib),
             ),
             "",
-            *table(
-                [t("導出量"), t("値")],
-                [
-                    [t("保存オブジェクト数"), f"{cell.objects_stored:,.0f}"],
-                    [t("月間書き込みオブジェクト数"), f"{cell.objects_per_month:,.0f}"],
-                    [t("月間読み取り回数"), f"{cell.reads_per_month:,.0f}"],
-                    [
-                        t("capacity pool 課金リクエスト数"),
-                        t("未確認 (GET あたりの回数が未測定)"),
-                    ],
-                    [t("平均所要スループット"), f"{cell.required_mbps:,.1f} MB/s"],
-                ],
-            ),
+            *table([t("導出量"), t("値")], _baseline_cell_rows(cell)),
             "",
         ]
 
-        for label, lines in (
-            (t("FSx for ONTAP S3 AP (この構成)"), fsx_s3ap(cell)),
-            (t("S3 バケット + S3 Files"), s3_files_option(cell)),
+        no_first_read_stream = _books_no_first_read_stream(cell)
+        for label, lines, note in (
+            (t("FSx for ONTAP S3 AP (この構成)"), fsx_s3ap(cell), None),
+            (
+                t("S3 バケット + S3 Files"),
+                s3_files_option(cell, split_metadata=True),
+                t(
+                    "書き込みがないセルの S3 Files ({threshold} KiB 以下) は、"
+                    "初回読み出しのストリームを計上しない。"
+                    "読み取りはすべて高性能ストレージの読み取りとして計上している",
+                    threshold=f"{S3FILES_DEFAULT_THRESHOLD_KIB:g}",
+                )
+                if no_first_read_stream
+                else None,
+            ),
+            (
+                t("S3 単独 (利用側も S3 API)"),
+                baseline_s3_only(cell),
+                None,
+            ),
         ):
             if lines is None:
                 continue
@@ -2651,8 +3377,141 @@ def render_baseline_grid() -> list[str]:
                 ]
             )
             out += [f"**{label}**", "", *table([t("内訳"), t("月額")], rows), ""]
+            if note:
+                out += [note, ""]
 
     return out
+
+
+def _ratio_text(stored_gib: float, pattern: BaselinePattern) -> str:
+    """Read : write byte ratio of a pattern. Size does not change it, so any cell would do."""
+    probe = BaselineCell(pattern=pattern, object_mib=1.0, stored_gib=stored_gib)
+    return f"{probe.read_share_pct:.1f} : {probe.write_share_pct:.1f}"
+
+
+# ------------------------------------------------------------------------ machine-readable
+
+
+def _in_language[T](lang: str, build: Callable[[], T]) -> T:
+    """Run `build()` with the module language set to `lang`, then put the previous one back."""
+    global _LANG
+    if lang not in LANGS:
+        raise SystemExit(f"finops-model: unknown language {lang!r}")
+    previous, _LANG = _LANG, lang
+    try:
+        return build()
+    finally:
+        _LANG = previous
+
+
+def _method_json(lines: dict[str, float]) -> dict[str, object]:
+    subtotal = sum(lines.values())
+    return {
+        "lines": [{"label": label, "usd": usd_} for label, usd_ in lines.items()],
+        "subtotal_usd": subtotal,
+        "subtotal_display": usd(subtotal),
+    }
+
+
+def baseline_json(lang: str = "ja") -> dict[str, object]:
+    """The baseline grid as plain data, derived from the same cells the document is rendered from.
+
+    A figure that reads this does not retype a number. Nothing here is computed a second time: the
+    quantities are the `BaselineCell` properties and the amounts are the pricing helpers' lines.
+    `lines[].label` and `position` follow `lang`; `name_ja` and `name_en` are always both present.
+    """
+
+    def build() -> dict[str, object]:
+        cells = baseline_cells()
+        sample = cells[0]
+        stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+        patterns: list[dict[str, object]] = []
+        for pattern in BASELINE_PATTERNS:
+            cell_docs: list[dict[str, object]] = []
+            for cell in (c for c in cells if c.pattern is pattern):
+                files_lines = s3_files_option(cell, split_metadata=True)
+                assert files_lines is not None
+                ingest_usd, read_usd = s3_files_metadata_usd(cell)
+                files = _method_json(files_lines)
+                files["metadata_usd"] = {"ingest": ingest_usd, "read": read_usd}
+                files["subtotal_excluding_metadata_usd"] = (
+                    sum(files_lines.values()) - ingest_usd - read_usd
+                )
+                direct = baseline_s3_only(cell)
+                cell_docs.append(
+                    {
+                        "size_kib": _whole(cell.object_kib),
+                        "stored_objects": _whole(cell.objects_stored),
+                        "working_set_gib": cell.working_set_gib,
+                        "working_set_objects": _whole(cell.working_set_objects),
+                        "unread_gib": cell.unread_gib,
+                        "read_gib": cell.read_gib_per_month,
+                        "read_requests": _whole(cell.reads_per_month),
+                        "write_gib": cell.write_gib_per_month,
+                        "write_objects": _whole(cell.objects_per_month),
+                        "average_mbps": cell.required_mbps,
+                        "methods": {
+                            "fsx_s3ap": _method_json(fsx_s3ap(cell)),
+                            "s3_files": files,
+                            "s3_direct": None
+                            if direct is None
+                            else _method_json(direct),
+                        },
+                    }
+                )
+            probe = next(c for c in cells if c.pattern is pattern)
+            patterns.append(
+                {
+                    "id": pattern.key,
+                    "name_ja": pattern.name,
+                    "name_en": _in_language("en", lambda p=pattern: t(p.name)),
+                    "working_set_pct": pattern.working_set_pct,
+                    "reads_per_object": pattern.reads_per_object,
+                    "churn_pct": pattern.churn_pct,
+                    "read_multiple": pattern.read_multiple,
+                    "read_write_byte_ratio_pct": [
+                        round(probe.read_share_pct, 1),
+                        round(probe.write_share_pct, 1),
+                    ],
+                    "placeholder": pattern.placeholder,
+                    "basis": dict(
+                        zip(
+                            ("working_set", "reads_per_object", "churn"),
+                            pattern.basis,
+                            strict=True,
+                        )
+                    ),
+                    "position": baseline_position(pattern),
+                    "cells": cell_docs,
+                }
+            )
+        return {
+            "schema_version": 1,
+            "generated_by": "tools/finops_model.py --baseline-json",
+            "region": REGION,
+            "price_snapshot": PRICE_SNAPSHOT,
+            "currency": "USD",
+            "stored_gib": _whole(stored_gib),
+            "sizes_kib": list(BASELINE_SIZES_KIB),
+            "pricing_depends_on_working_set": False,
+            "price_inputs": ["object_size", "read_bytes", "write_bytes"],
+            "fixed_premises": [
+                "fsx_capacity_pool_share_is_fixed_in_every_pattern",
+                "s3files_high_performance_storage_is_fully_active_at_or_below_threshold",
+                "s3files_books_no_first_read_stream_when_there_are_no_writes",
+            ],
+            "assumptions": {
+                "deployment": DEPLOYMENTS[sample.deployment]["api"],
+                "efficiency_ssd": sample.efficiency_ssd,
+                "pool_fraction": sample.pool_fraction,
+                "retention_months": sample.retention_months,
+                "s3files_threshold_kib": sample.s3files_threshold_kib,
+                "s3files_expiration_days": sample.s3files_expiration_days,
+            },
+            "patterns": patterns,
+        }
+
+    return _in_language(lang, build)
 
 
 def render(lang: str = "ja") -> str:
@@ -2758,7 +3617,31 @@ def main() -> int:
         action="store_true",
         help="list the generated strings that have no English entry yet",
     )
+    parser.add_argument(
+        "--baseline-json",
+        action="store_true",
+        help="print the common baseline grid as JSON (figures read this instead of retyping numbers)",
+    )
+    parser.add_argument(
+        "--lang",
+        choices=LANGS,
+        default=None,
+        help="language of the labels in --baseline-json output (default: ja)",
+    )
     args = parser.parse_args()
+
+    if args.lang and not args.baseline_json:
+        parser.error("--lang only applies to --baseline-json")
+    if args.baseline_json:
+        if args.write or args.check or args.show_prices or args.translation_gaps:
+            parser.error(
+                "--baseline-json cannot be combined with --write, --check, "
+                "--show-prices or --translation-gaps"
+            )
+        print(
+            json.dumps(baseline_json(args.lang or "ja"), ensure_ascii=False, indent=2)
+        )
+        return 0
 
     if args.show_prices:
         show_prices()
