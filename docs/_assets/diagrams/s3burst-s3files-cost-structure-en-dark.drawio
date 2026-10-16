@@ -1,0 +1,131 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="cost" name="s3files-cost-structure">
+    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="678" background="#232F3E" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0.0" y="4.0" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Storage (S3 Standard, SSD, capacity pool)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="28.0" y="0.0" width="398.0" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#F2975A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="430.0" y="4.0" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="S3 Files high-performance storage" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="458.0" y="0.0" width="398.0" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#8FCB4A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0.0" y="36.0" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Provisioned throughput capacity" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="28.0" y="32.0" width="398.0" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="430.0" y="36.0" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Requests and S3 Files read/write charges" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="458.0" y="32.0" width="398.0" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Example 1: store 20 TiB, read 4 MiB objects 10 times a month" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0" y="78.0" width="860" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="Monthly cost (USD). Axis runs from 0 to $1,100" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="106.0" width="860" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="Read with&#10;the S3 API" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="144.0" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="$512.00" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220.0" y="144.0" width="242.03636363636363" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="462.0363636363636" y="144.0" width="1.0" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="$513.94" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470.9534545454545" y="144.0" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="Requests $1.94 (too thin to see)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="186.0" width="640" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="Via S3 Files" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="224.0" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="$512.00" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220.0" y="224.0" width="242.03636363636363" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="462.0363636363636" y="224.0" width="1.3614545454545455" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="$514.88" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="471.39781818181814" y="224.0" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="Requests etc. $2.88 (too thin to see)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="266.0" width="640" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="FSx for ONTAP&#10;(read over NFS)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="304.0" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="$936.56" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220.0" y="304.0" width="442.73745454545457" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#8FCB4A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="662.7374545454545" y="304.0" width="54.82218181818182" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="$1,052.53" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="725.5596363636363" y="304.0" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="26" value="Throughput $115.97. Reading via S3 Access Points adds $0.15 for GET" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="346.0" width="640" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="Example 2: write 300 million 64 KiB objects a month, read each twice" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0" y="394.0" width="860" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="Monthly cost (USD). Axis runs from 0 to $11,000 (a different scale from Example 1)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="422.0" width="860" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="Via S3 Files" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="460.0" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="30" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220.0" y="460.0" width="21.639563636363636" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="$6,591.80" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#F2975A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="241.63956363636365" y="460.0" width="311.6123636363636" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="32" value="$3,706.82" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="553.2519272727272" y="460.0" width="175.23149090909092" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="33" value="$10,756.38" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="736.4834181818181" y="460.0" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="34" value="Storage $457.76 (too thin to see)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="502.0" width="640" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="35" value="FSx for ONTAP&#10;(write via S3 Access Points)" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="540.0" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="36" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#5FB3E6;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220.0" y="540.0" width="77.90781818181819" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="37" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#8FCB4A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="297.9078181818182" y="540.0" width="5.482218181818181" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="38" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="303.39003636363634" y="540.0" width="15.316363636363636" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="39" value="$2,088.02" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="326.7064" y="540.0" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="40" value="Storage $1,648.05, throughput $115.97, requests $324.00" style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="582.0" width="640" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="41" value="List price x quantity, not an invoice. ap-northeast-1; prices read on 2026-08-09 and re-read on 2026-10-16." style="text;html=0;whiteSpace=wrap;overflow=visible;align=left;verticalAlign=middle;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="626.0" width="860" height="52" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
