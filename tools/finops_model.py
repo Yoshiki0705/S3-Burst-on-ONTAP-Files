@@ -2982,6 +2982,18 @@ def render_baseline_grid() -> list[str]:
         c for c in baseline_cells() if c.pattern is example and c.object_kib == 4096
     )
 
+    # The largest amount the unconfirmed metadata lines could add among the cells of 1 MiB or more,
+    # and what share of that cell's S3 Files subtotal it is. Derived, so it follows the prices.
+    def _metadata_delta(cell: BaselineCell) -> float:
+        return sum(s3_files_metadata_usd(cell))
+
+    large_object_cells = [c for c in baseline_cells() if c.object_kib >= 1024]
+    delta_cell = max(large_object_cells, key=_metadata_delta)
+    delta_lines = s3_files_option(delta_cell, split_metadata=True)
+    assert delta_lines is not None
+    metadata_delta_max = _metadata_delta(delta_cell)
+    metadata_share_max = 100 * metadata_delta_max / sum(delta_lines.values())
+
     out = [
         t("### 共通ベースライン — 20 TiB を同じ条件で"),
         "",
@@ -3135,9 +3147,16 @@ def render_baseline_grid() -> list[str]:
             "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
             "S3 Files の内訳は、4 KiB × 操作のメタデータ課金を取り込み側と読み取り側の別行で示し、"
             "どちらも小計に算入している。"
-            "S3 Files のメタデータ行 (4 KiB × 操作) は、1 MiB 以上の読み取りにも立つかを未確認のまま小計に算入している。"
-            "除いた場合の小計は、`python3 tools/finops_model.py --baseline-json` の "
-            "`subtotal_excluding_metadata_usd` で読める。"
+            "S3 Files のメタデータ行 (4 KiB × 操作) が 1 MiB 以上の読み取りと取り込みにも立つかは、未確認である。"
+            "[計量ページ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html)は"
+            "バケットからの直接読み取りに 4 KiB のメタデータ読み取りが付くと書き、"
+            "[料金ページ](https://aws.amazon.com/s3/pricing/)は同じ読み取りに S3 の GET 課金だけが付くと書いている。"
+            "2 ページの文面が揃わず、実測もないため、小計には算入したままにしている。"
+            "除くと、1 MiB 以上のセルの小計は最大 {delta} (そのセルの小計の {pct}%) 下がる。"
+            "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
+            "`subtotal_excluding_metadata_usd` で読める。",
+            delta=usd(metadata_delta_max),
+            pct=f"{metadata_share_max:.1f}",
         ),
         "",
         t(
