@@ -29,8 +29,22 @@ import pytest
 
 
 def teardown_function() -> None:
-    """Rendering sets module state; leave it as the module found it."""
-    fm.render("ja")
+    """Rendering sets the module language; leave it as the module found it.
+
+    This used to call `fm.render("ja")`, which with the sensitivity section now runs ~6.4x10**4
+    break-even evaluations after every test. The only module state a render leaves is `_LANG`, so
+    resetting just that is enough and avoids the per-test cost.
+    """
+    fm._LANG = "ja"
+
+
+def test_render_restores_the_language_state_so_teardown_need_only_reset_lang() -> None:
+    """The teardown above assumes `render` leaves only `_LANG` changed. Confirm that holds: a full
+    Japanese render after an English one is byte-identical, so no other state carried over."""
+    first = fm.render("ja")
+    fm.render("en")
+    fm._LANG = "ja"
+    assert fm.render("ja") == first
 
 
 # --- the Japanese output is not affected by the language mechanism -------------------------------
@@ -1576,3 +1590,296 @@ def test_the_whole_number_check_still_bites_on_the_baseline() -> None:
     with pytest.raises(ValueError):
         fm._whole(100.5)
     assert fm._count(100.5, strict=False) == 100.5
+
+
+# --- the sensitivity section (PR-B) ----------------------------------------------------------
+
+
+def _sensitivity_section(lang: str = "ja") -> str:
+    head = (
+        "### 基準の前提と感度"
+        if lang == "ja"
+        else "### Baseline assumptions and sensitivity"
+    )
+    tail_ja = "\n### "
+    block = fm.render(lang)
+    fm._LANG = "ja"
+    after = block.split(head, 1)[1]
+    # Up to the next top-level '### ' heading (read-heavy section).
+    return head + after.split(tail_ja, 1)[0]
+
+
+def test_the_sensitivity_section_follows_the_baseline_grid() -> None:
+    block = fm.render("ja")
+    fm._LANG = "ja"
+    grid = block.index("### 共通ベースライン")
+    sens = block.index("### 基準の前提と感度")
+    read_heavy = block.index("### 読み取りが繰り返されるとき")
+    assert grid < sens < read_heavy
+
+
+def test_the_section_has_one_h3_and_eight_h4() -> None:
+    section = _sensitivity_section("ja")
+    assert section.count("\n### ") == 0  # the only ### is the first line
+    assert section.startswith("### 基準の前提と感度")
+    h4 = [line for line in section.split("\n") if line.startswith("#### ")]
+    assert len(h4) == 8, h4
+    # The eight headings in the brief's order.
+    assert h4 == [
+        "#### 誤読を防ぐ注",
+        "#### 前提の一覧",
+        "#### 前提を 1 つずつ動かしたときの小計",
+        "#### 小計の高低が入れ替わる前提の値",
+        "#### 2 つの前提の組での入れ替わり",
+        "#### 複数の前提を同時に動かしたシナリオ",
+        "#### 算入していない費目",
+        "#### 自分の値での試算手順",
+    ]
+
+
+def test_existing_baseline_anchors_are_unchanged() -> None:
+    """The sensitivity section must not duplicate or displace the baseline-grid headings."""
+    block = fm.render("ja")
+    fm._LANG = "ja"
+    for heading in (
+        "### 共通ベースライン — 20 TiB を同じ条件で",
+        "#### パターンの一覧",
+        "#### 式と読み方の例",
+    ):
+        assert block.count(heading) == 1, heading
+
+
+def test_the_baseline_row_matches_the_figure_subtotals() -> None:
+    """The baseline row of the one-at-a-time tables equals the recorded figure subtotals."""
+    for (key, kib), (fsx, files) in FIGURE_SUBTOTALS.items():
+        if key not in fm.SENSITIVITY_PATTERNS or kib not in fm.SENSITIVITY_SIZES_KIB:
+            continue
+        shown = fm._sens_cell_subtotals(key, kib, None)
+        assert f"FSx for ONTAP {fsx}" in shown, (key, kib)
+        assert f"S3 Files {files}" in shown, (key, kib)
+
+
+def test_every_sensitivity_subtotal_matches_an_independent_recompute() -> None:
+    """Each one-at-a-time cell equals a subtotal taken straight from the pricing helpers."""
+    for kib in fm.SENSITIVITY_SIZES_KIB:
+        for key, points in fm.SWEEPS.items():
+            for point in points:
+                if kib not in point.sizes:
+                    continue
+                for pat in fm.SENSITIVITY_PATTERNS:
+                    cell = fm._sens_cell(pat, kib, fm.Assumptions(**{key: point.value}))
+                    files_lines = fm.s3_files_option(cell, split_metadata=True)
+                    assert files_lines is not None
+                    independent_fsx = sum(fm.fsx_s3ap(cell).values())
+                    independent_files = sum(files_lines.values())
+                    shown_fsx, shown_files = fm._subtotals(cell)
+                    assert abs(shown_fsx - independent_fsx) < 1e-9
+                    assert abs(shown_files - independent_files) < 1e-9
+
+
+def test_every_sweep_point_declares_a_range_basis() -> None:
+    for key, points in fm.SWEEPS.items():
+        for point in points:
+            assert point.basis in fm.RANGE_BASES, (key, point)
+
+
+def test_the_numeric_and_enum_assumptions_all_have_sweeps() -> None:
+    """Every registry key that the section sweeps has a SWEEPS entry (or a stated reason not to)."""
+    swept = set(fm.SWEEPS)
+    # stored_tib's baseline is a definition, but it is still swept; read_scale likewise.
+    for key in fm.ASSUMPTION_SPECS:
+        assert key in swept, key
+
+
+def test_the_sourced_range_matches_the_design() -> None:
+    assert fm.sourced_range("efficiency_ssd") == (0.65, 0.75)
+    assert (
+        fm.sourced_range("ssd_headroom") is None
+    )  # a single sourced point, not a range
+    assert fm.sourced_points("ssd_headroom") == [0.25]
+    assert (
+        fm.sourced_range("pool_fraction") is None
+    )  # 0.80 is "reused", not sourced (M-6)
+    assert fm.sourced_points("pool_fraction") == []
+
+
+def test_the_applicable_range_bound_matches_a_closed_form() -> None:
+    """hi' for read_scale / stored_tib equals the independent closed-form hi_model, per cell."""
+    counter = fm._EvalCounter()
+    for key in ("read_scale", "stored_tib"):
+        for kib in fm.SENSITIVITY_SIZES_KIB:
+            for pat in fm.SENSITIVITY_PATTERNS:
+                _, hi = fm._bisect_breakevens(pat, kib, key, counter)
+                base_cell = fm._sens_cell(pat, kib, None)
+                max_tier = fm._max_tier(base_cell)
+                headroom = base_cell.tput_headroom
+                x_b = (
+                    1.0
+                    if key == "read_scale"
+                    else base_cell.stored_gib / fm.GIB_PER_TIB
+                )
+                closed = x_b * max_tier / (base_cell.required_mbps * (1.0 + headroom))
+                domain_hi = float(fm.SEARCH_DOMAINS[key]["hi"])
+                assert abs(hi - min(domain_hi, closed)) < 1e-6, (key, kib, pat)
+
+
+def test_a_break_even_flips_sigma_across_x_star() -> None:
+    """At each x*, sigma differs just below and just above (delta = final interval width)."""
+    counter = fm._EvalCounter()
+    found = 0
+    for key in fm.BREAKEVEN_NUMERIC_KEYS:
+        for kib in fm.SENSITIVITY_SIZES_KIB:
+            if key == "active_fraction" and kib == 4096:
+                continue
+            for pat in fm.SENSITIVITY_PATTERNS:
+                results, _ = fm._bisect_breakevens(pat, kib, key, counter)
+                for be in results:
+                    found += 1
+                    delta = max(1e-6, abs(be.x_star) * 1e-6)
+                    below = fm._sigma(fm._d(pat, kib, key, be.x_star - delta))
+                    above = fm._sigma(fm._d(pat, kib, key, be.x_star + delta))
+                    assert below != above, (key, kib, pat, be.x_star)
+    assert found > 0  # the section is meant to find some break-evens
+
+
+def test_a_none_break_even_has_no_sign_change_under_a_dense_sweep() -> None:
+    """Where the render says "none", a 4096-point dense sweep confirms no sign change."""
+    counter = fm._EvalCounter()
+    for key in fm.BREAKEVEN_NUMERIC_KEYS:
+        for kib in fm.SENSITIVITY_SIZES_KIB:
+            if key == "active_fraction" and kib == 4096:
+                continue
+            for pat in fm.SENSITIVITY_PATTERNS:
+                results, _ = fm._bisect_breakevens(pat, kib, key, counter)
+                if not results:
+                    assert fm._dense_has_no_sign_change(pat, kib, key), (key, kib, pat)
+
+
+def test_the_evaluation_count_stays_under_the_cap() -> None:
+    counter = fm._EvalCounter()
+    for key in fm.BREAKEVEN_NUMERIC_KEYS:
+        for kib in fm.SENSITIVITY_SIZES_KIB:
+            if key == "active_fraction" and kib == 4096:
+                continue
+            for pat in fm.SENSITIVITY_PATTERNS:
+                fm._bisect_breakevens(pat, kib, key, counter)
+    assert counter.count <= fm._EVAL_CAP
+
+
+def test_japanese_and_english_sensitivity_tables_match_in_shape() -> None:
+    ja = _sensitivity_section("ja")
+    en = _sensitivity_section("en")
+    for marker in ("|---", "####"):
+        assert ja.count(marker) == en.count(marker), marker
+    # The table rows (lines starting with "| ") count the same.
+    ja_rows = [line for line in ja.split("\n") if line.startswith("| ")]
+    en_rows = [line for line in en.split("\n") if line.startswith("| ")]
+    assert len(ja_rows) == len(en_rows)
+
+
+def test_the_english_sensitivity_section_has_no_japanese() -> None:
+    en = _sensitivity_section("en")
+    cjk = re.compile(r"[\u3000-\u30ff\u4e00-\u9fff]")
+    residue = [line for line in en.split("\n") if cjk.search(line)]
+    assert residue == []
+
+
+def test_the_scenario_direction_names_match_the_data() -> None:
+    """The render-time check (M-2) passes on the current prices; it is what render relies on."""
+    fm._check_scenario_directions()  # must not raise
+
+
+def test_a_flipped_cell_fails_the_scenario_direction_check(monkeypatch) -> None:
+    """Monkeypatch one cell's direction the wrong way; the check must raise (M-2)."""
+    real_subtotals = fm._subtotals
+
+    def flipped(cell):
+        fsx, files = real_subtotals(cell)
+        # J1 sets efficiency_ssd=0.75 (baseline is 0.40). Inflate FSx only on the J1-override
+        # P1 4 MiB cell, so base (0.40) and override (0.75) differ and the "FSx goes down" name
+        # is contradicted (FSx goes up) for that cell.
+        if (
+            cell.object_kib == 4096
+            and cell.pattern.key == "P1"
+            and abs(cell.efficiency_ssd - 0.75) < 1e-9
+        ):
+            return fsx * 100.0, files
+        return fsx, files
+
+    monkeypatch.setattr(fm, "_subtotals", flipped)
+    with pytest.raises(ValueError):
+        fm._check_scenario_directions()
+
+
+def test_j3_moves_two_premises_without_first_read_mode() -> None:
+    overrides = fm.SCENARIO_DEFS["J3"]["overrides"]
+    assert set(overrides) == {"active_fraction", "metadata_multiplier"}
+    assert "first_read_mode" not in overrides
+
+
+def test_an_out_of_range_cell_is_marked_and_excluded_from_direction() -> None:
+    """A read_scale large enough to leave the applicable range marks the cell with ※ and (M-5)
+    the marked cell does not drive the direction column."""
+    # P6 64 KiB has the lowest hi_model; find a read_scale value above it.
+    counter = fm._EvalCounter()
+    _, hi = fm._bisect_breakevens("P6", 64, "read_scale", counter)
+    over_value = hi * 4
+    cell = fm._sens_cell("P6", 64, fm.Assumptions(read_scale=over_value))
+    assert fm._out_of_model(cell)
+    shown = fm._sens_cell_subtotals("P6", 64, fm.Assumptions(read_scale=over_value))
+    assert "※" in shown
+    # The out-of-range cell is not counted as a direction difference.
+    differing = fm._direction_differs("read_scale", over_value, (64,))
+    assert "P6 64 KiB" not in differing
+
+
+def test_the_metadata_observation_note_only_appears_for_n_gt_1_patterns() -> None:
+    """The 64 KiB one-at-a-time table's metadata_multiplier=2 row carries the re-read note; the
+    note is about n>1 patterns, so the row is annotated (M-7)."""
+    table = fm._one_at_a_time_table(64)
+    text = "\n".join(table)
+    # The observed metadata point (2) at 64 KiB carries the UNCONFIRMED re-read note.
+    assert "再読み取りの操作数が未測定" in text
+    # P1 and P8 are n=1 (observation condition); the note is a property of the row, not the cell.
+    assert fm._n_eq_1_pattern("P1") and fm._n_eq_1_pattern("P8")
+    assert not fm._n_eq_1_pattern("P4")  # n=10
+
+
+def test_the_sensitivity_json_values_match_the_table() -> None:
+    """The structure --sensitivity-json emits equals the subtotals the tables are built from."""
+    data = fm.sensitivity_json("ja")
+    assert data["schema_version"] == 1
+    for kib_str, rows in data["one_at_a_time"].items():
+        kib = int(kib_str)
+        for row in rows:
+            key, value = row["key"], row["value"]
+            for pat, cell in row["cells"].items():
+                fsx, files = fm._subtotals(
+                    fm._sens_cell(pat, kib, fm.Assumptions(**{key: value}))
+                )
+                assert abs(cell["fsx_s3ap_usd"] - fsx) < 1e-9
+                assert abs(cell["s3_files_usd"] - files) < 1e-9
+
+
+def test_the_baseline_direction_sentence_true_branch_matches_the_data() -> None:
+    """The current prices give opposed directions by size, so the single-sentence branch is used."""
+    lines = fm._direction_baseline_sentence()
+    text = "\n".join(lines)
+    assert "向きを分けているのはオブジェクトサイズである" in text
+
+
+def test_the_64kib_direction_sentence_switches_branch_when_no_break_even(
+    monkeypatch,
+) -> None:
+    """When active_fraction has no break-even in any 64 KiB cell, the false branch is used."""
+    real = fm._bisect_breakevens
+
+    def no_breakeven(pattern_key, kib, key, counter):
+        if key == "active_fraction":
+            return [], 1.0
+        return real(pattern_key, kib, key, counter)
+
+    monkeypatch.setattr(fm, "_bisect_breakevens", no_breakeven)
+    text = "\n".join(fm._direction_64kib_sentence())
+    assert "向きが変わらない" in text
+    assert "仮置き・未測定" in text

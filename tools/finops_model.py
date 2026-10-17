@@ -43,6 +43,7 @@ import re
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from pathlib import Path
 
 from finops_translations import TRANSLATIONS as FINOPS_TRANSLATIONS
@@ -4512,6 +4513,1645 @@ def _render_assumption_list(lang: str = "ja") -> str:
     return _in_language(lang, build)
 
 
+# ------------------------------------------------------------------ sensitivity (PR-B)
+#
+# The sensitivity section shows how the baseline subtotals move as each assumption is placed
+# differently, and at what value the lower-subtotal side changes. The declarations below live here,
+# not in ASSUMPTION_SPECS: a sweep point is a modelling choice of where to probe, and its range basis
+# (sourced / observed / reused / mechanical) is the discipline the section exists to carry. No point
+# is declared without a basis (a test enforces it), and the "sourced range" of a key is derived from
+# these declarations rather than held as a second constant that could drift from them.
+
+# The five figure patterns crossed with the two figure sizes. The 32-cell grid stays in the baseline
+# section; here only these are shown, so the section stays readable.
+SENSITIVITY_PATTERNS = ("P1", "P4", "P5", "P6", "P8")
+SENSITIVITY_SIZES_KIB = (64, 4096)
+
+# A sweep point: a value to probe, its range basis, which sizes it applies to, and a note. The basis
+# is one of the four range vocabularies; the note carries a UNCONFIRMED-style caveat where one is
+# owed (observation not confirmed in billing, source text not confirmed as charged).
+RANGE_BASES = ("sourced", "observed", "reused", "mechanical")
+
+
+@dataclass(frozen=True)
+class SweepPoint:
+    value: object  # float for numeric keys, str for enum keys
+    basis: str  # one of RANGE_BASES
+    sizes: tuple[int, ...]  # which of SENSITIVITY_SIZES_KIB this point applies to
+    note_ja: str = ""
+
+    def __post_init__(self) -> None:
+        if self.basis not in RANGE_BASES:
+            raise ValueError(
+                f"range basis must be one of {RANGE_BASES}: {self.basis!r}"
+            )
+        for size in self.sizes:
+            if size not in SENSITIVITY_SIZES_KIB:
+                raise ValueError(f"sweep size {size} not in {SENSITIVITY_SIZES_KIB}")
+
+
+_BOTH = SENSITIVITY_SIZES_KIB  # (64, 4096)
+_K64 = (64,)
+_M4 = (4096,)
+
+
+# The sweep points per key. Baseline is not listed here; the render inserts the baseline row. Points
+# within a key are listed in model (declaration) order. Enum keys ("deployment", "throughput_mbps"
+# as a tier set, "first_read_mode", "first_read_stream_billing") carry their alternatives here too,
+# but are handled in the one-at-a-time table's "direction differs" column, not the break-even table.
+SWEEPS: dict[str, tuple[SweepPoint, ...]] = {
+    "deployment": (
+        SweepPoint(
+            "MULTI_AZ_1", "sourced", _BOTH, "公式の提供形態。可用性構成も変わる"
+        ),
+        SweepPoint(
+            "SINGLE_AZ_2", "sourced", _BOTH, "公式の提供形態。可用性構成も変わる"
+        ),
+        SweepPoint(
+            "MULTI_AZ_2", "sourced", _BOTH, "公式の提供形態。可用性構成も変わる"
+        ),
+    ),
+    "efficiency_ssd": (
+        SweepPoint(0.0, "mechanical", _BOTH),
+        SweepPoint(0.20, "mechanical", _BOTH),
+        SweepPoint(0.65, "sourced", _BOTH, "AWS 公表表"),
+        SweepPoint(0.75, "sourced", _BOTH, "AWS 公表表"),
+    ),
+    "pool_efficiency_retention": (
+        SweepPoint(0.0, "mechanical", _BOTH),
+        SweepPoint(0.25, "mechanical", _BOTH),
+        SweepPoint(1.0, "mechanical", _BOTH),
+    ),
+    "pool_fraction": (
+        SweepPoint(0.0, "reused", _BOTH, "別節のテレメトリ"),
+        SweepPoint(0.50, "mechanical", _BOTH),
+        SweepPoint(0.70, "reused", _BOTH, "別節の読み取り中心"),
+        SweepPoint(
+            0.80,
+            "reused",
+            _BOTH,
+            "サイジングブログの cold:hot 80/20。cold:hot 比が pool_fraction と同じ量かは未確認",
+        ),
+        SweepPoint(0.95, "mechanical", _BOTH),
+    ),
+    "ssd_headroom": (
+        SweepPoint(0.0, "mechanical", _BOTH),
+        SweepPoint(
+            0.25, "sourced", _BOTH, "公式の SSD 使用率 80% 以下の推奨から算術で導く"
+        ),
+        SweepPoint(0.50, "mechanical", _BOTH),
+    ),
+    "throughput_mbps": (
+        SweepPoint(256, "sourced", _BOTH, "SINGLE_AZ_1 の段"),
+        SweepPoint(512, "sourced", _BOTH, "SINGLE_AZ_1 の段"),
+        SweepPoint(1024, "sourced", _BOTH, "SINGLE_AZ_1 の段"),
+        SweepPoint(2048, "sourced", _BOTH, "SINGLE_AZ_1 の段"),
+    ),
+    "active_fraction": (
+        SweepPoint(0.05, "mechanical", _K64),
+        SweepPoint(0.10, "mechanical", _K64),
+        SweepPoint(0.20, "mechanical", _K64),
+        SweepPoint(0.50, "mechanical", _K64),
+    ),
+    "s3files_threshold_kib": (
+        SweepPoint(32.0, "mechanical", _K64),
+        SweepPoint(512.0, "mechanical", _K64),
+    ),
+    "first_read_mode": (
+        SweepPoint(
+            "none", "mechanical", _K64, "モデルの変種。部分計上で、向きは定まらない"
+        ),
+        SweepPoint(
+            "working_set",
+            "mechanical",
+            _K64,
+            "モデルの変種。部分計上で、向きは定まらない",
+        ),
+    ),
+    "first_read_stream_billing": (
+        SweepPoint(
+            "file_read",
+            "sourced",
+            _K64,
+            "公式の計量ページの例の文面が出典。課金の実際は未確認",
+        ),
+    ),
+    "metadata_multiplier": (
+        SweepPoint(0.0, "mechanical", _BOTH),
+        SweepPoint(3.0, "mechanical", _BOTH),
+        SweepPoint(
+            2.0,
+            "observed",
+            _K64,
+            "64 KiB の対照で約 2.0 回/個、1 オブジェクト 1 パス読み。CloudWatch 指標の 1 回の観測、請求反映は未確認",
+        ),
+        SweepPoint(
+            6.0,
+            "observed",
+            _M4,
+            "4 MiB で約 6.0 回/個、1 オブジェクト 1 パス読み。CloudWatch 指標の 1 回の観測、請求反映は未確認",
+        ),
+    ),
+    "read_scale": (
+        SweepPoint(0.1, "mechanical", _BOTH),
+        SweepPoint(0.5, "mechanical", _BOTH),
+        SweepPoint(2.0, "mechanical", _BOTH),
+        SweepPoint(10.0, "mechanical", _BOTH),
+    ),
+    "stored_tib": (
+        SweepPoint(5.0, "mechanical", _BOTH),
+        SweepPoint(10.0, "mechanical", _BOTH),
+        SweepPoint(50.0, "mechanical", _BOTH),
+        SweepPoint(100.0, "mechanical", _BOTH),
+    ),
+}
+
+# Keys handled by enumeration (no continuous break-even): their alternatives are shown in the
+# one-at-a-time table's "direction differs" column, not the break-even table.
+ENUM_SWEEP_KEYS = (
+    "deployment",
+    "throughput_mbps",
+    "first_read_mode",
+    "first_read_stream_billing",
+)
+
+# The continuous numeric keys the break-even table covers, plus the special-cased threshold key.
+BREAKEVEN_NUMERIC_KEYS = (
+    "pool_fraction",
+    "efficiency_ssd",
+    "pool_efficiency_retention",
+    "ssd_headroom",
+    "active_fraction",
+    "metadata_multiplier",
+    "read_scale",
+    "stored_tib",
+)
+
+# Search domain [lo, hi] and axis per numeric key. "log" axes are geometric; "linear" are even. The
+# zero of a multiplier axis is probed as a separate point. read_scale and stored_tib are truncated
+# per cell to the model's applicable range (see _hi_model). The axis widths are mechanical choices;
+# stored_tib's 2**10 upper bound has no sourced maximum (noted in the table).
+SEARCH_DOMAINS: dict[str, dict[str, object]] = {
+    "pool_fraction": {"lo": 0.0, "hi": 1.0, "axis": "linear"},
+    "efficiency_ssd": {"lo": 0.0, "hi": 0.99, "axis": "linear"},
+    "pool_efficiency_retention": {"lo": 0.0, "hi": 1.0, "axis": "linear"},
+    "ssd_headroom": {"lo": 0.0, "hi": 1.0, "axis": "linear"},
+    "active_fraction": {"lo": 0.0, "hi": 1.0, "axis": "linear"},
+    "metadata_multiplier": {"lo": 2.0**-10, "hi": 2.0**24, "axis": "log", "zero": True},
+    "read_scale": {"lo": 2.0**-10, "hi": 2.0**24, "axis": "log", "truncate": True},
+    "stored_tib": {"lo": 2.0**-3, "hi": 2.0**10, "axis": "log", "truncate": True},
+}
+
+_BISECT_N = 256  # intervals the truncated domain is split into before bracketing
+_BISECT_TOL = 1e-9  # relative half-width at which bisection stops
+_BISECT_MAX_ITERS = 80
+_STEP_USD = (
+    1.0  # |d(b) - d(a)| above this on the final interval is reported as a step change
+)
+_EVAL_CAP = 100_000  # a bisection runaway tripwire, not a performance target
+
+
+def sourced_range(key: str) -> tuple[float, float] | None:
+    """The sourced range of a numeric key: min..max of its basis=='sourced' points, or None.
+
+    Derived from SWEEPS, so there is one place a point's basis is stated. A single sourced point is
+    not a range; the caller distinguishes that case by reading `sourced_points`.
+    """
+    values = sorted(sourced_points(key))
+    if len(values) < 2:
+        return None
+    return (values[0], values[-1])
+
+
+def sourced_points(key: str) -> list[float]:
+    """Numeric values of a key's sourced sweep points (empty for enum-only or no sourced points)."""
+    return [
+        float(p.value)
+        for p in SWEEPS.get(key, ())
+        if p.basis == "sourced" and isinstance(p.value, (int, float))
+    ]
+
+
+def _sens_cell(
+    pattern_key: str, kib: int, assumptions: Assumptions | None
+) -> BaselineCell:
+    """One figure cell under the given assumptions."""
+    cells = baseline_cells(assumptions)
+    return next(
+        c for c in cells if c.pattern.key == pattern_key and c.object_kib == kib
+    )
+
+
+def _subtotals(cell: BaselineCell) -> tuple[float, float]:
+    """(FSx for ONTAP S3 AP subtotal, S3 Files subtotal) for a cell, both split_metadata=True."""
+    files = s3_files_option(cell, split_metadata=True)
+    assert files is not None  # the grid is always viable for S3 Files
+    return sum(fsx_s3ap(cell).values()), sum(files.values())
+
+
+def _d(pattern_key: str, kib: int, key: str, value: object) -> float:
+    """d(x) = S3 Files subtotal - FSx for ONTAP subtotal, with `key` set to `value`, others baseline."""
+    cell = _sens_cell(pattern_key, kib, Assumptions(**{key: value}))
+    fsx, files = _subtotals(cell)
+    return files - fsx
+
+
+def _sigma(d_value: float) -> int:
+    """-1 when S3 Files is lower (d < 0), +1 otherwise. d == 0 falls to +1 (a determinism rule)."""
+    return -1 if d_value < 0 else +1
+
+
+def _hi_model(
+    pattern_key: str, kib: int, key: str, assumptions: Assumptions | None
+) -> float:
+    """Largest multiplier of `key` keeping the cell inside the model's applicable range (M-5).
+
+    read_scale and stored_tib scale required_mbps linearly, so a closed form gives the value at which
+    required_mbps * (1 + headroom) reaches the maximum tier: x_b * max_tier / (base * (1 + headroom)).
+    Returned as the key's own unit (a read_scale multiplier, or TiB for stored_tib).
+    """
+    base_cell = _sens_cell(pattern_key, kib, assumptions)
+    max_tier = _max_tier(base_cell)
+    headroom = base_cell.tput_headroom
+    if key == "read_scale":
+        x_b = 1.0
+        base_required = base_cell.required_mbps  # at read_scale 1.0
+    elif key == "stored_tib":
+        x_b = base_cell.stored_gib / GIB_PER_TIB
+        base_required = base_cell.required_mbps  # at the baseline stored volume
+    else:
+        return math.inf
+    if base_required <= 0:
+        return math.inf
+    return x_b * max_tier / (base_required * (1.0 + headroom))
+
+
+@dataclass(frozen=True)
+class BreakEven:
+    """One side change of a numeric key in a cell."""
+
+    x_star: float
+    low_below: str  # "FSx for ONTAP" or "S3 Files": the lower side for x < x_star
+    low_above: str  # the lower side for x >= x_star
+    step_change: bool  # the final interval's d jumps by more than _STEP_USD
+    sourced_relation: (
+        str  # "inside" | "outside" | "point_below" | "point_above" | "none"
+    )
+
+
+class _EvalCounter:
+    """Counts d(x) evaluations across one render, so a test can assert the cap holds."""
+
+    def __init__(self) -> None:
+        self.count = 0
+
+    def bump(self) -> None:
+        self.count += 1
+        if self.count > _EVAL_CAP:
+            raise RuntimeError(f"sensitivity exceeded {_EVAL_CAP} evaluations")
+
+
+def _domain_points(key: str, hi: float) -> list[float]:
+    """The N+1 split points of [lo, hi] on the key's axis, plus a 0 point for a zero-bearing axis.
+
+    hi is the already-truncated upper bound (hi' in the design): [lo, hi'] is split into N intervals,
+    so a narrow applicable range still gets full resolution. The baseline value is inserted so the
+    baseline direction is always one of the evaluated points.
+    """
+    domain = SEARCH_DOMAINS[key]
+    lo = float(domain["lo"])
+    axis = domain["axis"]
+    points: list[float] = []
+    if domain.get("zero"):
+        points.append(0.0)
+    if axis == "log":
+        lo = max(lo, 1e-12)
+        ratio = (hi / lo) ** (1.0 / _BISECT_N)
+        points += [lo * ratio**i for i in range(_BISECT_N + 1)]
+    else:
+        step = (hi - lo) / _BISECT_N
+        points += [lo + step * i for i in range(_BISECT_N + 1)]
+    baseline = (
+        float(ASSUMPTION_SPECS[key].baseline()) if _baseline_is_numeric(key) else None
+    )
+    if baseline is not None and lo <= baseline <= hi and baseline not in points:
+        points.append(baseline)
+    return sorted(set(points))
+
+
+def _baseline_is_numeric(key: str) -> bool:
+    try:
+        return isinstance(float(ASSUMPTION_SPECS[key].baseline()), float)
+    except (TypeError, ValueError):
+        return False
+
+
+def _midpoint(a: float, b: float, axis: str) -> float:
+    """Geometric mean for a log axis away from zero; arithmetic mean otherwise."""
+    if axis == "log" and a > 0 and b > 0:
+        return math.sqrt(a * b)
+    return (a + b) / 2.0
+
+
+def _bisect_breakevens(
+    pattern_key: str, kib: int, key: str, counter: _EvalCounter
+) -> tuple[list[BreakEven], float]:
+    """Every sign change of d(x) for a numeric key in a cell, and the truncated upper bound hi'.
+
+    Deterministic: the domain is truncated to hi' first, split into N intervals, every adjacent pair
+    with differing sigma is bisected to a fixed tolerance. No randomness, time, or environment.
+    """
+    domain = SEARCH_DOMAINS[key]
+    axis = str(domain["axis"])
+    hi = float(domain["hi"])
+    if domain.get("truncate"):
+        hi = min(hi, _hi_model(pattern_key, kib, key, None))
+
+    def d_at(x: float) -> float:
+        counter.bump()
+        return _d(pattern_key, kib, key, x)
+
+    points = [p for p in _domain_points(key, hi) if p <= hi + 1e-12]
+    sigmas = [(x, _sigma(d_at(x))) for x in points]
+    results: list[BreakEven] = []
+    for (a, sa), (b, sb) in pairwise(sigmas):
+        if sa == sb:
+            continue
+        lo_a, hi_b = a, b
+        for _ in range(_BISECT_MAX_ITERS):
+            if hi_b - lo_a <= _BISECT_TOL * max(1.0, abs(hi_b)):
+                break
+            m = _midpoint(lo_a, hi_b, axis)
+            if _sigma(d_at(m)) == sa:
+                lo_a = m
+            else:
+                hi_b = m
+        x_star = _midpoint(lo_a, hi_b, axis)
+        d_lo = d_at(lo_a)
+        d_hi = d_at(hi_b)
+        step = abs(d_hi - d_lo) > _STEP_USD
+        low_below = "S3 Files" if sa < 0 else "FSx for ONTAP"
+        low_above = "S3 Files" if sb < 0 else "FSx for ONTAP"
+        results.append(
+            BreakEven(
+                x_star=x_star,
+                low_below=low_below,
+                low_above=low_above,
+                step_change=step,
+                sourced_relation=_sourced_relation(key, x_star),
+            )
+        )
+    return results, hi
+
+
+def _sourced_relation(key: str, x_star: float) -> str:
+    """Where x_star sits relative to the key's sourced range (or single sourced point)."""
+    rng = sourced_range(key)
+    if rng is not None:
+        return "inside" if rng[0] <= x_star <= rng[1] else "outside"
+    points = sourced_points(key)
+    if len(points) == 1:
+        return "point_below" if x_star < points[0] else "point_above"
+    return "none"
+
+
+def _dense_has_no_sign_change(pattern_key: str, kib: int, key: str) -> bool:
+    """A 4096-point dense sweep of the truncated domain shows no sign change (for the "none" claim).
+
+    Used only by the test backstop, not by the rendered sentences. Returns True when sigma never
+    changes across the dense grid, so a break-even missed by the 256-interval split would be caught.
+    """
+    domain = SEARCH_DOMAINS[key]
+    axis = str(domain["axis"])
+    lo = float(domain["lo"])
+    hi = float(domain["hi"])
+    if domain.get("truncate"):
+        hi = min(hi, _hi_model(pattern_key, kib, key, None))
+    n = 4096
+    xs: list[float] = []
+    if domain.get("zero"):
+        xs.append(0.0)
+    if axis == "log":
+        lo = max(lo, 1e-12)
+        ratio = (hi / lo) ** (1.0 / n)
+        xs += [lo * ratio**i for i in range(n + 1)]
+    else:
+        step = (hi - lo) / n
+        xs += [lo + step * i for i in range(n + 1)]
+    sigmas = {_sigma(_d(pattern_key, kib, key, x)) for x in xs}
+    return len(sigmas) == 1
+
+
+def _out_of_model(cell: BaselineCell) -> bool:
+    """The cell's required throughput exceeds the maximum tier with throughput auto (M-5)."""
+    return _throughput_out_of_model_range(cell)
+
+
+def _low_side(fsx: float, files: float) -> str:
+    """The lower-subtotal side, as a product name (never a quality word)."""
+    return "S3 Files" if files < fsx else "FSx for ONTAP"
+
+
+def _side_label(side: str) -> str:
+    """Localized product name for a side token."""
+    return side if side == "S3 Files" else t("FSx for ONTAP")
+
+
+def _sens_cell_subtotals(
+    pattern_key: str, kib: int, assumptions: Assumptions | None
+) -> str:
+    """A cell as `FSx for ONTAP {usd} / S3 Files {usd}`, with ※ when out of the applicable range."""
+    cell = _sens_cell(pattern_key, kib, assumptions)
+    fsx, files = _subtotals(cell)
+    mark = " ※" if _out_of_model(cell) else ""
+    return t(
+        "FSx for ONTAP {fsx} / S3 Files {files}{mark}",
+        fsx=usd(fsx),
+        files=usd(files),
+        mark=mark,
+    )
+
+
+def _direction_differs(key: str, value: object, sizes: tuple[int, ...]) -> str:
+    """Patterns whose lower side differs from the baseline when `key`=`value`, over `sizes`.
+
+    A cell driven out of the applicable range by the value is excluded from the direction judgement
+    (its subtotal is not a real configuration), per M-5.
+    """
+    differing: list[str] = []
+    for kib in sizes:
+        for pattern_key in SENSITIVITY_PATTERNS:
+            base_cell = _sens_cell(pattern_key, kib, None)
+            base_fsx, base_files = _subtotals(base_cell)
+            base_low = _low_side(base_fsx, base_files)
+            over_cell = _sens_cell(pattern_key, kib, Assumptions(**{key: value}))
+            if _out_of_model(over_cell):
+                continue
+            over_fsx, over_files = _subtotals(over_cell)
+            over_low = _low_side(over_fsx, over_files)
+            if over_low != base_low:
+                differing.append(f"{pattern_key} {_size_label(kib)}")
+    return t("、").join(differing) if differing else "—"
+
+
+def _basis_word(basis: str) -> str:
+    return {
+        "sourced": t("出典"),
+        "observed": t("観測"),
+        "reused": t("再利用"),
+        "mechanical": t("機械的"),
+    }[basis]
+
+
+def _tier_word(tier: str) -> str:
+    return t(tier)
+
+
+def _n_eq_1_pattern(pattern_key: str) -> bool:
+    """P1 and P8 read each working-set object once (n=1); the metadata observation matches them."""
+    pattern = next(p for p in BASELINE_PATTERNS if p.key == pattern_key)
+    return pattern.reads_per_object == 1
+
+
+# -------------------------------------------------------------------- the eight subsections
+
+
+def _sens_intro() -> list[str]:
+    """The `###` heading, the introduction, the direction sentences, and the fixed misreading notes."""
+    base_pct_pool = f"{BASELINE_POOL_FRACTION:.0%}".rstrip("%")
+    out = [
+        t("### 基準の前提と感度"),
+        "",
+        t(
+            "この節は、基準の前提（論理 20 TiB、capacity pool {pool}%、SSD 効率 {eff}% など）で出した"
+            "小計が、前提の置き方でどう動くかを示す。表の小計はモデルの計算値で、実測ではない。"
+            "いずれも**主要費目小計**であって月額総額ではない。",
+            pool=base_pct_pool,
+            eff=f"{BASELINE_EFFICIENCY_SSD:.0%}".rstrip("%"),
+        ),
+        "",
+        t(
+            "対象は、図で使う 5 パターン（{patterns}）× 2 サイズ（64 KiB、4 MiB）である。"
+            "32 セル全部の格子は「共通ベースライン」の節にある。"
+            "小計の低い側はセルに印を置かず、基準と低い側が入れ替わったパターンを別列に挙げる。",
+            patterns=t("・").join(SENSITIVITY_PATTERNS),
+        ),
+        "",
+    ]
+    out += _sens_direction_sentences()
+    out += [
+        t("#### 誤読を防ぐ注"),
+        "",
+    ]
+    notes = [
+        t(
+            "1. 前提を動かす範囲には、出典のあるものと機械的なものがある。表の「範囲の根拠」列で"
+            "区別する。機械的な値（0%、50%、100%、0.5 倍、2 倍など）は、振る位置を決めただけで、"
+            "確率的な幅や起こりやすさを表さない。"
+        ),
+        t(
+            "2. 出典の厚みが両側で違う。FSx for ONTAP 側には効率、cold:hot 比、SSD 使用率の推奨、"
+            "デプロイ形態に公式の数値がある。S3 Files 側のアクティブ割合には、今回読んだ公式ページに"
+            "数値の範囲がない。表で FSx for ONTAP の前提の行が出典ありで、S3 Files の前提の行が"
+            "機械的な範囲に偏るのは、この差による。"
+        ),
+        t(
+            "3. 小計の動く幅を製品の性質と読まない。4 MiB のセルの S3 Files の小計は S3 Standard の"
+            "保管料が大半を占める。動きが小さいのはこのセルの構成による。"
+        ),
+        t(
+            "4. 「出典のある範囲」は、範囲の根拠が「出典」の点の最小〜最大の区間である。"
+            "点が 1 つしかない前提は区間にならず、「出典のある値が 1 点」と書く。"
+        ),
+        t(
+            "5. FSx for ONTAP の小計は、必要なスループットが構成の最大段を超えると、最大段で頭打ちになる。"
+            "その領域はモデルの適用範囲外である。損益分岐の算出は、探索範囲を適用範囲の上限で切り詰めて"
+            "この領域を含めない。1 つずつ動かした表・シナリオ・2 つの前提の組の表では、適用範囲外に"
+            "落ちたセルの値に ※ を付けて載せ、そのセルを向きの導出から除く。"
+        ),
+        t(
+            "6. 「1 つずつ動かした表」は、他の前提を基準に固定している。複数を同時に動かした結果は"
+            "「シナリオ」の節にある。1 つずつでは向きが変わらない前提でも、同時に動かすと変わりうる。"
+        ),
+        t(
+            "7. 基準の値は推奨値ではない。基準は、全パターンを同じ条件で並べるために置いた値である。"
+        ),
+        t(
+            "8. 基準の前提では、アクティブ割合は上限の 100% で、S3 Files の小計を上げる方向に"
+            "動かせる余地がない。この前提は下げる方向にだけ振る。これは基準の置き方の性質で、"
+            "製品の性質を述べるものではない。"
+        ),
+    ]
+    for note in notes:
+        out += [note, ""]
+    return out
+
+
+def _sens_direction_sentences() -> list[str]:
+    """The five data-driven direction sentences, each with a true/false branch chosen from the model."""
+    out: list[str] = []
+    out += _direction_baseline_sentence()
+    out += _direction_4mib_sentence()
+    out += _direction_4mib_simultaneous_sentence()
+    out += _direction_64kib_sentence()
+    out += _direction_unmeasured_sentence()
+    return out
+
+
+def _baseline_low_sides(kib: int) -> dict[str, str]:
+    """The lower side of each figure pattern at a size, under the baseline assumptions."""
+    sides: dict[str, str] = {}
+    for pattern_key in SENSITIVITY_PATTERNS:
+        fsx, files = _subtotals(_sens_cell(pattern_key, kib, None))
+        sides[pattern_key] = _low_side(fsx, files)
+    return sides
+
+
+def _direction_baseline_sentence() -> list[str]:
+    low64 = _baseline_low_sides(64)
+    low4m = _baseline_low_sides(4096)
+    same64 = len(set(low64.values())) == 1
+    same4m = len(set(low4m.values())) == 1
+    opposed = (
+        same64 and same4m and next(iter(low64.values())) != next(iter(low4m.values()))
+    )
+    if opposed:
+        sentence = t(
+            "基準の前提では、図の 5 パターンのうち 64 KiB のセルは {low64} の小計が低く、"
+            "4 MiB のセルは {low4m} の小計が低い。向きを分けているのはオブジェクトサイズである。",
+            low64=_side_label(next(iter(low64.values()))),
+            low4m=_side_label(next(iter(low4m.values()))),
+        )
+    else:
+        parts: list[str] = []
+        for kib in SENSITIVITY_SIZES_KIB:
+            sides = low64 if kib == 64 else low4m
+            for pattern_key in SENSITIVITY_PATTERNS:
+                parts.append(
+                    t(
+                        "{pattern} {size}: {low}",
+                        pattern=pattern_key,
+                        size=_size_label(kib),
+                        low=_side_label(sides[pattern_key]),
+                    )
+                )
+        sentence = t(
+            "基準の前提で小計が低い側は、セルごとに次のとおり: {cells}。",
+            cells=t("、").join(parts),
+        )
+    return [sentence, ""]
+
+
+def _4mib_sourced_sign_changes() -> dict[str, list[str]]:
+    """4 MiB patterns whose direction changes at any sourced point, keyed by `key=value`."""
+    changes: dict[str, list[str]] = {}
+    for key, points in SWEEPS.items():
+        for point in points:
+            if 4096 not in point.sizes or point.basis != "sourced":
+                continue
+            differing: list[str] = []
+            for pattern_key in SENSITIVITY_PATTERNS:
+                base_fsx, base_files = _subtotals(_sens_cell(pattern_key, 4096, None))
+                over_cell = _sens_cell(
+                    pattern_key, 4096, Assumptions(**{key: point.value})
+                )
+                if _out_of_model(over_cell):
+                    continue
+                over_fsx, over_files = _subtotals(over_cell)
+                if _low_side(over_fsx, over_files) != _low_side(base_fsx, base_files):
+                    differing.append(pattern_key)
+            if differing:
+                changes[f"{key}={_fmt(point.value)}"] = differing
+    return changes
+
+
+def _direction_4mib_sentence() -> list[str]:
+    counter = _EvalCounter()
+    sourced_changes = _4mib_sourced_sign_changes()
+    # x* for each numeric key outside the sourced range, over all 4 MiB figure cells.
+    outside_by_key: dict[str, list[float]] = {}
+    for key in BREAKEVEN_NUMERIC_KEYS:
+        xs: list[float] = []
+        for pattern_key in SENSITIVITY_PATTERNS:
+            results, _ = _bisect_breakevens(pattern_key, 4096, key, counter)
+            for be in results:
+                if be.sourced_relation in (
+                    "outside",
+                    "point_below",
+                    "point_above",
+                    "none",
+                ):
+                    xs.append(be.x_star)
+        if xs:
+            outside_by_key[key] = xs
+    if not sourced_changes:
+        if outside_by_key:
+            clauses: list[str] = []
+            for key, xs in outside_by_key.items():
+                lo, hi = min(xs), max(xs)
+                clauses.append(
+                    t(
+                        "{key} が {lo}〜{hi} の範囲で低い側が入れ替わる",
+                        key=key,
+                        lo=f"{lo:.3g}",
+                        hi=f"{hi:.3g}",
+                    )
+                )
+            sentence = t(
+                "4 MiB のセルは、出典のある点で前提を 1 つずつ動かしても向きが変わらない。"
+                "出典のある範囲の外では、{clauses}（詳細は損益分岐の表）。",
+                clauses=t("、").join(clauses),
+            )
+        else:
+            sentence = t(
+                "4 MiB のセルは、出典のある点で前提を 1 つずつ動かしても向きが変わらない。"
+                "出典のある範囲の外でも、探索範囲では向きが変わらない。"
+            )
+    else:
+        parts = [
+            t("{kv}: {pats}", kv=kv, pats=t("・").join(pats))
+            for kv, pats in sourced_changes.items()
+        ]
+        sentence = t(
+            "4 MiB のセルのうち、出典のある点で向きが変わるのは次のとおり: {parts}。",
+            parts=t("、").join(parts),
+        )
+    return [sentence, ""]
+
+
+def _direction_4mib_simultaneous_sentence() -> list[str]:
+    j1 = _scenario_assumptions("J1")
+    flips = 0
+    for pattern_key in SENSITIVITY_PATTERNS:
+        base_fsx, base_files = _subtotals(_sens_cell(pattern_key, 4096, None))
+        over_fsx, over_files = _subtotals(_sens_cell(pattern_key, 4096, j1))
+        if _low_side(over_fsx, over_files) != _low_side(base_fsx, base_files):
+            flips += 1
+    if flips == 0:
+        sentence = t("J1 では 4 MiB のどのパターンでも低い側は変わらない。")
+    else:
+        # Which single-key revert keeps or removes the flip.
+        kept: list[str] = []
+        removed: list[str] = []
+        for key in ("pool_fraction", "efficiency_ssd", "pool_efficiency_retention"):
+            reverted = _scenario_assumptions("J1", drop=key)
+            still = 0
+            for pattern_key in SENSITIVITY_PATTERNS:
+                base_fsx, base_files = _subtotals(_sens_cell(pattern_key, 4096, None))
+                over_fsx, over_files = _subtotals(
+                    _sens_cell(pattern_key, 4096, reverted)
+                )
+                if _low_side(over_fsx, over_files) != _low_side(base_fsx, base_files):
+                    still += 1
+            (kept if still > 0 else removed).append(key)
+        sentence = t(
+            "FSx for ONTAP の小計が下がる側へ 3 前提を同時に動かすと（J1）、{n} パターンで"
+            "低い側が入れ替わる。3 前提のうち pool 層の効率の保持（1.0）には出典がない。"
+            "J1 から 1 前提だけを基準に戻すと、入れ替わりが残るのは {kept}、消えるのは {removed} である。",
+            n=flips,
+            kept=t("・").join(kept) if kept else t("なし"),
+            removed=t("・").join(removed) if removed else t("なし"),
+        )
+    return [sentence, ""]
+
+
+def _direction_64kib_sentence() -> list[str]:
+    counter = _EvalCounter()
+    per_pattern: dict[str, float] = {}
+    for pattern_key in SENSITIVITY_PATTERNS:
+        results, _ = _bisect_breakevens(pattern_key, 64, "active_fraction", counter)
+        if results:
+            per_pattern[pattern_key] = results[0].x_star
+    if per_pattern:
+        parts = [
+            t("{pattern} {x}", pattern=k, x=f"{v:.3g}") for k, v in per_pattern.items()
+        ]
+        sentence = t(
+            "64 KiB のセルの向きは、S3 Files の高性能ストレージのアクティブ割合に依存する。"
+            "アクティブ割合が {parts}（それぞれ以下）で S3 Files の小計が低くなる。"
+            "残りのパターンは探索範囲では入れ替わらない。基準の値は 100% で、この割合は"
+            "**仮置き・未測定**である。",
+            parts=t("、").join(parts),
+        )
+        observation = t(
+            "隣接の実測では、作業セット 5% / 20% のとき `StorageBytes` の 5.47% / 21.89% が"
+            "高性能ストレージの指標に載った（1 回の観測、2026-10-17、ap-northeast-1、"
+            "`ON_DIRECTORY_FIRST_ACCESS`。`StorageBytes` はデータとメタデータの合計で、"
+            "作業セット比は実験が設定した値。アクティブ割合そのものの測定ではない）。"
+        )
+        return [sentence, "", observation, ""]
+    sentence = t(
+        "64 KiB のセルは、アクティブ割合を 0〜100% の範囲で動かしても向きが変わらない。"
+        "基準の値は 100% で、この割合は**仮置き・未測定**である。"
+    )
+    return [sentence, ""]
+
+
+def _direction_unmeasured_sentence() -> list[str]:
+    placeholder_keys = [
+        key for key, spec in ASSUMPTION_SPECS.items() if spec.tier == "仮置き"
+    ]
+    sentence = t(
+        "{keys} は未測定または出典のない仮置きである。表の値はこれらを仮置きしたものである。",
+        keys=t("、").join(placeholder_keys),
+    )
+    return [sentence, ""]
+
+
+def _sens_assumption_list() -> list[str]:
+    """#### 前提の一覧: the registry keys plus the immovable premises, with tier and moving side."""
+    out = [
+        t("#### 前提の一覧"),
+        "",
+        t(
+            "「基準値の区分」は基準値の出どころ（公式 / 観測 / 試算前提 / 仮置き / 定義）で、"
+            "次の表の「範囲の根拠」（出典 / 観測 / 再利用 / 機械的）とは別の区分である。"
+            "「出典のある範囲」は、範囲の根拠が「出典」の点の最小〜最大の区間を指す。"
+            "「再利用」は、このリポジトリの別の節が置いた値の再利用で、外部の根拠でも測定でもない。"
+        ),
+        "",
+    ]
+    headers = [
+        t("前提"),
+        t("基準の値"),
+        t("基準値の区分"),
+        t("出典・根拠"),
+        t("読者が決められるか"),
+        t("小計が動く側"),
+    ]
+    rows: list[list[str]] = []
+    for key, spec in ASSUMPTION_SPECS.items():
+        rows.append(
+            [
+                f"`{key}`",
+                _fmt(spec.baseline()),
+                _tier_word(spec.tier),
+                t(spec.description_ja),
+                t(spec.reader_decides_ja),
+                _moving_side(key),
+            ]
+        )
+    # Immovable premises.
+    rows += [
+        [
+            t("リージョン"),
+            f"`{REGION}`",
+            _tier_word("定義"),
+            t("検証リージョン"),
+            t("—"),
+            t("—"),
+        ],
+        [
+            t("単価の日付"),
+            PRICE_SNAPSHOT,
+            _tier_word("定義"),
+            t("Price List のスナップショット日"),
+            t("—"),
+            t("—"),
+        ],
+        [
+            t("保存量の定義"),
+            t("論理 {tib} TiB", tib=BASELINE_STORED_TIB),
+            _tier_word("定義"),
+            t("全セル共通の土俵"),
+            t("—"),
+            t("—"),
+        ],
+        [
+            t("価格の作業セット比非連動"),
+            t("連動しない"),
+            _tier_word("定義"),
+            t("金額は読み書き量とサイズで決まる"),
+            t("—"),
+            t("—"),
+        ],
+    ]
+    out += table(headers, rows)
+    out += [""]
+    return out
+
+
+def _moving_side(key: str) -> str:
+    """Which subtotal a key moves: FSx for ONTAP / S3 Files / both, derived from the model."""
+    moves_fsx = False
+    moves_files = False
+    for kib in SENSITIVITY_SIZES_KIB:
+        base_cell = _sens_cell("P4", kib, None)
+        base_fsx, base_files = _subtotals(base_cell)
+        probe = SWEEPS.get(key)
+        if not probe:
+            continue
+        for point in probe:
+            if kib not in point.sizes:
+                continue
+            over = _sens_cell("P4", kib, Assumptions(**{key: point.value}))
+            over_fsx, over_files = _subtotals(over)
+            if abs(over_fsx - base_fsx) > 1e-6:
+                moves_fsx = True
+            if abs(over_files - base_files) > 1e-6:
+                moves_files = True
+    if moves_fsx and moves_files:
+        return t("両側")
+    if moves_fsx:
+        return t("FSx for ONTAP")
+    if moves_files:
+        return "S3 Files"
+    return t("—")
+
+
+def _sens_one_at_a_time() -> list[str]:
+    """#### 前提を 1 つずつ動かしたときの小計: one table per size, baseline row first."""
+    out = [
+        t("#### 前提を 1 つずつ動かしたときの小計"),
+        "",
+        t(
+            "他の前提を基準に固定し、1 つの前提だけを動かしたときの小計である。"
+            "セルは `FSx for ONTAP {小計} / S3 Files {小計}`（USD / 月、主要費目小計）。"
+            "低い側を示す印は置かず、「向きが基準と異なるパターン」列に、基準と低い側が入れ替わった"
+            "パターンを並べる（なければ —）。※ は必要なスループットが最大段を超え、モデルの適用範囲外のセル。"
+        ),
+        "",
+    ]
+    for kib in SENSITIVITY_SIZES_KIB:
+        out += _one_at_a_time_table(kib)
+    return out
+
+
+def _one_at_a_time_table(kib: int) -> list[str]:
+    headers = [
+        t("前提"),
+        t("値"),
+        *SENSITIVITY_PATTERNS,
+        t("向きが基準と異なるパターン"),
+        t("範囲の根拠"),
+    ]
+    rows: list[list[str]] = []
+    # Baseline row.
+    rows.append(
+        [
+            t("基準"),
+            t("基準"),
+            *[_sens_cell_subtotals(p, kib, None) for p in SENSITIVITY_PATTERNS],
+            "—",
+            "—",
+        ]
+    )
+    unmoved_keys: list[str] = []
+    for key, points in SWEEPS.items():
+        applicable = [p for p in points if kib in p.sizes]
+        if not applicable:
+            continue
+        # Does the key move any of the five patterns' subtotals at this size?
+        moved = False
+        for point in applicable:
+            for pattern_key in SENSITIVITY_PATTERNS:
+                base = _subtotals(_sens_cell(pattern_key, kib, None))
+                over = _subtotals(
+                    _sens_cell(pattern_key, kib, Assumptions(**{key: point.value}))
+                )
+                if abs(over[0] - base[0]) > 1e-9 or abs(over[1] - base[1]) > 1e-9:
+                    moved = True
+                    break
+            if moved:
+                break
+        if not moved:
+            unmoved_keys.append(key)
+            continue
+        for point in applicable:
+            note = ""
+            if key == "metadata_multiplier" and point.basis == "observed":
+                # n>1 patterns need the UNCONFIRMED re-read note.
+                note = t("（n>1 のパターンは再読み取りの操作数が未測定）")
+            rows.append(
+                [
+                    f"`{key}`" if point is applicable[0] else "",
+                    _fmt(point.value),
+                    *[
+                        _sens_cell_subtotals(p, kib, Assumptions(**{key: point.value}))
+                        for p in SENSITIVITY_PATTERNS
+                    ],
+                    _direction_differs(key, point.value, (kib,)),
+                    f"{_basis_word(point.basis)}{note}",
+                ]
+            )
+    out = [
+        t("オブジェクト {size} の場合", size=_size_label(kib)),
+        "",
+        *table(headers, rows),
+        "",
+    ]
+    if unmoved_keys:
+        out += [
+            t(
+                "このサイズでは次の前提は小計を動かさない: {keys}。",
+                keys=t("、").join(f"`{k}`" for k in unmoved_keys),
+            ),
+            "",
+        ]
+    return out
+
+
+def _sens_breakeven(counter: _EvalCounter) -> list[str]:
+    """#### 小計の高低が入れ替わる前提の値: deterministic bisection per numeric key, two tables."""
+    out = [
+        t("#### 小計の高低が入れ替わる前提の値"),
+        "",
+        t(
+            "連続な数値の前提について、低い側が入れ替わる値 x* を決定的な二分法で求める。"
+            "探索範囲を適用範囲の上限で切り詰め、256 区間に分けて符号の変わる区間を二分する。"
+            "値は有効数字 3 桁。「なし」は探索範囲内で入れ替わらないことを指し、範囲外の主張はしない。"
+            "列挙の前提（`deployment`、`throughput_mbps`、`first_read_mode`、`first_read_stream_billing`）は、"
+            "「前提を 1 つずつ動かしたとき」の表の「向きが基準と異なるパターン」列で扱う。"
+            "`active_fraction` は 64 KiB のみ、4 MiB は「対象外」。"
+        ),
+        "",
+    ]
+    headers = [
+        t("前提"),
+        *[f"64 KiB {p}" for p in SENSITIVITY_PATTERNS],
+        *[f"4 MiB {p}" for p in SENSITIVITY_PATTERNS],
+    ]
+    rows: list[list[str]] = []
+    for key in BREAKEVEN_NUMERIC_KEYS:
+        row = [f"`{key}`"]
+        for kib in SENSITIVITY_SIZES_KIB:
+            for pattern_key in SENSITIVITY_PATTERNS:
+                row.append(_breakeven_cell(pattern_key, kib, key, counter))
+        rows.append(row)
+    # s3files_threshold_kib handled by the size comparison, 64 KiB only.
+    rows.append(_threshold_row())
+    out += table(headers, rows)
+    # Search ranges note.
+    out += ["", _breakeven_ranges_note(), ""]
+    return out
+
+
+def _breakeven_cell(pattern_key: str, kib: int, key: str, counter: _EvalCounter) -> str:
+    if key == "active_fraction" and kib == 4096:
+        return t("対象外")
+    results, hi = _bisect_breakevens(pattern_key, kib, key, counter)
+    truncated = SEARCH_DOMAINS[key].get("truncate")
+    if not results:
+        if truncated:
+            return t("なし（{hi} まで）", hi=f"{hi:.3g}")
+        return t("なし")
+    parts: list[str] = []
+    for be in results:
+        rel = _sourced_relation_text(key, be.sourced_relation)
+        step = t("、段差") if be.step_change else ""
+        parts.append(
+            t(
+                "{x}（{below}未満で{low_below}、以上で{low_above}{rel}{step}）",
+                x=f"{be.x_star:.3g}",
+                below="",
+                low_below=_side_label(be.low_below),
+                low_above=_side_label(be.low_above),
+                rel=rel,
+                step=step,
+            )
+        )
+    return t("、").join(parts)
+
+
+def _sourced_relation_text(key: str, relation: str) -> str:
+    if relation == "inside":
+        return t("、出典のある範囲内")
+    if relation == "outside":
+        return t("、出典のある範囲の外")
+    if relation in ("point_below", "point_above"):
+        pts = sourced_points(key)
+        value = pts[0] if pts else 0.0
+        side = t("より小さい") if relation == "point_below" else t("より大きい")
+        return t(
+            "、出典のある値は 1 点（{value}）で x* はそれ{side}",
+            value=f"{value:g}",
+            side=side,
+        )
+    return t("、出典のある範囲なし（機械的な探索範囲）")
+
+
+def _threshold_row() -> list[str]:
+    """s3files_threshold_kib: a size comparison, not a continuous axis. 64 KiB only."""
+    row = ["`s3files_threshold_kib`"]
+    for kib in SENSITIVITY_SIZES_KIB:
+        for pattern_key in SENSITIVITY_PATTERNS:
+            if kib >= 1024:
+                row.append(t("対象外"))
+                continue
+            # below-size (32 KiB) vs above-size-under-1MiB (512 KiB) representatives.
+            base_cell = _sens_cell(pattern_key, kib, None)
+            base_low = _low_side(*_subtotals(base_cell))
+            below = _sens_cell(
+                pattern_key, kib, Assumptions(s3files_threshold_kib=32.0)
+            )
+            above = _sens_cell(
+                pattern_key, kib, Assumptions(s3files_threshold_kib=512.0)
+            )
+            below_low = _low_side(*_subtotals(below))
+            above_low = _low_side(*_subtotals(above))
+            if below_low != base_low or above_low != base_low:
+                row.append(
+                    t("しきい値が {size} 未満のとき入れ替わる", size=_size_label(kib))
+                )
+            else:
+                row.append(t("なし"))
+    return row
+
+
+def _breakeven_ranges_note() -> str:
+    parts: list[str] = []
+    for key in BREAKEVEN_NUMERIC_KEYS:
+        domain = SEARCH_DOMAINS[key]
+        lo, hi = float(domain["lo"]), float(domain["hi"])
+        parts.append(t("`{key}`: {lo}〜{hi}", key=key, lo=f"{lo:.3g}", hi=f"{hi:.3g}"))
+    return t(
+        "探索範囲 [lo, hi]: {ranges}。`read_scale` と `stored_tib` の上限は、"
+        "必要スループットが最大段以内に収まる値（セルごと）で切り詰める。"
+        "`stored_tib` の上限 {stored_hi} TiB は出典のない機械的な値である。"
+        "区間内に 2 点以上の入れ替わりが 1 区間（1/256）に収まる場合は検出できない"
+        "（テストの密な走査で現行の価格では見落としがないことを確かめている）。",
+        ranges=t("、").join(parts),
+        stored_hi=f"{float(SEARCH_DOMAINS['stored_tib']['hi']):.3g}",
+    )
+
+
+# -------------------------------------------------------------------- scenarios (J0-J4)
+
+# Each scenario is a set of simultaneous assumption overrides. J4 uses a size-specific
+# metadata_multiplier (2 at 64 KiB, 6 at 4 MiB), so its value is resolved per size.
+SCENARIO_DEFS: dict[str, dict[str, object]] = {
+    "J0": {"name_ja": "基準の前提", "n": 0, "overrides": {}, "basis_ja": "—"},
+    "J1": {
+        "name_ja": "FSx for ONTAP の小計が下がる側へ 3 前提を同時に寄せる",
+        "n": 3,
+        "overrides": {
+            "pool_fraction": 0.80,
+            "efficiency_ssd": 0.75,
+            "pool_efficiency_retention": 1.0,
+        },
+        "basis_ja": "出典 1（効率 0.75、AWS 公表表）、再利用 1（pool 0.80、cold:hot を当てた。算出方法は未確認）、機械的 1（保持 1.0、出典なし）",
+    },
+    "J2": {
+        "name_ja": "FSx for ONTAP の小計が上がる側へ 3 前提を同時に寄せる",
+        "n": 3,
+        "overrides": {
+            "pool_fraction": 0.0,
+            "efficiency_ssd": 0.0,
+            "ssd_headroom": 0.25,
+        },
+        "basis_ja": "再利用 1（pool 0）、機械的 1（効率 0）、出典 1（余裕 0.25）",
+    },
+    "J3": {
+        "name_ja": "S3 Files の小計が下がる側へ 2 前提を同時に寄せる",
+        "n": 2,
+        "overrides": {"active_fraction": 0.05, "metadata_multiplier": 0.0},
+        "basis_ja": "すべて機械的",
+    },
+    "J4": {
+        "name_ja": "S3 Files の小計が上がる側へ 2 前提を同時に寄せる",
+        "n": 2,
+        "overrides": {
+            "first_read_stream_billing": "file_read",
+            "metadata_multiplier": None,
+        },
+        "basis_ja": "出典 1（公式の例の文面。課金の実際は未確認）、観測 1（サイズ別の 1 回の観測。請求反映は未確認）",
+    },
+}
+
+# The intended lower-moving side of each direction-bearing scenario, used by the render-time check.
+SCENARIO_DIRECTION: dict[str, str] = {
+    "J1": "FSx for ONTAP",  # the FSx subtotal goes down
+    "J2": "FSx for ONTAP",  # the FSx subtotal goes up
+    "J3": "S3 Files",
+    "J4": "S3 Files",
+}
+
+
+def _scenario_assumptions(
+    scenario_id: str, kib: int | None = None, drop: str | None = None
+) -> Assumptions:
+    """The Assumptions for a scenario, resolving J4's size-specific metadata_multiplier.
+
+    `drop` removes one key (used to decompose J1 / J3 by reverting one premise to baseline).
+    """
+    overrides = dict(SCENARIO_DEFS[scenario_id]["overrides"])
+    if "metadata_multiplier" in overrides and overrides["metadata_multiplier"] is None:
+        overrides["metadata_multiplier"] = 6.0 if kib == 4096 else 2.0
+    if drop is not None:
+        overrides.pop(drop, None)
+    return Assumptions(**overrides)
+
+
+def _check_scenario_directions() -> None:
+    """A direction-bearing scenario name must not be contradicted by any figure cell (M-2).
+
+    The check fails the render if a cell's lower side flips the opposite way to the scenario's name.
+    A cell where the subtotal does not move (J4's file_read at 4 MiB) is not a contradiction.
+    """
+    for scenario_id, moving_side in SCENARIO_DIRECTION.items():
+        for kib in SENSITIVITY_SIZES_KIB:
+            assumptions = _scenario_assumptions(scenario_id, kib)
+            for pattern_key in SENSITIVITY_PATTERNS:
+                base_fsx, base_files = _subtotals(_sens_cell(pattern_key, kib, None))
+                over_fsx, over_files = _subtotals(
+                    _sens_cell(pattern_key, kib, assumptions)
+                )
+                # The named side must not move up when the name says the opposite.
+                if moving_side == "FSx for ONTAP":
+                    up = SCENARIO_DEFS[scenario_id]["name_ja"].find("上がる") >= 0
+                    moved = over_fsx - base_fsx
+                else:
+                    up = SCENARIO_DEFS[scenario_id]["name_ja"].find("上がる") >= 0
+                    moved = over_files - base_files
+                # "down" scenario: a positive move on the named side contradicts the name.
+                if not up and moved > 1e-6:
+                    raise ValueError(
+                        f"{scenario_id} names a decrease but {pattern_key} {kib} moves "
+                        f"{moving_side} up by {moved:.4f}"
+                    )
+                if up and moved < -1e-6:
+                    raise ValueError(
+                        f"{scenario_id} names an increase but {pattern_key} {kib} moves "
+                        f"{moving_side} down by {-moved:.4f}"
+                    )
+
+
+def _sens_two_assumptions(counter: _EvalCounter) -> list[str]:
+    """#### 2 つの前提の組での入れ替わり: active_fraction x pool_fraction, efficiency_ssd x pool."""
+    out = [
+        t("#### 2 つの前提の組での入れ替わり"),
+        "",
+        t(
+            "1 次元の損益分岐は他の前提に依存する。依存の大きい 2 つの組を同じ算出で出す。"
+            "セルは入れ替わる値 x*（なければ「なし」）。"
+        ),
+        "",
+    ]
+    # Table 1: active_fraction break-even, fixing pool_fraction, 64 KiB.
+    out += [
+        t("固定: `pool_fraction`、動かす: `active_fraction`（64 KiB）"),
+        "",
+    ]
+    pool_fixes_1 = (0.0, 0.30, 0.50, 0.80, 0.95)
+    headers1 = [t("`pool_fraction`"), *SENSITIVITY_PATTERNS]
+    rows1: list[list[str]] = []
+    for pool in pool_fixes_1:
+        row = [_fmt(pool)]
+        for pattern_key in SENSITIVITY_PATTERNS:
+            row.append(
+                _two_dim_cell(
+                    pattern_key, 64, "active_fraction", {"pool_fraction": pool}, counter
+                )
+            )
+        rows1.append(row)
+    out += table(headers1, rows1)
+    out += [""]
+    # Table 2: efficiency_ssd break-even, fixing pool_fraction x pool_efficiency_retention, 4 MiB.
+    out += [
+        t(
+            "固定: `pool_fraction` × `pool_efficiency_retention`、動かす: `efficiency_ssd`（4 MiB）"
+        ),
+        "",
+    ]
+    pool_fixes_2 = (0.30, 0.70, 0.80)
+    retention_fixes = (0.5, 1.0)
+    headers2 = [
+        t("`pool_fraction` / `pool_efficiency_retention`"),
+        *SENSITIVITY_PATTERNS,
+    ]
+    rows2: list[list[str]] = []
+    for pool in pool_fixes_2:
+        for retention in retention_fixes:
+            row = [f"{_fmt(pool)} / {_fmt(retention)}"]
+            for pattern_key in SENSITIVITY_PATTERNS:
+                row.append(
+                    _two_dim_cell(
+                        pattern_key,
+                        4096,
+                        "efficiency_ssd",
+                        {"pool_fraction": pool, "pool_efficiency_retention": retention},
+                        counter,
+                    )
+                )
+            rows2.append(row)
+    out += table(headers2, rows2)
+    out += [""]
+    return out
+
+
+def _two_dim_cell(
+    pattern_key: str,
+    kib: int,
+    moving_key: str,
+    fixed: dict[str, object],
+    counter: _EvalCounter,
+) -> str:
+    """x* of `moving_key` with the `fixed` keys held, in one cell. "なし" when no sign change."""
+    domain = SEARCH_DOMAINS[moving_key]
+    axis = str(domain["axis"])
+    lo = float(domain["lo"])
+    hi = float(domain["hi"])
+
+    def d_at(x: float) -> float:
+        counter.bump()
+        over = dict(fixed)
+        over[moving_key] = x
+        cell = _sens_cell(pattern_key, kib, Assumptions(**over))
+        fsx, files = _subtotals(cell)
+        return files - fsx
+
+    step = (hi - lo) / _BISECT_N
+    points = [lo + step * i for i in range(_BISECT_N + 1)]
+    sigmas = [(x, _sigma(d_at(x))) for x in points]
+    for (a, sa), (b, sb) in pairwise(sigmas):
+        if sa == sb:
+            continue
+        lo_a, hi_b = a, b
+        for _ in range(_BISECT_MAX_ITERS):
+            if hi_b - lo_a <= _BISECT_TOL * max(1.0, abs(hi_b)):
+                break
+            m = _midpoint(lo_a, hi_b, axis)
+            if _sigma(d_at(m)) == sa:
+                lo_a = m
+            else:
+                hi_b = m
+        return f"{_midpoint(lo_a, hi_b, axis):.3g}"
+    return t("なし")
+
+
+def _sens_scenarios() -> list[str]:
+    """#### 複数の前提を同時に動かしたシナリオ: J0-J4 with per-size tables and J1/J3 decomposition."""
+    _check_scenario_directions()
+    out = [
+        t("#### 複数の前提を同時に動かしたシナリオ"),
+        "",
+        t(
+            "複数の前提を同時に動かした結果である。名前は動かす方向（その側の小計が下がる / 上がる）で付け、"
+            "「有利」「不利」は使わない。J1〜J4 は 3・3・2・2 前提で、完全には揃わない。"
+            "基準のアクティブ割合が上限の 100% で S3 Files の小計を上げる余地がなく、上げる側に置ける前提が"
+            "`metadata_multiplier`・`first_read_stream_billing` に限られること、"
+            "および向きの定まらない `first_read_mode=none` を J3 から外したことによる。"
+            "同時に動かした値の組は予測でも推奨でもなく、向きが変わりうることを示す例である。"
+        ),
+        "",
+    ]
+    for kib in SENSITIVITY_SIZES_KIB:
+        out += _scenario_table(kib)
+    out += [
+        t(
+            "J1 のような組み合わせが実在の構成として成立するか（pool 80% で SSD の最小値に当たる場合など）は"
+            "確認していない。"
+        ),
+        "",
+    ]
+    return out
+
+
+def _scenario_table(kib: int) -> list[str]:
+    headers = [t("シナリオ"), *SENSITIVITY_PATTERNS, t("向きが基準と異なるパターン")]
+    rows: list[list[str]] = []
+    for scenario_id in ("J0", "J1", "J2", "J3", "J4"):
+        n = SCENARIO_DEFS[scenario_id]["n"]
+        label = t("{id}（{n} 前提）", id=scenario_id, n=n) if n else scenario_id
+        assumptions = _scenario_assumptions(scenario_id, kib)
+        rows.append(
+            [
+                label,
+                *[
+                    _sens_cell_subtotals(p, kib, assumptions)
+                    for p in SENSITIVITY_PATTERNS
+                ],
+                _scenario_direction_differs(assumptions, kib),
+            ]
+        )
+        # Decomposition rows for J1 (3 premises) and J3 (2 premises).
+        if scenario_id in ("J1", "J3"):
+            for key in SCENARIO_DEFS[scenario_id]["overrides"]:
+                reverted = _scenario_assumptions(scenario_id, kib, drop=key)
+                rows.append(
+                    [
+                        t("{id} − {key}", id=scenario_id, key=key),
+                        *[
+                            _sens_cell_subtotals(p, kib, reverted)
+                            for p in SENSITIVITY_PATTERNS
+                        ],
+                        _scenario_direction_differs(reverted, kib),
+                    ]
+                )
+    return [
+        t("オブジェクト {size} の場合", size=_size_label(kib)),
+        "",
+        *table(headers, rows),
+        "",
+    ]
+
+
+def _scenario_direction_differs(assumptions: Assumptions, kib: int) -> str:
+    differing: list[str] = []
+    for pattern_key in SENSITIVITY_PATTERNS:
+        base_cell = _sens_cell(pattern_key, kib, None)
+        over_cell = _sens_cell(pattern_key, kib, assumptions)
+        if _out_of_model(over_cell):
+            continue
+        if _low_side(*_subtotals(over_cell)) != _low_side(*_subtotals(base_cell)):
+            differing.append(pattern_key)
+    return t("・").join(differing) if differing else "—"
+
+
+def _sens_not_included() -> list[str]:
+    """#### 算入していない費目: the retention note at the top, then the items table."""
+    out = [
+        t("#### 算入していない費目"),
+        "",
+        t(
+            "非現行バージョンの保持（S3 Files 側）とスナップショットの保持（FSx for ONTAP 側）は、"
+            "両側の式が未測定で、書き込みの多いパターンでは小計を大きく動かしうる。"
+            "保持日数を入力にするのは PR-A2（この作業の範囲外）で、ここでは未算入として注記する。"
+        ),
+        "",
+        t(
+            "数値は書かない。「根拠の確からしさ」は documented / verified / hypothesis / open の 4 語で付ける。"
+        ),
+        "",
+    ]
+    headers = [t("費目"), t("向き"), t("根拠"), t("根拠の確からしさ"), t("状態")]
+    rows = [
+        [
+            t("非現行バージョンの保持（S3 Files 側）"),
+            t("S3 Files の小計が上がる。書き込みの多いパターンで大きい"),
+            t("S3 Files はバージョニング必須（公式の同期のページ）"),
+            t("documented（公式の同期のページ）。影響の大きさは hypothesis"),
+            t("未算入（日数の入力は PR-A2）"),
+        ],
+        [
+            t("スナップショットの保持（FSx for ONTAP 側）"),
+            t("FSx for ONTAP の小計が上がる見込み"),
+            t("保持分がどの層に置かれ、どう課金されるかを公式文書で読んでいない"),
+            t("open（未確認。方向も未確認）"),
+            t("未算入（日数の入力は PR-A2）"),
+        ],
+        [
+            t("pool 配置分のメタデータ用 SSD"),
+            t("FSx for ONTAP の小計が上がる"),
+            t(
+                "公式の文面「ファイルのメタデータは常に SSD 層に残る」。目安は 1 点（サイジングブログ）"
+            ),
+            t(
+                "documented（公式のボリューム容量ページ、サイジングブログ）。基準単位は open"
+            ),
+            t("未算入（PR-A2 の判断待ち）"),
+        ],
+        [
+            t("初回ストリームの GET 数が読み取り回数を超える"),
+            t("S3 Files の小計が上がる（GET 行の過大計上）"),
+            t(
+                "既定の P8 64 KiB は書いた個数を GET として計上し、読み取り回数の 10 倍。モデルは上限しない"
+            ),
+            t("verified（基底を実行して確認）"),
+            t("算入している（上限なし）。PR-H のマージ後に外す"),
+        ],
+        [
+            t("SSD IOPS の追加、バックアップ、スナップショット予約"),
+            t("FSx for ONTAP の小計が上がる"),
+            t("単価と課金の仕組みをこの設計では公式文書で読んでいない"),
+            t("open"),
+            t("未算入"),
+        ],
+        [
+            t("pool への書き込みリクエスト"),
+            t("FSx for ONTAP の小計が上がる"),
+            t("モデルに単価が定義済みで、式に使っていない（コードで確認）"),
+            t("open（コードの事実は verified）"),
+            t("未算入"),
+        ],
+        [
+            t("pool 読み取りの操作数"),
+            t("FSx for ONTAP の小計"),
+            t("数え方が文書内で 3 通りあり、未確認"),
+            t("open"),
+            t("小計に算入しているが未確認"),
+        ],
+        [
+            t("S3 Access Points 経由の GET"),
+            t("FSx for ONTAP の小計が上がる"),
+            t(
+                "モデルは経由の PUT だけを足す（コードで確認）。GET の課金は単価と経路に依存"
+            ),
+            t("open（コードの事実は verified、単価は未再取得）"),
+            t("未算入"),
+        ],
+        [
+            t("高性能ストレージ上のメタデータの保管"),
+            t("S3 Files の小計が上がる"),
+            t(
+                "公式は、アクセスしたディレクトリのメタデータは期限切れにならないと書く。課金の基準が文書にない"
+            ),
+            t("documented（公式の計量ページ）。課金の基準は open"),
+            t("未算入"),
+        ],
+        [
+            t("1 MiB 以上のしきい値"),
+            t("—"),
+            t("モデルが公式の直接ストリーム規則を持たない"),
+            t("documented（公式の計量ページ）、モデルの不在は verified"),
+            t("未対応（PR-F）"),
+        ],
+    ]
+    out += table(headers, rows)
+    out += [""]
+    return out
+
+
+def _sens_procedure() -> list[str]:
+    """#### 自分の値での試算手順: the reader's own-value commands and how to read them."""
+    out = [
+        t("#### 自分の値での試算手順"),
+        "",
+        t(
+            "受け付ける前提の一覧は `--list-assumptions` で確認する。"
+            "自分の環境の値は `--assume key=value` で与え、公開文書の値とは比べない。"
+            "比べるのは、同じ前提を置いた 2 つの出力どうしである。"
+            "小計は主要費目小計で、月額総額ではない。"
+        ),
+        "",
+        "```bash",
+        t("# 1. 受け付ける前提の一覧（キー、既定値、許容範囲、基準値の区分）"),
+        "python3 tools/finops_model.py --list-assumptions",
+        "",
+        t(
+            "# 2. 自分の環境の値で小計の表を出す（保存量 50 TiB、Multi-AZ、SSD 層の効率 65%、pool 70%）"
+        ),
+        "python3 tools/finops_model.py --baseline-table \\",
+        "  --assume stored_tib=50 --assume deployment=MULTI_AZ_1 \\",
+        "  --assume efficiency_ssd=0.65 --assume pool_fraction=0.70",
+        "",
+        t(
+            "# 3. 内訳まで JSON で出し、英語のラベルで保存する（アクティブ割合を測った値に置き換えた例）"
+        ),
+        "python3 tools/finops_model.py --baseline-json --lang en --assume active_fraction=0.10 > my-run.json",
+        "```",
+        "",
+        t("値はコマンドの書式の例で、勧める値でも結果の予測でもない。"),
+        "",
+    ]
+    return out
+
+
+def sensitivity_json(lang: str = "ja") -> dict[str, object]:
+    """The sensitivity section as plain data, so a figure (PR-C) reads it instead of retyping numbers.
+
+    The render functions and this structure are checked for agreement by a test (the table values
+    equal the JSON values). `schema_version: 1`, same shape convention as `--baseline-json`.
+    """
+
+    def build() -> dict[str, object]:
+        counter = _EvalCounter()
+        one_at_a_time: dict[str, list[dict[str, object]]] = {}
+        for kib in SENSITIVITY_SIZES_KIB:
+            size_rows: list[dict[str, object]] = []
+            for key, points in SWEEPS.items():
+                for point in points:
+                    if kib not in point.sizes:
+                        continue
+                    cells = {}
+                    for pattern_key in SENSITIVITY_PATTERNS:
+                        cell = _sens_cell(
+                            pattern_key, kib, Assumptions(**{key: point.value})
+                        )
+                        fsx, files = _subtotals(cell)
+                        cells[pattern_key] = {
+                            "fsx_s3ap_usd": fsx,
+                            "s3_files_usd": files,
+                            "out_of_model_range": _out_of_model(cell),
+                        }
+                    size_rows.append(
+                        {
+                            "key": key,
+                            "value": point.value,
+                            "basis": point.basis,
+                            "cells": cells,
+                        }
+                    )
+            one_at_a_time[str(kib)] = size_rows
+        breakeven: dict[str, list[dict[str, object]]] = {}
+        for key in BREAKEVEN_NUMERIC_KEYS:
+            entries: list[dict[str, object]] = []
+            for kib in SENSITIVITY_SIZES_KIB:
+                if key == "active_fraction" and kib == 4096:
+                    continue
+                for pattern_key in SENSITIVITY_PATTERNS:
+                    results, hi = _bisect_breakevens(pattern_key, kib, key, counter)
+                    entries.append(
+                        {
+                            "pattern": pattern_key,
+                            "size_kib": kib,
+                            "hi": hi,
+                            "break_evens": [
+                                {
+                                    "x_star": be.x_star,
+                                    "low_below": be.low_below,
+                                    "low_above": be.low_above,
+                                    "step_change": be.step_change,
+                                    "sourced_relation": be.sourced_relation,
+                                }
+                                for be in results
+                            ],
+                        }
+                    )
+            breakeven[key] = entries
+        scenarios: dict[str, list[dict[str, object]]] = {}
+        for kib in SENSITIVITY_SIZES_KIB:
+            rows: list[dict[str, object]] = []
+            for scenario_id in ("J0", "J1", "J2", "J3", "J4"):
+                assumptions = _scenario_assumptions(scenario_id, kib)
+                cells = {}
+                for pattern_key in SENSITIVITY_PATTERNS:
+                    cell = _sens_cell(pattern_key, kib, assumptions)
+                    fsx, files = _subtotals(cell)
+                    cells[pattern_key] = {
+                        "fsx_s3ap_usd": fsx,
+                        "s3_files_usd": files,
+                        "out_of_model_range": _out_of_model(cell),
+                    }
+                rows.append({"id": scenario_id, "cells": cells})
+            scenarios[str(kib)] = rows
+        return {
+            "schema_version": 1,
+            "generated_by": "tools/finops_model.py --sensitivity-json",
+            "patterns": list(SENSITIVITY_PATTERNS),
+            "sizes_kib": list(SENSITIVITY_SIZES_KIB),
+            "one_at_a_time": one_at_a_time,
+            "break_even": breakeven,
+            "scenarios": scenarios,
+            "sourced_ranges": {
+                key: sourced_range(key) for key in BREAKEVEN_NUMERIC_KEYS
+            },
+        }
+
+    return _in_language(lang, build)
+
+
+def render_sensitivity() -> list[str]:
+    """The baseline-assumptions-and-sensitivity section (PR-B).
+
+    One `###` with eight `####` subsections, built from the model. Every subtotal shown is recomputed
+    from `baseline_cells` under an `Assumptions` override, so the table and the model cannot diverge.
+    The direction-bearing scenario names are checked against the data at render time (ValueError on a
+    mismatch), so a name that stops matching the prices stops the render rather than lingering.
+    """
+    counter = _EvalCounter()
+    out: list[str] = []
+    out += _sens_intro()
+    out += _sens_assumption_list()
+    out += _sens_one_at_a_time()
+    out += _sens_breakeven(counter)
+    out += _sens_two_assumptions(counter)
+    out += _sens_scenarios()
+    out += _sens_not_included()
+    out += _sens_procedure()
+    return out
+
+
 def render(lang: str = "ja") -> str:
     global _LANG
     if lang not in LANGS:
@@ -4540,6 +6180,7 @@ def render(lang: str = "ja") -> str:
     for sc in SCENARIOS:
         out += render_scenario(sc)
     out += render_baseline_grid()
+    out += render_sensitivity()
     out += render_read_heavy()
     out += render_cache_site()
     out += render_whole_system()
@@ -4618,6 +6259,7 @@ def _check_flag_combinations(parser: argparse.ArgumentParser, args) -> None:
     new_modes = {
         "--baseline-table": args.baseline_table,
         "--list-assumptions": args.list_assumptions,
+        "--sensitivity-json": args.sensitivity_json,
     }
     active_existing = [name for name, on in existing_modes.items() if on]
     active_new = [name for name, on in new_modes.items() if on]
@@ -4642,10 +6284,14 @@ def _check_flag_combinations(parser: argparse.ArgumentParser, args) -> None:
 
     # --lang: only with the label-bearing modes.
     if args.lang and not (
-        args.baseline_json or args.baseline_table or args.list_assumptions
+        args.baseline_json
+        or args.baseline_table
+        or args.list_assumptions
+        or args.sensitivity_json
     ):
         parser.error(
-            "--lang applies only to --baseline-json, --baseline-table or --list-assumptions"
+            "--lang applies only to --baseline-json, --baseline-table, "
+            "--list-assumptions or --sensitivity-json"
         )
 
 
@@ -4681,6 +6327,11 @@ def main() -> int:
         help="print the registry of reader-settable assumptions",
     )
     parser.add_argument(
+        "--sensitivity-json",
+        action="store_true",
+        help="print the sensitivity section's structure as JSON (figures read this instead of retyping numbers)",
+    )
+    parser.add_argument(
         "--assume",
         action="append",
         default=[],
@@ -4701,6 +6352,10 @@ def main() -> int:
 
     if args.list_assumptions:
         print(_render_assumption_list(lang), end="")
+        return 0
+
+    if args.sensitivity_json:
+        print(json.dumps(sensitivity_json(lang), ensure_ascii=False, indent=2))
         return 0
 
     if args.baseline_json or args.baseline_table:
