@@ -2149,6 +2149,274 @@ S3 単独の内訳表は、書き込みのないパターン (P1・P2・P3・P4)
 | S3 Files メタデータ読み取り (131,072 操作 × 4 KiB) | $0.02 |
 | **主要費目小計 / major-line-item subtotal** | **$518.58** |
 
+### 基準の前提と感度
+
+この節は、基準の前提（論理 20 TiB、capacity pool 30%、SSD 効率 40% など）で出した小計が、前提の置き方でどう動くかを示す。表の小計はモデルの計算値で、実測ではない。いずれも**主要費目小計**であって月額総額ではない。
+
+対象は、図で使う 5 パターン（P1・P4・P5・P6・P8）× 2 サイズ（64 KiB、4 MiB）である。32 セル全部の格子は「共通ベースライン」の節にある。小計の低い側はセルに印を置かず、基準と低い側が入れ替わったパターンを別列に挙げる。
+
+基準の前提では、図の 5 パターンのうち 64 KiB のセルは FSx for ONTAP の小計が低く、4 MiB のセルは S3 Files の小計が低い。向きを分けているのはオブジェクトサイズである。
+
+4 MiB のセルは、出典のある点で前提を 1 つずつ動かしても向きが変わらない。出典のある範囲の外では、efficiency_ssd が 0.869〜0.878 の範囲で低い側が入れ替わる、metadata_multiplier が 779〜3.17e+04 の範囲で低い側が入れ替わる（詳細は損益分岐の表）。
+
+FSx for ONTAP の小計が下がる側へ 3 前提を同時に動かすと（J1）、5 パターンで低い側が入れ替わる。3 前提のうち pool 層の効率の保持（1.0）には出典がない。J1 から 1 前提だけを基準に戻すと、入れ替わりが残るのは なし、消えるのは pool_fraction・efficiency_ssd・pool_efficiency_retention である。
+
+64 KiB のセルの向きは、S3 Files の高性能ストレージのアクティブ割合に依存する。アクティブ割合が P1 0.167、P4 0.0591、P5 0.0453（それぞれ以下）で S3 Files の小計が低くなる。残りのパターンは探索範囲では入れ替わらない。基準の値は 100% で、この割合は**仮置き・未測定**である。
+
+隣接の実測では、作業セット 5% / 20% のとき `StorageBytes` の 5.47% / 21.89% が高性能ストレージの指標に載った（1 回の観測、2026-10-17、ap-northeast-1、`ON_DIRECTORY_FIRST_ACCESS`。`StorageBytes` はデータとメタデータの合計で、作業セット比は実験が設定した値。アクティブ割合そのものの測定ではない）。
+
+efficiency_ssd、pool_efficiency_retention、pool_fraction、active_fraction、first_read_mode、first_read_stream_billing、metadata_multiplier は未測定または出典のない仮置きである。表の値はこれらを仮置きしたものである。
+
+#### 誤読を防ぐ注
+
+1. 前提を動かす範囲には、出典のあるものと機械的なものがある。表の「範囲の根拠」列で区別する。機械的な値（0%、50%、100%、0.5 倍、2 倍など）は、振る位置を決めただけで、確率的な幅や起こりやすさを表さない。
+
+2. 出典の厚みが両側で違う。FSx for ONTAP 側には効率、cold:hot 比、SSD 使用率の推奨、デプロイ形態に公式の数値がある。S3 Files 側のアクティブ割合には、今回読んだ公式ページに数値の範囲がない。表で FSx for ONTAP の前提の行が出典ありで、S3 Files の前提の行が機械的な範囲に偏るのは、この差による。
+
+3. 小計の動く幅を製品の性質と読まない。4 MiB のセルの S3 Files の小計は S3 Standard の保管料が大半を占める。動きが小さいのはこのセルの構成による。
+
+4. 「出典のある範囲」は、範囲の根拠が「出典」の点の最小〜最大の区間である。点が 1 つしかない前提は区間にならず、「出典のある値が 1 点」と書く。
+
+5. FSx for ONTAP の小計は、必要なスループットが構成の最大段を超えると、最大段で頭打ちになる。その領域はモデルの適用範囲外である。損益分岐の算出は、探索範囲を適用範囲の上限で切り詰めてこの領域を含めない。1 つずつ動かした表・シナリオ・2 つの前提の組の表では、適用範囲外に落ちたセルの値に ※ を付けて載せ、そのセルを向きの導出から除く。
+
+6. 「1 つずつ動かした表」は、他の前提を基準に固定している。複数を同時に動かした結果は「シナリオ」の節にある。1 つずつでは向きが変わらない前提でも、同時に動かすと変わりうる。
+
+7. 基準の値は推奨値ではない。基準は、全パターンを同じ条件で並べるために置いた値である。
+
+8. 基準の前提では、アクティブ割合は上限の 100% で、S3 Files の小計を上げる方向に動かせる余地がない。この前提は下げる方向にだけ振る。これは基準の置き方の性質で、製品の性質を述べるものではない。
+
+#### 前提の一覧
+
+「基準値の区分」は基準値の出どころ（公式 / 観測 / 試算前提 / 仮置き / 定義）で、次の表の「範囲の根拠」（出典 / 観測 / 再利用 / 機械的）とは別の区分である。「出典のある範囲」は、範囲の根拠が「出典」の点の最小〜最大の区間を指す。「再利用」は、このリポジトリの別の節が置いた値の再利用で、外部の根拠でも測定でもない。
+
+| 前提 | 基準の値 | 基準値の区分 | 出典・根拠 | 読者が決められるか | 小計が動く側 |
+|---|---|---|---|---|---|
+| `deployment` | SINGLE_AZ_1 | 試算前提 | デプロイ形態（可用性と世代） | 決める（可用性要件） | FSx for ONTAP |
+| `efficiency_ssd` | 0.4 | 仮置き | SSD 層のストレージ効率 | 決められる（データの性質） | FSx for ONTAP |
+| `pool_efficiency_retention` | 0.5 | 仮置き | キャパシティプール層に残る SSD 効率の割合 | データごとに測る（一般値なし） | FSx for ONTAP |
+| `pool_fraction` | 0.3 | 仮置き | キャパシティプールへ落とす割合 | 決められる | FSx for ONTAP |
+| `ssd_headroom` | 0.2 | 試算前提 | SSD のプロビジョニング余裕 | 決める（運用方針） | FSx for ONTAP |
+| `throughput_mbps` | auto | 試算前提 | スループットキャパシティ（指定の段 MBps、auto でモデルが選ぶ） | 決める（ピーク要件） | FSx for ONTAP |
+| `active_fraction` | auto | 仮置き | S3 Files 高性能ストレージのアクティブ割合（auto で現行の式） | アクセスの形で決まる | S3 Files |
+| `s3files_threshold_kib` | 128 | 公式 | S3 Files の取り込みしきい値（KiB） | 決める（設定） | S3 Files |
+| `first_read_mode` | written | 仮置き | 初回ストリームに数える個数（written: 書いた個数 / none: 0 / working_set: 作業セット） | 読み取りの時間的な偏りで決まる | S3 Files |
+| `first_read_stream_billing` | none | 仮置き | 初回ストリームのファイル読み取り課金（none: なし / file_read: 課金する） | 課金の実際が未確認（両方で試算できる） | — |
+| `metadata_multiplier` | 1 | 仮置き | 読み取り側メタデータの操作数倍率 | マウントオプションで動く | S3 Files |
+| `read_scale` | 1 | 定義 | 月間読み取り量に掛ける倍率（1.0 = パターンの定義どおり） | 決める（自分のワークロード） | 両側 |
+| `stored_tib` | 20 | 定義 | 保存量（TiB） | 決める | 両側 |
+| リージョン | `ap-northeast-1` | 定義 | 検証リージョン | — | — |
+| 単価の日付 | 2026-08-09 | 定義 | Price List のスナップショット日 | — | — |
+| 保存量の定義 | 論理 20 TiB | 定義 | 全セル共通の土俵 | — | — |
+| 価格の作業セット比非連動 | 連動しない | 定義 | 金額は読み書き量とサイズで決まる | — | — |
+
+#### 前提を 1 つずつ動かしたときの小計
+
+他の前提を基準に固定し、1 つの前提だけを動かしたときの小計である。セルは `FSx for ONTAP {小計} / S3 Files {小計}`（USD / 月、主要費目小計）。低い側を示す印は置かず、「向きが基準と異なるパターン」列に、基準と低い側が入れ替わったパターンを並べる（なければ —）。※ は必要なスループットが最大段を超え、モデルの適用範囲外のセル。
+
+オブジェクト 64 KiB の場合
+
+| 前提 | 値 | P1 | P4 | P5 | P6 | P8 | 向きが基準と異なるパターン | 範囲の根拠 |
+|---|---|---|---|---|---|---|---|---|
+| 基準 | 基準 | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — | — |
+| `deployment` | MULTI_AZ_1 | FSx for ONTAP $3,525.83 / S3 Files $7,928.32 | FSx for ONTAP $3,561.22 / S3 Files $8,755.20 | FSx for ONTAP $3,579.34 / S3 Files $8,875.46 | FSx for ONTAP $3,960.85 / S3 Files $12,030.81 | FSx for ONTAP $3,890.08 / S3 Files $11,114.33 | — | 出典 |
+|  | SINGLE_AZ_2 | FSx for ONTAP $2,440.14 / S3 Files $7,928.32 | FSx for ONTAP $2,475.52 / S3 Files $8,755.20 | FSx for ONTAP $2,493.64 / S3 Files $8,875.46 | FSx for ONTAP $2,875.15 / S3 Files $12,030.81 | FSx for ONTAP $2,804.39 / S3 Files $11,114.33 | — | 出典 |
+|  | MULTI_AZ_2 | FSx for ONTAP $4,541.26 / S3 Files $7,928.32 | FSx for ONTAP $4,576.64 / S3 Files $8,755.20 | FSx for ONTAP $4,594.76 / S3 Files $8,875.46 | FSx for ONTAP $4,976.27 / S3 Files $12,030.81 | FSx for ONTAP $4,905.51 / S3 Files $11,114.33 | — | 出典 |
+| `efficiency_ssd` | 0 | FSx for ONTAP $2,844.66 / S3 Files $7,928.32 | FSx for ONTAP $2,880.04 / S3 Files $8,755.20 | FSx for ONTAP $2,898.16 / S3 Files $8,875.46 | FSx for ONTAP $3,279.67 / S3 Files $12,030.81 | FSx for ONTAP $3,208.91 / S3 Files $11,114.33 | — | 機械的 |
+|  | 0.2 | FSx for ONTAP $2,313.88 / S3 Files $7,928.32 | FSx for ONTAP $2,349.27 / S3 Files $8,755.20 | FSx for ONTAP $2,367.39 / S3 Files $8,875.46 | FSx for ONTAP $2,748.90 / S3 Files $12,030.81 | FSx for ONTAP $2,678.13 / S3 Files $11,114.33 | — | 機械的 |
+|  | 0.65 | FSx for ONTAP $1,119.83 / S3 Files $7,928.32 | FSx for ONTAP $1,155.22 / S3 Files $8,755.20 | FSx for ONTAP $1,173.34 / S3 Files $8,875.46 | FSx for ONTAP $1,554.85 / S3 Files $12,030.81 | FSx for ONTAP $1,484.08 / S3 Files $11,114.33 | — | 出典 |
+|  | 0.75 | FSx for ONTAP $854.37 / S3 Files $7,928.32 | FSx for ONTAP $889.76 / S3 Files $8,755.20 | FSx for ONTAP $907.87 / S3 Files $8,875.46 | FSx for ONTAP $1,289.39 / S3 Files $12,030.81 | FSx for ONTAP $1,218.62 / S3 Files $11,114.33 | — | 出典 |
+| `pool_efficiency_retention` | 0 | FSx for ONTAP $1,812.36 / S3 Files $7,928.32 | FSx for ONTAP $1,847.74 / S3 Files $8,755.20 | FSx for ONTAP $1,865.86 / S3 Files $8,875.46 | FSx for ONTAP $2,247.37 / S3 Files $12,030.81 | FSx for ONTAP $2,176.61 / S3 Files $11,114.33 | — | 機械的 |
+|  | 0.25 | FSx for ONTAP $1,797.73 / S3 Files $7,928.32 | FSx for ONTAP $1,833.12 / S3 Files $8,755.20 | FSx for ONTAP $1,851.24 / S3 Files $8,875.46 | FSx for ONTAP $2,232.75 / S3 Files $12,030.81 | FSx for ONTAP $2,161.98 / S3 Files $11,114.33 | — | 機械的 |
+|  | 1 | FSx for ONTAP $1,753.87 / S3 Files $7,928.32 | FSx for ONTAP $1,789.25 / S3 Files $8,755.20 | FSx for ONTAP $1,807.37 / S3 Files $8,875.46 | FSx for ONTAP $2,188.88 / S3 Files $12,030.81 | FSx for ONTAP $2,118.12 / S3 Files $11,114.33 | — | 機械的 |
+| `pool_fraction` | 0 | FSx for ONTAP $2,327.87 / S3 Files $7,928.32 | FSx for ONTAP $2,327.87 / S3 Files $8,755.20 | FSx for ONTAP $2,345.99 / S3 Files $8,875.46 | FSx for ONTAP $2,690.26 / S3 Files $12,030.81 | FSx for ONTAP $2,690.26 / S3 Files $11,114.33 | — | 再利用 |
+|  | 0.5 | FSx for ONTAP $1,419.99 / S3 Files $7,928.32 | FSx for ONTAP $1,478.96 / S3 Files $8,755.20 | FSx for ONTAP $1,497.08 / S3 Files $8,875.46 | FSx for ONTAP $1,903.43 / S3 Files $12,030.81 | FSx for ONTAP $1,785.48 / S3 Files $11,114.33 | — | 機械的 |
+|  | 0.7 | FSx for ONTAP $1,056.87 / S3 Files $7,928.32 | FSx for ONTAP $1,139.43 / S3 Files $8,755.20 | FSx for ONTAP $1,157.55 / S3 Files $8,875.46 | FSx for ONTAP $1,588.73 / S3 Files $12,030.81 | FSx for ONTAP $1,423.60 / S3 Files $11,114.33 | — | 再利用 |
+|  | 0.8 | FSx for ONTAP $875.39 / S3 Files $7,928.32 | FSx for ONTAP $969.74 / S3 Files $8,755.20 | FSx for ONTAP $987.86 / S3 Files $8,875.46 | FSx for ONTAP $1,431.45 / S3 Files $12,030.81 | FSx for ONTAP $1,242.74 / S3 Files $11,114.33 | — | 再利用 |
+|  | 0.95 | FSx for ONTAP $645.91 / S3 Files $7,928.32 | FSx for ONTAP $757.95 / S3 Files $8,755.20 | FSx for ONTAP $776.07 / S3 Files $8,875.46 | FSx for ONTAP $1,238.29 / S3 Files $12,030.81 | FSx for ONTAP $1,014.19 / S3 Files $11,114.33 | — | 機械的 |
+| `ssd_headroom` | 0 | FSx for ONTAP $1,525.11 / S3 Files $7,928.32 | FSx for ONTAP $1,560.50 / S3 Files $8,755.20 | FSx for ONTAP $1,578.61 / S3 Files $8,875.46 | FSx for ONTAP $1,960.13 / S3 Files $12,030.81 | FSx for ONTAP $1,889.36 / S3 Files $11,114.33 | — | 機械的 |
+|  | 0.25 | FSx for ONTAP $1,847.61 / S3 Files $7,928.32 | FSx for ONTAP $1,883.00 / S3 Files $8,755.20 | FSx for ONTAP $1,901.11 / S3 Files $8,875.46 | FSx for ONTAP $2,282.63 / S3 Files $12,030.81 | FSx for ONTAP $2,211.86 / S3 Files $11,114.33 | — | 出典 |
+|  | 0.5 | FSx for ONTAP $2,170.26 / S3 Files $7,928.32 | FSx for ONTAP $2,205.65 / S3 Files $8,755.20 | FSx for ONTAP $2,223.76 / S3 Files $8,875.46 | FSx for ONTAP $2,605.28 / S3 Files $12,030.81 | FSx for ONTAP $2,534.51 / S3 Files $11,114.33 | — | 機械的 |
+| `throughput_mbps` | 256 | FSx for ONTAP $1,899.08 / S3 Files $7,928.32 | FSx for ONTAP $1,934.46 / S3 Files $8,755.20 | FSx for ONTAP $1,952.58 / S3 Files $8,875.46 | FSx for ONTAP $2,334.10 / S3 Files $12,030.81 | FSx for ONTAP $2,263.33 / S3 Files $11,114.33 | — | 出典 |
+|  | 512 | FSx for ONTAP $2,131.02 / S3 Files $7,928.32 | FSx for ONTAP $2,166.40 / S3 Files $8,755.20 | FSx for ONTAP $2,184.52 / S3 Files $8,875.46 | FSx for ONTAP $2,566.03 / S3 Files $12,030.81 | FSx for ONTAP $2,495.27 / S3 Files $11,114.33 | — | 出典 |
+|  | 1024 | FSx for ONTAP $2,594.89 / S3 Files $7,928.32 | FSx for ONTAP $2,630.27 / S3 Files $8,755.20 | FSx for ONTAP $2,648.39 / S3 Files $8,875.46 | FSx for ONTAP $3,029.90 / S3 Files $12,030.81 | FSx for ONTAP $2,959.14 / S3 Files $11,114.33 | — | 出典 |
+|  | 2048 | FSx for ONTAP $3,522.63 / S3 Files $7,928.32 | FSx for ONTAP $3,558.02 / S3 Files $8,755.20 | FSx for ONTAP $3,576.13 / S3 Files $8,875.46 | FSx for ONTAP $3,957.65 / S3 Files $12,030.81 | FSx for ONTAP $3,886.88 / S3 Files $11,114.33 | — | 出典 |
+| `active_fraction` | 0.05 | FSx for ONTAP $1,783.11 / S3 Files $924.16 | FSx for ONTAP $1,818.50 / S3 Files $1,751.04 | FSx for ONTAP $1,836.61 / S3 Files $1,871.30 | FSx for ONTAP $2,218.13 / S3 Files $5,026.65 | FSx for ONTAP $2,147.36 / S3 Files $4,110.17 | P1 64 KiB、P4 64 KiB | 機械的 |
+|  | 0.1 | FSx for ONTAP $1,783.11 / S3 Files $1,292.80 | FSx for ONTAP $1,818.50 / S3 Files $2,119.68 | FSx for ONTAP $1,836.61 / S3 Files $2,239.94 | FSx for ONTAP $2,218.13 / S3 Files $5,395.29 | FSx for ONTAP $2,147.36 / S3 Files $4,478.81 | P1 64 KiB | 機械的 |
+|  | 0.2 | FSx for ONTAP $1,783.11 / S3 Files $2,030.08 | FSx for ONTAP $1,818.50 / S3 Files $2,856.96 | FSx for ONTAP $1,836.61 / S3 Files $2,977.22 | FSx for ONTAP $2,218.13 / S3 Files $6,132.57 | FSx for ONTAP $2,147.36 / S3 Files $5,216.09 | — | 機械的 |
+|  | 0.5 | FSx for ONTAP $1,783.11 / S3 Files $4,241.92 | FSx for ONTAP $1,818.50 / S3 Files $5,068.80 | FSx for ONTAP $1,836.61 / S3 Files $5,189.06 | FSx for ONTAP $2,218.13 / S3 Files $8,344.41 | FSx for ONTAP $2,147.36 / S3 Files $7,427.93 | — | 機械的 |
+| `s3files_threshold_kib` | 32 | FSx for ONTAP $1,783.11 / S3 Files $520.77 | FSx for ONTAP $1,818.50 / S3 Files $687.35 | FSx for ONTAP $1,836.61 / S3 Files $770.68 | FSx for ONTAP $2,218.13 / S3 Files $2,529.36 | FSx for ONTAP $2,147.36 / S3 Files $2,196.19 | P1 64 KiB、P4 64 KiB、P5 64 KiB | 機械的 |
+|  | 512 | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — | 機械的 |
+| `first_read_mode` | none | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,910.21 | FSx for ONTAP $2,218.13 / S3 Files $12,725.86 | FSx for ONTAP $2,147.36 / S3 Files $11,072.10 | — | 機械的 |
+|  | working_set | FSx for ONTAP $1,783.11 / S3 Files $7,893.57 | FSx for ONTAP $1,818.50 / S3 Files $8,685.70 | FSx for ONTAP $1,836.61 / S3 Files $8,840.71 | FSx for ONTAP $2,218.13 / S3 Files $12,378.33 | FSx for ONTAP $2,147.36 / S3 Files $11,002.59 | — | 機械的 |
+| `first_read_stream_billing` | file_read | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,916.42 | FSx for ONTAP $2,218.13 / S3 Files $12,850.01 | FSx for ONTAP $2,147.36 / S3 Files $11,933.53 | — | 出典 |
+| `metadata_multiplier` | 0 | FSx for ONTAP $1,783.11 / S3 Files $7,925.76 | FSx for ONTAP $1,818.50 / S3 Files $8,704.00 | FSx for ONTAP $1,836.61 / S3 Files $8,824.26 | FSx for ONTAP $2,218.13 / S3 Files $11,928.41 | FSx for ONTAP $2,147.36 / S3 Files $11,109.21 | — | 機械的 |
+|  | 3 | FSx for ONTAP $1,783.11 / S3 Files $7,933.44 | FSx for ONTAP $1,818.50 / S3 Files $8,857.60 | FSx for ONTAP $1,836.61 / S3 Files $8,977.86 | FSx for ONTAP $2,218.13 / S3 Files $12,235.61 | FSx for ONTAP $2,147.36 / S3 Files $11,124.57 | — | 機械的 |
+|  | 2 | FSx for ONTAP $1,783.11 / S3 Files $7,930.88 | FSx for ONTAP $1,818.50 / S3 Files $8,806.40 | FSx for ONTAP $1,836.61 / S3 Files $8,926.66 | FSx for ONTAP $2,218.13 / S3 Files $12,133.21 | FSx for ONTAP $2,147.36 / S3 Files $11,119.45 | — | 観測（n>1 のパターンは再読み取りの操作数が未測定） |
+| `read_scale` | 0.1 | FSx for ONTAP $1,781.44 / S3 Files $7,889.15 | FSx for ONTAP $1,784.97 / S3 Files $7,971.84 | FSx for ONTAP $1,803.09 / S3 Files $8,092.10 | FSx for ONTAP $2,151.09 / S3 Files $11,119.45 | FSx for ONTAP $2,144.01 / S3 Files $11,109.72 | — | 機械的 |
+|  | 0.5 | FSx for ONTAP $1,782.18 / S3 Files $7,906.56 | FSx for ONTAP $1,799.87 / S3 Files $8,320.00 | FSx for ONTAP $1,817.99 / S3 Files $8,440.26 | FSx for ONTAP $2,180.88 / S3 Files $11,160.41 | FSx for ONTAP $2,145.50 / S3 Files $11,111.77 | — | 機械的 |
+|  | 2 | FSx for ONTAP $1,784.97 / S3 Files $7,971.84 | FSx for ONTAP $1,855.74 / S3 Files $9,625.60 | FSx for ONTAP $1,873.86 / S3 Files $9,745.86 | FSx for ONTAP $2,408.59 / S3 Files $13,771.61 | FSx for ONTAP $2,151.09 / S3 Files $11,119.45 | — | 機械的 |
+|  | 10 | FSx for ONTAP $1,799.87 / S3 Files $8,320.00 | FSx for ONTAP $2,501.61 / S3 Files $16,588.80 | FSx for ONTAP $2,519.73 / S3 Files $16,709.06 | FSx for ONTAP $3,700.32 / S3 Files $27,698.01 | FSx for ONTAP $2,180.88 / S3 Files $11,160.41 | — | 機械的 |
+| `stored_tib` | 5 | FSx for ONTAP $532.83 / S3 Files $1,982.08 | FSx for ONTAP $541.67 / S3 Files $2,188.80 | FSx for ONTAP $546.20 / S3 Files $2,218.87 | FSx for ONTAP $641.58 / S3 Files $3,007.70 | FSx for ONTAP $623.89 / S3 Files $2,778.58 | — | 機械的 |
+|  | 10 | FSx for ONTAP $949.54 / S3 Files $3,964.16 | FSx for ONTAP $967.23 / S3 Files $4,377.60 | FSx for ONTAP $976.29 / S3 Files $4,437.73 | FSx for ONTAP $1,167.05 / S3 Files $6,015.40 | FSx for ONTAP $1,131.67 / S3 Files $5,557.16 | — | 機械的 |
+|  | 50 | FSx for ONTAP $4,283.83 / S3 Files $19,820.80 | FSx for ONTAP $4,372.29 / S3 Files $21,888.00 | FSx for ONTAP $4,417.58 / S3 Files $22,188.65 | FSx for ONTAP $5,719.27 / S3 Files $30,077.02 | FSx for ONTAP $5,194.45 / S3 Files $27,785.82 | — | 機械的 |
+|  | 100 | FSx for ONTAP $8,451.69 / S3 Files $39,590.40 | FSx for ONTAP $8,744.57 / S3 Files $43,724.80 | FSx for ONTAP $8,835.17 / S3 Files $44,326.10 | FSx for ONTAP $11,438.55 / S3 Files $60,102.85 | FSx for ONTAP $10,388.91 / S3 Files $55,520.45 | — | 機械的 |
+
+オブジェクト 4 MiB の場合
+
+| 前提 | 値 | P1 | P4 | P5 | P6 | P8 | 向きが基準と異なるパターン | 範囲の根拠 |
+|---|---|---|---|---|---|---|---|---|
+| 基準 | 基準 | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — | — |
+| `deployment` | MULTI_AZ_1 | FSx for ONTAP $3,524.00 / S3 Files $512.14 | FSx for ONTAP $3,524.55 / S3 Files $514.74 | FSx for ONTAP $3,524.84 / S3 Files $516.04 | FSx for ONTAP $3,530.80 / S3 Files $543.52 | FSx for ONTAP $3,529.69 / S3 Files $538.32 | — | 出典 |
+|  | SINGLE_AZ_2 | FSx for ONTAP $2,438.30 / S3 Files $512.14 | FSx for ONTAP $2,438.86 / S3 Files $514.74 | FSx for ONTAP $2,439.14 / S3 Files $516.04 | FSx for ONTAP $2,445.10 / S3 Files $543.52 | FSx for ONTAP $2,443.99 / S3 Files $538.32 | — | 出典 |
+|  | MULTI_AZ_2 | FSx for ONTAP $4,539.42 / S3 Files $512.14 | FSx for ONTAP $4,539.98 / S3 Files $514.74 | FSx for ONTAP $4,540.26 / S3 Files $516.04 | FSx for ONTAP $4,546.22 / S3 Files $543.52 | FSx for ONTAP $4,545.12 / S3 Files $538.32 | — | 出典 |
+| `efficiency_ssd` | 0 | FSx for ONTAP $2,842.82 / S3 Files $512.14 | FSx for ONTAP $2,843.38 / S3 Files $514.74 | FSx for ONTAP $2,843.66 / S3 Files $516.04 | FSx for ONTAP $2,849.62 / S3 Files $543.52 | FSx for ONTAP $2,848.52 / S3 Files $538.32 | — | 機械的 |
+|  | 0.2 | FSx for ONTAP $2,312.05 / S3 Files $512.14 | FSx for ONTAP $2,312.60 / S3 Files $514.74 | FSx for ONTAP $2,312.89 / S3 Files $516.04 | FSx for ONTAP $2,318.85 / S3 Files $543.52 | FSx for ONTAP $2,317.74 / S3 Files $538.32 | — | 機械的 |
+|  | 0.65 | FSx for ONTAP $1,118.00 / S3 Files $512.14 | FSx for ONTAP $1,118.55 / S3 Files $514.74 | FSx for ONTAP $1,118.84 / S3 Files $516.04 | FSx for ONTAP $1,124.80 / S3 Files $543.52 | FSx for ONTAP $1,123.69 / S3 Files $538.32 | — | 出典 |
+|  | 0.75 | FSx for ONTAP $852.54 / S3 Files $512.14 | FSx for ONTAP $853.09 / S3 Files $514.74 | FSx for ONTAP $853.38 / S3 Files $516.04 | FSx for ONTAP $859.34 / S3 Files $543.52 | FSx for ONTAP $858.23 / S3 Files $538.32 | — | 出典 |
+| `pool_efficiency_retention` | 0 | FSx for ONTAP $1,810.52 / S3 Files $512.14 | FSx for ONTAP $1,811.08 / S3 Files $514.74 | FSx for ONTAP $1,811.36 / S3 Files $516.04 | FSx for ONTAP $1,817.32 / S3 Files $543.52 | FSx for ONTAP $1,816.22 / S3 Files $538.32 | — | 機械的 |
+|  | 0.25 | FSx for ONTAP $1,795.90 / S3 Files $512.14 | FSx for ONTAP $1,796.45 / S3 Files $514.74 | FSx for ONTAP $1,796.74 / S3 Files $516.04 | FSx for ONTAP $1,802.70 / S3 Files $543.52 | FSx for ONTAP $1,801.59 / S3 Files $538.32 | — | 機械的 |
+|  | 1 | FSx for ONTAP $1,752.03 / S3 Files $512.14 | FSx for ONTAP $1,752.59 / S3 Files $514.74 | FSx for ONTAP $1,752.87 / S3 Files $516.04 | FSx for ONTAP $1,758.83 / S3 Files $543.52 | FSx for ONTAP $1,757.72 / S3 Files $538.32 | — | 機械的 |
+| `pool_fraction` | 0 | FSx for ONTAP $2,327.87 / S3 Files $512.14 | FSx for ONTAP $2,327.87 / S3 Files $514.74 | FSx for ONTAP $2,328.15 / S3 Files $516.04 | FSx for ONTAP $2,333.53 / S3 Files $543.52 | FSx for ONTAP $2,333.53 / S3 Files $538.32 | — | 再利用 |
+|  | 0.5 | FSx for ONTAP $1,416.94 / S3 Files $512.14 | FSx for ONTAP $1,417.86 / S3 Files $514.74 | FSx for ONTAP $1,418.14 / S3 Files $516.04 | FSx for ONTAP $1,424.49 / S3 Files $543.52 | FSx for ONTAP $1,422.65 / S3 Files $538.32 | — | 機械的 |
+|  | 0.7 | FSx for ONTAP $1,052.59 / S3 Files $512.14 | FSx for ONTAP $1,053.88 / S3 Files $514.74 | FSx for ONTAP $1,054.17 / S3 Files $516.04 | FSx for ONTAP $1,060.90 / S3 Files $543.52 | FSx for ONTAP $1,058.32 / S3 Files $538.32 | — | 再利用 |
+|  | 0.8 | FSx for ONTAP $870.50 / S3 Files $512.14 | FSx for ONTAP $871.97 / S3 Files $514.74 | FSx for ONTAP $872.25 / S3 Files $516.04 | FSx for ONTAP $879.19 / S3 Files $543.52 | FSx for ONTAP $876.24 / S3 Files $538.32 | — | 再利用 |
+|  | 0.95 | FSx for ONTAP $640.10 / S3 Files $512.14 | FSx for ONTAP $641.85 / S3 Files $514.74 | FSx for ONTAP $642.14 / S3 Files $516.04 | FSx for ONTAP $649.36 / S3 Files $543.52 | FSx for ONTAP $645.86 / S3 Files $538.32 | — | 機械的 |
+| `ssd_headroom` | 0 | FSx for ONTAP $1,523.28 / S3 Files $512.14 | FSx for ONTAP $1,523.83 / S3 Files $514.74 | FSx for ONTAP $1,524.11 / S3 Files $516.04 | FSx for ONTAP $1,530.08 / S3 Files $543.52 | FSx for ONTAP $1,528.97 / S3 Files $538.32 | — | 機械的 |
+|  | 0.25 | FSx for ONTAP $1,845.78 / S3 Files $512.14 | FSx for ONTAP $1,846.33 / S3 Files $514.74 | FSx for ONTAP $1,846.61 / S3 Files $516.04 | FSx for ONTAP $1,852.58 / S3 Files $543.52 | FSx for ONTAP $1,851.47 / S3 Files $538.32 | — | 出典 |
+|  | 0.5 | FSx for ONTAP $2,168.43 / S3 Files $512.14 | FSx for ONTAP $2,168.98 / S3 Files $514.74 | FSx for ONTAP $2,169.26 / S3 Files $516.04 | FSx for ONTAP $2,175.23 / S3 Files $543.52 | FSx for ONTAP $2,174.12 / S3 Files $538.32 | — | 機械的 |
+| `throughput_mbps` | 256 | FSx for ONTAP $1,897.25 / S3 Files $512.14 | FSx for ONTAP $1,897.80 / S3 Files $514.74 | FSx for ONTAP $1,898.08 / S3 Files $516.04 | FSx for ONTAP $1,904.04 / S3 Files $543.52 | FSx for ONTAP $1,902.94 / S3 Files $538.32 | — | 出典 |
+|  | 512 | FSx for ONTAP $2,129.18 / S3 Files $512.14 | FSx for ONTAP $2,129.74 / S3 Files $514.74 | FSx for ONTAP $2,130.02 / S3 Files $516.04 | FSx for ONTAP $2,135.98 / S3 Files $543.52 | FSx for ONTAP $2,134.87 / S3 Files $538.32 | — | 出典 |
+|  | 1024 | FSx for ONTAP $2,593.05 / S3 Files $512.14 | FSx for ONTAP $2,593.61 / S3 Files $514.74 | FSx for ONTAP $2,593.89 / S3 Files $516.04 | FSx for ONTAP $2,599.85 / S3 Files $543.52 | FSx for ONTAP $2,598.75 / S3 Files $538.32 | — | 出典 |
+|  | 2048 | FSx for ONTAP $3,520.80 / S3 Files $512.14 | FSx for ONTAP $3,521.35 / S3 Files $514.74 | FSx for ONTAP $3,521.63 / S3 Files $516.04 | FSx for ONTAP $3,527.60 / S3 Files $543.52 | FSx for ONTAP $3,526.49 / S3 Files $538.32 | — | 出典 |
+| `metadata_multiplier` | 0 | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — | 機械的 |
+|  | 3 | FSx for ONTAP $1,781.28 / S3 Files $512.22 | FSx for ONTAP $1,781.83 / S3 Files $516.34 | FSx for ONTAP $1,782.11 / S3 Files $517.64 | FSx for ONTAP $1,788.08 / S3 Files $546.72 | FSx for ONTAP $1,786.97 / S3 Files $538.48 | — | 機械的 |
+|  | 6 | FSx for ONTAP $1,781.28 / S3 Files $512.34 | FSx for ONTAP $1,781.83 / S3 Files $518.74 | FSx for ONTAP $1,782.11 / S3 Files $520.04 | FSx for ONTAP $1,788.08 / S3 Files $551.52 | FSx for ONTAP $1,786.97 / S3 Files $538.72 | — | 観測（n>1 のパターンは再読み取りの操作数が未測定） |
+| `read_scale` | 0.1 | FSx for ONTAP $1,781.25 / S3 Files $512.01 | FSx for ONTAP $1,781.31 / S3 Files $512.27 | FSx for ONTAP $1,781.59 / S3 Files $513.58 | FSx for ONTAP $1,787.03 / S3 Files $538.59 | FSx for ONTAP $1,786.92 / S3 Files $538.07 | — | 機械的 |
+|  | 0.5 | FSx for ONTAP $1,781.26 / S3 Files $512.07 | FSx for ONTAP $1,781.54 / S3 Files $513.37 | FSx for ONTAP $1,781.82 / S3 Files $514.67 | FSx for ONTAP $1,787.49 / S3 Files $540.78 | FSx for ONTAP $1,786.94 / S3 Files $538.18 | — | 機械的 |
+|  | 2 | FSx for ONTAP $1,781.31 / S3 Files $512.27 | FSx for ONTAP $1,782.41 / S3 Files $517.48 | FSx for ONTAP $1,782.70 / S3 Files $518.78 | FSx for ONTAP $1,905.21 / S3 Files $549.00 | FSx for ONTAP $1,787.03 / S3 Files $538.59 | — | 機械的 |
+|  | 10 | FSx for ONTAP $1,781.54 / S3 Files $513.37 | FSx for ONTAP $2,134.97 / S3 Files $539.40 | FSx for ONTAP $2,135.26 / S3 Files $540.70 | FSx for ONTAP $2,610.33 / S3 Files $592.84 | FSx for ONTAP $1,787.49 / S3 Files $540.78 | — | 機械的 |
+| `stored_tib` | 5 | FSx for ONTAP $532.37 / S3 Files $128.03 | FSx for ONTAP $532.51 / S3 Files $128.68 | FSx for ONTAP $532.58 / S3 Files $129.01 | FSx for ONTAP $534.07 / S3 Files $135.88 | FSx for ONTAP $533.79 / S3 Files $134.58 | — | 機械的 |
+|  | 10 | FSx for ONTAP $948.62 / S3 Files $256.07 | FSx for ONTAP $948.90 / S3 Files $257.37 | FSx for ONTAP $949.04 / S3 Files $258.02 | FSx for ONTAP $952.02 / S3 Files $271.76 | FSx for ONTAP $951.47 / S3 Files $269.16 | — | 機械的 |
+|  | 50 | FSx for ONTAP $4,279.25 / S3 Files $1,280.34 | FSx for ONTAP $4,280.63 / S3 Files $1,286.85 | FSx for ONTAP $4,281.34 / S3 Files $1,290.10 | FSx for ONTAP $4,644.14 / S3 Files $1,358.80 | FSx for ONTAP $4,293.47 / S3 Files $1,345.79 | — | 機械的 |
+|  | 100 | FSx for ONTAP $8,442.52 / S3 Files $2,509.48 | FSx for ONTAP $8,561.25 / S3 Files $2,522.50 | FSx for ONTAP $8,562.67 / S3 Files $2,529.01 | FSx for ONTAP $9,288.28 / S3 Files $2,666.41 | FSx for ONTAP $8,586.95 / S3 Files $2,640.38 | — | 機械的 |
+
+#### 小計の高低が入れ替わる前提の値
+
+連続な数値の前提について、低い側が入れ替わる値 x* を決定的な二分法で求める。探索範囲を適用範囲の上限で切り詰め、256 区間に分けて符号の変わる区間を二分する。値は有効数字 3 桁。「なし」は探索範囲内で入れ替わらないことを指し、範囲外の主張はしない。列挙の前提（`deployment`、`throughput_mbps`、`first_read_mode`、`first_read_stream_billing`）は、「前提を 1 つずつ動かしたとき」の表の「向きが基準と異なるパターン」列で扱う。`active_fraction` は 64 KiB のみ、4 MiB は「対象外」。
+
+| 前提 | 64 KiB P1 | 64 KiB P4 | 64 KiB P5 | 64 KiB P6 | 64 KiB P8 | 4 MiB P1 | 4 MiB P4 | 4 MiB P5 | 4 MiB P6 | 4 MiB P8 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pool_fraction` | なし | なし | なし | なし | なし | なし | なし | なし | なし | なし |
+| `efficiency_ssd` | なし | なし | なし | なし | なし | 0.878（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲の外） | 0.878（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲の外） | 0.877（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲の外） | 0.869（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲の外） | 0.871（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲の外） |
+| `pool_efficiency_retention` | なし | なし | なし | なし | なし | なし | なし | なし | なし | なし |
+| `ssd_headroom` | なし | なし | なし | なし | なし | なし | なし | なし | なし | なし |
+| `active_fraction` | 0.167（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.0591（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.0453（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | なし | なし | 対象外 | 対象外 | 対象外 | 対象外 | 対象外 |
+| `metadata_multiplier` | なし | なし | なし | なし | なし | 3.17e+04（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 1.58e+03（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 1.58e+03（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 779（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 1.56e+04（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） |
+| `read_scale` | なし（2.02e+03 まで） | なし（101 まで） | なし（96.4 まで） | なし（33.8 まで） | なし（92 まで） | なし（2.02e+03 まで） | なし（101 まで） | なし（96.4 まで） | なし（33.8 まで） | なし（92 まで） |
+| `stored_tib` | 0.69（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.627（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.619（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.47（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | 0.507（未満でS3 Files、以上でFSx for ONTAP、出典のある範囲なし（機械的な探索範囲）） | なし（1.02e+03 まで） | なし（1.02e+03 まで） | なし（1.02e+03 まで） | なし（675 まで） | なし（1.02e+03 まで） |
+| `s3files_threshold_kib` | しきい値が 64 KiB 未満のとき入れ替わる | しきい値が 64 KiB 未満のとき入れ替わる | しきい値が 64 KiB 未満のとき入れ替わる | なし | なし | 対象外 | 対象外 | 対象外 | 対象外 | 対象外 |
+
+探索範囲 [lo, hi]: `pool_fraction`: 0〜1、`efficiency_ssd`: 0〜0.99、`pool_efficiency_retention`: 0〜1、`ssd_headroom`: 0〜1、`active_fraction`: 0〜1、`metadata_multiplier`: 0.000977〜1.68e+07、`read_scale`: 0.000977〜1.68e+07、`stored_tib`: 0.125〜1.02e+03。`read_scale` と `stored_tib` の上限は、必要スループットが最大段以内に収まる値（セルごと）で切り詰める。`stored_tib` の上限 1.02e+03 TiB は出典のない機械的な値である。区間内に 2 点以上の入れ替わりが 1 区間（1/256）に収まる場合は検出できない（テストの密な走査で現行の価格では見落としがないことを確かめている）。
+
+#### 2 つの前提の組での入れ替わり
+
+1 次元の損益分岐は他の前提に依存する。依存の大きい 2 つの組を同じ算出で出す。セルは入れ替わる値 x*（なければ「なし」）。
+
+固定: `pool_fraction`、動かす: `active_fraction`（64 KiB）
+
+| `pool_fraction` | P1 | P4 | P5 | P6 | P8 |
+|---|---|---|---|---|---|
+| 0 | 0.24 | 0.128 | 0.114 | なし | なし |
+| 0.3 | 0.167 | 0.0591 | 0.0453 | なし | なし |
+| 0.5 | 0.117 | 0.0131 | なし | なし | なし |
+| 0.8 | 0.0434 | なし | なし | なし | なし |
+| 0.95 | 0.0123 | なし | なし | なし | なし |
+
+固定: `pool_fraction` × `pool_efficiency_retention`、動かす: `efficiency_ssd`（4 MiB）
+
+| `pool_fraction` / `pool_efficiency_retention` | P1 | P4 | P5 | P6 | P8 |
+|---|---|---|---|---|---|
+| 0.3 / 0.5 | 0.878 | 0.878 | 0.877 | 0.869 | 0.871 |
+| 0.3 / 1 | 0.855 | 0.854 | 0.854 | 0.846 | 0.847 |
+| 0.7 / 0.5 | 0.823 | 0.822 | 0.822 | 0.805 | 0.807 |
+| 0.7 / 1 | 0.726 | 0.725 | 0.725 | 0.71 | 0.712 |
+| 0.8 / 0.5 | 0.784 | 0.783 | 0.782 | 0.76 | 0.762 |
+| 0.8 / 1 | 0.649 | 0.648 | 0.647 | 0.628 | 0.631 |
+
+#### 複数の前提を同時に動かしたシナリオ
+
+複数の前提を同時に動かした結果である。名前は動かす方向（その側の小計が下がる / 上がる）で付け、「有利」「不利」は使わない。J1〜J4 は 3・3・2・2 前提で、完全には揃わない。基準のアクティブ割合が上限の 100% で S3 Files の小計を上げる余地がなく、上げる側に置ける前提が`metadata_multiplier`・`first_read_stream_billing` に限られること、および向きの定まらない `first_read_mode=none` を J3 から外したことによる。同時に動かした値の組は予測でも推奨でもなく、向きが変わりうることを示す例である。
+
+オブジェクト 64 KiB の場合
+
+| シナリオ | P1 | P4 | P5 | P6 | P8 | 向きが基準と異なるパターン |
+|---|---|---|---|---|---|---|
+| J0 | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — |
+| J1（3 前提） | FSx for ONTAP $402.77 / S3 Files $7,928.32 | FSx for ONTAP $497.12 / S3 Files $8,755.20 | FSx for ONTAP $515.24 / S3 Files $8,875.46 | FSx for ONTAP $958.83 / S3 Files $12,030.81 | FSx for ONTAP $770.12 / S3 Files $11,114.33 | — |
+| J1 − pool_fraction | FSx for ONTAP $799.54 / S3 Files $7,928.32 | FSx for ONTAP $834.92 / S3 Files $8,755.20 | FSx for ONTAP $853.04 / S3 Files $8,875.46 | FSx for ONTAP $1,234.55 / S3 Files $12,030.81 | FSx for ONTAP $1,163.79 / S3 Files $11,114.33 | — |
+| J1 − efficiency_ssd | FSx for ONTAP $797.40 / S3 Files $7,928.32 | FSx for ONTAP $891.75 / S3 Files $8,755.20 | FSx for ONTAP $909.87 / S3 Files $8,875.46 | FSx for ONTAP $1,353.46 / S3 Files $12,030.81 | FSx for ONTAP $1,164.75 / S3 Files $11,114.33 | — |
+| J1 − pool_efficiency_retention | FSx for ONTAP $549.00 / S3 Files $7,928.32 | FSx for ONTAP $643.35 / S3 Files $8,755.20 | FSx for ONTAP $661.47 / S3 Files $8,875.46 | FSx for ONTAP $1,105.06 / S3 Files $12,030.81 | FSx for ONTAP $916.35 / S3 Files $11,114.33 | — |
+| J2（3 前提） | FSx for ONTAP $3,955.97 / S3 Files $7,928.32 | FSx for ONTAP $3,955.97 / S3 Files $8,755.20 | FSx for ONTAP $3,974.09 / S3 Files $8,875.46 | FSx for ONTAP $4,318.36 / S3 Files $12,030.81 | FSx for ONTAP $4,318.36 / S3 Files $11,114.33 | — |
+| J3（2 前提） | FSx for ONTAP $1,783.11 / S3 Files $921.60 | FSx for ONTAP $1,818.50 / S3 Files $1,699.84 | FSx for ONTAP $1,836.61 / S3 Files $1,820.10 | FSx for ONTAP $2,218.13 / S3 Files $4,924.25 | FSx for ONTAP $2,147.36 / S3 Files $4,105.05 | P1・P4・P5 |
+| J3 − active_fraction | FSx for ONTAP $1,783.11 / S3 Files $7,925.76 | FSx for ONTAP $1,818.50 / S3 Files $8,704.00 | FSx for ONTAP $1,836.61 / S3 Files $8,824.26 | FSx for ONTAP $2,218.13 / S3 Files $11,928.41 | FSx for ONTAP $2,147.36 / S3 Files $11,109.21 | — |
+| J3 − metadata_multiplier | FSx for ONTAP $1,783.11 / S3 Files $924.16 | FSx for ONTAP $1,818.50 / S3 Files $1,751.04 | FSx for ONTAP $1,836.61 / S3 Files $1,871.30 | FSx for ONTAP $2,218.13 / S3 Files $5,026.65 | FSx for ONTAP $2,147.36 / S3 Files $4,110.17 | P1・P4 |
+| J4（2 前提） | FSx for ONTAP $1,783.11 / S3 Files $7,930.88 | FSx for ONTAP $1,818.50 / S3 Files $8,806.40 | FSx for ONTAP $1,836.61 / S3 Files $8,967.62 | FSx for ONTAP $2,218.13 / S3 Files $12,952.41 | FSx for ONTAP $2,147.36 / S3 Files $11,938.65 | — |
+
+オブジェクト 4 MiB の場合
+
+| シナリオ | P1 | P4 | P5 | P6 | P8 | 向きが基準と異なるパターン |
+|---|---|---|---|---|---|---|
+| J0 | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — |
+| J1（3 前提） | FSx for ONTAP $397.88 / S3 Files $512.14 | FSx for ONTAP $399.35 / S3 Files $514.74 | FSx for ONTAP $399.64 / S3 Files $516.04 | FSx for ONTAP $406.57 / S3 Files $543.52 | FSx for ONTAP $403.62 / S3 Files $538.32 | P1・P4・P5・P6・P8 |
+| J1 − pool_fraction | FSx for ONTAP $797.70 / S3 Files $512.14 | FSx for ONTAP $798.26 / S3 Files $514.74 | FSx for ONTAP $798.54 / S3 Files $516.04 | FSx for ONTAP $804.50 / S3 Files $543.52 | FSx for ONTAP $803.40 / S3 Files $538.32 | — |
+| J1 − efficiency_ssd | FSx for ONTAP $792.51 / S3 Files $512.14 | FSx for ONTAP $793.98 / S3 Files $514.74 | FSx for ONTAP $794.27 / S3 Files $516.04 | FSx for ONTAP $801.20 / S3 Files $543.52 | FSx for ONTAP $798.25 / S3 Files $538.32 | — |
+| J1 − pool_efficiency_retention | FSx for ONTAP $544.11 / S3 Files $512.14 | FSx for ONTAP $545.58 / S3 Files $514.74 | FSx for ONTAP $545.87 / S3 Files $516.04 | FSx for ONTAP $552.80 / S3 Files $543.52 | FSx for ONTAP $549.85 / S3 Files $538.32 | — |
+| J2（3 前提） | FSx for ONTAP $3,955.97 / S3 Files $512.14 | FSx for ONTAP $3,955.97 / S3 Files $514.74 | FSx for ONTAP $3,956.25 / S3 Files $516.04 | FSx for ONTAP $3,961.63 / S3 Files $543.52 | FSx for ONTAP $3,961.63 / S3 Files $538.32 | — |
+| J3（2 前提） | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — |
+| J3 − active_fraction | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — |
+| J3 − metadata_multiplier | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — |
+| J4（2 前提） | FSx for ONTAP $1,781.28 / S3 Files $512.34 | FSx for ONTAP $1,781.83 / S3 Files $518.74 | FSx for ONTAP $1,782.11 / S3 Files $520.04 | FSx for ONTAP $1,788.08 / S3 Files $551.52 | FSx for ONTAP $1,786.97 / S3 Files $538.72 | — |
+
+J1 のような組み合わせが実在の構成として成立するか（pool 80% で SSD の最小値に当たる場合など）は確認していない。
+
+#### 算入していない費目
+
+非現行バージョンの保持（S3 Files 側）とスナップショットの保持（FSx for ONTAP 側）は、両側の式が未測定で、書き込みの多いパターンでは小計を大きく動かしうる。保持日数を入力にするのは PR-A2（この作業の範囲外）で、ここでは未算入として注記する。
+
+数値は書かない。「根拠の確からしさ」は documented / verified / hypothesis / open の 4 語で付ける。
+
+| 費目 | 向き | 根拠 | 根拠の確からしさ | 状態 |
+|---|---|---|---|---|
+| 非現行バージョンの保持（S3 Files 側） | S3 Files の小計が上がる。書き込みの多いパターンで大きい | S3 Files はバージョニング必須（公式の同期のページ） | documented（公式の同期のページ）。影響の大きさは hypothesis | 未算入（日数の入力は PR-A2） |
+| スナップショットの保持（FSx for ONTAP 側） | FSx for ONTAP の小計が上がる見込み | 保持分がどの層に置かれ、どう課金されるかを公式文書で読んでいない | open（未確認。方向も未確認） | 未算入（日数の入力は PR-A2） |
+| pool 配置分のメタデータ用 SSD | FSx for ONTAP の小計が上がる | 公式の文面「ファイルのメタデータは常に SSD 層に残る」。目安は 1 点（サイジングブログ） | documented（公式のボリューム容量ページ、サイジングブログ）。基準単位は open | 未算入（PR-A2 の判断待ち） |
+| 初回ストリームの GET 数が読み取り回数を超える | S3 Files の小計が上がる（GET 行の過大計上） | 既定の P8 64 KiB は書いた個数を GET として計上し、読み取り回数の 10 倍。モデルは上限しない | verified（基底を実行して確認） | 算入している（上限なし）。PR-H のマージ後に外す |
+| SSD IOPS の追加、バックアップ、スナップショット予約 | FSx for ONTAP の小計が上がる | 単価と課金の仕組みをこの設計では公式文書で読んでいない | open | 未算入 |
+| pool への書き込みリクエスト | FSx for ONTAP の小計が上がる | モデルに単価が定義済みで、式に使っていない（コードで確認） | open（コードの事実は verified） | 未算入 |
+| pool 読み取りの操作数 | FSx for ONTAP の小計 | 数え方が文書内で 3 通りあり、未確認 | open | 小計に算入しているが未確認 |
+| S3 Access Points 経由の GET | FSx for ONTAP の小計が上がる | モデルは経由の PUT だけを足す（コードで確認）。GET の課金は単価と経路に依存 | open（コードの事実は verified、単価は未再取得） | 未算入 |
+| 高性能ストレージ上のメタデータの保管 | S3 Files の小計が上がる | 公式は、アクセスしたディレクトリのメタデータは期限切れにならないと書く。課金の基準が文書にない | documented（公式の計量ページ）。課金の基準は open | 未算入 |
+| 1 MiB 以上のしきい値 | — | モデルが公式の直接ストリーム規則を持たない | documented（公式の計量ページ）、モデルの不在は verified | 未対応（PR-F） |
+
+#### 自分の値での試算手順
+
+受け付ける前提の一覧は `--list-assumptions` で確認する。自分の環境の値は `--assume key=value` で与え、公開文書の値とは比べない。比べるのは、同じ前提を置いた 2 つの出力どうしである。小計は主要費目小計で、月額総額ではない。
+
+```bash
+# 1. 受け付ける前提の一覧（キー、既定値、許容範囲、基準値の区分）
+python3 tools/finops_model.py --list-assumptions
+
+# 2. 自分の環境の値で小計の表を出す（保存量 50 TiB、Multi-AZ、SSD 層の効率 65%、pool 70%）
+python3 tools/finops_model.py --baseline-table \
+  --assume stored_tib=50 --assume deployment=MULTI_AZ_1 \
+  --assume efficiency_ssd=0.65 --assume pool_fraction=0.70
+
+# 3. 内訳まで JSON で出し、英語のラベルで保存する（アクティブ割合を測った値に置き換えた例）
+python3 tools/finops_model.py --baseline-json --lang en --assume active_fraction=0.10 > my-run.json
+```
+
+値はコマンドの書式の例で、勧める値でも結果の予測でもない。
+
 ### 読み取りが繰り返されるとき — 効くのは Egress
 
 ここまでの試算は利用側が同一リージョンにいることを前提にしていた。同一リージョン内のデータ転送には課金がないため、比較は保存単価とリクエスト単価の話になる。

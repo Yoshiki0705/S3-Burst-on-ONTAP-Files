@@ -2165,6 +2165,274 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | S3 Files metadata read (131,072 operations x 4 KiB) | $0.02 |
 | **major-line-item subtotal** | **$518.58** |
 
+### Baseline assumptions and sensitivity
+
+This section shows how the subtotals computed under the baseline assumptions (20 TiB logical, 30% capacity pool, 40% SSD efficiency, and so on) move as the assumptions are placed differently. The subtotals in the tables are the model's computed values, not measurements, and every one is a **major-line-item subtotal**, not a monthly total.
+
+The scope is the five figure patterns (P1, P4, P5, P6, P8) crossed with the two figure sizes (64 KiB, 4 MiB). The full 32-cell grid is in the common-baseline section. The lower side is not marked on the cell; patterns whose lower side differs from the baseline are listed in a separate column.
+
+Under the baseline assumptions, across the five figure patterns the 64 KiB cells have the lower FSx for ONTAP subtotal and the 4 MiB cells have the lower S3 Files subtotal. What divides the direction is object size.
+
+The 4 MiB cells do not change direction when one assumption is moved to any sourced point. Outside the sourced range, efficiency_ssd changes the lower side across 0.869-0.878, metadata_multiplier changes the lower side across 779-3.17e+04 (see the break-even table for the detail).
+
+Moving three assumptions together toward a lower FSx for ONTAP subtotal (J1) changes the lower side in 5 pattern(s). Of the three, the pool-layer efficiency retention (1.0) has no source. Reverting one assumption of J1 to baseline, the change persists for none and disappears for pool_fraction, efficiency_ssd, pool_efficiency_retention.
+
+The direction of the 64 KiB cells depends on the active fraction resident on S3 Files high-performance storage. At or below an active fraction of P1 0.167, P4 0.0591, P5 0.0453 the S3 Files subtotal is the lower one; the remaining patterns do not change within the search range. The baseline value is 100%, and this fraction is a **placeholder, unmeasured**.
+
+An adjacent measurement observed, for working sets of 5% / 20%, that 5.47% / 21.89% of `StorageBytes` showed up on the high-performance-storage metric (one observation, 2026-10-17, ap-northeast-1, `ON_DIRECTORY_FIRST_ACCESS`. `StorageBytes` is the sum of data and metadata, the working-set ratio is the value the experiment set, and this is not a measurement of the active fraction itself).
+
+efficiency_ssd, pool_efficiency_retention, pool_fraction, active_fraction, first_read_mode, first_read_stream_billing, metadata_multiplier are unmeasured or sourceless placeholders. The values in the tables place these as placeholders.
+
+#### Notes against misreading
+
+1. The range over which an assumption is moved is sometimes sourced and sometimes mechanical. The "range basis" column distinguishes them. A mechanical value (0%, 50%, 100%, 0.5x, 2x, and so on) only fixes where to probe; it expresses no probabilistic spread or likelihood.
+
+2. The weight of sources differs between the two sides. The FSx for ONTAP side has documented figures for efficiency, the cold:hot ratio, the SSD-utilization recommendation, and deployment generation. The S3 Files active fraction has no numeric range in the documentation read here. That the FSx for ONTAP assumption rows are sourced while the S3 Files assumption rows lean on mechanical ranges follows from this difference.
+
+3. Do not read the size of a subtotal's movement as a property of the product. The S3 Files subtotal of a 4 MiB cell is mostly S3 Standard storage; the small movement is a property of this cell's composition.
+
+4. The "sourced range" is the interval from the lowest to the highest point whose range basis is "sourced". An assumption with only one such point is not an interval and is written as "one sourced value".
+
+5. The FSx for ONTAP subtotal is capped at the maximum tier once the required throughput exceeds the configuration's maximum tier. That region is outside the model's range. The break-even computation truncates the search range at the applicable upper bound and does not include it. In the one-at-a-time, scenario, and two-assumption tables, a cell that falls outside the range is shown with a ※ and excluded from the direction judgement.
+
+6. The one-at-a-time table holds the other assumptions at baseline. Results of moving several together are in the scenarios section. An assumption that does not change the direction on its own can change it when moved together with others.
+
+7. The baseline value is not a recommended value. The baseline is a value placed so that all patterns can be laid out under the same conditions.
+
+8. Under the baseline assumptions the active fraction is at its 100% ceiling, so there is no room to move it in the direction that raises the S3 Files subtotal; it is swept only downward. This is a property of how the baseline is placed, not a statement about the product.
+
+#### List of assumptions
+
+The "baseline-value tier" is where the baseline value comes from (documented / observed / estimation premise / placeholder / definition), a different classification from the "range basis" (sourced / observed / reused / mechanical) in the next table. The "sourced range" is the interval from the lowest to the highest point whose range basis is "sourced". "Reused" is the reuse of a value placed by another section of this repository, neither an external source nor a measurement.
+
+| Assumption | Baseline value | baseline tier | Source / basis | reader decides? | Side the subtotal moves |
+|---|---|---|---|---|---|
+| `deployment` | SINGLE_AZ_1 | modelling assumption | Deployment option (availability and generation) | decide (availability requirement) | FSx for ONTAP |
+| `efficiency_ssd` | 0.4 | placeholder | Storage efficiency on the SSD tier | can decide (property of the data) | FSx for ONTAP |
+| `pool_efficiency_retention` | 0.5 | placeholder | Fraction of the SSD efficiency that survives on the capacity pool tier | measure per dataset (no general value) | FSx for ONTAP |
+| `pool_fraction` | 0.3 | placeholder | Fraction tiered to the capacity pool | can decide | FSx for ONTAP |
+| `ssd_headroom` | 0.2 | modelling assumption | SSD provisioning headroom | decide (operational policy) | FSx for ONTAP |
+| `throughput_mbps` | auto | modelling assumption | Throughput capacity (a tier in MBps; auto lets the model choose) | decide (peak requirement) | FSx for ONTAP |
+| `active_fraction` | auto | placeholder | S3 Files high-performance-storage active fraction (auto uses the current formula) | set by the access pattern | S3 Files |
+| `s3files_threshold_kib` | 128 | documented | S3 Files import threshold (KiB) | decide (a setting) | S3 Files |
+| `first_read_mode` | written | placeholder | Objects counted on first-read stream (written: objects written / none: 0 / working_set: the working set) | set by the temporal skew of reads | S3 Files |
+| `first_read_stream_billing` | none | placeholder | File-read charge on the first-read stream (none: not charged / file_read: charged) | the actual billing is unconfirmed (estimate both ways) | — |
+| `metadata_multiplier` | 1 | placeholder | Multiplier on the read-side metadata operation count | moves with the mount options | S3 Files |
+| `read_scale` | 1 | definition | Multiplier on the monthly read volume (1.0 = as the pattern defines it) | decide (your own workload) | both sides |
+| `stored_tib` | 20 | definition | Stored volume (TiB) | decide | both sides |
+| Region | `ap-northeast-1` | definition | verification region | — | — |
+| Unit-price date | 2026-08-09 | definition | Price List snapshot date | — | — |
+| Definition of stored volume | 20 TiB logical | definition | the common ground shared by all cells | — | — |
+| Pricing independent of the working-set ratio | does not depend on it | definition | the amount is set by read/write volume and size | — | — |
+
+#### Subtotals when one assumption moves at a time
+
+Subtotals with the other assumptions held at baseline and one assumption moved. Each cell is `FSx for ONTAP {subtotal} / S3 Files {subtotal}` (USD/month, major-line-item subtotal). No mark shows the lower side; the "patterns whose direction differs from the baseline" column lists the patterns whose lower side changed (— if none). A ※ marks a cell whose required throughput exceeds the maximum tier, outside the model's range.
+
+Object size 64 KiB
+
+| Assumption | Value | P1 | P4 | P5 | P6 | P8 | Patterns whose direction differs from the baseline | Range basis |
+|---|---|---|---|---|---|---|---|---|
+| baseline | baseline | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — | — |
+| `deployment` | MULTI_AZ_1 | FSx for ONTAP $3,525.83 / S3 Files $7,928.32 | FSx for ONTAP $3,561.22 / S3 Files $8,755.20 | FSx for ONTAP $3,579.34 / S3 Files $8,875.46 | FSx for ONTAP $3,960.85 / S3 Files $12,030.81 | FSx for ONTAP $3,890.08 / S3 Files $11,114.33 | — | sourced |
+|  | SINGLE_AZ_2 | FSx for ONTAP $2,440.14 / S3 Files $7,928.32 | FSx for ONTAP $2,475.52 / S3 Files $8,755.20 | FSx for ONTAP $2,493.64 / S3 Files $8,875.46 | FSx for ONTAP $2,875.15 / S3 Files $12,030.81 | FSx for ONTAP $2,804.39 / S3 Files $11,114.33 | — | sourced |
+|  | MULTI_AZ_2 | FSx for ONTAP $4,541.26 / S3 Files $7,928.32 | FSx for ONTAP $4,576.64 / S3 Files $8,755.20 | FSx for ONTAP $4,594.76 / S3 Files $8,875.46 | FSx for ONTAP $4,976.27 / S3 Files $12,030.81 | FSx for ONTAP $4,905.51 / S3 Files $11,114.33 | — | sourced |
+| `efficiency_ssd` | 0 | FSx for ONTAP $2,844.66 / S3 Files $7,928.32 | FSx for ONTAP $2,880.04 / S3 Files $8,755.20 | FSx for ONTAP $2,898.16 / S3 Files $8,875.46 | FSx for ONTAP $3,279.67 / S3 Files $12,030.81 | FSx for ONTAP $3,208.91 / S3 Files $11,114.33 | — | mechanical |
+|  | 0.2 | FSx for ONTAP $2,313.88 / S3 Files $7,928.32 | FSx for ONTAP $2,349.27 / S3 Files $8,755.20 | FSx for ONTAP $2,367.39 / S3 Files $8,875.46 | FSx for ONTAP $2,748.90 / S3 Files $12,030.81 | FSx for ONTAP $2,678.13 / S3 Files $11,114.33 | — | mechanical |
+|  | 0.65 | FSx for ONTAP $1,119.83 / S3 Files $7,928.32 | FSx for ONTAP $1,155.22 / S3 Files $8,755.20 | FSx for ONTAP $1,173.34 / S3 Files $8,875.46 | FSx for ONTAP $1,554.85 / S3 Files $12,030.81 | FSx for ONTAP $1,484.08 / S3 Files $11,114.33 | — | sourced |
+|  | 0.75 | FSx for ONTAP $854.37 / S3 Files $7,928.32 | FSx for ONTAP $889.76 / S3 Files $8,755.20 | FSx for ONTAP $907.87 / S3 Files $8,875.46 | FSx for ONTAP $1,289.39 / S3 Files $12,030.81 | FSx for ONTAP $1,218.62 / S3 Files $11,114.33 | — | sourced |
+| `pool_efficiency_retention` | 0 | FSx for ONTAP $1,812.36 / S3 Files $7,928.32 | FSx for ONTAP $1,847.74 / S3 Files $8,755.20 | FSx for ONTAP $1,865.86 / S3 Files $8,875.46 | FSx for ONTAP $2,247.37 / S3 Files $12,030.81 | FSx for ONTAP $2,176.61 / S3 Files $11,114.33 | — | mechanical |
+|  | 0.25 | FSx for ONTAP $1,797.73 / S3 Files $7,928.32 | FSx for ONTAP $1,833.12 / S3 Files $8,755.20 | FSx for ONTAP $1,851.24 / S3 Files $8,875.46 | FSx for ONTAP $2,232.75 / S3 Files $12,030.81 | FSx for ONTAP $2,161.98 / S3 Files $11,114.33 | — | mechanical |
+|  | 1 | FSx for ONTAP $1,753.87 / S3 Files $7,928.32 | FSx for ONTAP $1,789.25 / S3 Files $8,755.20 | FSx for ONTAP $1,807.37 / S3 Files $8,875.46 | FSx for ONTAP $2,188.88 / S3 Files $12,030.81 | FSx for ONTAP $2,118.12 / S3 Files $11,114.33 | — | mechanical |
+| `pool_fraction` | 0 | FSx for ONTAP $2,327.87 / S3 Files $7,928.32 | FSx for ONTAP $2,327.87 / S3 Files $8,755.20 | FSx for ONTAP $2,345.99 / S3 Files $8,875.46 | FSx for ONTAP $2,690.26 / S3 Files $12,030.81 | FSx for ONTAP $2,690.26 / S3 Files $11,114.33 | — | reused |
+|  | 0.5 | FSx for ONTAP $1,419.99 / S3 Files $7,928.32 | FSx for ONTAP $1,478.96 / S3 Files $8,755.20 | FSx for ONTAP $1,497.08 / S3 Files $8,875.46 | FSx for ONTAP $1,903.43 / S3 Files $12,030.81 | FSx for ONTAP $1,785.48 / S3 Files $11,114.33 | — | mechanical |
+|  | 0.7 | FSx for ONTAP $1,056.87 / S3 Files $7,928.32 | FSx for ONTAP $1,139.43 / S3 Files $8,755.20 | FSx for ONTAP $1,157.55 / S3 Files $8,875.46 | FSx for ONTAP $1,588.73 / S3 Files $12,030.81 | FSx for ONTAP $1,423.60 / S3 Files $11,114.33 | — | reused |
+|  | 0.8 | FSx for ONTAP $875.39 / S3 Files $7,928.32 | FSx for ONTAP $969.74 / S3 Files $8,755.20 | FSx for ONTAP $987.86 / S3 Files $8,875.46 | FSx for ONTAP $1,431.45 / S3 Files $12,030.81 | FSx for ONTAP $1,242.74 / S3 Files $11,114.33 | — | reused |
+|  | 0.95 | FSx for ONTAP $645.91 / S3 Files $7,928.32 | FSx for ONTAP $757.95 / S3 Files $8,755.20 | FSx for ONTAP $776.07 / S3 Files $8,875.46 | FSx for ONTAP $1,238.29 / S3 Files $12,030.81 | FSx for ONTAP $1,014.19 / S3 Files $11,114.33 | — | mechanical |
+| `ssd_headroom` | 0 | FSx for ONTAP $1,525.11 / S3 Files $7,928.32 | FSx for ONTAP $1,560.50 / S3 Files $8,755.20 | FSx for ONTAP $1,578.61 / S3 Files $8,875.46 | FSx for ONTAP $1,960.13 / S3 Files $12,030.81 | FSx for ONTAP $1,889.36 / S3 Files $11,114.33 | — | mechanical |
+|  | 0.25 | FSx for ONTAP $1,847.61 / S3 Files $7,928.32 | FSx for ONTAP $1,883.00 / S3 Files $8,755.20 | FSx for ONTAP $1,901.11 / S3 Files $8,875.46 | FSx for ONTAP $2,282.63 / S3 Files $12,030.81 | FSx for ONTAP $2,211.86 / S3 Files $11,114.33 | — | sourced |
+|  | 0.5 | FSx for ONTAP $2,170.26 / S3 Files $7,928.32 | FSx for ONTAP $2,205.65 / S3 Files $8,755.20 | FSx for ONTAP $2,223.76 / S3 Files $8,875.46 | FSx for ONTAP $2,605.28 / S3 Files $12,030.81 | FSx for ONTAP $2,534.51 / S3 Files $11,114.33 | — | mechanical |
+| `throughput_mbps` | 256 | FSx for ONTAP $1,899.08 / S3 Files $7,928.32 | FSx for ONTAP $1,934.46 / S3 Files $8,755.20 | FSx for ONTAP $1,952.58 / S3 Files $8,875.46 | FSx for ONTAP $2,334.10 / S3 Files $12,030.81 | FSx for ONTAP $2,263.33 / S3 Files $11,114.33 | — | sourced |
+|  | 512 | FSx for ONTAP $2,131.02 / S3 Files $7,928.32 | FSx for ONTAP $2,166.40 / S3 Files $8,755.20 | FSx for ONTAP $2,184.52 / S3 Files $8,875.46 | FSx for ONTAP $2,566.03 / S3 Files $12,030.81 | FSx for ONTAP $2,495.27 / S3 Files $11,114.33 | — | sourced |
+|  | 1024 | FSx for ONTAP $2,594.89 / S3 Files $7,928.32 | FSx for ONTAP $2,630.27 / S3 Files $8,755.20 | FSx for ONTAP $2,648.39 / S3 Files $8,875.46 | FSx for ONTAP $3,029.90 / S3 Files $12,030.81 | FSx for ONTAP $2,959.14 / S3 Files $11,114.33 | — | sourced |
+|  | 2048 | FSx for ONTAP $3,522.63 / S3 Files $7,928.32 | FSx for ONTAP $3,558.02 / S3 Files $8,755.20 | FSx for ONTAP $3,576.13 / S3 Files $8,875.46 | FSx for ONTAP $3,957.65 / S3 Files $12,030.81 | FSx for ONTAP $3,886.88 / S3 Files $11,114.33 | — | sourced |
+| `active_fraction` | 0.05 | FSx for ONTAP $1,783.11 / S3 Files $924.16 | FSx for ONTAP $1,818.50 / S3 Files $1,751.04 | FSx for ONTAP $1,836.61 / S3 Files $1,871.30 | FSx for ONTAP $2,218.13 / S3 Files $5,026.65 | FSx for ONTAP $2,147.36 / S3 Files $4,110.17 | P1 64 KiB, P4 64 KiB | mechanical |
+|  | 0.1 | FSx for ONTAP $1,783.11 / S3 Files $1,292.80 | FSx for ONTAP $1,818.50 / S3 Files $2,119.68 | FSx for ONTAP $1,836.61 / S3 Files $2,239.94 | FSx for ONTAP $2,218.13 / S3 Files $5,395.29 | FSx for ONTAP $2,147.36 / S3 Files $4,478.81 | P1 64 KiB | mechanical |
+|  | 0.2 | FSx for ONTAP $1,783.11 / S3 Files $2,030.08 | FSx for ONTAP $1,818.50 / S3 Files $2,856.96 | FSx for ONTAP $1,836.61 / S3 Files $2,977.22 | FSx for ONTAP $2,218.13 / S3 Files $6,132.57 | FSx for ONTAP $2,147.36 / S3 Files $5,216.09 | — | mechanical |
+|  | 0.5 | FSx for ONTAP $1,783.11 / S3 Files $4,241.92 | FSx for ONTAP $1,818.50 / S3 Files $5,068.80 | FSx for ONTAP $1,836.61 / S3 Files $5,189.06 | FSx for ONTAP $2,218.13 / S3 Files $8,344.41 | FSx for ONTAP $2,147.36 / S3 Files $7,427.93 | — | mechanical |
+| `s3files_threshold_kib` | 32 | FSx for ONTAP $1,783.11 / S3 Files $520.77 | FSx for ONTAP $1,818.50 / S3 Files $687.35 | FSx for ONTAP $1,836.61 / S3 Files $770.68 | FSx for ONTAP $2,218.13 / S3 Files $2,529.36 | FSx for ONTAP $2,147.36 / S3 Files $2,196.19 | P1 64 KiB, P4 64 KiB, P5 64 KiB | mechanical |
+|  | 512 | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — | mechanical |
+| `first_read_mode` | none | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,910.21 | FSx for ONTAP $2,218.13 / S3 Files $12,725.86 | FSx for ONTAP $2,147.36 / S3 Files $11,072.10 | — | mechanical |
+|  | working_set | FSx for ONTAP $1,783.11 / S3 Files $7,893.57 | FSx for ONTAP $1,818.50 / S3 Files $8,685.70 | FSx for ONTAP $1,836.61 / S3 Files $8,840.71 | FSx for ONTAP $2,218.13 / S3 Files $12,378.33 | FSx for ONTAP $2,147.36 / S3 Files $11,002.59 | — | mechanical |
+| `first_read_stream_billing` | file_read | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,916.42 | FSx for ONTAP $2,218.13 / S3 Files $12,850.01 | FSx for ONTAP $2,147.36 / S3 Files $11,933.53 | — | sourced |
+| `metadata_multiplier` | 0 | FSx for ONTAP $1,783.11 / S3 Files $7,925.76 | FSx for ONTAP $1,818.50 / S3 Files $8,704.00 | FSx for ONTAP $1,836.61 / S3 Files $8,824.26 | FSx for ONTAP $2,218.13 / S3 Files $11,928.41 | FSx for ONTAP $2,147.36 / S3 Files $11,109.21 | — | mechanical |
+|  | 3 | FSx for ONTAP $1,783.11 / S3 Files $7,933.44 | FSx for ONTAP $1,818.50 / S3 Files $8,857.60 | FSx for ONTAP $1,836.61 / S3 Files $8,977.86 | FSx for ONTAP $2,218.13 / S3 Files $12,235.61 | FSx for ONTAP $2,147.36 / S3 Files $11,124.57 | — | mechanical |
+|  | 2 | FSx for ONTAP $1,783.11 / S3 Files $7,930.88 | FSx for ONTAP $1,818.50 / S3 Files $8,806.40 | FSx for ONTAP $1,836.61 / S3 Files $8,926.66 | FSx for ONTAP $2,218.13 / S3 Files $12,133.21 | FSx for ONTAP $2,147.36 / S3 Files $11,119.45 | — | observed (for n>1 patterns the re-read operation count is unmeasured) |
+| `read_scale` | 0.1 | FSx for ONTAP $1,781.44 / S3 Files $7,889.15 | FSx for ONTAP $1,784.97 / S3 Files $7,971.84 | FSx for ONTAP $1,803.09 / S3 Files $8,092.10 | FSx for ONTAP $2,151.09 / S3 Files $11,119.45 | FSx for ONTAP $2,144.01 / S3 Files $11,109.72 | — | mechanical |
+|  | 0.5 | FSx for ONTAP $1,782.18 / S3 Files $7,906.56 | FSx for ONTAP $1,799.87 / S3 Files $8,320.00 | FSx for ONTAP $1,817.99 / S3 Files $8,440.26 | FSx for ONTAP $2,180.88 / S3 Files $11,160.41 | FSx for ONTAP $2,145.50 / S3 Files $11,111.77 | — | mechanical |
+|  | 2 | FSx for ONTAP $1,784.97 / S3 Files $7,971.84 | FSx for ONTAP $1,855.74 / S3 Files $9,625.60 | FSx for ONTAP $1,873.86 / S3 Files $9,745.86 | FSx for ONTAP $2,408.59 / S3 Files $13,771.61 | FSx for ONTAP $2,151.09 / S3 Files $11,119.45 | — | mechanical |
+|  | 10 | FSx for ONTAP $1,799.87 / S3 Files $8,320.00 | FSx for ONTAP $2,501.61 / S3 Files $16,588.80 | FSx for ONTAP $2,519.73 / S3 Files $16,709.06 | FSx for ONTAP $3,700.32 / S3 Files $27,698.01 | FSx for ONTAP $2,180.88 / S3 Files $11,160.41 | — | mechanical |
+| `stored_tib` | 5 | FSx for ONTAP $532.83 / S3 Files $1,982.08 | FSx for ONTAP $541.67 / S3 Files $2,188.80 | FSx for ONTAP $546.20 / S3 Files $2,218.87 | FSx for ONTAP $641.58 / S3 Files $3,007.70 | FSx for ONTAP $623.89 / S3 Files $2,778.58 | — | mechanical |
+|  | 10 | FSx for ONTAP $949.54 / S3 Files $3,964.16 | FSx for ONTAP $967.23 / S3 Files $4,377.60 | FSx for ONTAP $976.29 / S3 Files $4,437.73 | FSx for ONTAP $1,167.05 / S3 Files $6,015.40 | FSx for ONTAP $1,131.67 / S3 Files $5,557.16 | — | mechanical |
+|  | 50 | FSx for ONTAP $4,283.83 / S3 Files $19,820.80 | FSx for ONTAP $4,372.29 / S3 Files $21,888.00 | FSx for ONTAP $4,417.58 / S3 Files $22,188.65 | FSx for ONTAP $5,719.27 / S3 Files $30,077.02 | FSx for ONTAP $5,194.45 / S3 Files $27,785.82 | — | mechanical |
+|  | 100 | FSx for ONTAP $8,451.69 / S3 Files $39,590.40 | FSx for ONTAP $8,744.57 / S3 Files $43,724.80 | FSx for ONTAP $8,835.17 / S3 Files $44,326.10 | FSx for ONTAP $11,438.55 / S3 Files $60,102.85 | FSx for ONTAP $10,388.91 / S3 Files $55,520.45 | — | mechanical |
+
+Object size 4 MiB
+
+| Assumption | Value | P1 | P4 | P5 | P6 | P8 | Patterns whose direction differs from the baseline | Range basis |
+|---|---|---|---|---|---|---|---|---|
+| baseline | baseline | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — | — |
+| `deployment` | MULTI_AZ_1 | FSx for ONTAP $3,524.00 / S3 Files $512.14 | FSx for ONTAP $3,524.55 / S3 Files $514.74 | FSx for ONTAP $3,524.84 / S3 Files $516.04 | FSx for ONTAP $3,530.80 / S3 Files $543.52 | FSx for ONTAP $3,529.69 / S3 Files $538.32 | — | sourced |
+|  | SINGLE_AZ_2 | FSx for ONTAP $2,438.30 / S3 Files $512.14 | FSx for ONTAP $2,438.86 / S3 Files $514.74 | FSx for ONTAP $2,439.14 / S3 Files $516.04 | FSx for ONTAP $2,445.10 / S3 Files $543.52 | FSx for ONTAP $2,443.99 / S3 Files $538.32 | — | sourced |
+|  | MULTI_AZ_2 | FSx for ONTAP $4,539.42 / S3 Files $512.14 | FSx for ONTAP $4,539.98 / S3 Files $514.74 | FSx for ONTAP $4,540.26 / S3 Files $516.04 | FSx for ONTAP $4,546.22 / S3 Files $543.52 | FSx for ONTAP $4,545.12 / S3 Files $538.32 | — | sourced |
+| `efficiency_ssd` | 0 | FSx for ONTAP $2,842.82 / S3 Files $512.14 | FSx for ONTAP $2,843.38 / S3 Files $514.74 | FSx for ONTAP $2,843.66 / S3 Files $516.04 | FSx for ONTAP $2,849.62 / S3 Files $543.52 | FSx for ONTAP $2,848.52 / S3 Files $538.32 | — | mechanical |
+|  | 0.2 | FSx for ONTAP $2,312.05 / S3 Files $512.14 | FSx for ONTAP $2,312.60 / S3 Files $514.74 | FSx for ONTAP $2,312.89 / S3 Files $516.04 | FSx for ONTAP $2,318.85 / S3 Files $543.52 | FSx for ONTAP $2,317.74 / S3 Files $538.32 | — | mechanical |
+|  | 0.65 | FSx for ONTAP $1,118.00 / S3 Files $512.14 | FSx for ONTAP $1,118.55 / S3 Files $514.74 | FSx for ONTAP $1,118.84 / S3 Files $516.04 | FSx for ONTAP $1,124.80 / S3 Files $543.52 | FSx for ONTAP $1,123.69 / S3 Files $538.32 | — | sourced |
+|  | 0.75 | FSx for ONTAP $852.54 / S3 Files $512.14 | FSx for ONTAP $853.09 / S3 Files $514.74 | FSx for ONTAP $853.38 / S3 Files $516.04 | FSx for ONTAP $859.34 / S3 Files $543.52 | FSx for ONTAP $858.23 / S3 Files $538.32 | — | sourced |
+| `pool_efficiency_retention` | 0 | FSx for ONTAP $1,810.52 / S3 Files $512.14 | FSx for ONTAP $1,811.08 / S3 Files $514.74 | FSx for ONTAP $1,811.36 / S3 Files $516.04 | FSx for ONTAP $1,817.32 / S3 Files $543.52 | FSx for ONTAP $1,816.22 / S3 Files $538.32 | — | mechanical |
+|  | 0.25 | FSx for ONTAP $1,795.90 / S3 Files $512.14 | FSx for ONTAP $1,796.45 / S3 Files $514.74 | FSx for ONTAP $1,796.74 / S3 Files $516.04 | FSx for ONTAP $1,802.70 / S3 Files $543.52 | FSx for ONTAP $1,801.59 / S3 Files $538.32 | — | mechanical |
+|  | 1 | FSx for ONTAP $1,752.03 / S3 Files $512.14 | FSx for ONTAP $1,752.59 / S3 Files $514.74 | FSx for ONTAP $1,752.87 / S3 Files $516.04 | FSx for ONTAP $1,758.83 / S3 Files $543.52 | FSx for ONTAP $1,757.72 / S3 Files $538.32 | — | mechanical |
+| `pool_fraction` | 0 | FSx for ONTAP $2,327.87 / S3 Files $512.14 | FSx for ONTAP $2,327.87 / S3 Files $514.74 | FSx for ONTAP $2,328.15 / S3 Files $516.04 | FSx for ONTAP $2,333.53 / S3 Files $543.52 | FSx for ONTAP $2,333.53 / S3 Files $538.32 | — | reused |
+|  | 0.5 | FSx for ONTAP $1,416.94 / S3 Files $512.14 | FSx for ONTAP $1,417.86 / S3 Files $514.74 | FSx for ONTAP $1,418.14 / S3 Files $516.04 | FSx for ONTAP $1,424.49 / S3 Files $543.52 | FSx for ONTAP $1,422.65 / S3 Files $538.32 | — | mechanical |
+|  | 0.7 | FSx for ONTAP $1,052.59 / S3 Files $512.14 | FSx for ONTAP $1,053.88 / S3 Files $514.74 | FSx for ONTAP $1,054.17 / S3 Files $516.04 | FSx for ONTAP $1,060.90 / S3 Files $543.52 | FSx for ONTAP $1,058.32 / S3 Files $538.32 | — | reused |
+|  | 0.8 | FSx for ONTAP $870.50 / S3 Files $512.14 | FSx for ONTAP $871.97 / S3 Files $514.74 | FSx for ONTAP $872.25 / S3 Files $516.04 | FSx for ONTAP $879.19 / S3 Files $543.52 | FSx for ONTAP $876.24 / S3 Files $538.32 | — | reused |
+|  | 0.95 | FSx for ONTAP $640.10 / S3 Files $512.14 | FSx for ONTAP $641.85 / S3 Files $514.74 | FSx for ONTAP $642.14 / S3 Files $516.04 | FSx for ONTAP $649.36 / S3 Files $543.52 | FSx for ONTAP $645.86 / S3 Files $538.32 | — | mechanical |
+| `ssd_headroom` | 0 | FSx for ONTAP $1,523.28 / S3 Files $512.14 | FSx for ONTAP $1,523.83 / S3 Files $514.74 | FSx for ONTAP $1,524.11 / S3 Files $516.04 | FSx for ONTAP $1,530.08 / S3 Files $543.52 | FSx for ONTAP $1,528.97 / S3 Files $538.32 | — | mechanical |
+|  | 0.25 | FSx for ONTAP $1,845.78 / S3 Files $512.14 | FSx for ONTAP $1,846.33 / S3 Files $514.74 | FSx for ONTAP $1,846.61 / S3 Files $516.04 | FSx for ONTAP $1,852.58 / S3 Files $543.52 | FSx for ONTAP $1,851.47 / S3 Files $538.32 | — | sourced |
+|  | 0.5 | FSx for ONTAP $2,168.43 / S3 Files $512.14 | FSx for ONTAP $2,168.98 / S3 Files $514.74 | FSx for ONTAP $2,169.26 / S3 Files $516.04 | FSx for ONTAP $2,175.23 / S3 Files $543.52 | FSx for ONTAP $2,174.12 / S3 Files $538.32 | — | mechanical |
+| `throughput_mbps` | 256 | FSx for ONTAP $1,897.25 / S3 Files $512.14 | FSx for ONTAP $1,897.80 / S3 Files $514.74 | FSx for ONTAP $1,898.08 / S3 Files $516.04 | FSx for ONTAP $1,904.04 / S3 Files $543.52 | FSx for ONTAP $1,902.94 / S3 Files $538.32 | — | sourced |
+|  | 512 | FSx for ONTAP $2,129.18 / S3 Files $512.14 | FSx for ONTAP $2,129.74 / S3 Files $514.74 | FSx for ONTAP $2,130.02 / S3 Files $516.04 | FSx for ONTAP $2,135.98 / S3 Files $543.52 | FSx for ONTAP $2,134.87 / S3 Files $538.32 | — | sourced |
+|  | 1024 | FSx for ONTAP $2,593.05 / S3 Files $512.14 | FSx for ONTAP $2,593.61 / S3 Files $514.74 | FSx for ONTAP $2,593.89 / S3 Files $516.04 | FSx for ONTAP $2,599.85 / S3 Files $543.52 | FSx for ONTAP $2,598.75 / S3 Files $538.32 | — | sourced |
+|  | 2048 | FSx for ONTAP $3,520.80 / S3 Files $512.14 | FSx for ONTAP $3,521.35 / S3 Files $514.74 | FSx for ONTAP $3,521.63 / S3 Files $516.04 | FSx for ONTAP $3,527.60 / S3 Files $543.52 | FSx for ONTAP $3,526.49 / S3 Files $538.32 | — | sourced |
+| `metadata_multiplier` | 0 | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — | mechanical |
+|  | 3 | FSx for ONTAP $1,781.28 / S3 Files $512.22 | FSx for ONTAP $1,781.83 / S3 Files $516.34 | FSx for ONTAP $1,782.11 / S3 Files $517.64 | FSx for ONTAP $1,788.08 / S3 Files $546.72 | FSx for ONTAP $1,786.97 / S3 Files $538.48 | — | mechanical |
+|  | 6 | FSx for ONTAP $1,781.28 / S3 Files $512.34 | FSx for ONTAP $1,781.83 / S3 Files $518.74 | FSx for ONTAP $1,782.11 / S3 Files $520.04 | FSx for ONTAP $1,788.08 / S3 Files $551.52 | FSx for ONTAP $1,786.97 / S3 Files $538.72 | — | observed (for n>1 patterns the re-read operation count is unmeasured) |
+| `read_scale` | 0.1 | FSx for ONTAP $1,781.25 / S3 Files $512.01 | FSx for ONTAP $1,781.31 / S3 Files $512.27 | FSx for ONTAP $1,781.59 / S3 Files $513.58 | FSx for ONTAP $1,787.03 / S3 Files $538.59 | FSx for ONTAP $1,786.92 / S3 Files $538.07 | — | mechanical |
+|  | 0.5 | FSx for ONTAP $1,781.26 / S3 Files $512.07 | FSx for ONTAP $1,781.54 / S3 Files $513.37 | FSx for ONTAP $1,781.82 / S3 Files $514.67 | FSx for ONTAP $1,787.49 / S3 Files $540.78 | FSx for ONTAP $1,786.94 / S3 Files $538.18 | — | mechanical |
+|  | 2 | FSx for ONTAP $1,781.31 / S3 Files $512.27 | FSx for ONTAP $1,782.41 / S3 Files $517.48 | FSx for ONTAP $1,782.70 / S3 Files $518.78 | FSx for ONTAP $1,905.21 / S3 Files $549.00 | FSx for ONTAP $1,787.03 / S3 Files $538.59 | — | mechanical |
+|  | 10 | FSx for ONTAP $1,781.54 / S3 Files $513.37 | FSx for ONTAP $2,134.97 / S3 Files $539.40 | FSx for ONTAP $2,135.26 / S3 Files $540.70 | FSx for ONTAP $2,610.33 / S3 Files $592.84 | FSx for ONTAP $1,787.49 / S3 Files $540.78 | — | mechanical |
+| `stored_tib` | 5 | FSx for ONTAP $532.37 / S3 Files $128.03 | FSx for ONTAP $532.51 / S3 Files $128.68 | FSx for ONTAP $532.58 / S3 Files $129.01 | FSx for ONTAP $534.07 / S3 Files $135.88 | FSx for ONTAP $533.79 / S3 Files $134.58 | — | mechanical |
+|  | 10 | FSx for ONTAP $948.62 / S3 Files $256.07 | FSx for ONTAP $948.90 / S3 Files $257.37 | FSx for ONTAP $949.04 / S3 Files $258.02 | FSx for ONTAP $952.02 / S3 Files $271.76 | FSx for ONTAP $951.47 / S3 Files $269.16 | — | mechanical |
+|  | 50 | FSx for ONTAP $4,279.25 / S3 Files $1,280.34 | FSx for ONTAP $4,280.63 / S3 Files $1,286.85 | FSx for ONTAP $4,281.34 / S3 Files $1,290.10 | FSx for ONTAP $4,644.14 / S3 Files $1,358.80 | FSx for ONTAP $4,293.47 / S3 Files $1,345.79 | — | mechanical |
+|  | 100 | FSx for ONTAP $8,442.52 / S3 Files $2,509.48 | FSx for ONTAP $8,561.25 / S3 Files $2,522.50 | FSx for ONTAP $8,562.67 / S3 Files $2,529.01 | FSx for ONTAP $9,288.28 / S3 Files $2,666.41 | FSx for ONTAP $8,586.95 / S3 Files $2,640.38 | — | mechanical |
+
+#### Assumption values at which the lower subtotal changes sides
+
+For the continuous numeric assumptions, the value x* at which the lower side changes is found by a deterministic bisection. The search range is truncated at the applicable upper bound, split into 256 intervals, and the sign-changing intervals are bisected. Values are to three significant figures. "none" means no change within the search range and makes no claim outside it. The enumerated assumptions (`deployment`, `throughput_mbps`, `first_read_mode`, `first_read_stream_billing`) are handled in the one-at-a-time table's "patterns whose direction differs" column. `active_fraction` is 64 KiB only; 4 MiB reads "not applicable".
+
+| Assumption | 64 KiB P1 | 64 KiB P4 | 64 KiB P5 | 64 KiB P6 | 64 KiB P8 | 4 MiB P1 | 4 MiB P4 | 4 MiB P5 | 4 MiB P6 | 4 MiB P8 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pool_fraction` | none | none | none | none | none | none | none | none | none | none |
+| `efficiency_ssd` | none | none | none | none | none | 0.878 (below it S3 Files, at or above FSx for ONTAP, outside the sourced range) | 0.878 (below it S3 Files, at or above FSx for ONTAP, outside the sourced range) | 0.877 (below it S3 Files, at or above FSx for ONTAP, outside the sourced range) | 0.869 (below it S3 Files, at or above FSx for ONTAP, outside the sourced range) | 0.871 (below it S3 Files, at or above FSx for ONTAP, outside the sourced range) |
+| `pool_efficiency_retention` | none | none | none | none | none | none | none | none | none | none |
+| `ssd_headroom` | none | none | none | none | none | none | none | none | none | none |
+| `active_fraction` | 0.167 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.0591 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.0453 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | none | none | not applicable | not applicable | not applicable | not applicable | not applicable |
+| `metadata_multiplier` | none | none | none | none | none | 3.17e+04 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 1.58e+03 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 1.58e+03 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 779 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 1.56e+04 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) |
+| `read_scale` | none (up to 2.02e+03) | none (up to 101) | none (up to 96.4) | none (up to 33.8) | none (up to 92) | none (up to 2.02e+03) | none (up to 101) | none (up to 96.4) | none (up to 33.8) | none (up to 92) |
+| `stored_tib` | 0.69 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.627 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.619 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.47 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | 0.507 (below it S3 Files, at or above FSx for ONTAP, no sourced range (mechanical search range)) | none (up to 1.02e+03) | none (up to 1.02e+03) | none (up to 1.02e+03) | none (up to 675) | none (up to 1.02e+03) |
+| `s3files_threshold_kib` | changes when the threshold is below 64 KiB | changes when the threshold is below 64 KiB | changes when the threshold is below 64 KiB | none | none | not applicable | not applicable | not applicable | not applicable | not applicable |
+
+Search ranges [lo, hi]: `pool_fraction`: 0-1, `efficiency_ssd`: 0-0.99, `pool_efficiency_retention`: 0-1, `ssd_headroom`: 0-1, `active_fraction`: 0-1, `metadata_multiplier`: 0.000977-1.68e+07, `read_scale`: 0.000977-1.68e+07, `stored_tib`: 0.125-1.02e+03. The upper bounds of `read_scale` and `stored_tib` are truncated per cell to the value at which the required throughput stays within the maximum tier. The `stored_tib` upper bound of 1.02e+03 TiB is a sourceless mechanical value. Two or more changes falling within a single interval (1/256) cannot be detected (a dense sweep in the tests confirms none are missed at the current prices).
+
+#### Changes of sides under two assumptions together
+
+The one-dimensional break-even depends on the other assumptions. The two most dependent pairs are produced by the same computation. Each cell is the change value x* ("none" if there is none).
+
+Fixed: `pool_fraction`; moved: `active_fraction` (64 KiB)
+
+| `pool_fraction` | P1 | P4 | P5 | P6 | P8 |
+|---|---|---|---|---|---|
+| 0 | 0.24 | 0.128 | 0.114 | none | none |
+| 0.3 | 0.167 | 0.0591 | 0.0453 | none | none |
+| 0.5 | 0.117 | 0.0131 | none | none | none |
+| 0.8 | 0.0434 | none | none | none | none |
+| 0.95 | 0.0123 | none | none | none | none |
+
+Fixed: `pool_fraction` x `pool_efficiency_retention`; moved: `efficiency_ssd` (4 MiB)
+
+| `pool_fraction` / `pool_efficiency_retention` | P1 | P4 | P5 | P6 | P8 |
+|---|---|---|---|---|---|
+| 0.3 / 0.5 | 0.878 | 0.878 | 0.877 | 0.869 | 0.871 |
+| 0.3 / 1 | 0.855 | 0.854 | 0.854 | 0.846 | 0.847 |
+| 0.7 / 0.5 | 0.823 | 0.822 | 0.822 | 0.805 | 0.807 |
+| 0.7 / 1 | 0.726 | 0.725 | 0.725 | 0.71 | 0.712 |
+| 0.8 / 0.5 | 0.784 | 0.783 | 0.782 | 0.76 | 0.762 |
+| 0.8 / 1 | 0.649 | 0.648 | 0.647 | 0.628 | 0.631 |
+
+#### Scenarios that move several assumptions together
+
+Results of moving several assumptions together. The names are given by the direction moved (that side's subtotal goes down / up), not by "favourable" or "unfavourable". J1-J4 move 3, 3, 2, and 2 assumptions and are not perfectly matched: with the baseline active fraction at its 100% ceiling there is no room to raise the S3 Files subtotal, so the assumptions that can be placed on the raising side are limited to `metadata_multiplier` and `first_read_stream_billing`, and the direction-indeterminate `first_read_mode=none` was dropped from J3. A set of simultaneously moved values is neither a prediction nor a recommendation; it is an example showing that the direction can change.
+
+Object size 64 KiB
+
+| Scenario | P1 | P4 | P5 | P6 | P8 | Patterns whose direction differs from the baseline |
+|---|---|---|---|---|---|---|
+| J0 | FSx for ONTAP $1,783.11 / S3 Files $7,928.32 | FSx for ONTAP $1,818.50 / S3 Files $8,755.20 | FSx for ONTAP $1,836.61 / S3 Files $8,875.46 | FSx for ONTAP $2,218.13 / S3 Files $12,030.81 | FSx for ONTAP $2,147.36 / S3 Files $11,114.33 | — |
+| J1 (3 assumptions) | FSx for ONTAP $402.77 / S3 Files $7,928.32 | FSx for ONTAP $497.12 / S3 Files $8,755.20 | FSx for ONTAP $515.24 / S3 Files $8,875.46 | FSx for ONTAP $958.83 / S3 Files $12,030.81 | FSx for ONTAP $770.12 / S3 Files $11,114.33 | — |
+| J1 − pool_fraction | FSx for ONTAP $799.54 / S3 Files $7,928.32 | FSx for ONTAP $834.92 / S3 Files $8,755.20 | FSx for ONTAP $853.04 / S3 Files $8,875.46 | FSx for ONTAP $1,234.55 / S3 Files $12,030.81 | FSx for ONTAP $1,163.79 / S3 Files $11,114.33 | — |
+| J1 − efficiency_ssd | FSx for ONTAP $797.40 / S3 Files $7,928.32 | FSx for ONTAP $891.75 / S3 Files $8,755.20 | FSx for ONTAP $909.87 / S3 Files $8,875.46 | FSx for ONTAP $1,353.46 / S3 Files $12,030.81 | FSx for ONTAP $1,164.75 / S3 Files $11,114.33 | — |
+| J1 − pool_efficiency_retention | FSx for ONTAP $549.00 / S3 Files $7,928.32 | FSx for ONTAP $643.35 / S3 Files $8,755.20 | FSx for ONTAP $661.47 / S3 Files $8,875.46 | FSx for ONTAP $1,105.06 / S3 Files $12,030.81 | FSx for ONTAP $916.35 / S3 Files $11,114.33 | — |
+| J2 (3 assumptions) | FSx for ONTAP $3,955.97 / S3 Files $7,928.32 | FSx for ONTAP $3,955.97 / S3 Files $8,755.20 | FSx for ONTAP $3,974.09 / S3 Files $8,875.46 | FSx for ONTAP $4,318.36 / S3 Files $12,030.81 | FSx for ONTAP $4,318.36 / S3 Files $11,114.33 | — |
+| J3 (2 assumptions) | FSx for ONTAP $1,783.11 / S3 Files $921.60 | FSx for ONTAP $1,818.50 / S3 Files $1,699.84 | FSx for ONTAP $1,836.61 / S3 Files $1,820.10 | FSx for ONTAP $2,218.13 / S3 Files $4,924.25 | FSx for ONTAP $2,147.36 / S3 Files $4,105.05 | P1, P4, P5 |
+| J3 − active_fraction | FSx for ONTAP $1,783.11 / S3 Files $7,925.76 | FSx for ONTAP $1,818.50 / S3 Files $8,704.00 | FSx for ONTAP $1,836.61 / S3 Files $8,824.26 | FSx for ONTAP $2,218.13 / S3 Files $11,928.41 | FSx for ONTAP $2,147.36 / S3 Files $11,109.21 | — |
+| J3 − metadata_multiplier | FSx for ONTAP $1,783.11 / S3 Files $924.16 | FSx for ONTAP $1,818.50 / S3 Files $1,751.04 | FSx for ONTAP $1,836.61 / S3 Files $1,871.30 | FSx for ONTAP $2,218.13 / S3 Files $5,026.65 | FSx for ONTAP $2,147.36 / S3 Files $4,110.17 | P1, P4 |
+| J4 (2 assumptions) | FSx for ONTAP $1,783.11 / S3 Files $7,930.88 | FSx for ONTAP $1,818.50 / S3 Files $8,806.40 | FSx for ONTAP $1,836.61 / S3 Files $8,967.62 | FSx for ONTAP $2,218.13 / S3 Files $12,952.41 | FSx for ONTAP $2,147.36 / S3 Files $11,938.65 | — |
+
+Object size 4 MiB
+
+| Scenario | P1 | P4 | P5 | P6 | P8 | Patterns whose direction differs from the baseline |
+|---|---|---|---|---|---|---|
+| J0 | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — |
+| J1 (3 assumptions) | FSx for ONTAP $397.88 / S3 Files $512.14 | FSx for ONTAP $399.35 / S3 Files $514.74 | FSx for ONTAP $399.64 / S3 Files $516.04 | FSx for ONTAP $406.57 / S3 Files $543.52 | FSx for ONTAP $403.62 / S3 Files $538.32 | P1, P4, P5, P6, P8 |
+| J1 − pool_fraction | FSx for ONTAP $797.70 / S3 Files $512.14 | FSx for ONTAP $798.26 / S3 Files $514.74 | FSx for ONTAP $798.54 / S3 Files $516.04 | FSx for ONTAP $804.50 / S3 Files $543.52 | FSx for ONTAP $803.40 / S3 Files $538.32 | — |
+| J1 − efficiency_ssd | FSx for ONTAP $792.51 / S3 Files $512.14 | FSx for ONTAP $793.98 / S3 Files $514.74 | FSx for ONTAP $794.27 / S3 Files $516.04 | FSx for ONTAP $801.20 / S3 Files $543.52 | FSx for ONTAP $798.25 / S3 Files $538.32 | — |
+| J1 − pool_efficiency_retention | FSx for ONTAP $544.11 / S3 Files $512.14 | FSx for ONTAP $545.58 / S3 Files $514.74 | FSx for ONTAP $545.87 / S3 Files $516.04 | FSx for ONTAP $552.80 / S3 Files $543.52 | FSx for ONTAP $549.85 / S3 Files $538.32 | — |
+| J2 (3 assumptions) | FSx for ONTAP $3,955.97 / S3 Files $512.14 | FSx for ONTAP $3,955.97 / S3 Files $514.74 | FSx for ONTAP $3,956.25 / S3 Files $516.04 | FSx for ONTAP $3,961.63 / S3 Files $543.52 | FSx for ONTAP $3,961.63 / S3 Files $538.32 | — |
+| J3 (2 assumptions) | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — |
+| J3 − active_fraction | FSx for ONTAP $1,781.28 / S3 Files $512.10 | FSx for ONTAP $1,781.83 / S3 Files $513.94 | FSx for ONTAP $1,782.11 / S3 Files $515.24 | FSx for ONTAP $1,788.08 / S3 Files $541.92 | FSx for ONTAP $1,786.97 / S3 Files $538.24 | — |
+| J3 − metadata_multiplier | FSx for ONTAP $1,781.28 / S3 Files $512.14 | FSx for ONTAP $1,781.83 / S3 Files $514.74 | FSx for ONTAP $1,782.11 / S3 Files $516.04 | FSx for ONTAP $1,788.08 / S3 Files $543.52 | FSx for ONTAP $1,786.97 / S3 Files $538.32 | — |
+| J4 (2 assumptions) | FSx for ONTAP $1,781.28 / S3 Files $512.34 | FSx for ONTAP $1,781.83 / S3 Files $518.74 | FSx for ONTAP $1,782.11 / S3 Files $520.04 | FSx for ONTAP $1,788.08 / S3 Files $551.52 | FSx for ONTAP $1,786.97 / S3 Files $538.72 | — |
+
+Whether a combination like J1 holds as a real configuration (for instance when pool 80% hits the SSD minimum) has not been confirmed.
+
+#### Items not included
+
+Noncurrent-version retention (S3 Files side) and snapshot retention (FSx for ONTAP side) have formulas that are unmeasured on both sides and can move the subtotals substantially in write-heavy patterns. Taking the retention days as an input belongs to PR-A2 (outside the scope of this work); here it is noted as not included.
+
+No numbers are given. The "confidence of basis" uses the four words documented / verified / hypothesis / open.
+
+| Item | Direction | Basis | Confidence of basis | Status |
+|---|---|---|---|---|
+| Noncurrent-version retention (S3 Files side) | the S3 Files subtotal rises; larger in write-heavy patterns | S3 Files requires versioning (documented on the sync page) | documented (the sync page); the size of the effect is hypothesis | not included (days as an input is PR-A2) |
+| Snapshot retention (FSx for ONTAP side) | the FSx for ONTAP subtotal is expected to rise | this design has not read in the documentation which tier the retained data sits on or how it is charged | open (unconfirmed; the direction too) | not included (days as an input is PR-A2) |
+| Metadata SSD for the pool-placed data | the FSx for ONTAP subtotal rises | the documented statement that file metadata always remains on the SSD tier; one rough figure (the sizing blog) | documented (the volume-capacity page, the sizing blog); the base unit is open | not included (pending the PR-A2 decision) |
+| First-read stream GET count exceeding the read count | the S3 Files subtotal rises (the GET line is overcounted) | the default P8 64 KiB books the written count as GETs, ten times the read count; the model does not cap it | verified (confirmed by running the base model) | included (no cap); removed after PR-H merges |
+| Added SSD IOPS, backup, snapshot reserve | the FSx for ONTAP subtotal rises | this design has not read the unit price and charging mechanism in the documentation | open | not included |
+| Write requests to the pool | the FSx for ONTAP subtotal rises | a unit price is defined in the model but not used in the formula (confirmed in the code) | open (the fact about the code is verified) | not included |
+| Pool read operation count | the FSx for ONTAP subtotal | the documentation counts it in three ways and it is unconfirmed | open | included in the subtotal but unconfirmed |
+| GETs through S3 Access Points | the FSx for ONTAP subtotal rises | the model adds only the PUT through the access point (confirmed in the code); the GET charge depends on the unit price and the path | open (the fact about the code is verified; the unit price was not re-fetched) | not included |
+| Storage of metadata on high-performance storage | the S3 Files subtotal rises | the documentation states that metadata of an accessed directory does not expire; the charging basis is not in the documentation | documented (the metering page); the charging basis is open | not included |
+| Threshold of 1 MiB or more | — | the model does not have the documented direct-stream rule | documented (the metering page); the model's absence is verified | not supported (PR-F) |
+
+#### Procedure for running your own values
+
+Check the list of accepted assumptions with `--list-assumptions`. Give your own environment's values with `--assume key=value`, and do not compare against the values in the published document; compare two outputs that place the same assumptions. The subtotals are major-line-item subtotals, not monthly totals.
+
+```bash
+# 1. The list of accepted assumptions (key, default, accepted range, baseline-value tier)
+python3 tools/finops_model.py --list-assumptions
+
+# 2. Print the subtotal table with your own values (50 TiB stored, Multi-AZ, 65% SSD-tier efficiency, 70% pool)
+python3 tools/finops_model.py --baseline-table \
+  --assume stored_tib=50 --assume deployment=MULTI_AZ_1 \
+  --assume efficiency_ssd=0.65 --assume pool_fraction=0.70
+
+# 3. Print the breakdown as JSON with English labels (example replacing the active fraction with a measured value)
+python3 tools/finops_model.py --baseline-json --lang en --assume active_fraction=0.10 > my-run.json
+```
+
+The values are an example of the command form, neither recommended values nor a prediction of the result.
+
 ### When the same data is read repeatedly — egress is what decides it
 
 Every estimate so far assumed the consumers sit in the same Region. Transfer within a Region is not charged, which is why the comparison came down to storage and request rates.
