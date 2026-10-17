@@ -942,3 +942,93 @@ TRANSLATIONS.update(
         "読み取りはすべて高性能ストレージの読み取りとして計上している": "In a cell with no writes, S3 Files ({threshold} KiB or smaller) books no first-read stream; every read is booked as a high-performance-storage read",
     }
 )
+
+# --- PR-A: assumptions registry, overrides notice, and validation errors ------------------------
+#
+# These strings are reached only through the --assume / --baseline-table / --list-assumptions paths,
+# never through render(), so --translation-gaps (which renders) does not see them. They are
+# translated here so the English CLI output carries no Japanese.
+TRANSLATIONS.update(
+    {
+        # --- --list-assumptions column headers ---------------------------------------------------
+        "キー": "key",
+        "型": "type",
+        "検証": "validation",
+        "基準値の区分": "baseline tier",
+        "読者が決められるか": "reader decides?",
+        "説明": "description",
+        "数値": "number",
+        "整数": "integer",
+        "列挙": "enumeration",
+        # --- baseline tiers (基準値の区分) --------------------------------------------------------
+        "公式": "documented",
+        "観測": "observed",
+        "試算前提": "modelling assumption",
+        "仮置き": "placeholder",
+        "定義": "definition",
+        # --- ASSUMPTION_SPECS descriptions --------------------------------------------------------
+        "デプロイ形態（可用性と世代）": "Deployment option (availability and generation)",
+        "SSD 層のストレージ効率": "Storage efficiency on the SSD tier",
+        "キャパシティプール層に残る SSD 効率の割合": "Fraction of the SSD efficiency that survives on the capacity pool tier",
+        # "キャパシティプールへ落とす割合" and "SSD のプロビジョニング余裕" are already in the
+        # table above (they appear as scenario labels), so they are not repeated here.
+        "スループットキャパシティ（指定の段 MBps、auto でモデルが選ぶ）": "Throughput capacity (a tier in MBps; auto lets the model choose)",
+        "S3 Files 高性能ストレージのアクティブ割合（auto で現行の式）": "S3 Files high-performance-storage active fraction (auto uses the current formula)",
+        "S3 Files の取り込みしきい値（KiB）": "S3 Files import threshold (KiB)",
+        "初回ストリームに数える個数（written: 書いた個数 / none: 0 / working_set: 作業セット）": "Objects counted on first-read stream (written: objects written / none: 0 / working_set: the working set)",
+        "初回ストリームのファイル読み取り課金（none: なし / file_read: 課金する）": "File-read charge on the first-read stream (none: not charged / file_read: charged)",
+        "読み取り側メタデータの操作数倍率": "Multiplier on the read-side metadata operation count",
+        "月間読み取り量に掛ける倍率（1.0 = パターンの定義どおり）": "Multiplier on the monthly read volume (1.0 = as the pattern defines it)",
+        "保存量（TiB）": "Stored volume (TiB)",
+        # --- ASSUMPTION_SPECS domain text ---------------------------------------------------------
+        "0 以上 1 未満": "0 or more, less than 1",
+        "0 以上 1 以下": "0 to 1 inclusive",
+        "0 より大きく 1024 未満。格子のサイズと同値は不可": "greater than 0 and less than 1024; not equal to a grid size",
+        "0 以上の有限値": "a finite value of 0 or more",
+        "0 より大きい有限値": "a finite value greater than 0",
+        # --- ASSUMPTION_SPECS reader-decides text -------------------------------------------------
+        "決める（可用性要件）": "decide (availability requirement)",
+        "決められる（データの性質）": "can decide (property of the data)",
+        "データごとに測る（一般値なし）": "measure per dataset (no general value)",
+        "決められる": "can decide",
+        "決める（運用方針）": "decide (operational policy)",
+        "決める（ピーク要件）": "decide (peak requirement)",
+        "アクセスの形で決まる": "set by the access pattern",
+        "決める（設定）": "decide (a setting)",
+        "読み取りの時間的な偏りで決まる": "set by the temporal skew of reads",
+        "課金の実際が未確認（両方で試算できる）": "the actual billing is unconfirmed (estimate both ways)",
+        "マウントオプションで動く": "moves with the mount options",
+        "決める（自分のワークロード）": "decide (your own workload)",
+        "決める": "decide",
+        # --- --baseline-table framing -------------------------------------------------------------
+        "基準の前提（公開文書と同じ）": "Baseline assumptions (the same as the published document)",
+        "※ 必要なスループットが最大段を超える。モデルの適用範囲外": "* The required throughput exceeds the maximum tier; outside the model's range",
+        "主要費目小計。月額総額ではない。試算であり実測ではない": "Major-line-item subtotals, not monthly totals; estimates, not measurements",
+        # --- the file-read stream line ------------------------------------------------------------
+        "S3 Files 初回ストリームのファイル読み取り ({count} 個 × {size})": "S3 Files first-read stream as a file read ({count} objects x {size})",
+        # --- read-side metadata line with a non-default multiplier --------------------------------
+        "S3 Files メタデータ読み取り ({ops} 操作 × 4 KiB × {m})": "S3 Files metadata reads ({ops} operations x 4 KiB x {m})",
+        # --- notice -------------------------------------------------------------------------------
+        "この出力は基準の前提と異なる（変更 {count} 件: {changes}）。公開文書の値ではない。{caveat}": "This output uses assumptions that differ from the baseline ({count} changed: {changes}). These are not the values in the published document. {caveat}",
+        "{key}={value}（基準 {baseline}）": "{key}={value} (baseline {baseline})",
+        "{key}={value}（基準と同じ値を明示）": "{key}={value} (baseline value, set explicitly)",
+        "仮置きまたは未測定の前提を含む: {keys}。": "Includes placeholder or unmeasured assumptions: {keys}. ",
+        "初回読み出しを数える変種は取り込み書き込みを含まない部分的な計上で、小計の増減の向きは定まらない。": "Counting the first read is a partial accounting that leaves out the import write, so the direction of the change in the subtotal is not determined. ",
+        "初回ストリームにファイル読み取り課金が付くかどうかは、公式の文面が揃わず、課金の実際は未確認である。": "Whether the first-read stream carries a file-read charge is worded inconsistently in the documentation, and the actual billing is unconfirmed. ",
+        "スループットは読者の指定で、モデルが選んだ段ではない。": "Throughput is the value you set, not a tier the model chose. ",
+        "指定の段が平均所要を下回るセルが {n} 個ある。": "In {n} cell(s) the tier you set is below the sustained requirement. ",
+        "{n} 個のセルは、必要なスループットがこの構成の最大段を超え、FSx for ONTAP の小計が最大段で頭打ちになっている（モデルの適用範囲外）。": "In {n} cell(s) the required throughput exceeds this configuration's maximum tier, so the FSx for ONTAP subtotal is capped at the maximum tier (outside the model's range). ",
+        "{n} 個のセルは、初回ストリームの GET 数が読み取り回数を超える（モデルは上限しない。PR-H の対象）。": "In {n} cell(s) the first-read stream GET count exceeds the read count (the model does not cap it; this is for PR-H). ",
+        # --- validation errors (JA source is the key, per the t() convention) ---------------------
+        "未知の前提 `{key}`。使えるキーは `--list-assumptions` で確認する": "Unknown assumption `{key}`. Run `--list-assumptions` for the accepted keys.",
+        "`{item}` は key=value の形ではない": "`{item}` is not in key=value form.",
+        "`{key}` が複数回指定されている": "`{key}` is given more than once.",
+        "`{key}` の値 `{value}` を {kind} として読めない": "The value `{value}` for `{key}` cannot be read as {kind}.",
+        "`{key}` は有限の数値で指定する（NaN と無限大は不可）": "`{key}` must be a finite number (NaN and infinity are not accepted).",
+        "`{key}` の指定値 {value} は許容範囲 {domain} の外": "The value {value} for `{key}` is outside the accepted range {domain}.",
+        "`{key}` は {choices} のいずれかで指定する（指定値 {value}）": "`{key}` must be one of {choices} (given: {value}).",
+        "スループット {value} MBps は {deployment} の段 {tiers} にない": "{value} MBps is not a throughput tier of {deployment} ({tiers}).",
+        "`s3files_threshold_kib` に 1 MiB 以上は指定できない。1 MiB 以上の I/O を直接ストリームにする公式の規則をモデルが持たず、過大に計上するため": "`s3files_threshold_kib` cannot be 1 MiB or more. The model does not apply the documented rule that I/O of 1 MiB or more is always streamed directly, so it would overcount.",
+        "`s3files_threshold_kib` を格子のサイズ（{sizes}）と同じ値にできない。ちょうどのサイズの扱いが公式の文面で揃っていない": "`s3files_threshold_kib` cannot equal a grid size ({sizes}). The documentation words the boundary case inconsistently.",
+    }
+)
