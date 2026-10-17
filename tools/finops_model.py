@@ -559,6 +559,15 @@ class Scenario:
     s3files_reason: str = ""
     s3files_threshold_kib: float = S3FILES_DEFAULT_THRESHOLD_KIB
     s3files_expiration_days: float = S3FILES_DEFAULT_EXPIRY_DAYS
+    # Shared assumption fields, carried on both Scenario and BaselineCell so a pricing helper reads
+    # the same name on either. Every default here reproduces the current formula: None means "model
+    # chooses" (throughput, active fraction), and POOL_EFFICIENCY_RETENTION / "written" / "none" are
+    # the values the model already used. See ASSUMPTION_SPECS for the public keys.
+    pool_efficiency_retention: float = POOL_EFFICIENCY_RETENTION
+    throughput_mbps: int | None = None
+    active_fraction: float | None = None
+    first_read_mode: str = "written"
+    first_read_stream_billing: str = "none"
 
     @property
     def ingest_gib(self) -> float:
@@ -575,7 +584,7 @@ class Scenario:
     @property
     def efficiency_pool(self) -> float:
         """Saving assumed on blocks in the capacity pool. See POOL_EFFICIENCY_RETENTION."""
-        return self.efficiency_ssd * POOL_EFFICIENCY_RETENTION
+        return self.efficiency_ssd * self.pool_efficiency_retention
 
     @property
     def cache_required_mbps(self) -> float:
@@ -616,7 +625,12 @@ def fsx_component(sc: Scenario) -> dict[str, float]:
         math.ceil(logical_ssd * (1 - sc.efficiency_ssd) * (1 + sc.ssd_headroom)),
     )
     pool = logical_pool * (1 - sc.efficiency_pool)
-    tput = choose_throughput(sc.required_mbps, dep["tput_options"], sc.tput_headroom)
+    # None means the model chooses the tier; a reader's explicit value skips choose_throughput.
+    tput = (
+        choose_throughput(sc.required_mbps, dep["tput_options"], sc.tput_headroom)
+        if sc.throughput_mbps is None
+        else sc.throughput_mbps
+    )
 
     lines = {
         t("SSD ストレージ ({size})", size=gib(ssd)): ssd * dep["ssd"].usd,
@@ -668,12 +682,48 @@ def s3_files_metadata_usd(sc: Scenario | BaselineCell) -> tuple[float, float]:
     Four KiB per operation on each side, the same quantity `s3_files_option` books in both of its
     branches. Exposed so a caller can show the two amounts apart from the data lines without
     reading them back out of a label.
+
+    The read-side operation count carries `metadata_multiplier`, a BaselineCell-only field left at
+    1.0 by default; a Scenario does not have it, so `getattr` keeps the current formula for it. The
+    import side is never multiplied: the observation behind the multiplier is of the read-side
+    metadata metric, and the ingest-side metric could not be told apart from zero. See
+    ASSUMPTION_SPECS for `metadata_multiplier`.
     """
     metadata_gib = S3FILES_METADATA_KIB / (1024 * 1024)
+    read_multiplier = getattr(sc, "metadata_multiplier", 1.0)
     return (
         sc.objects_per_month * metadata_gib * S3FILES["write"].usd,
-        sc.reads_per_month * metadata_gib * S3FILES["read"].usd,
+        sc.reads_per_month * metadata_gib * read_multiplier * S3FILES["read"].usd,
     )
+
+
+def _is_round_percent(fraction: float) -> bool:
+    """True when `fraction * 100` is a whole number within floating-point tolerance.
+
+    The equality is deliberately not exact: `0.07 * 100` is 7.0000000000000009, not 7, so a strict
+    comparison would push the baseline's 100% onto the one-decimal path and break byte equality.
+    """
+    return abs(fraction * 100 - round(fraction * 100)) < 1e-9
+
+
+def _resolve_first_read_objects(sc: Scenario | BaselineCell) -> float:
+    """How many objects are streamed on first read, from `first_read_mode`.
+
+    "written" is the current default (objects written this month). "none" counts nothing.
+    "working_set" counts the working-set objects, a BaselineCell-only quantity; a Scenario has no
+    working set, so the mode is only valid on a cell (parse/validate forbids it on a Scenario).
+    """
+    mode = sc.first_read_mode
+    if mode == "none":
+        return 0.0
+    if mode == "working_set":
+        working_set = getattr(sc, "working_set_objects", None)
+        if working_set is None:
+            raise ValueError(
+                "first_read_mode='working_set' needs working_set_objects (BaselineCell only)"
+            )
+        return float(working_set)
+    return float(sc.objects_per_month)
 
 
 def s3_files_option(
@@ -726,7 +776,12 @@ def s3_files_option(
 
     if object_kib <= sc.s3files_threshold_kib:
         retention_days = sc.retention_months * 30.0
-        active = min(1.0, sc.s3files_expiration_days / retention_days)
+        # None (default) keeps the retention-window formula; a reader's value is used as given.
+        active = (
+            min(1.0, sc.s3files_expiration_days / retention_days)
+            if sc.active_fraction is None
+            else sc.active_fraction
+        )
         # A file smaller than the minimum billable size is charged as that size.
         floor_factor = max(1.0, S3FILES_MIN_FILE_KIB / object_kib)
         hps_gib = sc.stored_gib * active * floor_factor
@@ -736,19 +791,41 @@ def s3_files_option(
         # and carries an S3 GET plus a metadata read, with no file read charge. It is that read
         # which triggers the asynchronous import. Only the reads after it are served from
         # high-performance storage and metered as file reads.
-        streamed_reads = float(
-            sc.objects_per_month if first_read_objects is None else first_read_objects
-        )
+        #
+        # An explicit `first_read_objects` (used by the sensitivity helper) wins. Otherwise
+        # `first_read_mode` decides: "written" is the current default (objects written this month),
+        # "none" counts nothing, "working_set" counts the working-set objects. The model does not
+        # cap this at the read count; a cell where the written or working-set count exceeds the
+        # reads then books more GETs than there are reads (see ASSUMPTION_SPECS first_read_mode).
+        if first_read_objects is not None:
+            streamed_reads = float(first_read_objects)
+        else:
+            streamed_reads = _resolve_first_read_objects(sc)
         hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
         read_gib = hps_reads * io_kib / (1024 * 1024)
 
+        active_label = f"{active:.0%}" if _is_round_percent(active) else f"{active:.1%}"
         lines[
-            t("S3 Files 高性能ストレージ (アクティブ {share})", share=f"{active:.0%}")
+            t("S3 Files 高性能ストレージ (アクティブ {share})", share=active_label)
         ] = hps_gib * S3FILES["storage"].usd
         if not split_metadata or streamed_reads > 0:
             lines[t("GET リクエスト (初回読み出しはバケットからストリーム)")] = (
                 streamed_reads * S3["tier2"].usd
             )
+        # Only when the reader asks for it: a first read charged as a file read of at least 32 KiB.
+        # The default "none" leaves the current branch untouched; a cell that streams nothing on
+        # first read emits no line either way.
+        if sc.first_read_stream_billing == "file_read" and streamed_reads > 0:
+            stream_io_gib = (
+                streamed_reads * max(object_kib, S3FILES_MIN_IO_KIB) / (1024 * 1024)
+            )
+            lines[
+                t(
+                    "S3 Files 初回ストリームのファイル読み取り ({count} 個 × {size})",
+                    count=f"{streamed_reads:,.0f}",
+                    size=_size_label(max(object_kib, S3FILES_MIN_IO_KIB)),
+                )
+            ] = stream_io_gib * S3FILES["read"].usd
         if split_metadata:
             lines[t("S3 Files 書き込み (高性能ストレージへの取り込み)")] = (
                 import_gib * S3FILES["write"].usd
@@ -783,12 +860,21 @@ def s3_files_option(
                 ops=f"{sc.objects_per_month:,.0f}",
             )
         ] = ingest_usd
-        lines[
-            t(
+        # The read-side label carries the multiplier only when it is non-default, so the baseline
+        # output (multiplier 1.0) keeps the current label and its byte identity.
+        multiplier = getattr(sc, "metadata_multiplier", 1.0)
+        if multiplier == 1.0:
+            read_label = t(
                 "S3 Files メタデータ読み取り ({ops} 操作 × 4 KiB)",
                 ops=f"{sc.reads_per_month:,.0f}",
             )
-        ] = read_usd
+        else:
+            read_label = t(
+                "S3 Files メタデータ読み取り ({ops} 操作 × 4 KiB × {m})",
+                ops=f"{sc.reads_per_month:,.0f}",
+                m=f"{multiplier:g}",
+            )
+        lines[read_label] = read_usd
 
     return lines
 
@@ -2510,6 +2596,9 @@ BASELINE_SOURCE_URLS = {
 # Fixed modelling assumptions of the grid, held constant so the only variables are size and pattern.
 BASELINE_EFFICIENCY_SSD = 0.40
 BASELINE_POOL_FRACTION = 0.30
+# The grid's SSD provisioning headroom. Named as a constant so `resolve()` and the BaselineCell
+# default read one source rather than two copies of 0.20.
+BASELINE_SSD_HEADROOM = 0.20
 
 
 @dataclass(frozen=True)
@@ -2585,11 +2674,21 @@ class BaselineCell:
     pool_fraction: float = BASELINE_POOL_FRACTION
     deployment: str = "saz1"
     tput_headroom: float = 4.0
-    ssd_headroom: float = 0.20
+    ssd_headroom: float = BASELINE_SSD_HEADROOM
     retention_months: float = 1.0  # steady state: the 20 TiB is resident for the month
     s3files_viable: bool = True
     s3files_threshold_kib: float = S3FILES_DEFAULT_THRESHOLD_KIB
     s3files_expiration_days: float = S3FILES_DEFAULT_EXPIRY_DAYS
+    # Shared with Scenario; every default reproduces the current formula. See ASSUMPTION_SPECS.
+    pool_efficiency_retention: float = POOL_EFFICIENCY_RETENTION
+    throughput_mbps: int | None = None
+    active_fraction: float | None = None
+    first_read_mode: str = "written"
+    first_read_stream_billing: str = "none"
+    # BaselineCell-only (M-4). read_scale multiplies monthly read volume; metadata_multiplier scales
+    # the read-side metadata operation count. A Scenario does not carry these.
+    read_scale: float = 1.0
+    metadata_multiplier: float = 1.0
 
     @property
     def file_protocol_required(self) -> bool:
@@ -2612,12 +2711,17 @@ class BaselineCell:
 
     @property
     def read_gib_per_month(self) -> float:
-        """Monthly read volume = stored x w x n."""
-        return (
+        """Monthly read volume = stored x w x n, times read_scale.
+
+        read_scale is 1.0 by default and the multiplication is skipped then, so the default returns
+        the current expression unchanged rather than relying on `x * 1.0 == x`.
+        """
+        base = (
             self.stored_gib
             * (self.pattern.working_set_pct * self.pattern.reads_per_object)
             / 100
         )
+        return base if self.read_scale == 1.0 else base * self.read_scale
 
     @property
     def write_gib_per_month(self) -> float:
@@ -2671,7 +2775,7 @@ class BaselineCell:
 
     @property
     def efficiency_pool(self) -> float:
-        return self.efficiency_ssd * POOL_EFFICIENCY_RETENTION
+        return self.efficiency_ssd * self.pool_efficiency_retention
 
     @property
     def required_mbps(self) -> float:
@@ -2793,13 +2897,591 @@ BASELINE_PATTERNS: tuple[BaselinePattern, ...] = (
 )
 
 
-def baseline_cells() -> list[BaselineCell]:
+# ------------------------------------------------------------------------ assumptions (PR-A)
+#
+# The thirteen public assumption keys live in one registry. The CLI parse, the validation, the
+# `--list-assumptions` table, the override echo in the JSON, and (in PR-B) the sensitivity section's
+# list of assumptions all read it, so there is one place a key is defined and one place its baseline
+# value, domain and tier are stated. Threading the values through BaselineCell / Scenario fields
+# rather than module state keeps `baseline_cells(Assumptions())` a pure function of its argument.
+
+
+class AssumptionError(ValueError):
+    """A reader's assumption value or combination could not be accepted.
+
+    Carries a stable `code` so a test checks the classification while only the language test reads
+    the wording. `key` and `value` are the offending key and its string value where applicable.
+    """
+
+    def __init__(
+        self, code: str, message: str, key: str | None = None, value: str | None = None
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.key = key
+        self.value = value
+
+
+# Error messages are the one CLI output localized to JA/EN: they answer a reader's own input, and a
+# reader of the Japanese document reads them in Japanese. Argument-combination errors stay English
+# (`parser.error`), as the existing convention has them. Keys are the Japanese source text, per the
+# `t()` convention; `_assumption_error` wraps the lookup so `_LANG` governs the language.
+
+
+def _assumption_error(
+    lang: str,
+    code: str,
+    ja: str,
+    *,
+    key: str | None = None,
+    value: str | None = None,
+    **fmt: object,
+) -> AssumptionError:
+    # `key` and `value` are both the error's attributes and placeholders in the message, so they
+    # join `fmt` for the interpolation. Entries that do not use them simply ignore the extra keys.
+    placeholders = dict(fmt)
+    if key is not None:
+        placeholders.setdefault("key", key)
+    if value is not None:
+        placeholders.setdefault("value", value)
+
+    def build() -> str:
+        return t(ja, **placeholders)
+
+    return AssumptionError(code, _in_language(lang, build), key=key, value=value)
+
+
+_FLOAT_RE = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\Z")
+_INT_RE = re.compile(r"\d+\Z")
+_NONFINITE_WORDS = {
+    "nan",
+    "inf",
+    "+inf",
+    "-inf",
+    "infinity",
+    "+infinity",
+    "-infinity",
+}
+
+
+def _sep(lang: str) -> str:
+    """List separator for `lang`: a comma-space in English, an ideographic comma in Japanese.
+
+    Resolved from the `lang` argument rather than `t("、")` so it is correct even when it is built
+    as an eager argument outside the `_in_language` block that renders the surrounding message.
+    """
+    return ", " if lang == "en" else "、"
+
+
+@dataclass(frozen=True)
+class AssumptionSpec:
+    """One public assumption: its kind, baseline value, domain check and source tier."""
+
+    key: str
+    kind: str  # "float" | "int" | "enum"
+    baseline: Callable[[], object]  # the current model's value for this key
+    tier: str  # 基準値の区分: 公式 / 観測 / 試算前提 / 仮置き / 定義
+    description_ja: str
+    domain_text_ja: str = ""  # human text of the accepted range, for the range error
+    choices: tuple[str, ...] = ()  # enum keys, case-sensitive
+    in_domain: Callable[[float], bool] | None = None  # float range check
+    reader_decides_ja: str = ""  # for --list-assumptions
+    auto: bool = False  # accepts the literal "auto" (= unspecified)
+
+
+def _baseline_deployment_api() -> str:
+    return DEPLOYMENTS[BaselineCell.deployment]["api"]
+
+
+# Registry. Order is the canonical key order used by `resolve()`, `--list-assumptions`, and the
+# stage-2 validation sweep.
+ASSUMPTION_SPECS: dict[str, AssumptionSpec] = {
+    "deployment": AssumptionSpec(
+        key="deployment",
+        kind="enum",
+        baseline=_baseline_deployment_api,
+        tier="試算前提",
+        description_ja="デプロイ形態（可用性と世代）",
+        choices=tuple(d["api"] for d in DEPLOYMENTS.values()),
+        reader_decides_ja="決める（可用性要件）",
+    ),
+    "efficiency_ssd": AssumptionSpec(
+        key="efficiency_ssd",
+        kind="float",
+        baseline=lambda: BASELINE_EFFICIENCY_SSD,
+        tier="仮置き",
+        description_ja="SSD 層のストレージ効率",
+        domain_text_ja="0 以上 1 未満",
+        in_domain=lambda x: 0.0 <= x < 1.0,
+        reader_decides_ja="決められる（データの性質）",
+    ),
+    "pool_efficiency_retention": AssumptionSpec(
+        key="pool_efficiency_retention",
+        kind="float",
+        baseline=lambda: POOL_EFFICIENCY_RETENTION,
+        tier="仮置き",
+        description_ja="キャパシティプール層に残る SSD 効率の割合",
+        domain_text_ja="0 以上 1 以下",
+        in_domain=lambda x: 0.0 <= x <= 1.0,
+        reader_decides_ja="データごとに測る（一般値なし）",
+    ),
+    "pool_fraction": AssumptionSpec(
+        key="pool_fraction",
+        kind="float",
+        baseline=lambda: BASELINE_POOL_FRACTION,
+        tier="仮置き",
+        description_ja="キャパシティプールへ落とす割合",
+        domain_text_ja="0 以上 1 以下",
+        in_domain=lambda x: 0.0 <= x <= 1.0,
+        reader_decides_ja="決められる",
+    ),
+    "ssd_headroom": AssumptionSpec(
+        key="ssd_headroom",
+        kind="float",
+        baseline=lambda: BASELINE_SSD_HEADROOM,
+        tier="試算前提",
+        description_ja="SSD のプロビジョニング余裕",
+        domain_text_ja="0 以上 1 以下",
+        in_domain=lambda x: 0.0 <= x <= 1.0,
+        reader_decides_ja="決める（運用方針）",
+    ),
+    "throughput_mbps": AssumptionSpec(
+        key="throughput_mbps",
+        kind="int",
+        baseline=lambda: "auto",
+        tier="試算前提",
+        description_ja="スループットキャパシティ（指定の段 MBps、auto でモデルが選ぶ）",
+        reader_decides_ja="決める（ピーク要件）",
+        auto=True,
+    ),
+    "active_fraction": AssumptionSpec(
+        key="active_fraction",
+        kind="float",
+        baseline=lambda: "auto",
+        tier="仮置き",
+        description_ja="S3 Files 高性能ストレージのアクティブ割合（auto で現行の式）",
+        domain_text_ja="0 以上 1 以下",
+        in_domain=lambda x: 0.0 <= x <= 1.0,
+        reader_decides_ja="アクセスの形で決まる",
+        auto=True,
+    ),
+    "s3files_threshold_kib": AssumptionSpec(
+        key="s3files_threshold_kib",
+        kind="float",
+        baseline=lambda: S3FILES_DEFAULT_THRESHOLD_KIB,
+        tier="公式",
+        description_ja="S3 Files の取り込みしきい値（KiB）",
+        domain_text_ja="0 より大きく 1024 未満。格子のサイズと同値は不可",
+        in_domain=lambda x: (
+            x > 0.0
+        ),  # the 1 MiB and grid-size limits are stage-2 checks
+        reader_decides_ja="決める（設定）",
+    ),
+    "first_read_mode": AssumptionSpec(
+        key="first_read_mode",
+        kind="enum",
+        baseline=lambda: "written",
+        tier="仮置き",
+        description_ja="初回ストリームに数える個数（written: 書いた個数 / none: 0 / working_set: 作業セット）",
+        choices=("written", "none", "working_set"),
+        reader_decides_ja="読み取りの時間的な偏りで決まる",
+    ),
+    "first_read_stream_billing": AssumptionSpec(
+        key="first_read_stream_billing",
+        kind="enum",
+        baseline=lambda: "none",
+        tier="仮置き",
+        description_ja="初回ストリームのファイル読み取り課金（none: なし / file_read: 課金する）",
+        choices=("none", "file_read"),
+        reader_decides_ja="課金の実際が未確認（両方で試算できる）",
+    ),
+    "metadata_multiplier": AssumptionSpec(
+        key="metadata_multiplier",
+        kind="float",
+        baseline=lambda: 1.0,
+        tier="仮置き",
+        description_ja="読み取り側メタデータの操作数倍率",
+        domain_text_ja="0 以上の有限値",
+        in_domain=lambda x: x >= 0.0,
+        reader_decides_ja="マウントオプションで動く",
+    ),
+    "read_scale": AssumptionSpec(
+        key="read_scale",
+        kind="float",
+        baseline=lambda: 1.0,
+        tier="定義",
+        description_ja="月間読み取り量に掛ける倍率（1.0 = パターンの定義どおり）",
+        domain_text_ja="0 より大きい有限値",
+        in_domain=lambda x: x > 0.0,
+        reader_decides_ja="決める（自分のワークロード）",
+    ),
+    "stored_tib": AssumptionSpec(
+        key="stored_tib",
+        kind="float",
+        baseline=lambda: float(BASELINE_STORED_TIB),
+        tier="定義",
+        description_ja="保存量（TiB）",
+        domain_text_ja="0 より大きい有限値",
+        in_domain=lambda x: x > 0.0,
+        reader_decides_ja="決める",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class Assumptions:
+    """Reader-supplied assumptions. Every field defaults to None = unspecified = the baseline.
+
+    None is unspecified and uses the baseline value. A value equal to the baseline is still an
+    override: the output then carries a notice and the key is listed, so "I set it to the baseline
+    on purpose" and "I left it alone" are told apart. The `auto` fields never hold the string
+    "auto"; parse maps `auto` to None (= unspecified), so the types stay int|None and float|None.
+    """
+
+    deployment: str | None = None
+    efficiency_ssd: float | None = None
+    pool_efficiency_retention: float | None = None
+    pool_fraction: float | None = None
+    ssd_headroom: float | None = None
+    throughput_mbps: int | None = None  # None = auto (model chooses the tier)
+    active_fraction: float | None = None  # None = auto (current formula)
+    s3files_threshold_kib: float | None = None
+    first_read_mode: str | None = None
+    first_read_stream_billing: str | None = None
+    metadata_multiplier: float | None = None
+    read_scale: float | None = None
+    stored_tib: float | None = None
+
+
+def specified(a: Assumptions) -> dict[str, object]:
+    """The keys the reader set (not None), as a dict. These are the overrides."""
+    return {
+        key: getattr(a, key) for key in ASSUMPTION_SPECS if getattr(a, key) is not None
+    }
+
+
+def resolve(a: Assumptions) -> dict[str, object]:
+    """Effective value of all thirteen keys: the override where set, else the baseline."""
+    out: dict[str, object] = {}
+    for key, spec in ASSUMPTION_SPECS.items():
+        value = getattr(a, key)
+        out[key] = spec.baseline() if value is None else value
+    return out
+
+
+def _localized(lang: str, ja: str, **fmt: object) -> str:
+    """Resolve `t(ja, **fmt)` under `lang` without leaving module state changed.
+
+    Nested placeholder values (a kind word, a domain phrase) must be in the error's language, but
+    they are built eagerly as arguments outside the `_in_language` block that renders the message —
+    so each is wrapped here to pick up the target language.
+    """
+    return _in_language(lang, lambda: t(ja, **fmt))
+
+
+def _coerce_float(spec: AssumptionSpec, value: str, lang: str) -> float:
+    text = value.strip()
+    if spec.auto and text == "auto":
+        return (
+            math.nan
+        )  # sentinel; caller treats auto as unspecified before this is used
+    # NaN / infinity are not-finite, not a type error: Python would parse them to a float, so the
+    # fault is the value. Caught case-insensitively here (the regex does not match them) and again
+    # after float() for forms like 1e999 that overflow to inf.
+    if text.lower() in _NONFINITE_WORDS:
+        raise _assumption_error(
+            lang,
+            "not_finite",
+            "`{key}` は有限の数値で指定する（NaN と無限大は不可）",
+            key=spec.key,
+            value=value,
+        )
+    if not _FLOAT_RE.match(text):
+        raise _assumption_error(
+            lang,
+            "type",
+            "`{key}` の値 `{value}` を {kind} として読めない",
+            key=spec.key,
+            value=value,
+            kind=_localized(lang, "数値"),
+        )
+    number = float(text)
+    if not math.isfinite(number):
+        raise _assumption_error(
+            lang,
+            "not_finite",
+            "`{key}` は有限の数値で指定する（NaN と無限大は不可）",
+            key=spec.key,
+            value=value,
+        )
+    return number
+
+
+def _coerce_int(spec: AssumptionSpec, value: str, lang: str) -> int:
+    text = value.strip()
+    if spec.auto and text == "auto":
+        return -1  # sentinel; caller treats auto as unspecified before this is used
+    if not _INT_RE.match(text):
+        raise _assumption_error(
+            lang,
+            "type",
+            "`{key}` の値 `{value}` を {kind} として読めない",
+            key=spec.key,
+            value=value,
+            kind=_localized(lang, "整数"),
+        )
+    return int(text)
+
+
+def _coerce_enum(spec: AssumptionSpec, value: str, lang: str) -> str:
+    text = value.strip()
+    if text not in spec.choices:
+        raise _assumption_error(
+            lang,
+            "choice",
+            "`{key}` は {choices} のいずれかで指定する（指定値 {value}）",
+            key=spec.key,
+            value=value,
+            choices=_sep(lang).join(spec.choices),
+        )
+    return text
+
+
+def parse_assumptions(items, lang: str = "ja") -> Assumptions:
+    """Parse a sequence of `key=value` strings into an Assumptions.
+
+    Stage 1 of validation (format, key existence, duplicates, type, single-item range) runs here in
+    argument order, stopping at the first offender. `auto` for throughput/active maps to None, so no
+    `auto` string ever reaches the dataclass. The cross-item checks are stage 2 (validate).
+    """
+    fields: dict[str, object] = {}
+    seen: list[str] = []
+    for item in items:
+        if "=" not in item or item.split("=", 1)[0].strip() == "":
+            raise _assumption_error(
+                lang,
+                "bad_format",
+                "`{item}` は key=value の形ではない",
+                value=item,
+                item=item,
+            )
+        raw_key, raw_value = item.split("=", 1)
+        key = raw_key.strip()
+        if key not in ASSUMPTION_SPECS:
+            raise _assumption_error(
+                lang,
+                "unknown_key",
+                "未知の前提 `{key}`。使えるキーは `--list-assumptions` で確認する",
+                key=key,
+                value=raw_value,
+            )
+        if key in seen:
+            raise _assumption_error(
+                lang,
+                "duplicate",
+                "`{key}` が複数回指定されている",
+                key=key,
+                value=raw_value,
+            )
+        seen.append(key)
+        if raw_value.strip() == "":
+            raise _assumption_error(
+                lang,
+                "type",
+                "`{key}` の値 `{value}` を {kind} として読めない",
+                key=key,
+                value=raw_value,
+                kind=_kind_word(ASSUMPTION_SPECS[key], lang),
+            )
+        spec = ASSUMPTION_SPECS[key]
+        parsed = _parse_one(spec, raw_value, lang)
+        if parsed is None:  # auto -> unspecified
+            continue
+        fields[key] = parsed
+    return Assumptions(**fields)
+
+
+def _kind_word(spec: AssumptionSpec, lang: str) -> str:
+    ja = {"float": "数値", "int": "整数", "enum": "列挙"}[spec.kind]
+    return _localized(lang, ja)
+
+
+def _parse_one(spec: AssumptionSpec, raw_value: str, lang: str):
+    """Parse and single-item-range-check one value. Returns None when the value means `auto`."""
+    if spec.kind == "enum":
+        return _coerce_enum(spec, raw_value, lang)
+    if spec.kind == "int":
+        number = _coerce_int(spec, raw_value, lang)
+        if number == -1 and spec.auto and raw_value.strip() == "auto":
+            return None
+        return number
+    # float
+    stripped = raw_value.strip()
+    if spec.auto and stripped == "auto":
+        return None
+    value = _coerce_float(spec, raw_value, lang)
+    if spec.in_domain is not None and not spec.in_domain(value):
+        raise _assumption_error(
+            lang,
+            "range",
+            "`{key}` の指定値 {value} は許容範囲 {domain} の外",
+            key=spec.key,
+            value=raw_value,
+            domain=_localized(lang, spec.domain_text_ja),
+        )
+    return value
+
+
+def validate_assumptions(a: Assumptions, lang: str = "ja") -> None:
+    """Stage 2: cross-item checks, evaluated in registry key order, independent of argument order.
+
+    Stage 1 (format, type, single-item range) has already run during parse. The Python API path
+    skips stage 1 (the dataclass holds typed values), so this also range-checks the float fields it
+    is given, so a programmatic caller cannot slip an out-of-range value past the CLI's stage 1.
+    """
+    values = {key: getattr(a, key) for key in ASSUMPTION_SPECS}
+
+    # Re-run the single-item float range for the Python API path.
+    for key, spec in ASSUMPTION_SPECS.items():
+        value = values[key]
+        if value is None or spec.kind != "float":
+            continue
+        number = float(value)
+        if not math.isfinite(number):
+            raise _assumption_error(
+                lang,
+                "not_finite",
+                "`{key}` は有限の数値で指定する（NaN と無限大は不可）",
+                key=key,
+                value=repr(value),
+            )
+        if spec.in_domain is not None and not spec.in_domain(number):
+            raise _assumption_error(
+                lang,
+                "range",
+                "`{key}` の指定値 {value} は許容範囲 {domain} の外",
+                key=key,
+                value=f"{number:g}",
+                domain=_localized(lang, spec.domain_text_ja),
+            )
+
+    # first_read_mode choices (Python API may set an unknown string).
+    for key in ("first_read_mode", "first_read_stream_billing", "deployment"):
+        value = values[key]
+        spec = ASSUMPTION_SPECS[key]
+        if value is not None and value not in spec.choices:
+            raise _assumption_error(
+                lang,
+                "choice",
+                "`{key}` は {choices} のいずれかで指定する（指定値 {value}）",
+                key=key,
+                value=str(value),
+                choices=_sep(lang).join(spec.choices),
+            )
+
+    # s3files_threshold_kib: not 1 MiB or more, and not equal to a grid size.
+    threshold = values["s3files_threshold_kib"]
+    if threshold is not None:
+        if threshold >= 1024.0:
+            raise _assumption_error(
+                lang,
+                "threshold_unsupported",
+                "`s3files_threshold_kib` に 1 MiB 以上は指定できない。"
+                "1 MiB 以上の I/O を直接ストリームにする公式の規則をモデルが持たず、過大に計上するため",
+                key="s3files_threshold_kib",
+                value=f"{threshold:g}",
+            )
+        if any(abs(threshold - size) < 1e-9 for size in BASELINE_SIZES_KIB):
+            raise _assumption_error(
+                lang,
+                "threshold_on_grid",
+                "`s3files_threshold_kib` を格子のサイズ（{sizes}）と同じ値にできない。"
+                "ちょうどのサイズの扱いが公式の文面で揃っていない",
+                key="s3files_threshold_kib",
+                value=f"{threshold:g}",
+                sizes=_sep(lang).join(_size_label(s) for s in BASELINE_SIZES_KIB),
+            )
+
+    # throughput_mbps against the effective deployment's tier set.
+    tput = values["throughput_mbps"]
+    if tput is not None:
+        effective_dep = values["deployment"] or _baseline_deployment_api()
+        dep = next(d for d in DEPLOYMENTS.values() if d["api"] == effective_dep)
+        tiers = dep["tput_options"]
+        if tput not in tiers:
+            raise _assumption_error(
+                lang,
+                "throughput_tier",
+                "スループット {value} MBps は {deployment} の段 {tiers} にない",
+                key="throughput_mbps",
+                value=str(tput),
+                deployment=effective_dep,
+                tiers=_sep(lang).join(str(x) for x in tiers),
+            )
+
+
+def _internal_deployment_key(api: str) -> str:
+    """Map a public API deployment value (SINGLE_AZ_1 ...) to the internal key (saz1 ...)."""
+    for internal, dep in DEPLOYMENTS.items():
+        if dep["api"] == api:
+            return internal
+    raise ValueError(f"unknown deployment api: {api!r}")
+
+
+def _apply_assumptions(cell: BaselineCell, resolved: dict[str, object]) -> BaselineCell:
+    """Return a cell with the resolved assumptions applied. Pure; used per cell.
+
+    `stored_tib` is applied as `stored_gib`; `throughput_mbps`/`active_fraction` pass through as
+    None when the resolved value is the string "auto". The mutation test swaps this name.
+    """
+    throughput = resolved["throughput_mbps"]
+    active = resolved["active_fraction"]
+    deployment = _internal_deployment_key(str(resolved["deployment"]))
+    return replace(
+        cell,
+        stored_gib=float(resolved["stored_tib"]) * GIB_PER_TIB,
+        efficiency_ssd=float(resolved["efficiency_ssd"]),
+        pool_efficiency_retention=float(resolved["pool_efficiency_retention"]),
+        pool_fraction=float(resolved["pool_fraction"]),
+        ssd_headroom=float(resolved["ssd_headroom"]),
+        deployment=deployment,
+        throughput_mbps=None if throughput == "auto" else int(throughput),
+        active_fraction=None if active == "auto" else float(active),
+        s3files_threshold_kib=float(resolved["s3files_threshold_kib"]),
+        first_read_mode=str(resolved["first_read_mode"]),
+        first_read_stream_billing=str(resolved["first_read_stream_billing"]),
+        metadata_multiplier=float(resolved["metadata_multiplier"]),
+        read_scale=float(resolved["read_scale"]),
+    )
+
+
+def baseline_cells(
+    assumptions: Assumptions | None = None,
+    patterns=None,
+    lang: str = "ja",
+) -> list[BaselineCell]:
+    """The 32-cell grid (or `len(patterns) x 4`), with any reader assumptions applied.
+
+    `assumptions=None` reproduces the current grid byte for byte: no override is applied and the
+    cells keep their class defaults. The `lang`/`patterns` arguments let a caller substitute the
+    pattern set (validated by BaselinePattern.__post_init__) without changing module state.
+    """
+    use_patterns = BASELINE_PATTERNS if patterns is None else tuple(patterns)
+    if assumptions is None:
+        stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+        return [
+            BaselineCell(pattern=pattern, object_mib=kib / 1024, stored_gib=stored_gib)
+            for pattern in use_patterns
+            for kib in BASELINE_SIZES_KIB
+        ]
+    resolved = resolve(assumptions)
     stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
-    return [
+    cells = [
         BaselineCell(pattern=pattern, object_mib=kib / 1024, stored_gib=stored_gib)
-        for pattern in BASELINE_PATTERNS
+        for pattern in use_patterns
         for kib in BASELINE_SIZES_KIB
     ]
+    return [_apply_assumptions(cell, resolved) for cell in cells]
 
 
 def baseline_same_price_groups() -> list[list[BaselinePattern]]:
@@ -2881,6 +3563,16 @@ def _whole(value: float) -> int:
     if abs(value - rounded) > 1e-6:
         raise ValueError(f"expected a whole number, got {value!r}")
     return int(rounded)
+
+
+def _count(value: float, strict: bool = True) -> float:
+    """A count, whole-checked under the baseline (`strict`) and left fractional when overridden.
+
+    The baseline grid keeps the current strict check (existing tests depend on it). Once a reader
+    scales reads or stores a fractional TiB, the derived object counts are no longer whole, so the
+    override path emits them as floats rather than failing.
+    """
+    return _whole(value) if strict else value
 
 
 def _position_fields(pattern: BaselinePattern) -> dict[str, object]:
@@ -3413,20 +4105,191 @@ def _method_json(lines: dict[str, float]) -> dict[str, object]:
     }
 
 
-def baseline_json(lang: str = "ja") -> dict[str, object]:
+def _max_tier(cell: BaselineCell) -> int:
+    return DEPLOYMENTS[cell.deployment]["tput_options"][-1]
+
+
+def _throughput_out_of_model_range(cell: BaselineCell) -> bool:
+    """True when throughput is auto and the required tier would exceed the deployment's maximum.
+
+    choose_throughput caps at the maximum tier, so the subtotal there is a value for a configuration
+    that does not exist; the JSON flags it rather than presenting it as real.
+    """
+    if cell.throughput_mbps is not None:
+        return False
+    return cell.required_mbps * (1 + cell.tput_headroom) > _max_tier(cell)
+
+
+def _specified_tier_below_average(cell: BaselineCell) -> bool:
+    """True when the reader fixed a throughput tier below the cell's sustained requirement."""
+    return (
+        cell.throughput_mbps is not None and cell.required_mbps > cell.throughput_mbps
+    )
+
+
+def _first_read_exceeds_reads(cell: BaselineCell) -> bool:
+    """True when the modelled first-read stream count exceeds the month's read count (M-1).
+
+    Only in the high-performance-storage branch (object at or below the threshold). The model does
+    not cap this; PR-H will.
+    """
+    if cell.object_kib > cell.s3files_threshold_kib:
+        return False
+    return _resolve_first_read_objects(cell) > cell.reads_per_month
+
+
+def _changes_text(a: Assumptions, resolved_baseline: dict[str, object]) -> str:
+    """`key=value（基準 value）` list for the notice, baseline-equal keys marked."""
+    parts: list[str] = []
+    for key in ASSUMPTION_SPECS:
+        value = getattr(a, key)
+        if value is None:
+            continue
+        baseline = resolved_baseline[key]
+        if _value_equals_baseline(value, baseline):
+            parts.append(
+                t("{key}={value}（基準と同じ値を明示）", key=key, value=_fmt(value))
+            )
+        else:
+            parts.append(
+                t(
+                    "{key}={value}（基準 {baseline}）",
+                    key=key,
+                    value=_fmt(value),
+                    baseline=_fmt(baseline),
+                )
+            )
+    return t("、").join(parts)
+
+
+def _value_equals_baseline(value: object, baseline: object) -> bool:
+    if isinstance(value, (int, float)) and isinstance(baseline, (int, float)):
+        return float(value) == float(baseline)
+    return value == baseline
+
+
+def _fmt(value: object) -> str:
+    if isinstance(value, float):
+        return f"{value:g}"
+    return str(value)
+
+
+def _notice_caveat(a: Assumptions, cells: list[BaselineCell]) -> str:
+    """The caveat clauses of the notice, in fixed order, only the ones that apply."""
+    spec_keys = set(specified(a))
+    clauses: list[str] = []
+
+    placeholder_keys = [
+        key for key in spec_keys if ASSUMPTION_SPECS[key].tier == "仮置き"
+    ]
+    if placeholder_keys:
+        clauses.append(
+            t(
+                "仮置きまたは未測定の前提を含む: {keys}。",
+                keys=t("、").join(k for k in ASSUMPTION_SPECS if k in placeholder_keys),
+            )
+        )
+    if "first_read_mode" in spec_keys:
+        clauses.append(
+            t(
+                "初回読み出しを数える変種は取り込み書き込みを含まない部分的な計上で、"
+                "小計の増減の向きは定まらない。"
+            )
+        )
+    if a.first_read_stream_billing == "file_read":
+        clauses.append(
+            t(
+                "初回ストリームにファイル読み取り課金が付くかどうかは、"
+                "公式の文面が揃わず、課金の実際は未確認である。"
+            )
+        )
+    if "throughput_mbps" in spec_keys:
+        clauses.append(t("スループットは読者の指定で、モデルが選んだ段ではない。"))
+        below = sum(1 for c in cells if _specified_tier_below_average(c))
+        if below:
+            clauses.append(t("指定の段が平均所要を下回るセルが {n} 個ある。", n=below))
+    if "throughput_mbps" not in spec_keys:
+        out_of_range = sum(1 for c in cells if _throughput_out_of_model_range(c))
+        if out_of_range:
+            clauses.append(
+                t(
+                    "{n} 個のセルは、必要なスループットがこの構成の最大段を超え、"
+                    "FSx for ONTAP の小計が最大段で頭打ちになっている（モデルの適用範囲外）。",
+                    n=out_of_range,
+                )
+            )
+    exceed = sum(1 for c in cells if _first_read_exceeds_reads(c))
+    if exceed:
+        clauses.append(
+            t(
+                "{n} 個のセルは、初回ストリームの GET 数が読み取り回数を超える"
+                "（モデルは上限しない。PR-H の対象）。",
+                n=exceed,
+            )
+        )
+    return "".join(clauses)
+
+
+def _notice_text(a: Assumptions, cells: list[BaselineCell]) -> str:
+    resolved_baseline = {key: spec.baseline() for key, spec in ASSUMPTION_SPECS.items()}
+    changes = _changes_text(a, resolved_baseline)
+    caveat = _notice_caveat(a, cells)
+    return t(
+        "この出力は基準の前提と異なる（変更 {count} 件: {changes}）。"
+        "公開文書の値ではない。{caveat}",
+        count=len(specified(a)),
+        changes=changes,
+        caveat=caveat,
+    )
+
+
+def _assumption_overrides(a: Assumptions) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for key, spec in ASSUMPTION_SPECS.items():
+        value = getattr(a, key)
+        if value is None:
+            continue
+        out.append(
+            {
+                "key": key,
+                "value": value,
+                "baseline": spec.baseline(),
+                "tier": spec.tier,
+            }
+        )
+    return out
+
+
+# Fixed-premise identifiers removed when the reader overrides the key they describe.
+_PREMISE_FOR_KEY = {
+    "active_fraction": "s3files_high_performance_storage_is_fully_active_at_or_below_threshold",
+    "first_read_mode": "s3files_books_no_first_read_stream_when_there_are_no_writes",
+}
+
+
+def baseline_json(
+    lang: str = "ja", assumptions: Assumptions | None = None
+) -> dict[str, object]:
     """The baseline grid as plain data, derived from the same cells the document is rendered from.
 
     A figure that reads this does not retype a number. Nothing here is computed a second time: the
     quantities are the `BaselineCell` properties and the amounts are the pricing helpers' lines.
     `lines[].label` and `position` follow `lang`; `name_ja` and `name_en` are always both present.
+
+    `assumptions=None`, or an Assumptions with no key set, reproduces the current output byte for
+    byte — none of the override keys appear. When at least one key is set, a `notice` and the
+    `baseline_assumptions`/`assumption_overrides` keys are added, `position` is dropped (it is phrased
+    for the baseline quantities), object counts become fractional, and each cell carries the
+    out-of-range / tier-below-average flags.
     """
+    overridden = assumptions is not None and bool(specified(assumptions))
 
     def build() -> dict[str, object]:
-        cells = baseline_cells()
+        cells = baseline_cells(assumptions)
         sample = cells[0]
-        stored_gib = BASELINE_STORED_TIB * GIB_PER_TIB
+        strict = not overridden
         patterns: list[dict[str, object]] = []
-        for pattern in BASELINE_PATTERNS:
+        for index, pattern in enumerate(BASELINE_PATTERNS):
             cell_docs: list[dict[str, object]] = []
             for cell in (c for c in cells if c.pattern is pattern):
                 files_lines = s3_files_option(cell, split_metadata=True)
@@ -3438,78 +4301,213 @@ def baseline_json(lang: str = "ja") -> dict[str, object]:
                     sum(files_lines.values()) - ingest_usd - read_usd
                 )
                 direct = baseline_s3_only(cell)
-                cell_docs.append(
-                    {
-                        "size_kib": _whole(cell.object_kib),
-                        "stored_objects": _whole(cell.objects_stored),
-                        "working_set_gib": cell.working_set_gib,
-                        "working_set_objects": _whole(cell.working_set_objects),
-                        "unread_gib": cell.unread_gib,
-                        "read_gib": cell.read_gib_per_month,
-                        "read_requests": _whole(cell.reads_per_month),
-                        "write_gib": cell.write_gib_per_month,
-                        "write_objects": _whole(cell.objects_per_month),
-                        "average_mbps": cell.required_mbps,
-                        "methods": {
-                            "fsx_s3ap": _method_json(fsx_s3ap(cell)),
-                            "s3_files": files,
-                            "s3_direct": None
-                            if direct is None
-                            else _method_json(direct),
-                        },
-                    }
-                )
-            probe = next(c for c in cells if c.pattern is pattern)
-            patterns.append(
-                {
-                    "id": pattern.key,
-                    "name_ja": pattern.name,
-                    "name_en": _in_language("en", lambda p=pattern: t(p.name)),
-                    "working_set_pct": pattern.working_set_pct,
-                    "reads_per_object": pattern.reads_per_object,
-                    "churn_pct": pattern.churn_pct,
-                    "read_multiple": pattern.read_multiple,
-                    "read_write_byte_ratio_pct": [
-                        round(probe.read_share_pct, 1),
-                        round(probe.write_share_pct, 1),
-                    ],
-                    "placeholder": pattern.placeholder,
-                    "basis": dict(
-                        zip(
-                            ("working_set", "reads_per_object", "churn"),
-                            pattern.basis,
-                            strict=True,
-                        )
-                    ),
-                    "position": baseline_position(pattern),
-                    "cells": cell_docs,
+                doc: dict[str, object] = {
+                    "size_kib": _whole(cell.object_kib),
+                    "stored_objects": _count(cell.objects_stored, strict),
+                    "working_set_gib": cell.working_set_gib,
+                    "working_set_objects": _count(cell.working_set_objects, strict),
+                    "unread_gib": cell.unread_gib,
+                    "read_gib": cell.read_gib_per_month,
+                    "read_requests": _count(cell.reads_per_month, strict),
+                    "write_gib": cell.write_gib_per_month,
+                    "write_objects": _count(cell.objects_per_month, strict),
+                    "average_mbps": cell.required_mbps,
+                    "methods": {
+                        "fsx_s3ap": _method_json(fsx_s3ap(cell)),
+                        "s3_files": files,
+                        "s3_direct": None if direct is None else _method_json(direct),
+                    },
                 }
-            )
-        return {
+                if overridden:
+                    doc["throughput_out_of_model_range"] = (
+                        _throughput_out_of_model_range(cell)
+                    )
+                    doc["specified_tier_below_average"] = _specified_tier_below_average(
+                        cell
+                    )
+                cell_docs.append(doc)
+            probe = next(c for c in cells if c.pattern is pattern)
+            pattern_doc: dict[str, object] = {
+                "id": pattern.key,
+                "name_ja": pattern.name,
+                "name_en": _in_language("en", lambda p=pattern: t(p.name)),
+                "working_set_pct": pattern.working_set_pct,
+                "reads_per_object": pattern.reads_per_object,
+                "churn_pct": pattern.churn_pct,
+                "read_multiple": pattern.read_multiple,
+                "read_write_byte_ratio_pct": [
+                    round(probe.read_share_pct, 1),
+                    round(probe.write_share_pct, 1),
+                ],
+                "placeholder": pattern.placeholder,
+                "basis": dict(
+                    zip(
+                        ("working_set", "reads_per_object", "churn"),
+                        pattern.basis,
+                        strict=True,
+                    )
+                ),
+            }
+            if not overridden:
+                pattern_doc["position"] = baseline_position(pattern)
+            pattern_doc["cells"] = cell_docs
+            patterns.append(pattern_doc)
+
+        fixed_premises = [
+            "fsx_capacity_pool_share_is_fixed_in_every_pattern",
+            "s3files_high_performance_storage_is_fully_active_at_or_below_threshold",
+            "s3files_books_no_first_read_stream_when_there_are_no_writes",
+        ]
+        if overridden:
+            removed = {
+                _PREMISE_FOR_KEY[key]
+                for key in specified(assumptions)
+                if key in _PREMISE_FOR_KEY
+            }
+            fixed_premises = [p for p in fixed_premises if p not in removed]
+
+        document: dict[str, object] = {
             "schema_version": 1,
             "generated_by": "tools/finops_model.py --baseline-json",
-            "region": REGION,
-            "price_snapshot": PRICE_SNAPSHOT,
-            "currency": "USD",
-            "stored_gib": _whole(stored_gib),
-            "sizes_kib": list(BASELINE_SIZES_KIB),
-            "pricing_depends_on_working_set": False,
-            "price_inputs": ["object_size", "read_bytes", "write_bytes"],
-            "fixed_premises": [
-                "fsx_capacity_pool_share_is_fixed_in_every_pattern",
-                "s3files_high_performance_storage_is_fully_active_at_or_below_threshold",
-                "s3files_books_no_first_read_stream_when_there_are_no_writes",
-            ],
-            "assumptions": {
-                "deployment": DEPLOYMENTS[sample.deployment]["api"],
-                "efficiency_ssd": sample.efficiency_ssd,
-                "pool_fraction": sample.pool_fraction,
-                "retention_months": sample.retention_months,
-                "s3files_threshold_kib": sample.s3files_threshold_kib,
-                "s3files_expiration_days": sample.s3files_expiration_days,
-            },
-            "patterns": patterns,
         }
+        if overridden:
+            document["baseline_assumptions"] = False
+            document["assumption_overrides"] = _assumption_overrides(assumptions)
+            document["notice"] = _notice_text(assumptions, cells)
+        document.update(
+            {
+                "region": REGION,
+                "price_snapshot": PRICE_SNAPSHOT,
+                "currency": "USD",
+                "stored_gib": _count(sample.stored_gib, strict),
+                "sizes_kib": list(BASELINE_SIZES_KIB),
+                "pricing_depends_on_working_set": False,
+                "price_inputs": ["object_size", "read_bytes", "write_bytes"],
+                "fixed_premises": fixed_premises,
+                "assumptions": _assumptions_block(assumptions, sample, overridden),
+                "patterns": patterns,
+            }
+        )
+        return document
+
+    return _in_language(lang, build)
+
+
+def _assumptions_block(
+    assumptions: Assumptions | None, sample: BaselineCell, overridden: bool
+) -> dict[str, object]:
+    """The `assumptions` object of the JSON.
+
+    Baseline: the current six keys, byte for byte. Override: the thirteen effective values plus the
+    two existing keys that are not registry keys (`retention_months`, `s3files_expiration_days`),
+    which a schema-1 reader still expects. The two auto keys read "auto" when unspecified.
+    """
+    if not overridden:
+        return {
+            "deployment": DEPLOYMENTS[sample.deployment]["api"],
+            "efficiency_ssd": sample.efficiency_ssd,
+            "pool_fraction": sample.pool_fraction,
+            "retention_months": sample.retention_months,
+            "s3files_threshold_kib": sample.s3files_threshold_kib,
+            "s3files_expiration_days": sample.s3files_expiration_days,
+        }
+    resolved = resolve(assumptions)
+    block = dict(resolved)
+    block["retention_months"] = sample.retention_months
+    block["s3files_expiration_days"] = sample.s3files_expiration_days
+    return block
+
+
+def baseline_table(lang: str = "ja", assumptions: Assumptions | None = None) -> str:
+    """A compact Markdown table of the grid's FSx for ONTAP and S3 Files subtotals.
+
+    One row per pattern, two columns per size (FSx for ONTAP, S3 Files). It introduces no new
+    calculation — the subtotals are the same `fsx_s3ap` and `s3_files_option(split_metadata=True)`
+    the document already prints. When the reader overrode any assumption, the notice is quoted at
+    the top and an out-of-range cell is marked with `※`.
+    """
+    overridden = assumptions is not None and bool(specified(assumptions))
+
+    def build() -> str:
+        cells = baseline_cells(assumptions)
+        by_key: dict[str, dict[float, BaselineCell]] = {}
+        for cell in cells:
+            by_key.setdefault(cell.pattern.key, {})[cell.object_kib] = cell
+        out: list[str] = []
+        if overridden:
+            out += ["> " + _notice_text(assumptions, cells), ""]
+        else:
+            out += [t("基準の前提（公開文書と同じ）"), ""]
+        headers = [t("パターン")]
+        for size in BASELINE_SIZES_KIB:
+            label = _size_label(size)
+            headers += [
+                t("{size} FSx for ONTAP", size=label),
+                t("{size} S3 Files", size=label),
+            ]
+        rows: list[list[str]] = []
+        any_out_of_range = False
+        for pattern in BASELINE_PATTERNS:
+            row = [pattern.key]
+            for size in BASELINE_SIZES_KIB:
+                cell = by_key[pattern.key][size]
+                files = s3_files_option(cell, split_metadata=True)
+                assert files is not None
+                fsx_value = usd(sum(fsx_s3ap(cell).values()))
+                if overridden and _throughput_out_of_model_range(cell):
+                    fsx_value += "※"
+                    any_out_of_range = True
+                row += [fsx_value, usd(sum(files.values()))]
+            rows.append(row)
+        out += table(headers, rows)
+        out.append("")
+        if any_out_of_range:
+            out += [
+                t("※ 必要なスループットが最大段を超える。モデルの適用範囲外"),
+                "",
+            ]
+        out += [
+            t("主要費目小計。月額総額ではない。試算であり実測ではない"),
+            "",
+        ]
+        return "\n".join(out).rstrip() + "\n"
+
+    return _in_language(lang, build)
+
+
+def _render_assumption_list(lang: str = "ja") -> str:
+    """The `--list-assumptions` table: key, kind, baseline, domain, tier, description."""
+
+    def build() -> str:
+        headers = [
+            t("キー"),
+            t("型"),
+            t("既定値"),
+            t("検証"),
+            t("基準値の区分"),
+            t("読者が決められるか"),
+            t("説明"),
+        ]
+        kind_word = {"float": t("数値"), "int": t("整数"), "enum": t("列挙")}
+        rows: list[list[str]] = []
+        for key, spec in ASSUMPTION_SPECS.items():
+            baseline = spec.baseline()
+            if spec.choices:
+                domain = t("、").join(spec.choices)
+            else:
+                domain = t(spec.domain_text_ja) if spec.domain_text_ja else "—"
+            rows.append(
+                [
+                    key,
+                    kind_word[spec.kind],
+                    _fmt(baseline),
+                    domain,
+                    t(spec.tier),
+                    t(spec.reader_decides_ja),
+                    t(spec.description_ja),
+                ]
+            )
+        return "\n".join(table(headers, rows)).rstrip() + "\n"
 
     return _in_language(lang, build)
 
@@ -3601,6 +4599,56 @@ def splice(text: str, block: str, doc: Path) -> str:
     return pattern.sub(block.rstrip("\n"), text)
 
 
+def _check_flag_combinations(parser: argparse.ArgumentParser, args) -> None:
+    """Enforce the mode-flag and --assume/--lang combination rules.
+
+    The three new mode flags (--baseline-table, --list-assumptions, and in PR-B --sensitivity-json)
+    cannot be combined with any other mode flag. --assume applies only to --baseline-json and
+    --baseline-table. --lang applies only to the three label-bearing modes. Every violation is a
+    `parser.error`, which exits 2, so the shell sees usage errors and value errors alike as 2.
+    """
+    # The existing mode flags, kept as-is.
+    existing_modes = {
+        "--write": args.write,
+        "--check": args.check,
+        "--show-prices": args.show_prices,
+        "--translation-gaps": args.translation_gaps,
+        "--baseline-json": args.baseline_json,
+    }
+    new_modes = {
+        "--baseline-table": args.baseline_table,
+        "--list-assumptions": args.list_assumptions,
+    }
+    active_existing = [name for name, on in existing_modes.items() if on]
+    active_new = [name for name, on in new_modes.items() if on]
+
+    # A new mode cannot be combined with any other mode (new or existing).
+    if active_new and (active_existing or len(active_new) > 1):
+        others = sorted(set(active_existing + active_new) - {active_new[0]})
+        parser.error(f"{active_new[0]} cannot be combined with {', '.join(others)}")
+
+    # The existing --baseline-json exclusivity is preserved unchanged.
+    if args.baseline_json and (
+        args.write or args.check or args.show_prices or args.translation_gaps
+    ):
+        parser.error(
+            "--baseline-json cannot be combined with --write, --check, "
+            "--show-prices or --translation-gaps"
+        )
+
+    # --assume: only with --baseline-json or --baseline-table.
+    if args.assume and not (args.baseline_json or args.baseline_table):
+        parser.error("--assume applies only to --baseline-json or --baseline-table")
+
+    # --lang: only with the label-bearing modes.
+    if args.lang and not (
+        args.baseline_json or args.baseline_table or args.list_assumptions
+    ):
+        parser.error(
+            "--lang applies only to --baseline-json, --baseline-table or --list-assumptions"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -3623,24 +4671,54 @@ def main() -> int:
         help="print the common baseline grid as JSON (figures read this instead of retyping numbers)",
     )
     parser.add_argument(
+        "--baseline-table",
+        action="store_true",
+        help="print the baseline grid's FSx for ONTAP and S3 Files subtotals as a Markdown table",
+    )
+    parser.add_argument(
+        "--list-assumptions",
+        action="store_true",
+        help="print the registry of reader-settable assumptions",
+    )
+    parser.add_argument(
+        "--assume",
+        action="append",
+        default=[],
+        metavar="key=value",
+        help="override a baseline assumption (repeatable); with --baseline-json or --baseline-table",
+    )
+    parser.add_argument(
         "--lang",
         choices=LANGS,
         default=None,
-        help="language of the labels in --baseline-json output (default: ja)",
+        help="language of the labels in --baseline-json / --baseline-table / --list-assumptions "
+        "and assumption-validation errors (default: ja)",
     )
     args = parser.parse_args()
 
-    if args.lang and not args.baseline_json:
-        parser.error("--lang only applies to --baseline-json")
-    if args.baseline_json:
-        if args.write or args.check or args.show_prices or args.translation_gaps:
-            parser.error(
-                "--baseline-json cannot be combined with --write, --check, "
-                "--show-prices or --translation-gaps"
+    _check_flag_combinations(parser, args)
+    lang = args.lang or "ja"
+
+    if args.list_assumptions:
+        print(_render_assumption_list(lang), end="")
+        return 0
+
+    if args.baseline_json or args.baseline_table:
+        try:
+            assumptions = parse_assumptions(args.assume, lang) if args.assume else None
+            if assumptions is not None:
+                validate_assumptions(assumptions, lang)
+        except AssumptionError as error:
+            print(f"finops-model: {error}", file=sys.stderr)
+            return 2
+        if args.baseline_json:
+            print(
+                json.dumps(
+                    baseline_json(lang, assumptions), ensure_ascii=False, indent=2
+                )
             )
-        print(
-            json.dumps(baseline_json(args.lang or "ja"), ensure_ascii=False, indent=2)
-        )
+        else:
+            print(baseline_table(lang, assumptions), end="")
         return 0
 
     if args.show_prices:

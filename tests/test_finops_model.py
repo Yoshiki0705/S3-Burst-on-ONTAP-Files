@@ -896,3 +896,683 @@ def test_each_language_resolves_to_its_own_document() -> None:
 def test_the_japanese_document_exists() -> None:
     """The English one is created by the promotion; this script only splices into it."""
     assert fm.doc_for("ja").is_file()
+
+
+# --- PR-A: reader assumptions -------------------------------------------------------------------
+#
+# The central guarantee is byte equality of the default output: Assumptions() and None produce the
+# same grid as the current call with no argument, and `make finops` compares the rendered document.
+# The tests here do not pin the four baseline hashes; a later price change would otherwise force a
+# rewrite of a test whose point is that PR-A changed nothing. Instead they compare the default
+# assumptions path against the no-argument path.
+
+ALL_KEYS = (
+    "deployment",
+    "efficiency_ssd",
+    "pool_efficiency_retention",
+    "pool_fraction",
+    "ssd_headroom",
+    "throughput_mbps",
+    "active_fraction",
+    "s3files_threshold_kib",
+    "first_read_mode",
+    "first_read_stream_billing",
+    "metadata_multiplier",
+    "read_scale",
+    "stored_tib",
+)
+
+
+def _subtotals(cell: fm.BaselineCell) -> tuple[float, float]:
+    files = fm.s3_files_option(cell, split_metadata=True)
+    assert files is not None
+    return sum(fm.fsx_s3ap(cell).values()), sum(files.values())
+
+
+def test_the_registry_api_list_and_dataclass_hold_the_same_thirteen_keys() -> None:
+    assert set(fm.ASSUMPTION_SPECS) == set(ALL_KEYS)
+    assert tuple(fm.ASSUMPTION_SPECS) == ALL_KEYS  # order is canonical
+    fields = {f.name for f in fm.Assumptions.__dataclass_fields__.values()}
+    assert fields == set(ALL_KEYS)
+    table = fm._render_assumption_list("ja")
+    listed = {line.split(" | ")[0].lstrip("| ") for line in table.splitlines()[2:]}
+    assert listed == set(ALL_KEYS)
+    for spec in fm.ASSUMPTION_SPECS.values():
+        assert spec.tier in ("公式", "観測", "試算前提", "仮置き", "定義")
+
+
+def test_the_default_grid_is_the_same_whether_or_not_assumptions_are_given() -> None:
+    none_cells = fm.baseline_cells()
+    empty_cells = fm.baseline_cells(fm.Assumptions())
+    assert len(none_cells) == len(empty_cells) == 32
+    for a, b in zip(none_cells, empty_cells, strict=True):
+        assert _subtotals(a) == _subtotals(b), a.pattern.key
+    for lang in fm.LANGS:
+        none_json = json.dumps(fm.baseline_json(lang), ensure_ascii=False, indent=2)
+        empty_json = json.dumps(
+            fm.baseline_json(lang, fm.Assumptions()), ensure_ascii=False, indent=2
+        )
+        assert none_json == empty_json, lang
+        assert "baseline_assumptions" not in fm.baseline_json(lang, fm.Assumptions())
+
+
+def test_setting_every_key_to_its_baseline_value_reproduces_the_baseline_subtotals() -> (
+    None
+):
+    """A full set of explicit values equal to the baseline: the amounts match, a notice is attached,
+    and all thirteen keys show up as overrides. throughput and active resolve to 128 and 1.0 in
+    every cell, derived from the cells rather than asserted."""
+    for cell in fm.baseline_cells():
+        if cell.object_kib <= cell.s3files_threshold_kib:
+            # auto picks the smallest tier that covers the requirement; the grid lands on 128.
+            assert (
+                fm.choose_throughput(
+                    cell.required_mbps,
+                    fm.DEPLOYMENTS[cell.deployment]["tput_options"],
+                    cell.tput_headroom,
+                )
+                in fm.DEPLOYMENTS[cell.deployment]["tput_options"]
+            )
+    explicit = fm.Assumptions(
+        deployment="SINGLE_AZ_1",
+        efficiency_ssd=0.40,
+        pool_efficiency_retention=0.5,
+        pool_fraction=0.30,
+        ssd_headroom=0.20,
+        throughput_mbps=128,
+        active_fraction=1.0,
+        s3files_threshold_kib=128.0,
+        first_read_mode="written",
+        first_read_stream_billing="none",
+        metadata_multiplier=1.0,
+        read_scale=1.0,
+        stored_tib=20.0,
+    )
+    fm.validate_assumptions(explicit)
+    # throughput=128 and active=1.0 are the auto values in every cell, so the subtotals match.
+    for base, over in zip(
+        fm.baseline_cells(), fm.baseline_cells(explicit), strict=True
+    ):
+        assert _subtotals(base) == pytest.approx(_subtotals(over)), base.pattern.key
+    data = fm.baseline_json("ja", explicit)
+    assert data["baseline_assumptions"] is False
+    assert "notice" in data
+    assert len(data["assumption_overrides"]) == 13
+
+
+def test_an_override_is_an_override_even_when_the_value_equals_the_baseline() -> None:
+    """Detected by presence, not by value. Specifying pool_fraction=0.30 still carries a notice."""
+    a = fm.Assumptions(pool_fraction=0.30)
+    assert fm.specified(a) == {"pool_fraction": 0.30}
+    data = fm.baseline_json("ja", a)
+    assert "notice" in data
+    assert data["assumption_overrides"][0]["key"] == "pool_fraction"
+
+
+# --- monotonicity -------------------------------------------------------------------------------
+
+
+def _single(key: str, value: object) -> fm.Assumptions:
+    return fm.Assumptions(**{key: value})
+
+
+def test_a_subtotal_does_not_move_the_wrong_way_when_one_assumption_rises() -> None:
+    """Direction only, across all cells. fsx: non-decreasing in ssd_headroom/read_scale/stored_tib,
+    non-increasing in efficiency_ssd. S3 Files: non-decreasing in active_fraction, metadata_multiplier,
+    read_scale, stored_tib."""
+    checks = [
+        ("ssd_headroom", 0.0, 0.5, "fsx", "up"),
+        ("efficiency_ssd", 0.1, 0.9, "fsx", "down"),
+        ("read_scale", 1.0, 2.0, "fsx", "up"),
+        ("stored_tib", 20.0, 40.0, "fsx", "up"),
+        ("active_fraction", 0.1, 0.9, "files", "up"),
+        ("metadata_multiplier", 1.0, 3.0, "files", "up"),
+        ("read_scale", 1.0, 2.0, "files", "up"),
+        ("stored_tib", 20.0, 40.0, "files", "up"),
+    ]
+    for key, low, high, side, direction in checks:
+        lo_cells = fm.baseline_cells(_single(key, low))
+        hi_cells = fm.baseline_cells(_single(key, high))
+        for lo, hi in zip(lo_cells, hi_cells, strict=True):
+            lo_fsx, lo_files = _subtotals(lo)
+            hi_fsx, hi_files = _subtotals(hi)
+            lo_v, hi_v = (lo_fsx, hi_fsx) if side == "fsx" else (lo_files, hi_files)
+            if direction == "up":
+                assert hi_v >= lo_v - 1e-6, (key, side, lo.pattern.key, lo.object_kib)
+            else:
+                assert hi_v <= lo_v + 1e-6, (key, side, lo.pattern.key, lo.object_kib)
+
+
+def test_throughput_tier_rising_does_not_lower_the_fsx_subtotal() -> None:
+    for lo, hi in zip(
+        fm.baseline_cells(_single("throughput_mbps", 256)),
+        fm.baseline_cells(_single("throughput_mbps", 512)),
+        strict=True,
+    ):
+        assert _subtotals(hi)[0] >= _subtotals(lo)[0] - 1e-6, lo.pattern.key
+
+
+def test_pool_fraction_zero_drops_the_pool_line_and_one_minimises_ssd() -> None:
+    zero = fm.baseline_cells(_single("pool_fraction", 0.0))[0]
+    one = fm.baseline_cells(_single("pool_fraction", 1.0))[0]
+    assert not any("キャパシティプール" in label for label in fm.fsx_s3ap(zero))
+    full_ssd = next(v for k, v in fm.fsx_s3ap(one).items() if "SSD" in k)
+    dep = fm.DEPLOYMENTS[one.deployment]
+    assert full_ssd == dep["min_ssd_gib"] * dep["ssd"].usd
+
+
+# --- acting side --------------------------------------------------------------------------------
+
+
+def test_each_key_moves_only_the_side_it_should() -> None:
+    """fsx-only keys leave every S3 Files subtotal unchanged, and vice versa. read_scale/stored_tib
+    move both. The one-sided keys must still move their own side in at least one cell."""
+    fsx_only = (
+        "deployment",
+        "efficiency_ssd",
+        "pool_efficiency_retention",
+        "pool_fraction",
+        "ssd_headroom",
+        "throughput_mbps",
+    )
+    files_only = (
+        "active_fraction",
+        "s3files_threshold_kib",
+        "first_read_mode",
+        "first_read_stream_billing",
+        "metadata_multiplier",
+    )
+    values = {
+        "deployment": "MULTI_AZ_1",
+        "efficiency_ssd": 0.9,
+        "pool_efficiency_retention": 1.0,
+        "pool_fraction": 0.8,
+        "ssd_headroom": 0.5,
+        "throughput_mbps": 2048,
+        "active_fraction": 0.1,
+        "s3files_threshold_kib": 32.0,
+        "first_read_mode": "none",
+        "first_read_stream_billing": "file_read",
+        "metadata_multiplier": 3.0,
+    }
+    base = fm.baseline_cells()
+    for key in fsx_only:
+        over = fm.baseline_cells(_single(key, values[key]))
+        moved_fsx = False
+        for b, o in zip(base, over, strict=True):
+            assert _subtotals(b)[1] == pytest.approx(_subtotals(o)[1]), (
+                key,
+                b.pattern.key,
+            )
+            if _subtotals(b)[0] != pytest.approx(_subtotals(o)[0]):
+                moved_fsx = True
+        assert moved_fsx, key
+    for key in files_only:
+        over = fm.baseline_cells(_single(key, values[key]))
+        moved_files = False
+        for b, o in zip(base, over, strict=True):
+            assert _subtotals(b)[0] == pytest.approx(_subtotals(o)[0]), (
+                key,
+                b.pattern.key,
+            )
+            if _subtotals(b)[1] != pytest.approx(_subtotals(o)[1]):
+                moved_files = True
+        assert moved_files, key
+
+
+def test_read_scale_and_stored_tib_move_both_sides() -> None:
+    for key in ("read_scale", "stored_tib"):
+        value = 2.0 if key == "read_scale" else 40.0
+        over = fm.baseline_cells(_single(key, value))
+        base = fm.baseline_cells()
+        assert any(
+            _subtotals(b)[0] != pytest.approx(_subtotals(o)[0])
+            for b, o in zip(base, over, strict=True)
+        ), key
+        assert any(
+            _subtotals(b)[1] != pytest.approx(_subtotals(o)[1])
+            for b, o in zip(base, over, strict=True)
+        ), key
+
+
+# --- value parsing ------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "item, key, value",
+    [
+        ("efficiency_ssd=0.1", "efficiency_ssd", 0.1),
+        ("efficiency_ssd=.5", "efficiency_ssd", 0.5),
+        ("efficiency_ssd=1e-1", "efficiency_ssd", 0.1),
+        ("read_scale=128", "read_scale", 128.0),
+        ("stored_tib=  50  ", "stored_tib", 50.0),
+        ("throughput_mbps=256", "throughput_mbps", 256),
+        ("deployment=MULTI_AZ_1", "deployment", "MULTI_AZ_1"),
+        ("first_read_mode=none", "first_read_mode", "none"),
+    ],
+)
+def test_accepted_values_parse_to_the_expected_field(item, key, value) -> None:
+    a = fm.parse_assumptions([item])
+    assert getattr(a, key) == value
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        "throughput_mbps=auto",
+        "active_fraction=auto",
+    ],
+)
+def test_auto_parses_as_unspecified(item) -> None:
+    key = item.split("=")[0]
+    a = fm.parse_assumptions([item])
+    assert getattr(a, key) is None
+    assert key not in fm.specified(a)
+
+
+@pytest.mark.parametrize(
+    "item, code",
+    [
+        ("efficiency_ssd=1_0", "type"),
+        ("efficiency_ssd=30%", "type"),
+        ("efficiency_ssd=abc", "type"),
+        ("efficiency_ssd=true", "type"),
+        ("throughput_mbps=128.0", "type"),
+        ("throughput_mbps=AUTO", "type"),
+        ("efficiency_ssd=1e999", "not_finite"),
+        ("efficiency_ssd=nan", "not_finite"),
+        ("efficiency_ssd=Inf", "not_finite"),
+        ("efficiency_ssd=", "type"),
+        ("foo=1", "unknown_key"),
+        ("noeq", "bad_format"),
+        ("=1", "bad_format"),
+        ("efficiency_ssd=2", "range"),
+        ("read_scale=0", "range"),
+        ("stored_tib=0", "range"),
+        ("deployment=multi_az_1", "choice"),
+        ("first_read_mode=bogus", "choice"),
+        ("throughput_mbps=999", "throughput_tier"),
+        ("s3files_threshold_kib=1024", "threshold_unsupported"),
+        ("s3files_threshold_kib=64", "threshold_on_grid"),
+    ],
+)
+def test_a_rejected_value_raises_with_the_right_code(item, code) -> None:
+    with pytest.raises(fm.AssumptionError) as info:
+        a = fm.parse_assumptions([item])
+        fm.validate_assumptions(a)
+    assert info.value.code == code, item
+
+
+def test_a_duplicate_key_is_rejected_even_with_the_same_value() -> None:
+    with pytest.raises(fm.AssumptionError) as info:
+        fm.parse_assumptions(["pool_fraction=0.3", "pool_fraction=0.3"])
+    assert info.value.code == "duplicate"
+
+
+def test_a_validation_error_exits_two_on_the_command_line(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        sys, "argv", ["finops_model.py", "--baseline-json", "--assume", "foo=1"]
+    )
+    assert fm.main() == 2
+    captured = capsys.readouterr()
+    assert "finops-model:" in captured.err
+    assert fm.CJK.search(captured.err)  # Japanese by default
+
+
+def test_the_validation_error_language_follows_lang(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["finops_model.py", "--baseline-json", "--lang", "en", "--assume", "foo=1"],
+    )
+    assert fm.main() == 2
+    err = capsys.readouterr().err
+    assert "Unknown assumption" in err
+    assert not fm.CJK.search(err)
+
+
+# --- M-3: order independence of cross-item validation -------------------------------------------
+
+
+def test_throughput_and_deployment_validate_the_same_in_either_order() -> None:
+    forward = fm.parse_assumptions(["throughput_mbps=384", "deployment=SINGLE_AZ_2"])
+    backward = fm.parse_assumptions(["deployment=SINGLE_AZ_2", "throughput_mbps=384"])
+    fm.validate_assumptions(forward)  # no raise
+    fm.validate_assumptions(backward)  # no raise
+    api = fm.Assumptions(throughput_mbps=384, deployment="SINGLE_AZ_2")
+    fm.validate_assumptions(api)
+    # 384 is a second-generation tier only; against the default first generation it is rejected.
+    with pytest.raises(fm.AssumptionError) as info:
+        fm.validate_assumptions(fm.parse_assumptions(["throughput_mbps=384"]))
+    assert info.value.code == "throughput_tier"
+
+
+# --- combination rules --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--baseline-table", "--write"],
+        ["--baseline-table", "--check"],
+        ["--baseline-table", "--baseline-json"],
+        ["--list-assumptions", "--write"],
+        ["--list-assumptions", "--baseline-json"],
+        ["--baseline-table", "--list-assumptions"],
+        ["--assume", "pool_fraction=0.5"],
+        ["--list-assumptions", "--assume", "pool_fraction=0.5"],
+        ["--write", "--assume", "pool_fraction=0.5"],
+        ["--check", "--assume", "pool_fraction=0.5"],
+        ["--lang", "en", "--write"],
+    ],
+)
+def test_incompatible_flag_combinations_exit_two(
+    monkeypatch: pytest.MonkeyPatch, argv
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["finops_model.py", *argv])
+    with pytest.raises(SystemExit) as info:
+        fm.main()
+    assert info.value.code == 2, argv
+
+
+def test_assume_is_allowed_with_baseline_json_and_baseline_table(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for mode in ("--baseline-json", "--baseline-table"):
+        monkeypatch.setattr(
+            sys, "argv", ["finops_model.py", mode, "--assume", "pool_fraction=0.5"]
+        )
+        assert fm.main() == 0, mode
+        capsys.readouterr()
+
+
+# --- mutation testing ---------------------------------------------------------------------------
+
+
+def test_mutation_apply_ignores_all_keys_breaks_the_acting_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If _apply_assumptions returns the cell untouched, the fsx-only override no longer moves fsx."""
+    monkeypatch.setattr(fm, "_apply_assumptions", lambda cell, resolved: cell)
+    base = fm.baseline_cells()
+    over = fm.baseline_cells(_single("efficiency_ssd", 0.9))
+    assert all(_subtotals(b) == _subtotals(o) for b, o in zip(base, over, strict=True))
+
+
+@pytest.mark.parametrize("dropped", ALL_KEYS)
+def test_mutation_dropping_one_key_in_apply_is_caught(
+    monkeypatch: pytest.MonkeyPatch, dropped
+) -> None:
+    """Drop one resolved key before it is applied; moving that key must then fail to move anything.
+
+    For the two auto keys and the enums, moving to a value that differs from the baseline still has
+    to change some subtotal; dropping the key makes it not."""
+    real = fm._apply_assumptions
+
+    def mutant(cell, resolved):
+        patched = dict(resolved)
+        patched[dropped] = fm.ASSUMPTION_SPECS[dropped].baseline()
+        return real(cell, patched)
+
+    values = {
+        "deployment": "MULTI_AZ_1",
+        "efficiency_ssd": 0.9,
+        "pool_efficiency_retention": 1.0,
+        "pool_fraction": 0.8,
+        "ssd_headroom": 0.5,
+        "throughput_mbps": 2048,
+        "active_fraction": 0.1,
+        "s3files_threshold_kib": 32.0,
+        "first_read_mode": "none",
+        "first_read_stream_billing": "file_read",
+        "metadata_multiplier": 3.0,
+        "read_scale": 2.0,
+        "stored_tib": 40.0,
+    }
+    over = fm.baseline_cells(_single(dropped, values[dropped]))
+    monkeypatch.setattr(fm, "_apply_assumptions", mutant)
+    muted = fm.baseline_cells(_single(dropped, values[dropped]))
+    assert any(
+        _subtotals(a) != _subtotals(b) for a, b in zip(over, muted, strict=True)
+    ), dropped
+
+
+def test_mutation_removing_the_threshold_check_lets_a_bad_value_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(fm, "validate_assumptions", lambda a, lang="ja": None)
+    # Without the check, a 1 MiB threshold no longer raises.
+    fm.validate_assumptions(fm.parse_assumptions(["s3files_threshold_kib=2048"]))
+
+
+def test_mutation_emptying_the_notice_is_caught(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the notice emptied, the guarantee the notice test checks (a non-empty notice on an
+    override) no longer holds. The real test is `test_a_notice_is_present_exactly_when_...`."""
+    monkeypatch.setattr(fm, "_notice_text", lambda a, cells: "")
+    data = fm.baseline_json("ja", fm.Assumptions(pool_fraction=0.5))
+    assert not data["notice"]  # the mutant; the live notice test asserts it is truthy
+
+
+# --- notice -------------------------------------------------------------------------------------
+
+
+def test_a_notice_is_present_exactly_when_something_is_overridden() -> None:
+    assert "notice" not in fm.baseline_json("ja")
+    assert "notice" not in fm.baseline_json("ja", fm.Assumptions())
+    data = fm.baseline_json("ja", fm.Assumptions(pool_fraction=0.5))
+    assert data["notice"]
+    assert data["baseline_assumptions"] is False
+    table = fm.baseline_table("ja", fm.Assumptions(pool_fraction=0.5))
+    assert table.splitlines()[0].startswith("> ")
+
+
+def test_render_has_no_assumptions_parameter() -> None:
+    import inspect
+
+    assert "assumptions" not in inspect.signature(fm.render).parameters
+
+
+def test_each_caveat_clause_appears_only_when_its_condition_holds() -> None:
+    placeholder = fm.baseline_json("ja", fm.Assumptions(pool_fraction=0.5))["notice"]
+    assert "仮置きまたは未測定の前提を含む" in placeholder
+    definition = fm.baseline_json("ja", fm.Assumptions(read_scale=0.5))["notice"]
+    assert "仮置きまたは未測定の前提を含む" not in definition
+
+    first_read = fm.baseline_json("ja", fm.Assumptions(first_read_mode="none"))[
+        "notice"
+    ]
+    assert "初回読み出しを数える変種" in first_read
+    assert "初回読み出しを数える変種" not in placeholder
+
+    billing = fm.baseline_json(
+        "ja", fm.Assumptions(first_read_stream_billing="file_read")
+    )["notice"]
+    assert "ファイル読み取り課金が付くかどうか" in billing
+    assert "ファイル読み取り課金が付くかどうか" not in placeholder
+
+    tput = fm.baseline_json("ja", fm.Assumptions(throughput_mbps=128))["notice"]
+    assert "スループットは読者の指定" in tput
+    assert "スループットは読者の指定" not in placeholder
+
+
+def test_overriding_active_fraction_or_first_read_mode_drops_the_matching_premise() -> (
+    None
+):
+    base = fm.baseline_json("ja")["fixed_premises"]
+    active = fm.baseline_json("ja", fm.Assumptions(active_fraction=1.0))[
+        "fixed_premises"
+    ]
+    assert (
+        "s3files_high_performance_storage_is_fully_active_at_or_below_threshold" in base
+    )
+    assert (
+        "s3files_high_performance_storage_is_fully_active_at_or_below_threshold"
+        not in active
+    )
+    first = fm.baseline_json("ja", fm.Assumptions(first_read_mode="none"))[
+        "fixed_premises"
+    ]
+    assert "s3files_books_no_first_read_stream_when_there_are_no_writes" not in first
+    # the pool-share premise stays for both
+    assert "fsx_capacity_pool_share_is_fixed_in_every_pattern" in active
+
+
+# --- applied-range flags and model range --------------------------------------------------------
+
+
+def test_out_of_model_range_matches_an_independent_computation() -> None:
+    big = fm.Assumptions(read_scale=5000.0)
+    data = fm.baseline_json("ja", big)
+    for p in data["patterns"]:
+        for c in p["cells"]:
+            cell = next(
+                x
+                for x in fm.baseline_cells(big)
+                if x.pattern.key == p["id"] and x.object_kib == c["size_kib"]
+            )
+            expected = cell.required_mbps * (1 + cell.tput_headroom) > fm._max_tier(
+                cell
+            )
+            assert c["throughput_out_of_model_range"] == expected, (
+                p["id"],
+                c["size_kib"],
+            )
+
+
+def test_a_specified_tier_below_average_is_flagged() -> None:
+    data = fm.baseline_json(
+        "ja", fm.Assumptions(throughput_mbps=128, read_scale=1000.0)
+    )
+    assert any(
+        c["specified_tier_below_average"] for p in data["patterns"] for c in p["cells"]
+    )
+
+
+# --- M-4: metadata_multiplier only on BaselineCell, and its effect ------------------------------
+
+
+def test_scenario_and_baseline_cell_share_five_assumption_fields() -> None:
+    shared = (
+        "pool_efficiency_retention",
+        "throughput_mbps",
+        "active_fraction",
+        "first_read_mode",
+        "first_read_stream_billing",
+    )
+    scenario = fm.SCENARIOS[0]
+    cell = fm.baseline_cells()[0]
+    for name in shared:
+        assert hasattr(scenario, name), name
+        assert hasattr(cell, name), name
+        assert getattr(scenario, name) == getattr(cell, name), name
+    # read_scale and metadata_multiplier are BaselineCell-only
+    assert hasattr(cell, "metadata_multiplier")
+    assert hasattr(cell, "read_scale")
+    assert not hasattr(scenario, "metadata_multiplier")
+    assert not hasattr(scenario, "read_scale")
+
+
+def test_metadata_multiplier_scales_only_the_read_side_metadata() -> None:
+    cell = next(
+        c for c in fm.baseline_cells() if c.pattern.key == "P5" and c.object_kib == 64
+    )
+    doubled = fm.replace(cell, metadata_multiplier=2.0)
+    base_in, base_rd = fm.s3_files_metadata_usd(cell)
+    two_in, two_rd = fm.s3_files_metadata_usd(doubled)
+    assert two_in == base_in  # import side untouched
+    assert two_rd == pytest.approx(base_rd * 2.0)
+
+
+def test_metadata_multiplier_moves_the_files_subtotal_in_the_split_path_for_every_cell() -> (
+    None
+):
+    """It is applied through s3_files_metadata_usd, which the baseline grid always calls with
+    split_metadata=True; the read-metadata line is the only thing that moves."""
+    for base in fm.baseline_cells():
+        over = fm.replace(base, metadata_multiplier=3.0)
+        if base.reads_per_month > 0:
+            assert _subtotals(over)[1] >= _subtotals(base)[1]
+        # fsx side never moves
+        assert _subtotals(over)[0] == _subtotals(base)[0]
+
+
+def test_the_read_metadata_label_shows_the_multiplier_only_when_overridden() -> None:
+    cell = next(
+        c for c in fm.baseline_cells() if c.pattern.key == "P5" and c.object_kib == 64
+    )
+    default_labels = list(fm.s3_files_option(cell, split_metadata=True))
+    assert any(
+        label
+        == f"S3 Files メタデータ読み取り ({cell.reads_per_month:,.0f} 操作 × 4 KiB)"
+        for label in default_labels
+    )
+    over = fm.replace(cell, metadata_multiplier=2.0)
+    over_labels = list(fm.s3_files_option(over, split_metadata=True))
+    assert any("× 4 KiB × 2" in label for label in over_labels)
+
+
+def test_a_non_round_active_fraction_uses_one_decimal_in_the_label() -> None:
+    cell = next(
+        c for c in fm.baseline_cells() if c.pattern.key == "P1" and c.object_kib == 64
+    )
+    frac = fm.replace(cell, active_fraction=0.075)
+    assert any(
+        "アクティブ 7.5%" in label
+        for label in fm.s3_files_option(frac, split_metadata=True)
+    )
+    # a whole percent keeps the zero-decimal form
+    whole = fm.replace(cell, active_fraction=0.07)
+    assert any(
+        "アクティブ 7%" in label
+        for label in fm.s3_files_option(whole, split_metadata=True)
+    )
+    # the baseline's 100% is unchanged
+    assert any(
+        "アクティブ 100%" in label
+        for label in fm.s3_files_option(cell, split_metadata=True)
+    )
+
+
+def test_first_read_mode_working_set_can_exceed_the_read_count() -> None:
+    """P8 at 64 KiB writes more than it reads; working_set first reads are not capped by the model."""
+    cell = next(
+        c for c in fm.baseline_cells() if c.pattern.key == "P8" and c.object_kib == 64
+    )
+    ws = fm.replace(cell, first_read_mode="working_set")
+    assert fm._resolve_first_read_objects(ws) == ws.working_set_objects
+
+
+# --- stored_tib override integrity --------------------------------------------------------------
+
+
+def test_stored_tib_override_scales_quantities_and_drops_position() -> None:
+    data = fm.baseline_json("ja", fm.Assumptions(stored_tib=50.0))
+    assert data["stored_gib"] == pytest.approx(50 * 1024)
+    for p in data["patterns"]:
+        assert "position" not in p
+        for c in p["cells"]:
+            # quantities scale 2.5x versus the 20 TiB baseline
+            base_cell = next(
+                x
+                for x in fm.baseline_cells()
+                if x.pattern.key == p["id"] and x.object_kib == c["size_kib"]
+            )
+            assert c["read_gib"] == pytest.approx(base_cell.read_gib_per_month * 2.5)
+
+
+def test_a_fractional_stored_tib_emits_fractional_counts() -> None:
+    data = fm.baseline_json("ja", fm.Assumptions(stored_tib=1.3))
+    counts = [c["stored_objects"] for p in data["patterns"] for c in p["cells"]]
+    assert any(not float(x).is_integer() for x in counts)
+
+
+def test_the_whole_number_check_still_bites_on_the_baseline() -> None:
+    with pytest.raises(ValueError):
+        fm._whole(100.5)
+    assert fm._count(100.5, strict=False) == 100.5
