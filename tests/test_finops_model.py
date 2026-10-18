@@ -1242,7 +1242,6 @@ def test_auto_parses_as_unspecified(item) -> None:
         ("deployment=multi_az_1", "choice"),
         ("first_read_mode=bogus", "choice"),
         ("throughput_mbps=999", "throughput_tier"),
-        ("s3files_threshold_kib=1024", "threshold_unsupported"),
         ("s3files_threshold_kib=64", "threshold_on_grid"),
     ],
 )
@@ -1395,8 +1394,9 @@ def test_mutation_removing_the_threshold_check_lets_a_bad_value_through(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(fm, "validate_assumptions", lambda a, lang="ja": None)
-    # Without the check, a 1 MiB threshold no longer raises.
-    fm.validate_assumptions(fm.parse_assumptions(["s3files_threshold_kib=2048"]))
+    # Without the check, a grid-size threshold no longer raises. (A 1 MiB or larger threshold is
+    # allowed since PR-F; the grid-size equality is what the remaining stage-2 check rejects.)
+    fm.validate_assumptions(fm.parse_assumptions(["s3files_threshold_kib=64"]))
 
 
 def test_mutation_emptying_the_notice_is_caught(

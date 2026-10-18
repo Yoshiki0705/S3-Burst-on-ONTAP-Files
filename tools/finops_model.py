@@ -783,6 +783,16 @@ def s3_files_option(
             if sc.active_fraction is None
             else sc.active_fraction
         )
+        # Large file reads (1 MiB or larger file IO) are always streamed directly from the bucket,
+        # even when the file sits on high-performance storage, and carry an S3 GET plus a 4 KiB
+        # metadata read with no file read charge. The metering page states this of the I/O size, not
+        # the file size; this model treats one read as reading the whole object, so a file of 1 MiB
+        # or more is read with a 1 MiB-or-larger I/O. That assumption is stated in the note, and the
+        # real I/O size (NFS rsize and similar) is unverified. The default threshold is 128 KiB, so
+        # no object of 1 MiB or more enters this branch by default and the default output is
+        # unchanged; large_io only becomes true once the threshold is raised to 1 MiB or more.
+        #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html
+        large_io = object_kib >= 1024.0
         # A file smaller than the minimum billable size is charged as that size.
         floor_factor = max(1.0, S3FILES_MIN_FILE_KIB / object_kib)
         hps_gib = sc.stored_gib * active * floor_factor
@@ -800,11 +810,16 @@ def s3_files_option(
             streamed_reads = float(first_read_objects)
         else:
             streamed_reads = _resolve_first_read_objects(sc)
-        # A read that happens for the first time is still a single read, so the number of first-read
-        # streams cannot exceed the month's reads. Cap it: a cell whose written or working-set count
-        # exceeds the reads (default P8 64 KiB, `read_scale < 1`, `first_read_mode=working_set`)
-        # would otherwise book more GETs than there are reads.
-        streamed_reads = min(streamed_reads, sc.reads_per_month)
+        if large_io:
+            # Every read of a 1 MiB-or-larger file streams directly from the bucket, so all reads
+            # are GETs and none are served as file reads from high-performance storage.
+            streamed_reads = sc.reads_per_month
+        else:
+            # A read that happens for the first time is still a single read, so the number of
+            # first-read streams cannot exceed the month's reads. Cap it: a cell whose written or
+            # working-set count exceeds the reads (default P8 64 KiB, `read_scale < 1`,
+            # `first_read_mode=working_set`) would otherwise book more GETs than there are reads.
+            streamed_reads = min(streamed_reads, sc.reads_per_month)
         hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
         read_gib = hps_reads * io_kib / (1024 * 1024)
 
@@ -812,14 +827,23 @@ def s3_files_option(
         lines[
             t("S3 Files 高性能ストレージ (アクティブ {share})", share=active_label)
         ] = hps_gib * S3FILES["storage"].usd
-        if not split_metadata or streamed_reads > 0:
+        if large_io:
+            lines[t("GET リクエスト (1 MiB 以上はバケットから直接ストリーム)")] = (
+                streamed_reads * S3["tier2"].usd
+            )
+        elif not split_metadata or streamed_reads > 0:
             lines[t("GET リクエスト (初回読み出しはバケットからストリーム)")] = (
                 streamed_reads * S3["tier2"].usd
             )
         # Only when the reader asks for it: a first read charged as a file read of at least 32 KiB.
         # The default "none" leaves the current branch untouched; a cell that streams nothing on
-        # first read emits no line either way.
-        if sc.first_read_stream_billing == "file_read" and streamed_reads > 0:
+        # first read emits no line either way. A 1 MiB-or-larger read never carries a file read
+        # charge, so this line does not apply when large_io.
+        if (
+            not large_io
+            and sc.first_read_stream_billing == "file_read"
+            and streamed_reads > 0
+        ):
             stream_io_gib = (
                 streamed_reads * max(object_kib, S3FILES_MIN_IO_KIB) / (1024 * 1024)
             )
@@ -3075,10 +3099,8 @@ ASSUMPTION_SPECS: dict[str, AssumptionSpec] = {
         baseline=lambda: S3FILES_DEFAULT_THRESHOLD_KIB,
         tier="公式",
         description_ja="S3 Files の取り込みしきい値（KiB）",
-        domain_text_ja="0 より大きく 1024 未満。格子のサイズと同値は不可",
-        in_domain=lambda x: (
-            x > 0.0
-        ),  # the 1 MiB and grid-size limits are stage-2 checks
+        domain_text_ja="0 より大きい。格子のサイズと同値は不可",
+        in_domain=lambda x: x > 0.0,  # the grid-size limit is a stage-2 check
         reader_decides_ja="決める（設定）",
     ),
     "first_read_mode": AssumptionSpec(
@@ -3383,28 +3405,22 @@ def validate_assumptions(a: Assumptions, lang: str = "ja") -> None:
                 choices=_sep(lang).join(spec.choices),
             )
 
-    # s3files_threshold_kib: not 1 MiB or more, and not equal to a grid size.
+    # s3files_threshold_kib: not equal to a grid size. A threshold of 1 MiB or more is now allowed:
+    # the high-performance branch streams reads of 1 MiB or larger directly (GET + 4 KiB metadata
+    # read), matching the metering page, so the model no longer overcounts there (PR-F).
     threshold = values["s3files_threshold_kib"]
-    if threshold is not None:
-        if threshold >= 1024.0:
-            raise _assumption_error(
-                lang,
-                "threshold_unsupported",
-                "`s3files_threshold_kib` に 1 MiB 以上は指定できない。"
-                "1 MiB 以上の I/O を直接ストリームにする公式の規則をモデルが持たず、過大に計上するため",
-                key="s3files_threshold_kib",
-                value=f"{threshold:g}",
-            )
-        if any(abs(threshold - size) < 1e-9 for size in BASELINE_SIZES_KIB):
-            raise _assumption_error(
-                lang,
-                "threshold_on_grid",
-                "`s3files_threshold_kib` を格子のサイズ（{sizes}）と同じ値にできない。"
-                "ちょうどのサイズの扱いが公式の文面で揃っていない",
-                key="s3files_threshold_kib",
-                value=f"{threshold:g}",
-                sizes=_sep(lang).join(_size_label(s) for s in BASELINE_SIZES_KIB),
-            )
+    if threshold is not None and any(
+        abs(threshold - size) < 1e-9 for size in BASELINE_SIZES_KIB
+    ):
+        raise _assumption_error(
+            lang,
+            "threshold_on_grid",
+            "`s3files_threshold_kib` を格子のサイズ（{sizes}）と同じ値にできない。"
+            "ちょうどのサイズの扱いが公式の文面で揃っていない",
+            key="s3files_threshold_kib",
+            value=f"{threshold:g}",
+            sizes=_sep(lang).join(_size_label(s) for s in BASELINE_SIZES_KIB),
+        )
 
     # throughput_mbps against the effective deployment's tier set.
     tput = values["throughput_mbps"]
@@ -5962,13 +5978,6 @@ def _sens_not_included() -> list[str]:
             ),
             t("documented（公式の計量ページ）。課金の基準は open"),
             t("未算入"),
-        ],
-        [
-            t("1 MiB 以上のしきい値"),
-            t("—"),
-            t("モデルが公式の直接ストリーム規則を持たない"),
-            t("documented（公式の計量ページ）、モデルの不在は verified"),
-            t("未対応（PR-F）"),
         ],
     ]
     out += table(headers, rows)

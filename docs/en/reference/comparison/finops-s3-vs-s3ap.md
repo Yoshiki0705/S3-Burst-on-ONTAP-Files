@@ -2411,7 +2411,6 @@ No numbers are given. The "confidence of basis" uses the four words documented /
 | Pool read operation count | the FSx for ONTAP subtotal | the documentation counts it in three ways and it is unconfirmed | open | included in the subtotal but unconfirmed |
 | GETs through S3 Access Points | the FSx for ONTAP subtotal rises | the model adds only the PUT through the access point (confirmed in the code); the GET charge depends on the unit price and the path | open (the fact about the code is verified; the unit price was not re-fetched) | not included |
 | Storage of metadata on high-performance storage | the S3 Files subtotal rises | the documentation states that metadata of an accessed directory does not expire; the charging basis is not in the documentation | documented (the metering page); the charging basis is open | not included |
-| Threshold of 1 MiB or more | — | the model does not have the documented direct-stream rule | documented (the metering page); the model's absence is verified | not supported (PR-F) |
 
 #### Procedure for running your own values
 
