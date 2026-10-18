@@ -145,6 +145,7 @@ TRANSLATIONS: dict[str, str] = {
     "ストレージ (S3 Standard)": "Storage (S3 Standard)",
     "ストレージ (S3 Standard、着信面 {size})": "Storage (S3 Standard, landing area {size})",
     "ストレージ (S3 Standard、正本はバケットに残る)": "Storage (S3 Standard; the authoritative copy stays in the bucket)",
+    "S3 Standard 非現行バージョンの保持": "S3 Standard noncurrent-version retention",
     "PUT リクエスト": "PUT requests",
     "GET リクエスト": "GET requests",
     "PUT リクエスト (S3 バケット宛)": "PUT requests (to an S3 bucket)",
@@ -981,6 +982,8 @@ TRANSLATIONS.update(
         "読み取り側メタデータの操作数倍率": "Multiplier on the read-side metadata operation count",
         "月間読み取り量に掛ける倍率（1.0 = パターンの定義どおり）": "Multiplier on the monthly read volume (1.0 = as the pattern defines it)",
         "保存量（TiB）": "Stored volume (TiB)",
+        "非現行バージョンの保持容量（GiB、S3 Files 側）。S3 Standard の増分として算入": "Retained noncurrent-version capacity (GiB, S3 Files side); added as extra S3 Standard storage",
+        "スナップショットの保持容量（GiB、FSx for ONTAP 側）。層・課金が未確認のため式に算入せず入力のみ（open 未確認）": "Retained snapshot capacity (GiB, FSx for ONTAP side); the tier and charge are unconfirmed, so it is an input only and not put into the formula (open/unconfirmed)",
         # --- ASSUMPTION_SPECS domain text ---------------------------------------------------------
         "0 以上 1 未満": "0 or more, less than 1",
         "0 以上 1 以下": "0 to 1 inclusive",
@@ -1001,6 +1004,8 @@ TRANSLATIONS.update(
         "マウントオプションで動く": "moves with the mount options",
         "決める（自分のワークロード）": "decide (your own workload)",
         "決める": "decide",
+        "決める（バージョニングの保持方針）": "decide (versioning retention policy)",
+        "決める（スナップショットの保持方針）": "decide (snapshot retention policy)",
         # --- --baseline-table framing -------------------------------------------------------------
         "基準の前提（公開文書と同じ）": "Baseline assumptions (the same as the published document)",
         "※ 必要なスループットが最大段を超える。モデルの適用範囲外": "* The required throughput exceeds the maximum tier; outside the model's range",
@@ -1126,6 +1131,10 @@ TRANSLATIONS.update(
         "J1 のような組み合わせが実在の構成として成立するか（pool 80% で SSD の最小値に当たる場合など）は確認していない。": "Whether a combination like J1 holds as a real configuration (for instance when pool 80% hits the SSD minimum) has not been confirmed.",
         # Not included.
         "非現行バージョンの保持（S3 Files 側）とスナップショットの保持（FSx for ONTAP 側）は、両側の式が未測定で、書き込みの多いパターンでは小計を大きく動かしうる。保持日数を入力にするのは PR-A2（この作業の範囲外）で、ここでは未算入として注記する。": "Noncurrent-version retention (S3 Files side) and snapshot retention (FSx for ONTAP side) have formulas that are unmeasured on both sides and can move the subtotals substantially in write-heavy patterns. Taking the retention days as an input belongs to PR-A2 (outside the scope of this work); here it is noted as not included.",
+        # C1 (PR-A2): retention-days inputs. Top note after both sides became inputs.
+        "非現行バージョンの保持（S3 Files 側）は `--assume noncurrent_version_gib=GiB` で入力でき、S3 Standard の増分として小計に算入する（既定 0）。スナップショットの保持（FSx for ONTAP 側）は `--assume snapshot_gib=GiB` で入力を受けるが、どの層に置かれ、どう課金されるかが公式文面で揃わず、式には算入しない（既定 0、open 未確認）。どちらも保持日数から容量を導く式は未測定なので、容量を直接与える。": "Noncurrent-version retention (S3 Files side) can be entered with `--assume noncurrent_version_gib=GiB` and is added to the subtotal as extra S3 Standard storage (default 0). Snapshot retention (FSx for ONTAP side) takes an input with `--assume snapshot_gib=GiB`, but which tier it sits on and how it is charged are not consistent across the official pages, so it is not put into the formula (default 0, open/unconfirmed). Neither has a measured formula from retention days to capacity, so capacity is given directly.",
+        "保持分がどの層に置かれ、どう課金されるかで公式文面が揃わない": "the official pages are not consistent on which tier the retained data sits on or how it is charged",
+        "入力あり（snapshot_gib）、式に算入しない": "input available (snapshot_gib), not put into the formula",
         "数値は書かない。「根拠の確からしさ」は documented / verified / hypothesis / open の 4 語で付ける。": 'No numbers are given. The "confidence of basis" uses the four words documented / verified / hypothesis / open.',
         "費目": "Item",
         "向き": "Direction",

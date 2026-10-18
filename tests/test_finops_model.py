@@ -970,6 +970,8 @@ ALL_KEYS = (
     "metadata_multiplier",
     "read_scale",
     "stored_tib",
+    "noncurrent_version_gib",
+    "snapshot_gib",
 )
 
 
@@ -979,7 +981,7 @@ def _subtotals(cell: fm.BaselineCell) -> tuple[float, float]:
     return sum(fm.fsx_s3ap(cell).values()), sum(files.values())
 
 
-def test_the_registry_api_list_and_dataclass_hold_the_same_thirteen_keys() -> None:
+def test_the_registry_api_list_and_dataclass_hold_the_same_keys() -> None:
     assert set(fm.ASSUMPTION_SPECS) == set(ALL_KEYS)
     assert tuple(fm.ASSUMPTION_SPECS) == ALL_KEYS  # order is canonical
     fields = {f.name for f in fm.Assumptions.__dataclass_fields__.values()}
@@ -989,6 +991,40 @@ def test_the_registry_api_list_and_dataclass_hold_the_same_thirteen_keys() -> No
     assert listed == set(ALL_KEYS)
     for spec in fm.ASSUMPTION_SPECS.values():
         assert spec.tier in ("公式", "観測", "試算前提", "仮置き", "定義")
+
+
+def test_c1_noncurrent_versions_add_an_s3_standard_line_only_when_set() -> None:
+    """C1 (PR-A2) S3 Files side: non-current versions are priced as extra S3 Standard storage,
+    as the marginal tiered cost on top of the stored volume. Default 0 books no line, so the
+    baseline output is unchanged."""
+    base = fm.baseline_cells()[0]
+    base_files = fm.s3_files_option(base, split_metadata=True)
+    assert base_files is not None
+    label = "S3 Standard 非現行バージョンの保持"
+    assert label not in base_files  # default books nothing
+
+    over_cell = fm.baseline_cells(fm.Assumptions(noncurrent_version_gib=1000.0))[0]
+    over_files = fm.s3_files_option(over_cell, split_metadata=True)
+    assert over_files is not None
+    expected = fm.tiered_s3_storage(base.stored_gib + 1000.0) - fm.tiered_s3_storage(
+        base.stored_gib
+    )
+    assert over_files[label] == pytest.approx(expected)
+    assert expected > 0
+
+
+def test_c1_snapshot_gib_is_an_input_that_moves_no_subtotal() -> None:
+    """C1 (PR-A2) FSx for ONTAP side: snapshot_gib is an input only. Which tier snapshot data
+    occupies is open/unconfirmed, so it is not put into any formula and must move neither the
+    S3 Files nor the FSx for ONTAP subtotal."""
+    base = fm.baseline_cells()[0]
+    over = fm.baseline_cells(fm.Assumptions(snapshot_gib=99_999.0))[0]
+    assert _subtotals(base) == _subtotals(over)
+    # It is still a registered assumption, so it is validated and echoed as an override.
+    fm.validate_assumptions(fm.Assumptions(snapshot_gib=99_999.0))
+    data = fm.baseline_json("ja", fm.Assumptions(snapshot_gib=10.0))
+    keys = [o["key"] for o in data["assumption_overrides"]]
+    assert "snapshot_gib" in keys
 
 
 def test_the_default_grid_is_the_same_whether_or_not_assumptions_are_given() -> None:
@@ -1010,8 +1046,9 @@ def test_setting_every_key_to_its_baseline_value_reproduces_the_baseline_subtota
     None
 ):
     """A full set of explicit values equal to the baseline: the amounts match, a notice is attached,
-    and all thirteen keys show up as overrides. throughput and active resolve to 128 and 1.0 in
-    every cell, derived from the cells rather than asserted."""
+    and every key shows up as an override. throughput and active resolve to 128 and 1.0 in
+    every cell, derived from the cells rather than asserted. noncurrent_version_gib and snapshot_gib
+    set to their baseline 0 book no line, so the subtotals still match."""
     for cell in fm.baseline_cells():
         if cell.object_kib <= cell.s3files_threshold_kib:
             # auto picks the smallest tier that covers the requirement; the grid lands on 128.
@@ -1037,6 +1074,8 @@ def test_setting_every_key_to_its_baseline_value_reproduces_the_baseline_subtota
         metadata_multiplier=1.0,
         read_scale=1.0,
         stored_tib=20.0,
+        noncurrent_version_gib=0.0,
+        snapshot_gib=0.0,
     )
     fm.validate_assumptions(explicit)
     # throughput=128 and active=1.0 are the auto values in every cell, so the subtotals match.
@@ -1047,7 +1086,7 @@ def test_setting_every_key_to_its_baseline_value_reproduces_the_baseline_subtota
     data = fm.baseline_json("ja", explicit)
     assert data["baseline_assumptions"] is False
     assert "notice" in data
-    assert len(data["assumption_overrides"]) == 13
+    assert len(data["assumption_overrides"]) == len(ALL_KEYS)
 
 
 def test_an_override_is_an_override_even_when_the_value_equals_the_baseline() -> None:
@@ -1352,7 +1391,14 @@ def test_mutation_apply_ignores_all_keys_breaks_the_acting_side(
     assert all(_subtotals(b) == _subtotals(o) for b, o in zip(base, over, strict=True))
 
 
-@pytest.mark.parametrize("dropped", ALL_KEYS)
+# snapshot_gib (C1, PR-A2) is an input only: the tier it occupies is open/unconfirmed, so it is
+# deliberately not put into any formula and moves no subtotal. It is therefore excluded from the
+# "dropping the key must stop a subtotal from moving" mutation. noncurrent_version_gib does move the
+# S3 Files subtotal (extra S3 Standard storage) and stays covered.
+_APPLY_MUTATION_KEYS = tuple(k for k in ALL_KEYS if k != "snapshot_gib")
+
+
+@pytest.mark.parametrize("dropped", _APPLY_MUTATION_KEYS)
 def test_mutation_dropping_one_key_in_apply_is_caught(
     monkeypatch: pytest.MonkeyPatch, dropped
 ) -> None:
@@ -1381,6 +1427,7 @@ def test_mutation_dropping_one_key_in_apply_is_caught(
         "metadata_multiplier": 3.0,
         "read_scale": 2.0,
         "stored_tib": 40.0,
+        "noncurrent_version_gib": 1000.0,
     }
     over = fm.baseline_cells(_single(dropped, values[dropped]))
     monkeypatch.setattr(fm, "_apply_assumptions", mutant)
@@ -1723,7 +1770,14 @@ def test_the_numeric_and_enum_assumptions_all_have_sweeps() -> None:
     """Every registry key that the section sweeps has a SWEEPS entry (or a stated reason not to)."""
     swept = set(fm.SWEEPS)
     # stored_tib's baseline is a definition, but it is still swept; read_scale likewise.
+    # C1 (PR-A2): the retention-days inputs default to 0 (no line booked) and are documented in the
+    # "not included" table rather than swept in the one-at-a-time sensitivity section, so they carry
+    # no SWEEPS entry by design. snapshot_gib is not even in any formula (open/unconfirmed tier).
+    not_swept = {"noncurrent_version_gib", "snapshot_gib"}
     for key in fm.ASSUMPTION_SPECS:
+        if key in not_swept:
+            assert key not in swept, key
+            continue
         assert key in swept, key
 
 
