@@ -400,7 +400,8 @@ def _independent_subtotals(
         floor_factor = max(Decimal(1), Decimal(10) / kib)
         hps = stored * floor_factor * _dec(fm.S3FILES["storage"].usd)
         io_kib = max(kib, Decimal(32))
-        streamed = writes
+        # A first read is still one read, so the stream count cannot exceed the month's reads.
+        streamed = min(writes, reads)
         files_get = streamed * _dec(fm.S3["tier2"].usd)
         imp = writes * io_kib * gib_per_kib * _dec(fm.S3FILES["write"].usd)
         hps_reads = max(Decimal(0), reads - streamed)
@@ -443,7 +444,7 @@ FIGURE_SUBTOTALS = {
     ("P4", 4096): ("$1,781.83", "$514.74"),
     ("P6", 64): ("$2,218.13", "$12,030.81"),
     ("P6", 4096): ("$1,788.08", "$543.52"),
-    ("P8", 64): ("$2,147.36", "$11,114.33"),
+    ("P8", 64): ("$2,147.36", "$11,002.59"),
     ("P8", 4096): ("$1,786.97", "$538.32"),
 }
 DIRECT_SUBTOTALS = {
@@ -573,6 +574,41 @@ def test_a_cell_with_no_writes_books_no_first_read_stream_line() -> None:
         plain = fm.s3_files_option(_cell(pattern.key, 64))
         assert plain is not None
         assert abs(sum(lines.values()) - sum(plain.values())) < 1e-9, pattern.key
+
+
+_FIRST_READ_STREAM_LABEL = "GET リクエスト (初回読み出しはバケットからストリーム)"
+
+
+def test_p8_64_kib_first_read_get_is_capped_at_the_read_count() -> None:
+    """PR-H: the first-read stream GET line of the default P8 64 KiB cell is driven by the month's
+    read count, not the (larger) written count. The cell books 335,544,320 writes against only
+    33,554,432 reads, so without the cap the GET line would be ten times too large."""
+    cell = _cell("P8", 64)
+    # The cap binds here: the resolved first-read count exceeds the reads.
+    assert fm._resolve_first_read_objects(cell) > cell.reads_per_month
+    lines = fm.s3_files_option(cell, split_metadata=True)
+    assert lines is not None
+    get = lines[_FIRST_READ_STREAM_LABEL]
+    assert abs(get - cell.reads_per_month * fm.S3["tier2"].usd) < 1e-9
+    # Concretely, the capped GET line is 12.42, not the uncapped 124.15.
+    assert fm.usd(get) == "$12.42"
+    assert fm.usd(sum(lines.values())) == "$11,002.59"
+
+
+def test_only_p8_64_kib_moves_under_the_cap_the_other_31_cells_are_unchanged() -> None:
+    """PR-H changes exactly one of the 32 baseline cells. For every other cell the cap is a no-op:
+    the resolved first-read count never exceeds the reads (writes <= reads, or the object is above
+    the threshold and streamed directly), so the first-read GET line equals the uncapped value."""
+    moved = []
+    for cell in fm.baseline_cells():
+        resolved = fm._resolve_first_read_objects(cell)
+        capped = min(resolved, cell.reads_per_month)
+        if (
+            abs(resolved - capped) > 1e-9
+            and cell.object_kib <= cell.s3files_threshold_kib
+        ):
+            moved.append((cell.pattern.key, int(cell.object_kib)))
+    assert moved == [("P8", 64)], moved
 
 
 # --- the generated section -------------------------------------------------------------------
