@@ -2220,6 +2220,8 @@ The "baseline-value tier" is where the baseline value comes from (documented / o
 | `metadata_multiplier` | 1 | placeholder | Multiplier on the read-side metadata operation count | moves with the mount options | S3 Files |
 | `read_scale` | 1 | definition | Multiplier on the monthly read volume (1.0 = as the pattern defines it) | decide (your own workload) | both sides |
 | `stored_tib` | 20 | definition | Stored volume (TiB) | decide | both sides |
+| `noncurrent_version_gib` | 0 | modelling assumption | Retained noncurrent-version capacity (GiB, S3 Files side); added as extra S3 Standard storage | decide (versioning retention policy) | — |
+| `snapshot_gib` | 0 | modelling assumption | Retained snapshot capacity (GiB, FSx for ONTAP side); the tier and charge are unconfirmed, so it is an input only and not put into the formula (open/unconfirmed) | decide (snapshot retention policy) | — |
 | Region | `ap-northeast-1` | definition | verification region | — | — |
 | Unit-price date | 2026-08-09 | definition | Price List snapshot date | — | — |
 | Definition of stored volume | 20 TiB logical | definition | the common ground shared by all cells | — | — |
@@ -2397,14 +2399,13 @@ Whether a combination like J1 holds as a real configuration (for instance when p
 
 #### Items not included
 
-Noncurrent-version retention (S3 Files side) and snapshot retention (FSx for ONTAP side) have formulas that are unmeasured on both sides and can move the subtotals substantially in write-heavy patterns. Taking the retention days as an input belongs to PR-A2 (outside the scope of this work); here it is noted as not included.
+Noncurrent-version retention (S3 Files side) can be entered with `--assume noncurrent_version_gib=GiB` and is added to the subtotal as extra S3 Standard storage (default 0). Snapshot retention (FSx for ONTAP side) takes an input with `--assume snapshot_gib=GiB`, but which tier it sits on and how it is charged are not consistent across the official pages, so it is not put into the formula (default 0, open/unconfirmed). Neither has a measured formula from retention days to capacity, so capacity is given directly.
 
 No numbers are given. The "confidence of basis" uses the four words documented / verified / hypothesis / open.
 
 | Item | Direction | Basis | Confidence of basis | Status |
 |---|---|---|---|---|
-| Noncurrent-version retention (S3 Files side) | the S3 Files subtotal rises; larger in write-heavy patterns | S3 Files requires versioning (documented on the sync page) | documented (the sync page); the size of the effect is hypothesis | not included (days as an input is PR-A2) |
-| Snapshot retention (FSx for ONTAP side) | the FSx for ONTAP subtotal is expected to rise | this design has not read in the documentation which tier the retained data sits on or how it is charged | open (unconfirmed; the direction too) | not included (days as an input is PR-A2) |
+| Snapshot retention (FSx for ONTAP side) | the FSx for ONTAP subtotal is expected to rise | the official pages are not consistent on which tier the retained data sits on or how it is charged | open (unconfirmed; the direction too) | input available (snapshot_gib), not put into the formula |
 | Metadata SSD for the pool-placed data | the FSx for ONTAP subtotal rises | the documented statement that file metadata always remains on the SSD tier; one rough figure (the sizing blog) | documented (the volume-capacity page, the sizing blog); the base unit is open | not included (pending the PR-A2 decision) |
 | Added SSD IOPS, backup, snapshot reserve | the FSx for ONTAP subtotal rises | this design has not read the unit price and charging mechanism in the documentation | open | not included |
 | Write requests to the pool | the FSx for ONTAP subtotal rises | a unit price is defined in the model but not used in the formula (confirmed in the code) | open (the fact about the code is verified) | not included |

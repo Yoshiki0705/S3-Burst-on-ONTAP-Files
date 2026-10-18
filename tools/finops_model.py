@@ -775,6 +775,16 @@ def s3_files_option(
         t("PUT リクエスト (S3 バケット宛)"): sc.objects_per_month * S3["tier1"].usd,
     }
 
+    # C1 (PR-A2): non-current versions are extra S3 Standard storage. S3 Files requires bucket
+    # versioning and keeps old versions on every edit (documented: the S3 Files sync page), so a
+    # reader who retains them pays for the extra GiB. Priced as the marginal tiered cost on top of
+    # the current volume. Default 0 books nothing, so the baseline output is unchanged.
+    noncurrent_gib = getattr(sc, "noncurrent_version_gib", 0.0)
+    if noncurrent_gib > 0:
+        lines[t("S3 Standard 非現行バージョンの保持")] = tiered_s3_storage(
+            sc.stored_gib + noncurrent_gib
+        ) - tiered_s3_storage(sc.stored_gib)
+
     if object_kib <= sc.s3files_threshold_kib:
         retention_days = sc.retention_months * 30.0
         # None (default) keeps the retention-window formula; a reader's value is used as given.
@@ -2717,6 +2727,13 @@ class BaselineCell:
     # the read-side metadata operation count. A Scenario does not carry these.
     read_scale: float = 1.0
     metadata_multiplier: float = 1.0
+    # BaselineCell-only (C1, PR-A2). Retention-days cost inputs, both 0 by default so no line is
+    # booked. noncurrent_version_gib is the S3 Files side (non-current versions, priced as extra S3
+    # Standard storage; documented from the sync page). snapshot_gib is the FSx for ONTAP side,
+    # which is NOT put into the formula: which tier snapshot data sits in is policy-dependent and
+    # the official pages disagree, so it is an input kept at 0 with an open (未確認) note.
+    noncurrent_version_gib: float = 0.0
+    snapshot_gib: float = 0.0
 
     @property
     def file_protocol_required(self) -> bool:
@@ -3151,6 +3168,31 @@ ASSUMPTION_SPECS: dict[str, AssumptionSpec] = {
         in_domain=lambda x: x > 0.0,
         reader_decides_ja="決める",
     ),
+    # C1 (PR-A2): retention-days cost inputs. Both default to 0, so the baseline output is
+    # unchanged. noncurrent_version_gib goes into the S3 Files subtotal as extra S3 Standard
+    # storage (documented from the sync page). snapshot_gib is an input only: it is not put into
+    # any formula because the tier snapshot data occupies is policy-dependent and the official
+    # pages disagree, so it stays open (未確認). See s3_files_option (C1) and the impl note.
+    "noncurrent_version_gib": AssumptionSpec(
+        key="noncurrent_version_gib",
+        kind="float",
+        baseline=lambda: 0.0,
+        tier="試算前提",
+        description_ja="非現行バージョンの保持容量（GiB、S3 Files 側）。S3 Standard の増分として算入",
+        domain_text_ja="0 以上の有限値",
+        in_domain=lambda x: x >= 0.0,
+        reader_decides_ja="決める（バージョニングの保持方針）",
+    ),
+    "snapshot_gib": AssumptionSpec(
+        key="snapshot_gib",
+        kind="float",
+        baseline=lambda: 0.0,
+        tier="試算前提",
+        description_ja="スナップショットの保持容量（GiB、FSx for ONTAP 側）。層・課金が未確認のため式に算入せず入力のみ（open 未確認）",
+        domain_text_ja="0 以上の有限値",
+        in_domain=lambda x: x >= 0.0,
+        reader_decides_ja="決める（スナップショットの保持方針）",
+    ),
 }
 
 
@@ -3177,6 +3219,10 @@ class Assumptions:
     metadata_multiplier: float | None = None
     read_scale: float | None = None
     stored_tib: float | None = None
+    # C1 (PR-A2): noncurrent_version_gib books an S3 Files line when > 0; snapshot_gib is input
+    # only, not in any formula (open/unconfirmed tier). Both 0 by default.
+    noncurrent_version_gib: float | None = None
+    snapshot_gib: float | None = None
 
 
 def specified(a: Assumptions) -> dict[str, object]:
@@ -3472,6 +3518,8 @@ def _apply_assumptions(cell: BaselineCell, resolved: dict[str, object]) -> Basel
         first_read_stream_billing=str(resolved["first_read_stream_billing"]),
         metadata_multiplier=float(resolved["metadata_multiplier"]),
         read_scale=float(resolved["read_scale"]),
+        noncurrent_version_gib=float(resolved["noncurrent_version_gib"]),
+        snapshot_gib=float(resolved["snapshot_gib"]),
     )
 
 
@@ -5903,9 +5951,10 @@ def _sens_not_included() -> list[str]:
         t("#### 算入していない費目"),
         "",
         t(
-            "非現行バージョンの保持（S3 Files 側）とスナップショットの保持（FSx for ONTAP 側）は、"
-            "両側の式が未測定で、書き込みの多いパターンでは小計を大きく動かしうる。"
-            "保持日数を入力にするのは PR-A2（この作業の範囲外）で、ここでは未算入として注記する。"
+            "非現行バージョンの保持（S3 Files 側）は `--assume noncurrent_version_gib=GiB` で入力でき、"
+            "S3 Standard の増分として小計に算入する（既定 0）。スナップショットの保持（FSx for ONTAP 側）は "
+            "`--assume snapshot_gib=GiB` で入力を受けるが、どの層に置かれ、どう課金されるかが公式文面で揃わず、"
+            "式には算入しない（既定 0、open 未確認）。どちらも保持日数から容量を導く式は未測定なので、容量を直接与える。"
         ),
         "",
         t(
@@ -5916,18 +5965,11 @@ def _sens_not_included() -> list[str]:
     headers = [t("費目"), t("向き"), t("根拠"), t("根拠の確からしさ"), t("状態")]
     rows = [
         [
-            t("非現行バージョンの保持（S3 Files 側）"),
-            t("S3 Files の小計が上がる。書き込みの多いパターンで大きい"),
-            t("S3 Files はバージョニング必須（公式の同期のページ）"),
-            t("documented（公式の同期のページ）。影響の大きさは hypothesis"),
-            t("未算入（日数の入力は PR-A2）"),
-        ],
-        [
             t("スナップショットの保持（FSx for ONTAP 側）"),
             t("FSx for ONTAP の小計が上がる見込み"),
-            t("保持分がどの層に置かれ、どう課金されるかを公式文書で読んでいない"),
+            t("保持分がどの層に置かれ、どう課金されるかで公式文面が揃わない"),
             t("open（未確認。方向も未確認）"),
-            t("未算入（日数の入力は PR-A2）"),
+            t("入力あり（snapshot_gib）、式に算入しない"),
         ],
         [
             t("pool 配置分のメタデータ用 SSD"),
