@@ -59,6 +59,37 @@ LOCAL_NAMES = {
         "VMware-Migration-EC2-ONTAP",
         "vmware-migration-ec2-ontap",
     ),
+    # The six below are in check_links.PUBLISHED_REPOS and are cited by the blog drafts, so
+    # check_blog_links.root_for() needs their local directory names here. Each lists the GitHub
+    # name first -- so an exact match is tried before the case-insensitive fall-through -- then the
+    # directory names these clones actually carry under ~/Projects. The divergences were read from
+    # the GitHub API in PUBLISHED_REPOS's comment; the local names were confirmed against the
+    # sibling directories on disk.
+    "FSx-for-ONTAP-Observability-integrations": (
+        "FSx-for-ONTAP-Observability-integrations",
+        "fsxn-observability-integrations",
+    ),
+    "FSx-for-ONTAP-Cyber-Resilience-Patterns": (
+        "FSx-for-ONTAP-Cyber-Resilience-Patterns",
+        "fsxn-cyber-resilience-patterns",
+    ),
+    "FSx-for-ONTAP-Lakehouse-Integrations": (
+        "FSx-for-ONTAP-Lakehouse-Integrations",
+        "fsxn-lakehouse-integrations",
+    ),
+    "FSx-for-ONTAP-Agentic-Access-Aware-RAG": (
+        "FSx-for-ONTAP-Agentic-Access-Aware-RAG",
+        "RAG-FSxN-CDK",
+        "agentic-rag",
+    ),
+    "ONTAP-Edge-to-Cloud-AI": (
+        "ONTAP-Edge-to-Cloud-AI",
+        "edge-to-cloud-ai",
+    ),
+    "BLEA-FSx-for-ONTAP-Usecase": (
+        "BLEA-FSx-for-ONTAP-Usecase",
+        "blea-fsxn-usecase",
+    ),
 }
 
 FAIL_ROLE = "retraction"
