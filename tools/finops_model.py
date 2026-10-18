@@ -795,13 +795,16 @@ def s3_files_option(
         #
         # An explicit `first_read_objects` (used by the sensitivity helper) wins. Otherwise
         # `first_read_mode` decides: "written" is the current default (objects written this month),
-        # "none" counts nothing, "working_set" counts the working-set objects. The model does not
-        # cap this at the read count; a cell where the written or working-set count exceeds the
-        # reads then books more GETs than there are reads (see ASSUMPTION_SPECS first_read_mode).
+        # "none" counts nothing, "working_set" counts the working-set objects.
         if first_read_objects is not None:
             streamed_reads = float(first_read_objects)
         else:
             streamed_reads = _resolve_first_read_objects(sc)
+        # A read that happens for the first time is still a single read, so the number of first-read
+        # streams cannot exceed the month's reads. Cap it: a cell whose written or working-set count
+        # exceeds the reads (default P8 64 KiB, `read_scale < 1`, `first_read_mode=working_set`)
+        # would otherwise book more GETs than there are reads.
+        streamed_reads = min(streamed_reads, sc.reads_per_month)
         hps_reads = max(0.0, sc.reads_per_month - streamed_reads)
         read_gib = hps_reads * io_kib / (1024 * 1024)
 
@@ -4128,17 +4131,6 @@ def _specified_tier_below_average(cell: BaselineCell) -> bool:
     )
 
 
-def _first_read_exceeds_reads(cell: BaselineCell) -> bool:
-    """True when the modelled first-read stream count exceeds the month's read count (M-1).
-
-    Only in the high-performance-storage branch (object at or below the threshold). The model does
-    not cap this; PR-H will.
-    """
-    if cell.object_kib > cell.s3files_threshold_kib:
-        return False
-    return _resolve_first_read_objects(cell) > cell.reads_per_month
-
-
 def _changes_text(a: Assumptions, resolved_baseline: dict[str, object]) -> str:
     """`key=value（基準 value）` list for the notice, baseline-equal keys marked."""
     parts: list[str] = []
@@ -4219,15 +4211,6 @@ def _notice_caveat(a: Assumptions, cells: list[BaselineCell]) -> str:
                     n=out_of_range,
                 )
             )
-    exceed = sum(1 for c in cells if _first_read_exceeds_reads(c))
-    if exceed:
-        clauses.append(
-            t(
-                "{n} 個のセルは、初回ストリームの GET 数が読み取り回数を超える"
-                "（モデルは上限しない。PR-H の対象）。",
-                n=exceed,
-            )
-        )
     return "".join(clauses)
 
 
@@ -5940,15 +5923,6 @@ def _sens_not_included() -> list[str]:
                 "documented（公式のボリューム容量ページ、サイジングブログ）。基準単位は open"
             ),
             t("未算入（PR-A2 の判断待ち）"),
-        ],
-        [
-            t("初回ストリームの GET 数が読み取り回数を超える"),
-            t("S3 Files の小計が上がる（GET 行の過大計上）"),
-            t(
-                "既定の P8 64 KiB は書いた個数を GET として計上し、読み取り回数の 10 倍。モデルは上限しない"
-            ),
-            t("verified（基底を実行して確認）"),
-            t("算入している（上限なし）。PR-H のマージ後に外す"),
         ],
         [
             t("SSD IOPS の追加、バックアップ、スナップショット予約"),

@@ -344,13 +344,13 @@
         <mxCell id="bar-P8-64-s3_files-hps" value="$7,372.80" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#F2975A;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="192.94" y="1062.00" width="330.30" height="26.00" as="geometry" />
         </mxCell>
-        <mxCell id="bar-P8-64-s3_files-req" value="$3,229.53" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="523.24" y="1062.00" width="144.68" height="26.00" as="geometry" />
+        <mxCell id="bar-P8-64-s3_files-req" value="$3,117.79" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#B89BF2;strokeColor=#232F3E;strokeWidth=1;fontSize=16;fontColor=#101820;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="523.24" y="1062.00" width="139.68" height="26.00" as="geometry" />
         </mxCell>
-        <mxCell id="total-P8-64-s3_files" value="&lt;b&gt;$11,114.33&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="675.92" y="1062.00" width="112.00" height="26.00" as="geometry" />
+        <mxCell id="total-P8-64-s3_files" value="&lt;b&gt;$11,002.59&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="670.92" y="1062.00" width="112.00" height="26.00" as="geometry" />
         </mxCell>
-        <mxCell id="brk-P8-64-s3_files" value="&lt;font color='#5FB3E6'&gt;■&lt;/font&gt;Storage $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#F2975A'&gt;■&lt;/font&gt;High-performance $7,372.80&amp;nbsp;&amp;nbsp;&lt;font color='#B89BF2'&gt;■&lt;/font&gt;Requests etc. $3,229.53" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#FFFFFF;fontStyle=0;fillColor=#232F3E;strokeColor=none;" vertex="1" parent="1">
+        <mxCell id="brk-P8-64-s3_files" value="&lt;font color='#5FB3E6'&gt;■&lt;/font&gt;Storage $512.00&amp;nbsp;&amp;nbsp;&lt;font color='#F2975A'&gt;■&lt;/font&gt;High-performance $7,372.80&amp;nbsp;&amp;nbsp;&lt;font color='#B89BF2'&gt;■&lt;/font&gt;Requests etc. $3,117.79" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#FFFFFF;fontStyle=0;fillColor=#232F3E;strokeColor=none;" vertex="1" parent="1">
           <mxGeometry x="170.00" y="1090.00" width="613.44" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="name-P8-64-fsx_s3ap" value="FSx for ONTAP" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#FFFFFF;fontStyle=0;" vertex="1" parent="1">
