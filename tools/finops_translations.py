@@ -153,6 +153,7 @@ TRANSLATIONS: dict[str, str] = {
     "GET / LIST リクエスト (同期の読み出し)": "GET / LIST requests (read by the sync task)",
     "GET リクエスト (初回読み出しはバケットからストリーム)": "GET requests (the first read is streamed from the bucket)",
     "GET リクエスト (バケットから直接ストリーム)": "GET requests (streamed straight from the bucket)",
+    "GET リクエスト (1 MiB 以上はバケットから直接ストリーム)": "GET requests (1 MiB or larger reads stream straight from the bucket)",
     "DataSync 転送": "DataSync transfer",
     "SSD ストレージ ({size})": "SSD storage ({size})",
     "SSD ストレージ ({size}、階層化不可)": "SSD storage ({size}; cannot be tiered)",
@@ -983,7 +984,7 @@ TRANSLATIONS.update(
         # --- ASSUMPTION_SPECS domain text ---------------------------------------------------------
         "0 以上 1 未満": "0 or more, less than 1",
         "0 以上 1 以下": "0 to 1 inclusive",
-        "0 より大きく 1024 未満。格子のサイズと同値は不可": "greater than 0 and less than 1024; not equal to a grid size",
+        "0 より大きい。格子のサイズと同値は不可": "greater than 0; not equal to a grid size",
         "0 以上の有限値": "a finite value of 0 or more",
         "0 より大きい有限値": "a finite value greater than 0",
         # --- ASSUMPTION_SPECS reader-decides text -------------------------------------------------
@@ -1027,7 +1028,6 @@ TRANSLATIONS.update(
         "`{key}` の指定値 {value} は許容範囲 {domain} の外": "The value {value} for `{key}` is outside the accepted range {domain}.",
         "`{key}` は {choices} のいずれかで指定する（指定値 {value}）": "`{key}` must be one of {choices} (given: {value}).",
         "スループット {value} MBps は {deployment} の段 {tiers} にない": "{value} MBps is not a throughput tier of {deployment} ({tiers}).",
-        "`s3files_threshold_kib` に 1 MiB 以上は指定できない。1 MiB 以上の I/O を直接ストリームにする公式の規則をモデルが持たず、過大に計上するため": "`s3files_threshold_kib` cannot be 1 MiB or more. The model does not apply the documented rule that I/O of 1 MiB or more is always streamed directly, so it would overcount.",
         "`s3files_threshold_kib` を格子のサイズ（{sizes}）と同じ値にできない。ちょうどのサイズの扱いが公式の文面で揃っていない": "`s3files_threshold_kib` cannot equal a grid size ({sizes}). The documentation words the boundary case inconsistently.",
     }
 )
@@ -1163,10 +1163,6 @@ TRANSLATIONS.update(
         "高性能ストレージ上のメタデータの保管": "Storage of metadata on high-performance storage",
         "公式は、アクセスしたディレクトリのメタデータは期限切れにならないと書く。課金の基準が文書にない": "the documentation states that metadata of an accessed directory does not expire; the charging basis is not in the documentation",
         "documented（公式の計量ページ）。課金の基準は open": "documented (the metering page); the charging basis is open",
-        "1 MiB 以上のしきい値": "Threshold of 1 MiB or more",
-        "モデルが公式の直接ストリーム規則を持たない": "the model does not have the documented direct-stream rule",
-        "documented（公式の計量ページ）、モデルの不在は verified": "documented (the metering page); the model's absence is verified",
-        "未対応（PR-F）": "not supported (PR-F)",
         "未算入": "not included",
         # Procedure.
         "受け付ける前提の一覧は `--list-assumptions` で確認する。自分の環境の値は `--assume key=value` で与え、公開文書の値とは比べない。比べるのは、同じ前提を置いた 2 つの出力どうしである。小計は主要費目小計で、月額総額ではない。": "Check the list of accepted assumptions with `--list-assumptions`. Give your own environment's values with `--assume key=value`, and do not compare against the values in the published document; compare two outputs that place the same assumptions. The subtotals are major-line-item subtotals, not monthly totals.",
