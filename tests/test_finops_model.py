@@ -1973,3 +1973,103 @@ def test_the_64kib_direction_sentence_switches_branch_when_no_break_even(
     text = "\n".join(fm._direction_64kib_sentence())
     assert "向きが変わらない" in text
     assert "仮置き・未測定" in text
+
+
+# --- assumption_axes: what the break-even map reads (PR-C) -----------------------------------------
+
+
+_SENS_CACHE: dict[str, dict] = {}
+
+
+def _sens() -> dict:
+    """One sensitivity_json("ja") per test run; it costs about three seconds and is read-only here."""
+    if "ja" not in _SENS_CACHE:
+        _SENS_CACHE["ja"] = fm.sensitivity_json("ja")
+    return _SENS_CACHE["ja"]
+
+
+def test_assumption_axes_covers_exactly_the_swept_keys_with_their_domains() -> None:
+    axes = _sens()["assumption_axes"]
+    assert list(axes) == list(fm.SWEEPS)
+    assert len(axes) == 13
+    numeric = set(fm.BREAKEVEN_NUMERIC_KEYS)
+    for key, axis in axes.items():
+        if key in numeric:
+            domain = fm.SEARCH_DOMAINS[key]
+            assert axis["lo"] == float(domain["lo"])
+            assert axis["domain_hi"] == float(domain["hi"])
+            assert axis["scale"] == domain["axis"]
+            assert axis["zero_probe"] is bool(domain.get("zero", False))
+            assert isinstance(axis["baseline"], float)
+        elif key in fm.ENUM_SWEEP_KEYS:
+            assert axis["scale"] == "enum"
+        else:
+            assert key == "s3files_threshold_kib"
+            assert axis["scale"] == "discrete"
+        # A per-key flag or count would be false for some cells; the figure reads the cell instead.
+        assert "truncated_to_model_range" not in axis
+        assert "sourced_point_count" not in axis
+        assert set(axis["moves_p4"]) == {"64", "4096"}
+
+
+def test_moves_p4_matches_a_classification_derived_from_the_rows() -> None:
+    """Derive the classification from `one_at_a_time` and J0 with its own threshold, so the model's
+    `_moving_flags` is checked against a second route to the same fact."""
+    data = _sens()
+    axes = data["assumption_axes"]
+    eps = 1e-6  # the model's MOVE_EPS_USD, deliberately not imported
+    for kib in (64, 4096):
+        base = next(r for r in data["scenarios"][str(kib)] if r["id"] == "J0")["cells"][
+            "P4"
+        ]
+        rows = data["one_at_a_time"][str(kib)]
+        for key, axis in axes.items():
+            mine = [r["cells"]["P4"] for r in rows if r["key"] == key]
+            got = axis["moves_p4"][str(kib)]
+            if not mine:
+                assert got is None, (key, kib)
+                continue
+            fsx = any(abs(c["fsx_s3ap_usd"] - base["fsx_s3ap_usd"]) > eps for c in mine)
+            files = any(
+                abs(c["s3_files_usd"] - base["s3_files_usd"]) > eps for c in mine
+            )
+            want = {
+                (True, True): "both",
+                (True, False): "fsx",
+                (False, True): "s3_files",
+                (False, False): "none",
+            }[(fsx, files)]
+            assert got == want, (key, kib, got, want)
+    # The document column is the union of the two sizes, in the same words.
+    for key, axis in axes.items():
+        sides = {w for w in axis["moves_p4"].values() if w is not None}
+        fsx = bool(sides & {"fsx", "both"})
+        files = bool(sides & {"s3_files", "both"})
+        want = (
+            "両側"
+            if fsx and files
+            else "FSx for ONTAP"
+            if fsx
+            else "S3 Files"
+            if files
+            else "—"
+        )
+        assert fm._moving_side(key) == want, key
+
+
+def test_the_effective_baseline_reproduces_the_unspecified_p4_subtotals() -> None:
+    """Passing a key's reported baseline explicitly must change nothing; for `active_fraction` this
+    is what shows the effective value (the registry says "auto") is the one the model uses."""
+    axes = _sens()["assumption_axes"]
+    for key in fm.BREAKEVEN_NUMERIC_KEYS:
+        for kib in (64, 4096):
+            plain = fm._subtotals(fm._sens_cell("P4", kib, None))
+            explicit = fm._subtotals(
+                fm._sens_cell("P4", kib, fm.Assumptions(**{key: axes[key]["baseline"]}))
+            )
+            assert explicit == pytest.approx(plain, abs=1e-9), (key, kib)
+    assert axes["s3files_threshold_kib"]["baseline"] == fm.S3FILES_DEFAULT_THRESHOLD_KIB
+
+
+def test_move_eps_is_the_old_inline_threshold() -> None:
+    assert fm.MOVE_EPS_USD == 1e-6

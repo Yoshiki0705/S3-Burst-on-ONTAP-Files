@@ -1,0 +1,602 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="breakeven" name="s3files-breakeven-map">
+    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="3142" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="&lt;b&gt;Break-even map: where the lower subtotal changes sides for P4&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="0.00" width="860.00" height="28.00" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Each other assumption is held at its baseline while one assumption moves; the comparison is between the&lt;br&gt;FSx for ONTAP and S3 Files major-line-item subtotals." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="28.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-dot" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="15.00" y="84.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="legtxt-dot" value="Baseline value (the value the model uses)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="52.00" y="80.00" width="808.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-src" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="2.00" y="111.00" width="40.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="legtxt-src" value="Sourced value (official pages and published tables): a min-to-max range for two or more sourced&lt;br&gt;points, a short bar for one point" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="52.00" y="106.00" width="808.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-pt" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20.50" y="155.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="legtxt-pt" value="Reused or observed value (set in another section, or one observation in this repository): a point,&lt;br&gt;not a range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="52.00" y="154.00" width="808.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-dom" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="2.00" y="207.00" width="40.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="legtxt-dom" value="Mechanical search range (no source for the values; the lower to upper bound the model searched)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="52.00" y="202.00" width="808.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-flip" value="" style="rhombus;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="13.00" y="230.00" width="18.00" height="18.00" as="geometry" />
+        </mxCell>
+        <mxCell id="legtxt-flip" value="Value at which the lower subtotal changes sides" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="52.00" y="228.00" width="808.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="phead-64" value="&lt;b&gt;64 KiB: under the baseline assumptions, the FSx for ONTAP subtotal is lower&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="262.00" width="860.00" height="28.00" as="geometry" />
+        </mxCell>
+        <mxCell id="psub-64" value="Baseline subtotals (major line items, per month): FSx for ONTAP $1,818.50 / S3 Files $8,755.20" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="290.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-64-fsx" value="&lt;b&gt;Assumptions that move the FSx for ONTAP subtotal&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="320.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-pool_fraction" value="Share moved to capacity pool" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="357.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-pool_fraction" value="pool_fraction" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="379.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-pool_fraction" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="372.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-64-pool_fraction-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="260.50" y="368.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-64-pool_fraction-1" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="662.30" y="368.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-64-pool_fraction-2" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="719.70" y="368.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-pool_fraction" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="427.20" y="371.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-pool_fraction-base" value="0.3" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="422.68" y="346.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-pool_fraction-pt0" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="257.52" y="346.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-pool_fraction-pt1" value="0.7" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="652.28" y="346.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-pool_fraction-pt2" value="0.8" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="709.68" y="346.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_fraction-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="388.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_fraction-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="388.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_fraction-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="388.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-efficiency_ssd" value="SSD-tier storage efficiency" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="433.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-efficiency_ssd" value="efficiency_ssd" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="455.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-efficiency_ssd" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="448.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="src-64-efficiency_ssd" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="638.87" y="448.00" width="57.98" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-efficiency_ssd" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="486.92" y="447.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-efficiency_ssd-base" value="0.4" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="482.40" y="422.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-efficiency_ssd-src" value="0.65–0.75" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="631.06" y="422.00" width="73.60" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-efficiency_ssd-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="464.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-efficiency_ssd-hi" value="0.99" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="804.00" y="464.00" width="32.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-efficiency_ssd-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="352.28" y="464.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-pool_efficiency_retention" value="Efficiency kept in pool tier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="509.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-pool_efficiency_retention" value="pool_efficiency_retention" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="531.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-pool_efficiency_retention" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="524.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-pool_efficiency_retention" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="542.00" y="523.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-pool_efficiency_retention-base" value="0.5" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="537.48" y="498.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_efficiency_retention-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="540.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_efficiency_retention-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="540.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-pool_efficiency_retention-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="540.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-ssd_headroom" value="SSD provisioning headroom" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="607.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-ssd_headroom" value="ssd_headroom" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="629.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-ssd_headroom" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="622.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="src-64-ssd_headroom" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="401.50" y="622.00" width="8.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-ssd_headroom" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="369.80" y="621.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-ssd_headroom-base" value="0.2" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="365.28" y="596.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-ssd_headroom-src" value="0.25" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="389.50" y="574.00" width="32.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-ssd_headroom-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="638.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-ssd_headroom-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="638.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-ssd_headroom-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="638.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-64-s3_files" value="&lt;b&gt;Assumptions that move the S3 Files subtotal&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="672.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-active_fraction" value="High-perf. tier active share" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="709.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-active_fraction" value="active_fraction" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="731.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-active_fraction" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="724.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-active_fraction" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="829.00" y="723.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="flip-64-active_fraction-0" value="" style="rhombus;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="286.95" y="721.00" width="18.00" height="18.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-active_fraction-base" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="831.52" y="698.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-active_fraction-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="740.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-active_fraction-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="740.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-active_fraction-flip0" value="◆ 0.0591: lower side: S3 Files below, FSx for ONTAP at or above" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="762.00" width="515.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-metadata_multiplier" value="Metadata ops multiplier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="807.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-metadata_multiplier" value="metadata_multiplier (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="829.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-metadata_multiplier" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="290.00" y="822.00" width="546.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-metadata_multiplier-zero" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="822.00" width="6.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-64-metadata_multiplier-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="465.15" y="818.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-metadata_multiplier" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="443.59" y="821.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-metadata_multiplier-base" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="446.11" y="796.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-metadata_multiplier-pt0" value="2" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="462.17" y="796.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-metadata_multiplier-zero" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="838.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-metadata_multiplier-lo" value="2^-10" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="290.00" y="838.00" width="46.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-metadata_multiplier-hi" value="2^24" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="799.52" y="838.00" width="36.48" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-metadata_multiplier-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="382.60" y="838.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-64-both" value="&lt;b&gt;Assumptions that move both subtotals&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="872.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-read_scale" value="Monthly read multiplier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="909.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-read_scale" value="read_scale (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="931.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-read_scale" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="924.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-read_scale" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="599.50" y="923.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-read_scale-base" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="602.02" y="898.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-read_scale-lo" value="2^-10" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="940.00" width="46.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-read_scale-hi" value="101.25 (upper limit of the applicable range)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="474.08" y="940.00" width="361.92" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-read_scale-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="962.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-64-stored_tib" value="Stored volume (TiB)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1007.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-64-stored_tib" value="stored_tib (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1029.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-64-stored_tib" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1022.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-64-stored_tib" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="578.29" y="1021.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="flip-64-stored_tib-0" value="" style="rhombus;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="355.71" y="1019.00" width="18.00" height="18.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-64-stored_tib-base" value="20" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="576.33" y="996.00" width="17.92" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-stored_tib-lo" value="0.125" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1038.00" width="40.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-stored_tib-hi" value="1,024" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="795.04" y="1038.00" width="40.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-64-stored_tib-flip0" value="◆ 0.627: lower side: S3 Files below, FSx for ONTAP at or above" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1060.00" width="506.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ehead-64" value="&lt;b&gt;Assumptions tried at listed values (no axis)&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1098.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-64-deployment" value="Deployment type deployment (FSx for ONTAP side; baseline SINGLE_AZ_1; 3 sourced tried): does not&lt;br&gt;change sides at the values tried" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1124.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-64-throughput_mbps" value="Throughput capacity throughput_mbps (FSx for ONTAP side; baseline automatic (the model picks the tier&lt;br&gt;from the required throughput); 4 sourced tried): does not change sides at the values tried" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1174.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-64-s3files_threshold_kib" value="S3 Files import threshold (KiB) s3files_threshold_kib (S3 Files side; baseline 128; 2 mechanical&lt;br&gt;tried): changes sides at 32" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1224.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-64-first_read_mode" value="First-stream object count first_read_mode (S3 Files side; baseline written; 2 mechanical tried): does&lt;br&gt;not change sides at the values tried" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1274.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-64-first_read_stream_billing" value="First-stream read billing first_read_stream_billing (subtotals do not move; baseline none; 1 sourced&lt;br&gt;tried): the P4 subtotals do not move" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1324.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="phead-4096" value="&lt;b&gt;4 MiB: under the baseline assumptions, the S3 Files subtotal is lower&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1398.00" width="860.00" height="28.00" as="geometry" />
+        </mxCell>
+        <mxCell id="psub-4096" value="Baseline subtotals (major line items, per month): FSx for ONTAP $1,781.83 / S3 Files $514.74" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1426.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-4096-fsx" value="&lt;b&gt;Assumptions that move the FSx for ONTAP subtotal&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1456.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-pool_fraction" value="Share moved to capacity pool" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1493.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-pool_fraction" value="pool_fraction" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1515.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-pool_fraction" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1508.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-4096-pool_fraction-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="260.50" y="1504.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-4096-pool_fraction-1" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="662.30" y="1504.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-4096-pool_fraction-2" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="719.70" y="1504.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-pool_fraction" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="427.20" y="1507.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-pool_fraction-base" value="0.3" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="422.68" y="1482.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-pool_fraction-pt0" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="257.52" y="1482.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-pool_fraction-pt1" value="0.7" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="652.28" y="1482.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-pool_fraction-pt2" value="0.8" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="709.68" y="1482.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_fraction-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1524.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_fraction-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="1524.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_fraction-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="1524.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-efficiency_ssd" value="SSD-tier storage efficiency" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1569.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-efficiency_ssd" value="efficiency_ssd" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1591.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-efficiency_ssd" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1584.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="src-4096-efficiency_ssd" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="638.87" y="1584.00" width="57.98" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-efficiency_ssd" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="486.92" y="1583.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="flip-4096-efficiency_ssd-0" value="" style="rhombus;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="761.79" y="1581.00" width="18.00" height="18.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-efficiency_ssd-base" value="0.4" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="482.40" y="1558.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-efficiency_ssd-src" value="0.65–0.75" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="631.06" y="1558.00" width="73.60" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-efficiency_ssd-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1600.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-efficiency_ssd-hi" value="0.99" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="804.00" y="1600.00" width="32.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-efficiency_ssd-flip0" value="◆ 0.878: lower side: S3 Files below, FSx for ONTAP at or above" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1622.00" width="506.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-pool_efficiency_retention" value="Efficiency kept in pool tier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1667.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-pool_efficiency_retention" value="pool_efficiency_retention" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1689.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-pool_efficiency_retention" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1682.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-pool_efficiency_retention" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="542.00" y="1681.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-pool_efficiency_retention-base" value="0.5" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="537.48" y="1656.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_efficiency_retention-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1698.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_efficiency_retention-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="1698.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-pool_efficiency_retention-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="1698.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-ssd_headroom" value="SSD provisioning headroom" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1765.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-ssd_headroom" value="ssd_headroom" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1787.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-ssd_headroom" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1780.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="src-4096-ssd_headroom" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="401.50" y="1780.00" width="8.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-ssd_headroom" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="369.80" y="1779.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-ssd_headroom-base" value="0.2" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="365.28" y="1754.00" width="23.04" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-ssd_headroom-src" value="0.25" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="389.50" y="1732.00" width="32.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-ssd_headroom-lo" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1796.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-ssd_headroom-hi" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="827.04" y="1796.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-ssd_headroom-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="1796.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-4096-s3_files" value="&lt;b&gt;Assumptions that move the S3 Files subtotal&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1830.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-metadata_multiplier" value="Metadata ops multiplier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1867.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-metadata_multiplier" value="metadata_multiplier (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1889.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-metadata_multiplier" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="290.00" y="1882.00" width="546.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-metadata_multiplier-zero" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1882.00" width="6.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="pt-4096-metadata_multiplier-0" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="490.60" y="1878.00" width="3.00" height="20.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-metadata_multiplier" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="443.59" y="1881.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="flip-4096-metadata_multiplier-0" value="" style="rhombus;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="612.30" y="1879.00" width="18.00" height="18.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-metadata_multiplier-base" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="446.11" y="1856.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-metadata_multiplier-pt0" value="6" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="487.62" y="1856.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-metadata_multiplier-zero" value="0" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1898.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-metadata_multiplier-lo" value="2^-10" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="290.00" y="1898.00" width="46.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-metadata_multiplier-hi" value="2^24" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="799.52" y="1898.00" width="36.48" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-metadata_multiplier-flip0" value="◆ 1,580: lower side: S3 Files below, FSx for ONTAP at or above" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="1920.00" width="506.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ghead-4096-both" value="&lt;b&gt;Assumptions that move both subtotals&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1954.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-read_scale" value="Monthly read multiplier" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="1991.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-read_scale" value="read_scale (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2013.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-read_scale" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="2006.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-read_scale" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="599.50" y="2005.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-read_scale-base" value="1" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="602.02" y="1980.00" width="8.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-read_scale-lo" value="2^-10" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="2022.00" width="46.08" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-read_scale-hi" value="101.25 (upper limit of the applicable range)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="474.08" y="2022.00" width="361.92" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-read_scale-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="2044.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="name-4096-stored_tib" value="Stored volume (TiB)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2089.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="key-4096-stored_tib" value="stored_tib (log)" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2111.00" width="250.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dom-4096-stored_tib" value="" style="rounded=0;whiteSpace=nowrap;html=0;fillColor=none;strokeColor=#232F3E;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="2104.00" width="574.00" height="12.00" as="geometry" />
+        </mxCell>
+        <mxCell id="dot-4096-stored_tib" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="578.29" y="2103.00" width="14.00" height="14.00" as="geometry" />
+        </mxCell>
+        <mxCell id="val-4096-stored_tib-base" value="20" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=center;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="576.33" y="2078.00" width="17.92" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-stored_tib-lo" value="0.125" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="262.00" y="2120.00" width="40.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-stored_tib-hi" value="1,024" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=right;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="795.04" y="2120.00" width="40.96" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-4096-stored_tib-noflip" value="Does not change sides within the search range" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="363.80" y="2120.00" width="370.40" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="ehead-4096" value="&lt;b&gt;Assumptions tried at listed values (no axis)&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2158.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-4096-deployment" value="Deployment type deployment (FSx for ONTAP side; baseline SINGLE_AZ_1; 3 sourced tried): does not&lt;br&gt;change sides at the values tried" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2184.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="enum-4096-throughput_mbps" value="Throughput capacity throughput_mbps (FSx for ONTAP side; baseline automatic (the model picks the tier&lt;br&gt;from the required throughput); 4 sourced tried): does not change sides at the values tried" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2234.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="nottried-4096" value="Not tried at this size. These assumptions are outside the search at this size; that does not mean they&lt;br&gt;have no effect on the subtotals: active_fraction, s3files_threshold_kib, first_read_mode,&lt;br&gt;first_read_stream_billing" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2284.00" width="860.00" height="66.00" as="geometry" />
+        </mxCell>
+        <mxCell id="reason-4096" value="active_fraction: 4 MiB is above the S3 Files import threshold (128 KiB), so the active share does not&lt;br&gt;enter the subtotal and was not searched" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2354.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="notes-head" value="&lt;b&gt;Notes&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2422.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-1-0" value="&lt;b&gt;Line length:&lt;/b&gt; It does not represent uncertainty. A line shows the kind of evidence behind a value and the&lt;br&gt;range the model searched. An axis whose right end reads &amp;#x27;upper limit of the applicable range&amp;#x27;&lt;br&gt;(read_scale) was searched up to the limit of the range where the model holds, and the figure shows&lt;br&gt;nothing beyond it. An axis with a small outline and a zero tick at its left end (metadata_multiplier) was&lt;br&gt;also tried at zero; it is not a mechanical-range band." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2444.00" width="860.00" height="110.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-2-0" value="&lt;b&gt;Why P4 is the example:&lt;/b&gt; Among the patterns with no writes that are not labeled placeholders, P4 is the&lt;br&gt;only one in the sensitivity set. The baseline direction is opposite at 64 KiB and 4 MiB. P4 reads a 10%&lt;br&gt;working set of the 20,480 GiB stored, 10 times per object per month; both are repository assumptions. The&lt;br&gt;set of assumptions that flip the result, and their values, differ by pattern (for example&lt;br&gt;metadata_multiplier at 4 MiB: 779 to 3.17e4 across 5 patterns). The other patterns are in the tables in&lt;br&gt;the body." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2565.00" width="860.00" height="132.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-0" value="&lt;b&gt;Baseline direction and counts:&lt;/b&gt; Under the baseline assumptions, the FSx for ONTAP subtotal is lower at&lt;br&gt;64 KiB; the S3 Files subtotal is lower at 4 MiB. This direction can reverse when the assumptions change." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2708.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-1" value="The comparison is between two subtotals. The FSx for ONTAP subtotal reads from the file system and&lt;br&gt;includes no S3 Access Points read charge. Reading directly through the S3 API is not included." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2755.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-2" value="Each count reads &amp;#x27;assumptions with sourced points / denominator&amp;#x27;. The denominator is the number of&lt;br&gt;assumptions tried at this size that moved a P4 subtotal; it is not the total number of assumptions on that&lt;br&gt;side." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2802.00" width="860.00" height="66.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-3" value="64 KiB: FSx for ONTAP side 4/6, S3 Files side 0/4, both 0/2. The S3 Files side has a lower share of&lt;br&gt;assumptions with sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2871.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-4" value="4 MiB: FSx for ONTAP side 4/6, S3 Files side 0/1, both 0/2. The S3 Files side has a lower share of&lt;br&gt;assumptions with sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2918.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-5" value="64 KiB: assumptions with sourced points that are not counted because they do not move a P4 subtotal at&lt;br&gt;this size: first_read_stream_billing" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2965.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-6" value="Sizes with assumptions not tried (4 MiB) list them at the end of the panel." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="3012.00" width="860.00" height="22.00" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3-7" value="The counts record whether sourced points exist. They do not express how reliable an assumption or its&lt;br&gt;value is. Choices such as the deployment type or a tier are counted too when they have sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="3037.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+        <mxCell id="foot" value="Axis values are model calculations, not measurements. Subtotals are major-line-item subtotals, not&lt;br&gt;monthly totals. ap-northeast-1; unit prices retrieved 2026-08-09." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="3098.00" width="860.00" height="44.00" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
