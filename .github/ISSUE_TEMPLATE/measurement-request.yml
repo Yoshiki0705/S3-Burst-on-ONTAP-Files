@@ -1,0 +1,77 @@
+name: Measurement request
+description: Describe a number you need that this repository has not measured, and the decision it would change.
+title: "[measurement-request] "
+labels: [measurement-request]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        This form collects requests for measurements, so that the effort goes to numbers someone
+        will use. Filing a request does not commit anyone to taking the measurement or to a date.
+        A measurement that costs money is taken up only when a concrete use case is described, so
+        the workload and the decision in the fields below matter more than the length of the
+        request. If you can take the measurement in your own environment, say so in the last
+        field; a result with its conditions can be recorded through the verification result form.
+  - type: textarea
+    id: measurement
+    attributes:
+      label: What you want measured
+      description: >-
+        State the quantity and the unit, for example a throughput, a latency, a request count or a
+        monthly charge. One measurement per issue.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Your workload and the decision it would change
+      description: >-
+        What the workload does, and which choice the number would settle (for example, which
+        option to adopt, or whether a design is large enough). Without a decision, a measurement
+        has no way to be judged sufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Your environment
+      description: >-
+        Describe the conditions you would run under, since a number is only usable with them.
+        Write "not decided" for anything you have not settled.
+      value: |
+        - Region:
+        - Client instance type:
+        - Client count:
+        - Protocol (NFS, SMB, S3 API, other):
+        - Object or file size:
+        - Access pattern (read or write mix, sequential or random, concurrency):
+    validations:
+      required: true
+  - type: textarea
+    id: sufficient
+    attributes:
+      label: What number would be enough to decide
+      description: >-
+        A threshold, a range, or a comparison between two options. If any result would leave
+        your decision unchanged, say so; that is a sign the measurement is not needed.
+    validations:
+      required: true
+  - type: dropdown
+    id: share
+    attributes:
+      label: Can you share a measurement of your own
+      options:
+        - Yes, with the conditions above
+        - Possibly, I would need to check
+        - No
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before submitting
+      options:
+        - label: >-
+            I understand this issue is public. It contains no AWS account IDs, names of
+            organizations I work with or for, or other identifying details.
+          required: true
