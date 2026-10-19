@@ -97,7 +97,7 @@ TEXT_NUMBER_ALLOWLIST = {
 TEXT: dict[str, dict[str, str]] = {
     "ja": {
         "title": "損益分岐の地図: P4 の小計の高低が入れ替わる前提の位置",
-        "subtitle": "他の前提を基準に固定し、1 つの前提だけを動かしたときの、FSx for ONTAP と S3 Files の主要費目小計の比較です。",
+        "subtitle": "他の前提は基準に固定し、1 つだけ動かして、FSx for ONTAP と S3 Files の主要費目小計を比べます。",
         "leg_dot": "基準の値（モデルが置いた値）",
         "leg_src": "出典のある値（公式ページ・公表表）。出典の点が 2 つ以上なら最小〜最大の範囲、1 点なら範囲でなく点（短い太線）",
         "leg_pt": "再利用または観測の値（別の節が置いた値、このリポジトリの 1 回の観測）。範囲ではなく点",
@@ -134,6 +134,7 @@ TEXT: dict[str, dict[str, str]] = {
         "notes_head": "注",
         "n1_lead": "線の長さ:",
         "n1": " 線の長さは不確かさの大きさを表しません。線は、値に付いた根拠の種類と、モデルが探索した範囲を示します。",
+        "n1_zero": " 左端に小さな輪郭とゼロの目盛が付いた軸（{axes}）は、値ゼロも試したことを示します。機械的な範囲の帯ではありません。",
         "n1_limit": " 右端に「適用範囲の上限」と付いた軸（{axes}）は、モデルが成り立つ範囲の上限までを探索しており、その先の向きは示していません。",
         "n2_lead": "P4 を例に選んだ理由:",
         "n2": " 書き込みがなく、仮置きと明記されていないパターンのうち、感度の対象にあるのは P4 だけです。",
@@ -195,7 +196,8 @@ TEXT: dict[str, dict[str, str]] = {
         "key_join": ", ",
         "notes_head": "Notes",
         "n1_lead": "Line length:",
-        "n1": " Line length does not represent uncertainty. A line shows the kind of evidence behind a value and the range the model searched.",
+        "n1": " It does not represent uncertainty. A line shows the kind of evidence behind a value and the range the model searched.",
+        "n1_zero": " An axis with a small outline and a zero tick at its left end ({axes}) was also tried at zero; it is not a mechanical-range band.",
         "n1_limit": " An axis whose right end reads 'upper limit of the applicable range' ({axes}) was searched up to the limit of the range where the model holds, and the figure shows nothing beyond it.",
         "n2_lead": "Why P4 is the example:",
         "n2": " Among the patterns with no writes that are not labeled placeholders, P4 is the only one in the sensitivity set.",
@@ -215,7 +217,7 @@ TEXT: dict[str, dict[str, str]] = {
         "n3_less": ". The S3 Files side has a lower share of assumptions with sourced points",
         "n3_excl": "{size}: assumptions with sourced points that are not counted because they do not move a P4 subtotal at this size: {keys}",
         "n3_notried": "Sizes with assumptions not tried ({sizes}) list them at the end of the panel.",
-        "n3_meaning": "The counts record whether sourced points exist. They do not express how reliable an assumption or its value is. Choices such as the deployment type or a tier count when they have sourced points.",
+        "n3_meaning": "The counts record whether sourced points exist. They do not express how reliable an assumption or its value is. Choices such as the deployment type or a tier are counted too when they have sourced points.",
         "foot": "Axis values are model calculations, not measurements. Subtotals are major-line-item subtotals, not monthly totals. {region}; unit prices retrieved {snap}.",
         "val_join": ", ",
     },
@@ -1012,10 +1014,18 @@ class Builder:
             for key in p.axis_keys:
                 if p.truncated(key, sens) and key not in truncated:
                     truncated.append(key)
+        zero_keys = []
+        for p in panels:
+            for key in p.axis_keys:
+                if self.axes[key]["zero_probe"] and key not in zero_keys:
+                    zero_keys.append(key)
         n1 = self.join(
             tx["n1"],
             tx["n1_limit"].format(axes=tx["key_join"].join(truncated))
             if truncated
+            else "",
+            tx["n1_zero"].format(axes=tx["key_join"].join(zero_keys))
+            if zero_keys
             else "",
         )
         out.append((tx["n1_lead"], [n1]))

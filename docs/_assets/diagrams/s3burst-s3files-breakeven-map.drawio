@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net">
   <diagram id="breakeven" name="s3files-breakeven-map">
-    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="3010" math="0" shadow="0" background="#FFFFFF">
+    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="3032" math="0" shadow="0" background="#FFFFFF">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="title" value="&lt;b&gt;損益分岐の地図: P4 の小計の高低が入れ替わる前提の位置&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=18;fontColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="0.00" width="860.00" height="28.00" as="geometry" />
         </mxCell>
-        <mxCell id="subtitle" value="他の前提を基準に固定し、1 つの前提だけを動かしたときの、FSx for ONTAP と S3 Files の主要費目小計の比較で&lt;br&gt;す。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="他の前提は基準に固定し、1 つだけ動かして、FSx for ONTAP と S3 Files の主要費目小計を比べます。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=top;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="28.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="leg-dot" value="" style="ellipse;whiteSpace=nowrap;html=0;fillColor=#232F3E;strokeColor=#FFFFFF;strokeWidth=2;fontSize=16;" vertex="1" parent="1">
@@ -563,38 +563,38 @@
         <mxCell id="notes-head" value="&lt;b&gt;注&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="2422.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
-        <mxCell id="note-1-0" value="&lt;b&gt;線の長さ:&lt;/b&gt; 線の長さは不確かさの大きさを表しません。線は、値に付いた根拠の種類と、モデルが探索した範囲を示し&lt;br&gt;ます。右端に「適用範囲の上限」と付いた軸（read_scale）は、モデルが成り立つ範囲の上限までを探索しており、&lt;br&gt;その先の向きは示していません。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2444.00" width="860.00" height="66.00" as="geometry" />
+        <mxCell id="note-1-0" value="&lt;b&gt;線の長さ:&lt;/b&gt; 線の長さは不確かさの大きさを表しません。線は、値に付いた根拠の種類と、モデルが探索した範囲を示し&lt;br&gt;ます。右端に「適用範囲の上限」と付いた軸（read_scale）は、モデルが成り立つ範囲の上限までを探索しており、&lt;br&gt;その先の向きは示していません。左端に小さな輪郭とゼロの目盛が付いた軸（metadata_multiplier）は、&lt;br&gt;値ゼロも試したことを示します。機械的な範囲の帯ではありません。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2444.00" width="860.00" height="88.00" as="geometry" />
         </mxCell>
         <mxCell id="note-2-0" value="&lt;b&gt;P4 を例に選んだ理由:&lt;/b&gt; 書き込みがなく、仮置きと明記されていないパターンのうち、感度の対象にあるのは P4 だけで&lt;br&gt;す。基準の向きは 64 KiB と 4 MiB で逆です。P4 は保存 20,480 GiB のうち作業セットの 10% を、&lt;br&gt;各オブジェクト月あたり 10 回読む前提で、いずれも本リポジトリの試算前提です。入れ替わる前提の集合と値はパタ&lt;br&gt;ーンで異なります（例: 4 MiB の metadata_multiplier は、5 パターンで 779〜3.17e4）。&lt;br&gt;他のパターンは本文の表にあります。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2521.00" width="860.00" height="110.00" as="geometry" />
+          <mxGeometry x="0.00" y="2543.00" width="860.00" height="110.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-0" value="&lt;b&gt;基準の向きと件数:&lt;/b&gt; 基準の前提では、64 KiB は FSx for ONTAP の小計が低い、4 MiB は S3 Files の小計が低い。&lt;br&gt;この向きは前提によって入れ替わりえます。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2642.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2664.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-1" value="比べているのは 2 つの小計です。FSx for ONTAP の小計は読み取りをファイルシステムから行い、&lt;br&gt;S3 Access Points の読み取り課金は算入していません。S3 API 直読みは含みません。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2689.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2711.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-2" value="件数は「出典のある点を持つ前提の数 / 分母」です。分母は、この大きさで試し、P4 の小計を動かした前提の数で、&lt;br&gt;その側の前提の総数ではありません。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2736.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2758.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-3" value="64 KiB: FSx for ONTAP 4/6、S3 Files 0/4、両側 0/2。S3 Files 側は出典のある点を持つ前提の割合が低い。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2783.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="2805.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-4" value="4 MiB: FSx for ONTAP 4/6、S3 Files 0/1、両側 0/2。S3 Files 側は出典のある点を持つ前提の割合が低い。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2808.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="2830.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-5" value="64 KiB: 出典のある点を持つが、この大きさで P4 の小計を動かさないため数えていない前提:&lt;br&gt;first_read_stream_billing" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2833.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2855.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-6" value="試していない前提がある大きさ（4 MiB）では、パネルの末尾に挙げています。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2880.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="2902.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-7" value="件数は出典のある点があるかどうかを数えたもので、前提の確からしさや値の不確かさを表しません。&lt;br&gt;提供形態や段のような選択も、出典のある点があれば数えます。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2905.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2927.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="foot" value="各軸の値はモデルの計算で、実測ではありません。小計は主要費目小計で月額総額ではありません。ap-northeast-1、&lt;br&gt;単価は 2026-08-09 に取得しました。" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2966.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2988.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

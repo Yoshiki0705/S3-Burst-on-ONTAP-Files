@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net">
   <diagram id="breakeven" name="s3files-breakeven-map">
-    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="3120" math="0" shadow="0" background="#FFFFFF">
+    <mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="860" pageHeight="3142" math="0" shadow="0" background="#FFFFFF">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -563,38 +563,38 @@
         <mxCell id="notes-head" value="&lt;b&gt;Notes&lt;/b&gt;" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="0.00" y="2422.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
-        <mxCell id="note-1-0" value="&lt;b&gt;Line length:&lt;/b&gt; Line length does not represent uncertainty. A line shows the kind of evidence behind a value&lt;br&gt;and the range the model searched. An axis whose right end reads &amp;#x27;upper limit of the applicable range&amp;#x27;&lt;br&gt;(read_scale) was searched up to the limit of the range where the model holds, and the figure shows&lt;br&gt;nothing beyond it." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2444.00" width="860.00" height="88.00" as="geometry" />
+        <mxCell id="note-1-0" value="&lt;b&gt;Line length:&lt;/b&gt; It does not represent uncertainty. A line shows the kind of evidence behind a value and the&lt;br&gt;range the model searched. An axis whose right end reads &amp;#x27;upper limit of the applicable range&amp;#x27;&lt;br&gt;(read_scale) was searched up to the limit of the range where the model holds, and the figure shows&lt;br&gt;nothing beyond it. An axis with a small outline and a zero tick at its left end (metadata_multiplier) was&lt;br&gt;also tried at zero; it is not a mechanical-range band." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="2444.00" width="860.00" height="110.00" as="geometry" />
         </mxCell>
         <mxCell id="note-2-0" value="&lt;b&gt;Why P4 is the example:&lt;/b&gt; Among the patterns with no writes that are not labeled placeholders, P4 is the&lt;br&gt;only one in the sensitivity set. The baseline direction is opposite at 64 KiB and 4 MiB. P4 reads a 10%&lt;br&gt;working set of the 20,480 GiB stored, 10 times per object per month; both are repository assumptions. The&lt;br&gt;set of assumptions that flip the result, and their values, differ by pattern (for example&lt;br&gt;metadata_multiplier at 4 MiB: 779 to 3.17e4 across 5 patterns). The other patterns are in the tables in&lt;br&gt;the body." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2543.00" width="860.00" height="132.00" as="geometry" />
+          <mxGeometry x="0.00" y="2565.00" width="860.00" height="132.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-0" value="&lt;b&gt;Baseline direction and counts:&lt;/b&gt; Under the baseline assumptions, the FSx for ONTAP subtotal is lower at&lt;br&gt;64 KiB; the S3 Files subtotal is lower at 4 MiB. This direction can reverse when the assumptions change." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2686.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2708.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-1" value="The comparison is between two subtotals. The FSx for ONTAP subtotal reads from the file system and&lt;br&gt;includes no S3 Access Points read charge. Reading directly through the S3 API is not included." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2733.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2755.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-2" value="Each count reads &amp;#x27;assumptions with sourced points / denominator&amp;#x27;. The denominator is the number of&lt;br&gt;assumptions tried at this size that moved a P4 subtotal; it is not the total number of assumptions on that&lt;br&gt;side." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2780.00" width="860.00" height="66.00" as="geometry" />
+          <mxGeometry x="0.00" y="2802.00" width="860.00" height="66.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-3" value="64 KiB: FSx for ONTAP side 4/6, S3 Files side 0/4, both 0/2. The S3 Files side has a lower share of&lt;br&gt;assumptions with sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2849.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2871.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-4" value="4 MiB: FSx for ONTAP side 4/6, S3 Files side 0/1, both 0/2. The S3 Files side has a lower share of&lt;br&gt;assumptions with sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2896.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2918.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-5" value="64 KiB: assumptions with sourced points that are not counted because they do not move a P4 subtotal at&lt;br&gt;this size: first_read_stream_billing" style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2943.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="2965.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="note-3-6" value="Sizes with assumptions not tried (4 MiB) list them at the end of the panel." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="2990.00" width="860.00" height="22.00" as="geometry" />
+          <mxGeometry x="0.00" y="3012.00" width="860.00" height="22.00" as="geometry" />
         </mxCell>
-        <mxCell id="note-3-7" value="The counts record whether sourced points exist. They do not express how reliable an assumption or its&lt;br&gt;value is. Choices such as the deployment type or a tier count when they have sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="3015.00" width="860.00" height="44.00" as="geometry" />
+        <mxCell id="note-3-7" value="The counts record whether sourced points exist. They do not express how reliable an assumption or its&lt;br&gt;value is. Choices such as the deployment type or a tier are counted too when they have sourced points." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="0.00" y="3037.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
         <mxCell id="foot" value="Axis values are model calculations, not measurements. Subtotals are major-line-item subtotals, not&lt;br&gt;monthly totals. ap-northeast-1; unit prices retrieved 2026-08-09." style="text;html=1;whiteSpace=nowrap;overflow=visible;align=left;verticalAlign=middle;spacing=0;spacingLeft=0;spacingRight=0;spacingTop=0;spacingBottom=0;fontSize=16;fontColor=#232F3E;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry x="0.00" y="3076.00" width="860.00" height="44.00" as="geometry" />
+          <mxGeometry x="0.00" y="3098.00" width="860.00" height="44.00" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
