@@ -5418,25 +5418,56 @@ def _sens_assumption_list() -> list[str]:
     return out
 
 
+MOVE_EPS_USD = (
+    1e-6  # a subtotal that differs from the baseline by more than this has "moved"
+)
+
+
+def _moving_flags(key: str, kib: int) -> tuple[bool, bool] | None:
+    """Whether `key` moves P4's (FSx for ONTAP, S3 Files) subtotal at `kib`; None if not tried there.
+
+    "Tried" means a SWEEPS point of the key applies to this size. This is the single place the
+    moving-side judgement is made: `_moving_side` (the table column, both sizes together) and
+    `sensitivity_json`'s `assumption_axes[key].moves_p4` (one size at a time) both read it.
+    """
+    points = [p for p in SWEEPS.get(key, ()) if kib in p.sizes]
+    if not points:
+        return None
+    base_fsx, base_files = _subtotals(_sens_cell("P4", kib, None))
+    moves_fsx = False
+    moves_files = False
+    for point in points:
+        over_fsx, over_files = _subtotals(
+            _sens_cell("P4", kib, Assumptions(**{key: point.value}))
+        )
+        if abs(over_fsx - base_fsx) > MOVE_EPS_USD:
+            moves_fsx = True
+        if abs(over_files - base_files) > MOVE_EPS_USD:
+            moves_files = True
+    return moves_fsx, moves_files
+
+
+def _moving_word(flags: tuple[bool, bool] | None) -> str | None:
+    """The `moves_p4` vocabulary: fsx / s3_files / both / none, or None when not tried."""
+    if flags is None:
+        return None
+    return {
+        (True, True): "both",
+        (True, False): "fsx",
+        (False, True): "s3_files",
+        (False, False): "none",
+    }[flags]
+
+
 def _moving_side(key: str) -> str:
     """Which subtotal a key moves: FSx for ONTAP / S3 Files / both, derived from the model."""
     moves_fsx = False
     moves_files = False
     for kib in SENSITIVITY_SIZES_KIB:
-        base_cell = _sens_cell("P4", kib, None)
-        base_fsx, base_files = _subtotals(base_cell)
-        probe = SWEEPS.get(key)
-        if not probe:
-            continue
-        for point in probe:
-            if kib not in point.sizes:
-                continue
-            over = _sens_cell("P4", kib, Assumptions(**{key: point.value}))
-            over_fsx, over_files = _subtotals(over)
-            if abs(over_fsx - base_fsx) > 1e-6:
-                moves_fsx = True
-            if abs(over_files - base_files) > 1e-6:
-                moves_files = True
+        flags = _moving_flags(key, kib)
+        if flags is not None:
+            moves_fsx = moves_fsx or flags[0]
+            moves_files = moves_files or flags[1]
     if moves_fsx and moves_files:
         return t("両側")
     if moves_fsx:
@@ -6062,6 +6093,55 @@ def _sens_procedure() -> list[str]:
     return out
 
 
+def _assumption_axes() -> dict[str, object]:
+    """What a figure needs to draw one axis per assumption: the effective baseline, the search range,
+    the scale, and which subtotal the key moves at each of P4's two sizes.
+
+    Additive to `sensitivity_json` (schema_version stays 1); derived from `SWEEPS` (13 keys),
+    `SEARCH_DOMAINS` and `ASSUMPTION_SPECS`, so nothing here is typed a second time.
+    `moves_p4` is evaluated for pattern P4 only, one size at a time, by `_moving_flags`; the
+    document's "小計が動く側" column is the union of the two sizes. `null` means the key was not tried
+    at that size. The upper search bound `domain_hi` is the definition; whether a cell's right end was
+    cut to the applicable range is read from that cell's `break_even` `hi`, not stored per key.
+    """
+    base_cell = _sens_cell("P4", SENSITIVITY_SIZES_KIB[0], None)
+    axes: dict[str, object] = {}
+    for key in SWEEPS:
+        moves = {
+            str(kib): _moving_word(_moving_flags(key, kib))
+            for kib in SENSITIVITY_SIZES_KIB
+        }
+        if key in SEARCH_DOMAINS:
+            domain = SEARCH_DOMAINS[key]
+            if key == "active_fraction":
+                # "auto" in the registry; the effective value is the retention-window formula.
+                baseline = min(
+                    1.0,
+                    base_cell.s3files_expiration_days
+                    / (base_cell.retention_months * 30.0),
+                )
+            else:
+                baseline = float(ASSUMPTION_SPECS[key].baseline())
+            axes[key] = {
+                "baseline": baseline,
+                "lo": float(domain["lo"]),
+                "domain_hi": float(domain["hi"]),
+                "scale": str(domain["axis"]),
+                "zero_probe": bool(domain.get("zero", False)),
+                "moves_p4": moves,
+            }
+        else:
+            baseline = ASSUMPTION_SPECS[key].baseline()
+            axes[key] = {
+                "baseline": float(baseline)
+                if isinstance(baseline, (int, float))
+                else baseline,
+                "scale": "enum" if key in ENUM_SWEEP_KEYS else "discrete",
+                "moves_p4": moves,
+            }
+    return axes
+
+
 def sensitivity_json(lang: str = "ja") -> dict[str, object]:
     """The sensitivity section as plain data, so a figure (PR-C) reads it instead of retyping numbers.
 
@@ -6151,6 +6231,7 @@ def sensitivity_json(lang: str = "ja") -> dict[str, object]:
             "sourced_ranges": {
                 key: sourced_range(key) for key in BREAKEVEN_NUMERIC_KEYS
             },
+            "assumption_axes": _assumption_axes(),
         }
 
     return _in_language(lang, build)

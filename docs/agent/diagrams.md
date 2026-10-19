@@ -105,6 +105,8 @@ edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;strokeCol
 
 `s3burst-s3files-cost-structure*` are generated from the cost model, not drawn: run `python3 tools/build_cost_figures.py --recheck-date YYYY-MM-DD [--export]` after the model's output changes, and never edit those `.drawio` files by hand. Their only numeric input is `finops_model.baseline_json()`.
 
+`s3burst-s3files-breakeven-map*` is generated the same way: run `python3 tools/build_breakeven_map.py --export` after the model's output changes, and never edit those `.drawio` files by hand. Its numbers come from `finops_model.sensitivity_json()` (plus the region, price date and P4 definition from `baseline_json()`); `tests/test_breakeven_map.py` fails when the committed drawio files and the model disagree, or when the shape and fill that tell one kind of evidence from another change.
+
 ## Reference implementation
 
 The sibling repository above has `scripts/diagram_builder.py` with the full compliance system. Here,
