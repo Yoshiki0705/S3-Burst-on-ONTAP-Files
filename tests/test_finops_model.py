@@ -716,7 +716,14 @@ def test_the_metadata_lines_are_counted_in_the_subtotal_and_the_doubt_is_stated(
     None
 ):
     section = _baseline_section("ja")
-    assert "1 MiB 以上の読み取りと取り込みにも立つかは、未確認である" in section
+    # The read side was observed in the billed quantity for 4 MiB objects only; the import side for 1 MiB or larger was not.
+    assert (
+        "読み取り側が 4 MiB のオブジェクトの読み取りにも立つことは、請求の数量で観測した"
+        in section
+    )
+    assert "1 MiB と 16 MiB のオブジェクトの読み取りは観測していない" in section
+    assert "取り込み側が 1 MiB 以上のオブジェクトにも立つかは、未確認である" in section
+    assert "既定は 1 操作 × 4 KiB のままで、観測値には変えていない" in section
     # The delta in the note is the model's own figure for the cell that moves most (P6, 1 MiB).
     assert "最大 $12.00 (そのセルの小計の 1.9%) 下がる" in section
     assert "subtotal_excluding_metadata_usd" in section

@@ -264,7 +264,7 @@ SSD IOPS ベースライン 50,000 だが、**API は 200,000 のプロビジョ
 
 | 項目 | 状態 |
 |---|---|
-| Amazon S3 Files 固有の課金 | **未確認。** Price List API で S3 Files 固有の usagetype を特定できていない |
+| Amazon S3 Files 固有の課金 | Price List API では S3 Files 固有の usagetype を特定できていない。Cost Explorer では `APN1-Files-Read`・`APN1-Files-Write`・`APN1-Files-TimedStorage-ByteHrs` が計上され、単価は 0.04 / 0.07 / 0.36（[請求数量の突き合わせ](../../verification/s3files-billing-reconciled.md)。2 日、ap-northeast-1） |
 | 第二世代の SSD 最小容量とペアあたりの下限 | 未確認。1 ペア構成での実際の最小値を作成時に確認する |
 | 実際の請求額 | **未確認。** 上記はすべて公表単価からの計算値 |
 | 公表の「Single-AZ 書き込み 1,024 MBps / ペア」が何を指すか | **未確認。** 4 つの独立した測定が 1,270〜1,350 MB/s（1,536 指定）に入り、公表値を 30% 超えた |
