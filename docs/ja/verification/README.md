@@ -46,7 +46,7 @@
 | [Amazon S3 Files の実測](s3files-measured.md) | S3 Files 単体での反映の速さと意味論 | 検証済み |
 | [S3 Files のファイルシステム性能](s3files-throughput-measured.md) | S3 Files 単体のスループット / IOPS。**頭打ちは efs-proxy の 1 コア** | 検証済み（1 台 1 回のサンプル） |
 | [S3 Files の `StorageBytes` 増分と作業セット比](s3files-active-ratio-measured.md) | 作業セットの一部を読んだとき高性能ストレージに載る量。**読んだバイトの 1.094 倍（データ + メタデータ合計）** | 検証済み（1 回の観測）。読み取りの請求数量は CloudWatch に一致、書き込みは増分から見積った取り込み量の約 0.97（[突き合わせ](s3files-billing-reconciled.md)）。保管の時間積分は未確認 |
-| [S3 Files の請求数量と CloudWatch 指標の突き合わせ](s3files-billing-reconciled.md) | 2 日分の測定で、読み取りの請求数量が `DataReadBytes` + `MetadataReadBytes` に一致するか。**1 MiB 以上の読み取りにもメタデータ課金が立つ** | 検証済み（2 日、各 1 回の観測）。請求額は未確認（Estimated、クレジットで相殺） |
+| [S3 Files の請求数量と CloudWatch 指標の突き合わせ](s3files-billing-reconciled.md) | 2 日分の測定で、読み取りの請求数量が `DataReadBytes` + `MetadataReadBytes` に一致するか。**4 MiB のオブジェクトの読み取りにもメタデータ課金が立つ** | 検証済み（2 日、各 1 回の観測）。請求額は未確認（Estimated、クレジットで相殺） |
 | [S3 Files と本構成の比較検証](s3files-vs-flexcache.md) | 同一ホスト・単一クロックで 4 方向を並べた結果 | 検証済み（両側とも実測） |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | Amazon EFS と並べて測れる組み合わせはどこまでか。**可否は実測、性能値は未測定** | 可否は検証済み |
 
