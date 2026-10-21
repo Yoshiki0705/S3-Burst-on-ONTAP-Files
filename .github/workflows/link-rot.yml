@@ -45,7 +45,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.14'
+          python-version: '3.15'
       # The repository's own checker, not a third-party link crawler. It already knows which paths to
       # skip and which links are internal, so a second tool would need that configuration duplicated
       # and would drift from it.
