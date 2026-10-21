@@ -33,6 +33,8 @@
 | [スループット / IOPS / 並列度の実測](throughput-iops-concurrency.md) | 何が数値を動かすか。**1 台の測定を上限と読むと外れる件**（単独 1,195.27 が、転送サイズと多重度を直すと 1,646.17 まで伸びる）を含む | 検証済み |
 | [指定値・バースト・ベースラインの実測](throughput-capacity-burst-and-baseline.md) | 購入した指定値がそのまま上限なのか、バーストが混ざるのか | 検証済み |
 | [プロトコル別測定の結果](perf-matrix-results.md) | NFS / SMB / EFS を同じ手法で並べた結果。**同じデータを共有するかで読み取り合計が 5.5 倍変わる** | 検証済み |
+| [capacity pool の読み取り操作数](fsx-ontap-cpool-read-operations-measured.md) | FSx for ONTAP の S3 Access Points で ALL ボリュームを読んだとき、CloudWatch の `CapacityPoolReadOperations` が 1 回の `GetObject` で何回立つか。**4 MiB で 34.67〜36.73 回（ALL だけ読んだ Single-AZ の 4 バッチ）。操作数が 0 回のバッチが 35 バッチ中 18 バッチ** | 検証済み（2 ファイルシステム、1 日、バッチごとに 1 回）。CloudWatch の操作数で、請求されるリクエスト数との対応は未確認 |
+| [階層別の `GetObject` 遅延（VPC 内、Single-AZ と Multi-AZ 第 1 世代）](fsx-ontap-tier-latency-in-vpc-measured.md) | SSD と capacity pool のボリュームを VPC 内の EC2 から交互に読んだときの差。**届いた 4 MiB で ALL が +110.4 ms 遅い（Multi-AZ 優先 AZ、4 バッチ）。届かなかったバッチの差は capacity pool の遅延ではない** | 検証済み（1 日、Single-AZ の届いたバッチは 1 バッチ）。オンプレミスのクライアントは未測定 |
 
 **1 台で測った数字を上限として引用しないでください。** 同じファイルシステムで、8 スレッド・
 転送サイズ 64 KiB のときは約 1,200 MB/s でした。**転送サイズを 1 MiB にすると 1,446.66、
@@ -46,6 +48,7 @@
 | [Amazon S3 Files の実測](s3files-measured.md) | S3 Files 単体での反映の速さと意味論 | 検証済み |
 | [S3 Files のファイルシステム性能](s3files-throughput-measured.md) | S3 Files 単体のスループット / IOPS。**頭打ちは efs-proxy の 1 コア** | 検証済み（1 台 1 回のサンプル） |
 | [S3 Files の `StorageBytes` 増分と作業セット比](s3files-active-ratio-measured.md) | 作業セットの一部を読んだとき高性能ストレージに載る量。**読んだバイトの 1.094 倍（データ + メタデータ合計）** | 検証済み（1 回の観測）。読み取りの請求数量は CloudWatch に一致、書き込みは増分から見積った取り込み量の約 0.97（[突き合わせ](s3files-billing-reconciled.md)）。保管の時間積分は未確認 |
+| [S3 Files の 64 KiB 読み取りにおけるコールドとウォームの遅延](s3files-warm-cold-latency-measured.md) | 初めて読むファイルと 2 分後の再読みの遅延。**p50 は 230.22 ms 対 18.71 ms（各 n = 360）。コールドの経路は区別できていない** | 検証済み（1 クライアント、1 日、1 回の実行）。経路は未確認 |
 | [S3 Files の請求数量と CloudWatch 指標の突き合わせ](s3files-billing-reconciled.md) | 2 日分の測定で、読み取りの請求数量が `DataReadBytes` + `MetadataReadBytes` に一致するか。**4 MiB のオブジェクトの読み取りにもメタデータ課金が立つ** | 検証済み（2 日、各 1 回の観測）。請求額は未確認（Estimated、クレジットで相殺） |
 | [S3 Files と本構成の比較検証](s3files-vs-flexcache.md) | 同一ホスト・単一クロックで 4 方向を並べた結果 | 検証済み（両側とも実測） |
 | [プロトコル別の可否](protocol-matrix-efs-vs-ontap.md) | Amazon EFS と並べて測れる組み合わせはどこまでか。**可否は実測、性能値は未測定** | 可否は検証済み |

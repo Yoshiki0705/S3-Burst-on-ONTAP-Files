@@ -3756,7 +3756,7 @@ def _baseline_cell_rows(cell: BaselineCell) -> list[list[str]]:
         [t("8. リテンション"), retention],
         [
             t("capacity pool 課金リクエスト数"),
-            t("未確認 (GET あたりの回数が未測定)"),
+            t("未確認 (CloudWatch の操作数は測定済み、請求との対応が未確認)"),
         ],
         [t("平均所要スループット"), f"{cell.required_mbps:,.1f} MB/s"],
     ]
@@ -3884,7 +3884,11 @@ def render_baseline_grid() -> list[str]:
             "**月間読み取り回数** (読み取り量 / サイズ、S3 の GET と NFS の読み取り操作に対応)、"
             "そして **capacity pool の課金リクエスト数** である。"
             "最後の 1 つは FabricPool の 4 MiB 単位の読み取り操作数で、"
-            "GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+            "請求される GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+            "CloudWatch の操作数は 1 環境で測った"
+            "(4 MiB のオブジェクトで 1 個あたり 34.67〜36.73 回。"
+            "[測定記録](../../verification/fsx-ontap-cpool-read-operations-measured.md))。"
+            "請求の件数との対応は未確認で、モデルは capacity pool から読む GET 1 回につき 1 件として算入している。"
             "この 4 つを同じ数として扱わない。"
         ),
         "",
@@ -4021,7 +4025,7 @@ def render_baseline_grid() -> list[str]:
         "",
         t(
             "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
-            "capacity pool の読み取りリクエスト数が未確認であること、"
+            "capacity pool の請求リクエスト数が未確認であること (CloudWatch の操作数は測ったが、請求の件数との対応は未確認)、"
             "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
             "S3 Files の内訳は、4 KiB × 操作のメタデータ課金を取り込み側と読み取り側の別行で示し、"
             "どちらも小計に算入している。"
