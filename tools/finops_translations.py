@@ -694,12 +694,19 @@ TRANSLATIONS.update(
         "**月間読み取り回数** (読み取り量 / サイズ、S3 の GET と NFS の読み取り操作に対応)、"
         "そして **capacity pool の課金リクエスト数** である。"
         "最後の 1 つは FabricPool の 4 MiB 単位の読み取り操作数で、"
-        "GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+        "請求される GET 1 回あたりの回数は**未確認 (UNCONFIRMED)** のまま置く。"
+        "CloudWatch の操作数は 1 環境で測った"
+        "(4 MiB のオブジェクトで 1 個あたり 34.67〜36.73 回。"
+        "[測定記録](../../verification/fsx-ontap-cpool-read-operations-measured.md))。"
+        "請求の件数との対応は未確認で、モデルは capacity pool から読む GET 1 回につき 1 件として算入している。"
         "この 4 つを同じ数として扱わない。": "Each cell derives four quantities separately: the **stored object count** (stored bytes / size), "
         "the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), "
         "the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), "
         "and the **capacity-pool billed request count**. "
-        "That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. "
+        "That last one is a count of FabricPool 4 MiB-unit read operations, and the billed number per GET is left **UNCONFIRMED**. "
+        "The CloudWatch operation count was measured in one environment "
+        "(34.67 to 36.73 per object for 4 MiB objects; [measurement record](../../../ja/verification/fsx-ontap-cpool-read-operations-measured.md) (Japanese)). "
+        "Its relation to billed requests is unconfirmed, and the model counts one request for each GET served from the capacity pool. "
         "These four are not treated as the same number.",
         "項目": "Item",
         "リージョン": "Region",
@@ -715,7 +722,7 @@ TRANSLATIONS.update(
         "#### パターン {pattern} — オブジェクト {size}": "#### Pattern {pattern} — {size} objects",
         "導出量": "Derived quantity",
         "capacity pool 課金リクエスト数": "Capacity-pool billed request count",
-        "未確認 (GET あたりの回数が未測定)": "unconfirmed (the count per GET is not measured)",
+        "未確認 (CloudWatch の操作数は測定済み、請求との対応が未確認)": "unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not)",
         "**主要費目小計 / major-line-item subtotal**": "**major-line-item subtotal**",
         # --- working-set patterns P1-P8 ------------------------------------------------------------
         "ここまでのユースケース別の試算は、ワークロードごとに前提が違う。"
@@ -873,7 +880,7 @@ TRANSLATIONS.update(
         "Of the values in {repo_assumed}, those marked as repository assumptions in the table are assumptions of this repository, not measurements. "
         "{unsourced} have neither a source nor a repository assumption behind them.",
         "両方式とも、下の内訳は**主要費目小計**であって月額総額ではない。"
-        "capacity pool の読み取りリクエスト数が未確認であること、"
+        "capacity pool の請求リクエスト数が未確認であること (CloudWatch の操作数は測ったが、請求の件数との対応は未確認)、"
         "および S3 のバージョニング非現行版・バックアップ・通信費を算入していないことによる。"
         "S3 Files の内訳は、4 KiB × 操作のメタデータ課金を取り込み側と読み取り側の別行で示し、"
         "どちらも小計に算入している。"
@@ -905,7 +912,7 @@ TRANSLATIONS.update(
         "どちらも測っていない。"
         "セルごとの除いた小計は、`python3 tools/finops_model.py --baseline-json` の "
         "`subtotal_excluding_metadata_usd` で読める。": "For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. "
-        "The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted. "
+        "The capacity-pool billed request count is unconfirmed (the CloudWatch operation count was measured, but its relation to billed requests is not), and S3 noncurrent versioning, backup and transfer are not counted. "
         "The S3 Files breakdown shows the 4 KiB-per-operation metadata charges as separate import-side and read-side lines, and counts both in the subtotal. "
         "Of the metadata lines (4 KiB per operation), the read side was observed in the billed quantity for reads of 4 MiB objects "
         "([reconciliation of billed quantities](../../../ja/verification/s3files-billing-reconciled.md) (Japanese); 1 MiB I/O and 4 MiB I/O, m5.large, one environment). "

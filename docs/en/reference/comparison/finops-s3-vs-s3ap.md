@@ -759,7 +759,7 @@ The use-case estimates above each start from different assumptions. Each leans t
 
 The stored volume (logical) is fixed at 20 TiB in every cell. Writes replace existing objects; nothing accumulates over the month. **The monthly write volume is not equated with the average retained volume.** Against a steady-state 20 TiB resident set, writing 1 TiB a month replaces part of it; it does not add to it.
 
-Each cell derives four quantities separately: the **stored object count** (stored bytes / size), the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), and the **capacity-pool billed request count**. That last one is a count of FabricPool 4 MiB-unit read operations, and the number per GET is left **UNCONFIRMED**. These four are not treated as the same number.
+Each cell derives four quantities separately: the **stored object count** (stored bytes / size), the **objects written per month** (write volume / size, matching the S3 PUT and NFS write operations), the **reads per month** (read volume / size, matching the S3 GET and NFS read operations), and the **capacity-pool billed request count**. That last one is a count of FabricPool 4 MiB-unit read operations, and the billed number per GET is left **UNCONFIRMED**. The CloudWatch operation count was measured in one environment (34.67 to 36.73 per object for 4 MiB objects; [measurement record](../../../ja/verification/fsx-ontap-cpool-read-operations-measured.md) (Japanese)). Its relation to billed requests is unconfirmed, and the model counts one request for each GET served from the capacity pool. These four are not treated as the same number.
 
 #### Formulas and a worked example
 
@@ -794,7 +794,7 @@ These three premises are held apart from the working-set ratio. (a) The FSx for 
 
 P1, P6, P8 have no source; the values were placed to make the arithmetic work. Of the values in P4, P5, P7, those marked as repository assumptions in the table are assumptions of this repository, not measurements. P2 working-set ratio, P2 read count, P3 read count, P5 churn rate have neither a source nor a repository assumption behind them.
 
-For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. The capacity-pool read-request count is unconfirmed, and S3 noncurrent versioning, backup and transfer are not counted. The S3 Files breakdown shows the 4 KiB-per-operation metadata charges as separate import-side and read-side lines, and counts both in the subtotal. Of the metadata lines (4 KiB per operation), the read side was observed in the billed quantity for reads of 4 MiB objects ([reconciliation of billed quantities](../../../ja/verification/s3files-billing-reconciled.md) (Japanese); 1 MiB I/O and 4 MiB I/O, m5.large, one environment). Reads of 1 MiB and 16 MiB objects were not observed. Whether the import side also applies to objects of 1 MiB or larger is unconfirmed. The [metering page](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html) says a direct read from the bucket carries a 4 KiB metadata read, while the [pricing page](https://aws.amazon.com/s3/pricing/) says the same read carries only the S3 GET charge. The two pages do not agree. The read side stays in the subtotal because the billed quantity included the metadata reads. The import side stays in the subtotal because there is no measurement. Without them, the subtotal of a cell of 1 MiB or larger falls by at most $12.00 (1.9% of that cell's subtotal). The amount can also rise. If each read carries k metadata operations, the read-side line is k times as large. For a 4 MiB read, about 6.0 operations of about 4.1 KiB each per object were observed (one environment, one observation). What the 6 operations consist of is unconfirmed. The default stays at 1 operation of 4 KiB and was not changed to the observed value. The first listing of a directory meters a 4 KiB write for each file in it. The one-off cost of listing 20 TiB ($89.60 for 64 KiB) is for the metadata alone; it does not include the import write ($0.07/GB) for the data of files of 128 KiB or smaller, because the default trigger (first access to a directory) imports their data as well. For sizes above 128 KiB ($5.60 for 1 MiB, $1.40 for 4 MiB, $0.35 for 16 MiB) the data is not imported but read directly, so the figure is the metadata alone. The model counts neither. Neither has been measured. The subtotal without them, cell by cell, is available as `subtotal_excluding_metadata_usd` in the output of `python3 tools/finops_model.py --baseline-json`.
+For both methods, each breakdown below is a **major-line-item subtotal**, not a monthly total. The capacity-pool billed request count is unconfirmed (the CloudWatch operation count was measured, but its relation to billed requests is not), and S3 noncurrent versioning, backup and transfer are not counted. The S3 Files breakdown shows the 4 KiB-per-operation metadata charges as separate import-side and read-side lines, and counts both in the subtotal. Of the metadata lines (4 KiB per operation), the read side was observed in the billed quantity for reads of 4 MiB objects ([reconciliation of billed quantities](../../../ja/verification/s3files-billing-reconciled.md) (Japanese); 1 MiB I/O and 4 MiB I/O, m5.large, one environment). Reads of 1 MiB and 16 MiB objects were not observed. Whether the import side also applies to objects of 1 MiB or larger is unconfirmed. The [metering page](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-metering.html) says a direct read from the bucket carries a 4 KiB metadata read, while the [pricing page](https://aws.amazon.com/s3/pricing/) says the same read carries only the S3 GET charge. The two pages do not agree. The read side stays in the subtotal because the billed quantity included the metadata reads. The import side stays in the subtotal because there is no measurement. Without them, the subtotal of a cell of 1 MiB or larger falls by at most $12.00 (1.9% of that cell's subtotal). The amount can also rise. If each read carries k metadata operations, the read-side line is k times as large. For a 4 MiB read, about 6.0 operations of about 4.1 KiB each per object were observed (one environment, one observation). What the 6 operations consist of is unconfirmed. The default stays at 1 operation of 4 KiB and was not changed to the observed value. The first listing of a directory meters a 4 KiB write for each file in it. The one-off cost of listing 20 TiB ($89.60 for 64 KiB) is for the metadata alone; it does not include the import write ($0.07/GB) for the data of files of 128 KiB or smaller, because the default trigger (first access to a directory) imports their data as well. For sizes above 128 KiB ($5.60 for 1 MiB, $1.40 for 4 MiB, $0.35 for 16 MiB) the data is not imported but read directly, so the figure is the metadata alone. The model counts neither. Neither has been measured. The subtotal without them, cell by cell, is available as `subtotal_excluding_metadata_usd` in the output of `python3 tools/finops_model.py --baseline-json`.
 
 The S3-alone breakdown appears only for the patterns with no writes (P1, P2, P3, P4). The write path differs by method (an S3 API PUT, an NFS write plus a sync, a PUT through S3 Access Points), and putting them in one table would mix the write assumptions. This is a choice of scope, not a claim that an S3-alone configuration with writes cannot work.
 
@@ -822,7 +822,7 @@ The S3-alone breakdown appears only for the patterns with no writes (P1, P2, P3,
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 0.4 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -872,7 +872,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 0.4 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -918,7 +918,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 0.4 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -964,7 +964,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 0.4 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1010,7 +1010,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1060,7 +1060,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1106,7 +1106,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1152,7 +1152,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1198,7 +1198,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1248,7 +1248,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1294,7 +1294,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1340,7 +1340,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1386,7 +1386,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1436,7 +1436,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1482,7 +1482,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1528,7 +1528,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 0 GiB / 0 objects / churn rate 0% (no writes) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 100.0 : 0.0 |
 | 8. Retention | No writes. The stored volume stays at 20,480 GiB. Where a pattern does write, the writes replace existing objects and the stored volume does not change |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.1 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1574,7 +1574,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 16,777,216 objects / churn rate 5% (0.05x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.5 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1614,7 +1614,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 1,048,576 objects / churn rate 5% (0.05x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.5 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1651,7 +1651,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 262,144 objects / churn rate 5% (0.05x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.5 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1688,7 +1688,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 1,024 GiB (1 TiB) / 65,536 objects / churn rate 5% (0.05x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 95.2 : 4.8 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.5 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1725,7 +1725,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1765,7 +1765,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1802,7 +1802,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1839,7 +1839,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1876,7 +1876,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1916,7 +1916,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1953,7 +1953,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -1990,7 +1990,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 66.7 : 33.3 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 24.3 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -2027,7 +2027,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 335,544,320 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.9 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -2067,7 +2067,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 20,971,520 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.9 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -2104,7 +2104,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 5,242,880 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.9 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -2141,7 +2141,7 @@ In a cell with no writes, S3 Files (128 KiB or smaller) books no first-read stre
 | 6. Written per month (bytes / objects / ratio to stored volume = churn rate) | 20,480 GiB (20 TiB) / 1,310,720 objects / churn rate 100% (1x the stored volume) |
 | 7. Read : write (byte ratio, not an operation-count ratio) | 9.1 : 90.9 |
 | 8. Retention | Writes replace existing objects, so the stored volume stays at 20,480 GiB. Nothing accumulates over the month |
-| Capacity-pool billed request count | unconfirmed (the count per GET is not measured) |
+| Capacity-pool billed request count | unconfirmed (the CloudWatch operation count is measured; its relation to billed requests is not) |
 | Average throughput required | 8.9 MB/s |
 
 **FSx for ONTAP S3 AP (this architecture)**
@@ -2768,14 +2768,14 @@ effective date are stated there.
 | Approach | Tier the object is on | Items billed on read | Unit price | Count per read |
 |---|---|---|---|---|
 | FSx for ONTAP S3 AP | **SSD (hot)** | GET via S3 AP | $0.000029 / 1,000 | 1 GET |
-| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + ? (not produced by this repository's measurement; see below) |
+| FSx for ONTAP S3 AP | **Capacity pool (cold, Tiering All)** | GET via S3 AP **plus capacity-pool read request** | GET $0.000029 / 1,000, pool read $0.00037 / 1,000 | 1 GET + ? (the CloudWatch operation count was measured, but the billed count is unconfirmed; see below) |
 | S3 Files | High-performance storage (below threshold, ingested) | S3 Files data read | $0.04 / GB | min 32 KiB, rounded up to 1 KiB |
 | S3 Files | Bucket direct (1 MiB or larger, or not ingested) | S3 GET + 4 KiB metadata read | GET at the Amazon S3 price, metadata read $0.04 / GB | 1 GET + 4 KiB |
 
-**The capacity-pool read-request count is left blank.** How many read requests one `GetObject`
+**The billed capacity-pool read-request count is left blank.** How many read requests one `GetObject`
 generates against the capacity pool depends on the block-level read granularity and is not in the
-pricing page. **A guessed number would be quoted, so it stays blank until this repository has a
-measured count.** The "4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a
+pricing page. **A guessed number would be quoted, so it stays blank until the CloudWatch operation count and the
+billed request count are confirmed to correspond.** The "4 MB unit" wording for FabricPool gives a rough bound, but a bound is not a
 count.
 
 The measurement was taken, but it produced no count. In the
@@ -2785,6 +2785,12 @@ the capacity pool. With a numerator of 0, no per-read count can be derived. That
 with tiering NONE and changed to ALL afterwards, and **the relation between the 0 in the cold window
 and that path has not been identified.** Because volume-level metrics exist, later measurements can
 count the requests without waiting for Cost Explorer to populate.
+
+A later measurement did produce the CloudWatch operation count. It read from ALL volumes on two file systems from an EC2 instance inside the VPC
+(2026-10-20, ap-northeast-1, ONTAP 9.19.1P3, 128 MBps, parallelism 1; [measurement record](../../../ja/verification/fsx-ontap-cpool-read-operations-measured.md) (Japanese)).
+In the four Single-AZ batches that read only the ALL volume (30 objects each), `CapacityPoolReadOperations` was 34.67 to 36.73 per object at 4 MiB,
+7.13 and 7.63 at 1 MiB, and 0 at 64 KiB. Of 35 batches, including those that read ALL and SSD alternately, 18 had 0 operations, and the cause was not investigated.
+**These are CloudWatch operation counts, not billed requests.** The relation between the two is unconfirmed, so the blank in the table above stays blank and the model keeps one request.
 
 A sibling repository's measurement shows capacity-pool read operations on the first read of volumes created with ALL. On a file system of the same type (another day, other volumes, a Lambda outside a VPC), `CapacityPoolReadOperations` was about 5.4 to 5.6 per object at 1 MiB, 29.8 to 33.2 at 5 MiB, and 0 at 64 KiB ([capacity pool reads per invocation](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-throughput-benchmark.md#capacity-pool-reads-per-invocation-derived)). **These are CloudWatch operation counts, not billed requests**, and the relation between the two is unconfirmed in that record as well. The blank in the table above therefore stays blank.
 
@@ -2810,8 +2816,9 @@ The Observability-side user's point — "with Tiering All, both the S3 request c
 pool read-request charge apply" — matches the pricing page (S3 requests and Capacity pool usage are
 separate items). **As billing items, both the GET via S3 AP ($0.000029 / 1,000) and the
 capacity-pool read that fetches the cold block ($0.00037 / 1,000) can apply** (documented). When the
-capacity-pool read actually occurs has not been confirmed by this repository's measurement (it was 0
-in the S-5 cold window). The count is not produced, so the total per read cannot be written yet.
+capacity-pool read actually occurs is not settled: it occurs in some cases and not in others, and the cause is not identified
+(it was 0 in the S-5 cold window; in the 2026-10-20 measurement, 17 of 35 batches had one or more and 18 had none).
+The billed count is not produced, so the total per read cannot be written yet.
 
 ### How to choose (within this section)
 
@@ -2819,7 +2826,8 @@ in the S-5 cold window). The count is not produced, so the total per read cannot
   S3 AP applies ($0.000029 / 1,000, 1/12.76 of the S3-bucket price).
 - Reading objects placed on the capacity pool under Tiering All: whether a capacity-pool read is
   incurred has not been settled by this repository's measurement. In S-5 (a volume created with
-  NONE and changed to ALL), `CapacityPoolReadOperations` was 0 over 33 reads in the cold window. In a
+  NONE and changed to ALL), `CapacityPoolReadOperations` was 0 over 33 reads in the cold window. In the 2026-10-20 measurement from an EC2 instance inside the VPC,
+  four batches that read only ALL at 4 MiB had 34.67 to 36.73 operations per object, while 18 of 35 batches, including those that read ALL and SSD alternately, had 0. In a
   sibling repository's measurement, six of eight volumes created with ALL and written directly had
   capacity-pool reads on the first read, and two (DIR, in two experiments) had none; five volumes changed from
   NONE to ALL had none for up to 60 minutes (one file system, one day;
@@ -2841,10 +2849,12 @@ in the S-5 cold window). The count is not produced, so the total per read cannot
 |---|---|
 | Unit prices and billing model for SSD / capacity pool / S3 Files | documented (unit prices with the retrieval and effective dates in the [price table](#unit-prices)) |
 | That the S3 GET and the capacity-pool read can both appear as billing items under Tiering All | documented (the pricing page's item structure) |
-| How many capacity-pool reads one `GetObject` generates | unconfirmed (measured, but `CapacityPoolReadOperations` was 0 in the cold window, so no count came out. 2026-10-10, one run. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| How many capacity-pool reads one `GetObject` generates, as billed | unconfirmed (S-5 had `CapacityPoolReadOperations` at 0 in the cold window, so no count came out. 2026-10-10, one run. A later measurement produced the CloudWatch operation count, but its relation to billed requests is unconfirmed. [operation-count record](../../../ja/verification/fsx-ontap-cpool-read-operations-measured.md) (Japanese). S-5: [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese)) |
+| That `CapacityPoolReadOperations` is 34.67 to 36.73 for one 4 MiB `GetObject` when only the ALL volume is read | verified (one Single-AZ file system, one day, four batches of 30 objects. 2026-10-20, ONTAP 9.19.1P3, 128 MBps, EC2 inside the VPC, parallelism 1. [operation-count record](../../../ja/verification/fsx-ontap-cpool-read-operations-measured.md) (Japanese). A CloudWatch operation count, not a billed count. Of 35 batches, including those that read ALL and SSD alternately, 18 had 0, and the cause is unconfirmed) |
 | Capacity-pool reads occur on the first read of some volumes created with ALL and not of others; on volumes changed from NONE to ALL they did not occur for up to 60 minutes | verified (a sibling repository's measurement; one file system, one day, thirteen volumes) ([evidence tiers](https://github.com/Yoshiki0705/FSx-for-ONTAP-Observability-integrations/blob/main/docs/en/s3ap-throughput-benchmark.md#evidence-tiers-of-the-tiering-path-statements). Six directly written volumes with reads, two directly written without, five switched without. CloudWatch operation counts, not billed requests. Neither the write path, the elapsed time, nor the other volumes' reads is shown to be the cause) |
 | p50 measured in S-5 (SSD side 46.5 / 58.6 / 116.0 ms; after the change to ALL 56.4 / 74.0 / 121.3 ms; 64 KiB / 1 MiB / 5 MiB) | verified (one sample) (2026-10-10; local measurement with the internet round trip included. [measured record](../../../ja/verification/s3files-throughput-measured.md) (Japanese). The SSD side is 166-407 requests, the ALL side n=10. Not interleaved; the cold-side script and the raw samples were not kept) |
 | That "cold is 5-15 ms slower than SSD" can be read as a delay from reading the capacity pool | unverified (the reads did not reach the capacity pool: `CapacityPoolReadOperations` was 0 in the cold window. The 5 MiB difference of +5.3 ms is smaller than the 9.0 ms p50-to-p90 spread on the SSD side, so it is not distinguishable even within the one run) |
+| The ALL − SSD difference for 4 MiB reads that reached the capacity pool, from an EC2 instance inside the VPC | verified (+110.4 ms on the Multi-AZ gen 1 preferred AZ, one file system, one day, four batches of 30 pairs; +122.4 ms in one Single-AZ batch that reached it. 2026-10-20, ONTAP 9.19.1P3, 128 MBps, parallelism 1. [latency record](../../../ja/verification/fsx-ontap-tier-latency-in-vpc-measured.md) (Japanese). The conditions differ from the S-5 +5.3 to +15.4 ms, so it does not replace that value. The difference in batches with 0 operations is not a capacity-pool delay. Clients on premises were not measured) |
 
 ## Value that does not appear in the cost, and its reverse
 
