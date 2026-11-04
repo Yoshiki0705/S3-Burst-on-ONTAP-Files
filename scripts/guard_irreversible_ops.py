@@ -4,7 +4,7 @@
 PROVENANCE
 ----------
 Copied verbatim from `scripts/guard_irreversible_ops.py` in
-https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook on 2026-09-06, on that repository's
+https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook on 2026-09-06 (re-synced 2026-11-04 to upstream blob 049cc6673e), on that repository's
 advice: it is stdlib-only and project-independent, and copying the single file is the whole of the
 supported use. **No divergence.** Behaviour changes belong upstream, where the incident that produced
 this guard is recorded and where its tests live -- a local edit here would be a second version of a
@@ -138,7 +138,23 @@ MUTATING = re.compile(
       (?:create|update|put|modify|delete|initiate|complete|lock|enable|associate|tag)-
   | -X\s*(?:POST|PATCH|PUT|DELETE)
   | --method\s*(?:POST|PATCH|PUT|DELETE)
-  | \b(?:volume|vserver|snapmirror)\s+[\w\s-]*?\b(?:create|modify|delete|add-rule)\b  # ONTAP CLI
+  # ONTAP CLI. The verb must sit within two words of the object and be followed by a flag.
+  # Real invocations carry flags - `volume delete` alone is not a complete ONTAP command, it
+  # needs -vserver and -volume - and prose does not.
+  #
+  # Two words rather than one, because `volume snapshot policy create` exists. The `[\w-]*`
+  # after the verb is for `modify-snaplock-expiry-time`, where the hyphenated tail follows the
+  # verb with no space. Both were caught by the case table when a tighter version silently
+  # stopped blocking them: **loosening a guard has to be measured in the direction that still
+  # has to fail**, not only in the direction being relaxed.
+  #
+  # The looser form was `[\w\s-]*?` between object and verb, which let arbitrary words
+  # intervene, so **prose describing the feature matched as if it were a command.** Writing a
+  # pull request body about an audit log volume that cannot be deleted was blocked by this
+  # guard. A guard that blocks documentation about the hazard it guards gets switched off, and
+  # then it guards nothing.
+  | \b(?:volume|vserver|snapmirror)(?:\s+[\w-]+){0,2}?\s+
+      (?:create|modify|delete|add-rule)[\w-]*\s+-\w
     """
 )
 
@@ -207,6 +223,30 @@ def find_matches(command: str) -> tuple[list[str], list[str]]:
 # guard when it is copied into another repository. A guard with no tests invites the
 # over-blocking failure that gets guards switched off, so both directions are covered.
 SELFTEST_CASES: list[tuple[int, str, str]] = [
+    # Prose versus command, both directions. The looser ONTAP CLI pattern matched the first of
+    # these, so writing about the hazard was blocked while the actual command it describes still
+    # has to be. Both are needed: proving the guard stopped over-blocking says nothing about
+    # whether it still blocks, and that is the direction that matters.
+    (
+        0,
+        "prose describing an audit log volume that cannot be deleted",
+        "gh pr create --title x --body 'the SnapLock audit log volume delete is refused'",
+    ),
+    (
+        0,
+        "a commit message about the same constraint",
+        "git commit -m 'docs: snaplock volume delete refuses both forms'",
+    ),
+    (
+        2,
+        "the ONTAP CLI command that prose was being confused with",
+        "volume delete -vserver svm1 -volume snaplock_audit_log",
+    ),
+    (
+        2,
+        "an ONTAP CLI retention rule, which carries flags too",
+        "snapmirror policy add-rule -policy p1 -retention-period 6months",
+    ),
     # SnapLock
     (
         2,
