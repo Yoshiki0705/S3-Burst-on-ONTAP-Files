@@ -181,6 +181,22 @@ def test_command_under_an_alternate_key_is_still_inspected() -> None:
     assert done.returncode == 2
 
 
+def test_json_that_is_not_an_object_is_read_as_text() -> None:
+    """Valid JSON with no `.get` used to crash the guard with exit 1, which proceeds unchecked.
+
+    A bare array or null carries nothing to block and must pass silently. A blocked command wrapped
+    as a JSON string is the same text in a different envelope and must still be stopped.
+    """
+    for stdin in ("[]", "null"):
+        done = _run(stdin)
+        assert (done.returncode, done.stdout, done.stderr) == (0, "", ""), stdin
+    wrapped = _run(json.dumps(_first_command(2)))
+    assert wrapped.returncode == 2, (
+        "a blocked command inside a JSON string must still be blocked"
+    )
+    assert "BLOCKED" in wrapped.stderr
+
+
 # ---------------------------------------------------------------- 3. every area has a block case
 
 
