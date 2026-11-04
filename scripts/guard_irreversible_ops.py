@@ -4,7 +4,7 @@
 PROVENANCE
 ----------
 Copied verbatim from `scripts/guard_irreversible_ops.py` in
-https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook on 2026-09-06 (re-synced 2026-11-04 to upstream blob 049cc6673e), on that repository's
+https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook on 2026-09-06 (re-synced 2026-11-04 to upstream blob a8f650ba44), on that repository's
 advice: it is stdlib-only and project-independent, and copying the single file is the whole of the
 supported use. **No divergence.** Behaviour changes belong upstream, where the incident that produced
 this guard is recorded and where its tests live -- a local edit here would be a second version of a
@@ -529,6 +529,11 @@ def main() -> int:
     try:
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
+        payload = {"command": raw}
+    if not isinstance(payload, dict):
+        # Valid JSON that is not an object (`[]`, `null`, a bare string, a number) has no `.get`,
+        # so extract_command crashed with exit 1 - a warning that lets the call proceed
+        # unchecked. Treat it as text, the same as input that is not JSON at all.
         payload = {"command": raw}
 
     command = extract_command(payload)
