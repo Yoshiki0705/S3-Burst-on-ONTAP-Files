@@ -540,7 +540,8 @@ MTU の不一致で起きるのは接続失敗ではなく、小さな読み取�
 |---|---|---|
 | Google Cloud NetApp Volumes を Origin、FSx for ONTAP を Cache とする FlexCache | 未確認 | 一次資料の記載、または実機でのクラスタピアリングと Cache 作成の成否 |
 | Azure NetApp Files を Origin、FSx for ONTAP を Cache とする FlexCache | 未確認 | 同上。ANF 側がクラスタピアリングを外部に提供するかを含む |
-| FSx for ONTAP を Origin、Google Cloud NetApp Volumes / Azure NetApp Files を Cache とする FlexCache | 未確認（[検証状況](verification-status.md)に既出） | 同上 |
+| FSx for ONTAP を Origin、Google Cloud NetApp Volumes（ONTAP モード）を Cache とする FlexCache | documented + 他プロジェクトで一度観測（この repo では未再現。[検証状況](verification-status.md)に既出） | このリポジトリでの再現と、MTU をそろえた経路での読み取り実測 |
+| FSx for ONTAP を Origin、Azure NetApp Files を Cache とする FlexCache | 未確認（[検証状況](verification-status.md)に既出） | 同上。ANF 側がクラスタピアリングを外部に提供するかを含む |
 | パートナー経由（Direct Connect + プロバイダのファブリック + 相手クラウドの専用線）でのクラスタピアリング成立 | 未確認 | 実機での疎通と、MTU をそろえた状態での FlexCache 読み取り |
 | AWS Interconnect – multicloud 経由でのクラスタピアリング成立と、その経路での FlexCache 読み取り | 未確認 | 実機での疎通。**対応ペアに日本が無いため、測定するなら対応ペアのリージョンに環境を作る必要がある** |
 | Azure Multicloud Interconnect の帯域・SLA・料金 | 未確認 | Microsoft Learn 側のリファレンスに記載が現れること。ブログの数値は GA 時点の話で Preview の値ではない |
