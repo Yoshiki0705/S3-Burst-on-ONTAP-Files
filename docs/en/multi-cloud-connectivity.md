@@ -552,7 +552,8 @@ environment and the procedure stated alongside. Real-environment re-verification
 |---|---|---|
 | A FlexCache with Google Cloud NetApp Volumes as origin and FSx for ONTAP as cache | unconfirmed | A primary source, or the outcome of cluster peering and cache creation on real equipment |
 | A FlexCache with Azure NetApp Files as origin and FSx for ONTAP as cache | unconfirmed | The same, including whether ANF exposes cluster peering externally |
-| A FlexCache with FSx for ONTAP as origin and Google Cloud NetApp Volumes / Azure NetApp Files as cache | unconfirmed (already in [verification status](verification-status.md)) | The same |
+| A FlexCache with FSx for ONTAP as origin and Google Cloud NetApp Volumes (ONTAP-mode) as cache | documented + observed once in another project (not reproduced in this repo; already in [verification status](verification-status.md)) | Reproduction in this repository, and a read measurement over an MTU-aligned route |
+| A FlexCache with FSx for ONTAP as origin and Azure NetApp Files as cache | unconfirmed (already in [verification status](verification-status.md)) | The same, including whether ANF exposes cluster peering externally |
 | Cluster peering over a partner route (Direct Connect, the provider's fabric, the other cloud's circuit) | unconfirmed | Reachability on real equipment, and a FlexCache read with the MTU aligned |
 | Cluster peering over AWS Interconnect – multicloud, and a FlexCache read over that path | unconfirmed | Reachability on real equipment. **No Japanese pair exists, so measuring it means building an environment in a Region that is paired** |
 | Azure Multicloud Interconnect's bandwidth, SLA and pricing | unconfirmed | The material appearing in the Microsoft Learn reference. The blog figures describe GA, not Preview |
