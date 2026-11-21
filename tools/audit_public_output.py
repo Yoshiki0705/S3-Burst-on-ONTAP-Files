@@ -156,10 +156,19 @@ COINAGE_RULES: list[tuple[re.Pattern[str], str]] = [
 
 # ---------------------------------------------------------------- naming
 
+# Word boundaries for the product names. Python's `\b` treats a Japanese character as a word
+# character, so `FSxNを使う` and `構成でFSxN` have no boundary beside FSxN and were never reported,
+# while the ASCII form `FSxN を使う` was. Japanese prose attaches particles directly to a name, so the
+# common way of writing it was the one missed. A boundary here is "not adjacent to an ASCII letter,
+# digit or underscore"; the underscore stays in the class so that a configuration name such as
+# `FSxN_OnPre` is not read as prose. Do not go back to `\b`.
+LB = r"(?<![A-Za-z0-9_])"
+RB = r"(?![A-Za-z0-9_])"
+
 NAMING_RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bFSxN\b"), "use 'FSx for ONTAP'"),
-    (re.compile(r"\bFSx\s+ONTAP\b"), "use 'FSx for ONTAP' (missing 'for')"),
-    (re.compile(r"\bFSx\s+NetApp\b"), "use 'Amazon FSx for NetApp ONTAP'"),
+    (re.compile(LB + r"FSxN" + RB), "use 'FSx for ONTAP'"),
+    (re.compile(LB + r"FSx\s+ONTAP" + RB), "use 'FSx for ONTAP' (missing 'for')"),
+    (re.compile(LB + r"FSx\s+NetApp" + RB), "use 'Amazon FSx for NetApp ONTAP'"),
 ]
 
 # Suppressed by `naming` or by `vendor-ref`. The second exists for citation URLs and verbatim
@@ -177,8 +186,10 @@ FORBIDDEN_PRODUCTS = (
 
 # Bare "FSx" that is prose rather than part of an accepted phrase or an identifier.
 BARE_FSX = re.compile(
-    r"\bFSx\b"
-    r"(?!\s+for\s+(?:NetApp\s+)?ONTAP)"  # FSx for ONTAP / FSx for NetApp ONTAP
+    LB
+    + r"FSx"
+    + RB
+    + r"(?!\s+for\s+(?:NetApp\s+)?ONTAP)"  # FSx for ONTAP / FSx for NetApp ONTAP
     r"(?!\s+for\s+(?:Windows|Lustre|OpenZFS))"  # sibling AWS services are legitimate
     r"(?!-for-ONTAP)"  # repo / URL slugs
     r"(?![-\w]*\.(?:md|py|ya?ml|json|svg|png|drawio))"  # filenames
@@ -201,20 +212,80 @@ IDENT_SPANS = (
 )
 
 
-def bare_fsx_matches(line: str) -> list[re.Match[str]]:
+def bare_fsx_matches(
+    line: str, before: str = "", after: str = ""
+) -> list[re.Match[str]]:
     """Prose bare-"FSx" occurrences on one line, judged per occurrence.
 
     行に識別子や URL が 1 つあるだけで行全体を免除すると、隣に置かれた散文の
     "FSx" も一緒に通る。出現ごとに、その位置が識別子 span の内側かを見る。
+
+    `before` / `after` は、同じ文が続く前後の行（context_around が決める）。折り返された
+    `FSx for` / `ONTAP` や `Amazon` / `FSx` を、1 つの名前として読むために使う。返す一致は
+    `line` の中で始まるものだけで、名前が始まる行に 1 回数える。
+    `Amazon FSx` は AWS のサービス群の名前なので、直前が Amazon の出現は散文の裸の FSx ではない。
     """
+    head = before + " " if before else ""
+    text = head + line + (" " + after if after else "")
+    lo, hi = len(head), len(head) + len(line)
     spans = [
-        match.span() for pattern in IDENT_SPANS for match in pattern.finditer(line)
+        match.span() for pattern in IDENT_SPANS for match in pattern.finditer(text)
     ]
     return [
         match
-        for match in BARE_FSX.finditer(line)
-        if not any(start <= match.start() < end for start, end in spans)
+        for match in BARE_FSX.finditer(text)
+        if lo <= match.start() < hi
+        and not any(start <= match.start() < end for start, end in spans)
+        and not re.search(r"Amazon\s+$", text[: match.start()])
     ]
+
+
+# ---------------------------------------------------------------- sentence continuation
+
+# A comment or quote marker does not interrupt a sentence: a wrapped shell or YAML comment, or a
+# block quote, carries the sentence on after the marker.
+_MARKER = re.compile(r"^[\s#>]*")
+_LIST_ITEM = re.compile(r"^(?:[-*+]|\d+[.)])\s")
+_FENCE = re.compile(r"^(?:```|~~~)")
+MAX_LOOKAHEAD = 3  # FSx / for / NetApp / ONTAP, broken at every space, leaves three lines after
+
+
+def _body(line: str) -> str:
+    return line[_MARKER.match(line).end() :]
+
+
+def _ends_sentence(line: str) -> bool:
+    """A blank line, list item, table row or fence neither continues nor is continued."""
+    body = _body(line).rstrip()
+    return (
+        not body
+        or bool(_LIST_ITEM.match(body))
+        or body.startswith("|")
+        or bool(_FENCE.match(body))
+    )
+
+
+def context_around(lines: list[str], index: int) -> tuple[str, str]:
+    """The text of the same sentence before and after lines[index], for a name split by a wrap."""
+    current = _body(lines[index]).rstrip()
+    if not current or _FENCE.match(current) or current.startswith("|"):
+        return "", ""
+    before = ""
+    if not _LIST_ITEM.match(current) and index > 0:
+        previous = lines[index - 1]
+        previous_body = _body(previous).rstrip()
+        if (
+            previous_body
+            and not _FENCE.match(previous_body)
+            and not previous_body.startswith("|")
+        ):
+            before = previous_body
+    after: list[str] = []
+    for follower in lines[index + 1 : index + 1 + MAX_LOOKAHEAD]:
+        if _ends_sentence(follower):
+            break
+        after.append(_body(follower).strip())
+    return before, " ".join(after)
 
 
 # ---------------------------------------------------------------- neutrality
@@ -492,7 +563,10 @@ def file_allowances(lines: list[str]) -> set[str]:
 
 
 def audit_line(
-    line: str, file_allowed: frozenset[str] = frozenset()
+    line: str,
+    file_allowed: frozenset[str] = frozenset(),
+    before: str = "",
+    after: str = "",
 ) -> list[tuple[str, str]]:
     """Return (category, message) findings for one line, honouring allow markers."""
     allowed = {match.group(1) for match in ALLOW.finditer(line)} | set(file_allowed)
@@ -505,7 +579,7 @@ def audit_line(
         for pattern, message in NAMING_RULES:
             if pattern.search(line):
                 findings.append(("naming", message))
-        if bare_fsx_matches(line):
+        if bare_fsx_matches(line, before, after):
             findings.append(("naming", "bare 'FSx'; use 'FSx for ONTAP'"))
 
     if not ({"naming", "vendor-ref"} & allowed):
@@ -600,7 +674,8 @@ def main() -> int:
             continue
         file_allowed = frozenset(file_allowances(lines))
         for lineno, line in enumerate(lines, start=1):
-            for category, message in audit_line(line, file_allowed):
+            before, after = context_around(lines, lineno - 1)
+            for category, message in audit_line(line, file_allowed, before, after):
                 findings.append(f"{rel}:{lineno}: [{category}] {message}")
 
         # ai-style scan: Markdown only and additive. It reuses the existing file_allowances / ALLOW
