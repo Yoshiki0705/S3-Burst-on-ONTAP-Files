@@ -247,7 +247,8 @@ def bare_fsx_matches(
 _MARKER = re.compile(r"^[\s#>]*")
 _LIST_ITEM = re.compile(r"^(?:[-*+]|\d+[.)])\s")
 _FENCE = re.compile(r"^(?:```|~~~)")
-MAX_LOOKAHEAD = 3  # FSx / for / NetApp / ONTAP, broken at every space, leaves three lines after
+# "FSx for NetApp ONTAP" broken at every space leaves three lines after "FSx".
+MAX_LOOKAHEAD = 3
 
 
 def _body(line: str) -> str:
