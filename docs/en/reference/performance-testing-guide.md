@@ -503,6 +503,8 @@ on.**
 | **Comparing configurations across time** | Measured four configurations in sequence and wrote "1.73x from the policy." Elapsed time, which wasn't meant to change, changed too. **When comparing configuration A against configuration B, match the elapsed time from write to read** |
 | **Watching only `DiskIopsUtilization`** | Read 82% as "close to the ceiling." **Wrote that without knowing what saturation looks like** (it actually saturates at 89-98%). The relationship to the ceiling only emerges from taking all four metrics |
 
+- The Cyber Resilience Patterns repository's [recovery measurement results](https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/en/recovery-measurement-results.md#relation-to-earlier-records) cite this record among the earlier records that each recovery measurement builds on. Its values are not copied there.
+
 ### Three disproved hypotheses (each survived until a control experiment was run)
 
 **Plausibility is not evidence.** In the block measurements, three explanations were proposed in
