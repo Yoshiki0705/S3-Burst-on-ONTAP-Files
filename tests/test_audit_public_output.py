@@ -143,6 +143,81 @@ def test_the_dropped_contexts_are_ones_the_rule_cannot_match() -> None:
 # --- neutrality --------------------------------------------------------------------------------
 
 
+def naming_count(text: str) -> int:
+    """Naming findings over a multi-line text, with the same sentence context main() supplies."""
+    lines = text.split("\n")
+    total = 0
+    for index, line in enumerate(lines):
+        before, after = audit.context_around(lines, index)
+        total += sum(
+            1
+            for category, _ in audit.audit_line(line, frozenset(), before, after)
+            if category == "naming"
+        )
+    return total
+
+
+def every_fold(sentence: str) -> list[str]:
+    """The sentence broken at each single space, and at all of them."""
+    words = sentence.split(" ")
+    folds = [
+        " ".join(words[:i]) + "\n" + " ".join(words[i:]) for i in range(1, len(words))
+    ]
+    folds.append("\n".join(words))
+    return folds
+
+
+def test_a_name_beside_japanese_is_flagged_on_both_sides() -> None:
+    """Python's `\\b` counts a Japanese character as a word character, so neither of these was seen."""
+    for text in (
+        "FSxNを使う",
+        "構成でFSxN",
+        "Use FSxN here.",
+        "FSx ONTAPを使う",
+        "FSxを使う",
+        "構成でFSx",
+        "Use FSx here.",
+    ):
+        assert "naming" in categories(text), text
+
+
+def test_a_name_inside_an_identifier_is_not_flagged() -> None:
+    for text in ("FSxN_OnPre", "XFSxN", "FSxNN", "XFSx", "FSx_OnPre"):
+        assert "naming" not in categories(text), text
+
+
+def test_a_wrapped_accepted_name_is_not_a_violation() -> None:
+    for text in (
+        "The FSx for\nONTAP volume.",
+        "Amazon\nFSx API",
+        "# The FSx for\n# ONTAP volume.",
+        "> The FSx for\n> ONTAP volume.",
+        "The FSx for NetApp\nONTAP volume.",
+    ):
+        assert naming_count(text) == 0, text
+
+
+def test_a_sentence_end_stops_the_lookahead() -> None:
+    assert naming_count("The FSx for\n\nONTAP volume.") == 1
+    assert naming_count("uses FSx\n- for ONTAP") == 1
+    assert naming_count("uses FSx\n| for ONTAP |") == 1
+    assert naming_count("uses FSx\n```\nfor ONTAP") == 1
+
+
+def test_the_count_does_not_depend_on_where_the_line_is_wrapped() -> None:
+    for sentence, expected in (
+        ("Use Amazon FSx API calls here.", 0),
+        ("Use FSx API calls here.", 1),
+        ("The FSx for ONTAP volume is mounted.", 0),
+        ("The FSx for NetApp ONTAP volume is mounted.", 0),
+    ):
+        for text in every_fold(sentence):
+            assert naming_count(text) == expected, repr(text)
+
+
+# --- neutrality (continued) --------------------------------------------------------------------
+
+
 def test_vendor_versus_framing_is_flagged() -> None:
     for line in (
         "競合ツールと比較する",
