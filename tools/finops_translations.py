@@ -635,8 +635,8 @@ TRANSLATIONS.update(
         "効率をどう仮定しても S3 Files 側の金額は変わらない。"
         "つまり効率の仮定は、この構成に有利な方向にしか働かない。"
         "楽観的な効率を置くと、この構成が実際より良く見える。": "**The S3 Files column does not move.** ONTAP deduplication and compression do not reach S3 storage charges, so no efficiency assumption changes that figure. "
-        "The assumption can therefore only work in this architecture's favour. "
-        "An optimistic figure makes it look better than it is.",
+        "The assumption therefore changes only this architecture's figure, "
+        "and an optimistic value understates its monthly cost.",
         "階層化を有効にしている環境で高い効率を期待するのは慎重に扱う。"
         "**階層化されたデータには背景の効率化処理が動かない**。"
         "SSD にいる間に適用された分だけが保持され、"

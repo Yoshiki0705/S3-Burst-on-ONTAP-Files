@@ -2694,7 +2694,7 @@ Efficiency is the assumption that moves the figures in this document most. Sweep
 | 60% | 30% | $3,237.63 | $2,313.22 |  |
 | 75% | 38% | $2,361.04 | $2,313.22 | AWS's published figure for engineering data |
 
-**The S3 Files column does not move.** ONTAP deduplication and compression do not reach S3 storage charges, so no efficiency assumption changes that figure. The assumption can therefore only work in this architecture's favour. An optimistic figure makes it look better than it is.
+**The S3 Files column does not move.** ONTAP deduplication and compression do not reach S3 storage charges, so no efficiency assumption changes that figure. The assumption therefore changes only this architecture's figure, and an optimistic value understates its monthly cost.
 
 Be careful expecting a high figure where tiering is enabled. **Background efficiency processing does not run on tiered data.** Only what was applied while the block was on SSD is preserved, and a block tiered before efficiency ran stays in the pool with no reduction at all ([FSx for ONTAP documentation](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/manage-vol-SE.html), [NetApp KB](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/Does_ONTAP_apply_efficiencies_to_blocks_that_are_tiered-out_to_Fabricpool%3F)). With a short cooling period, or an `All` policy, the pool-tier figure tends towards 0%.
 
