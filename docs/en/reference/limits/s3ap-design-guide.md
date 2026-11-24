@@ -29,7 +29,7 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 | HeadObject | — |
 | DeleteObject | — |
 | MultipartUpload | CreateMultipartUpload / UploadPart / CompleteMultipartUpload |
-| CopyObject | Within the same AP and the same Region only. The `x-amz-object-annotation-directive` header is not supported ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)) |
+| CopyObject | Server-side copy works between an Amazon S3 bucket and an access point, between access points, and within one access point. Same Region only; when the destination is an FSx for ONTAP volume, encryption is limited to `SSE-FSX` and the storage class to `FSX_ONTAP` ([What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/), announced 2026-11-22, checked 2026-11-24). FSx-for-ONTAP-Adoption-Playbook measured `CopyObject` on 2026-11-24 with 8 MiB objects, between a bucket and an access point, within one access point, and between access points on different file systems, and recorded success and a matching SHA-256 ([record](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md) (Japanese)). This repository has not re-measured it. That record does not cover objects larger than 8 MiB, copies across accounts, or access points on FlexCache volumes, and this repository has not checked them either. The `x-amz-object-annotation-directive` header is not supported ([compatibility table](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html); not re-read for this row) |
 
 ### Not supported (an error is returned)
 
@@ -42,7 +42,7 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 
 | Operation | Condition | State in this repository |
 |---|---|---|
-| UploadPartCopy | The compatibility table states same-AP, same-Region only | **Measured with a source inside the same access point, it returns `NoSuchKey`** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19). **`CopyObject` given the identical `CopySource` succeeds in the same run**, which is the control. The measurement runs opposite to the table. Whether `UploadPartCopy` is unsupported outright **cannot be decided here**: no other source namespace copies successfully on this endpoint, since a source in a different access point is refused for `CopyObject` too. The earlier single observation of `404 NoSuchKey` for a source outside the access point **does not fit, because a different access point yields `InvalidArgument`** |
+| UploadPartCopy | Usable within the same scope as `CopyObject` (same Region only; when the destination is an FSx for ONTAP volume, `SSE-FSX` and `FSX_ONTAP` only), between a bucket and an access point and between access points ([What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/), announced 2026-11-22, checked 2026-11-24) | **FSx-for-ONTAP-Adoption-Playbook measured it on 2026-11-24 and it succeeded** (ap-northeast-1, first-generation `SINGLE_AZ_1`, ONTAP 9.19.1P4, 8 MiB, two parts, source key containing `/`, SHA-256 of the content matched; see the section "Server-side copy between a bucket and another access point" in [its record](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md) (Japanese)). **This repository has not re-measured it.** Objects larger than 8 MiB, copies across accounts, and access points on FlexCache volumes have not been checked. **When this repository measured a source inside the same access point on 2026-08-19, it returned `NoSuchKey`** ([measurement record](../../../ja/verification/s3ap-operations.md) (Japanese); `CopyObject` given the identical `CopySource` succeeded in the same run). That result did not reproduce on 2026-11-24. The record stays as that day's result and is not treated as a current limitation |
 
 ### Features that do not exist
 
@@ -54,7 +54,6 @@ The FSx for ONTAP S3 AP supports a subset of the S3 API. It is not identical to 
 | Object Lock / WORM | SnapLock Compliance / Enterprise |
 | S3 Select | Athena + Glue Data Catalog |
 | SSE-S3 / SSE-KMS | NAE / NVE (ONTAP volume encryption) |
-| Cross-AP Copy | DataSync / rsync |
 
 ### Presigned URL
 

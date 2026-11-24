@@ -57,7 +57,7 @@
 
 | 記録 | 答える問い | 段階 |
 |---|---|---|
-| [presigned URL と UploadPartCopy](s3ap-operations.md) | 公式対応表と実際の挙動が一致するか（**測定時は 2 点とも逆向きだった。presigned URL は 2026-10-08 時点の対応表と一致**） | 検証済み |
+| [presigned URL と UploadPartCopy](s3ap-operations.md) | 公式対応表と実際の挙動が一致するか（**測定時は 2 点とも逆向きだった。presigned URL は 2026-10-08 時点の対応表と一致。`UploadPartCopy` の `NoSuchKey` は、2026-11-24 に FSx-for-ONTAP-Adoption-Playbook が再確認したところ再現しなかった（[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)）**） | 検証済み（測定日の結果として） |
 | [マルチパートの境界と Internet origin 経由の書き込み](s3ap-multipart-internet-origin.md) | パート 5 GiB と全体 50 GiB の境界でどう振る舞うか、NFS 直書き込みとどれだけ差があるか。**1 構成・回数限定のサンプル実行** | 検証済み（1 構成・各 1〜2 回）。全体 50 GiB 超の判定は未観測 |
 
 ## 自分で測るときに読むもの

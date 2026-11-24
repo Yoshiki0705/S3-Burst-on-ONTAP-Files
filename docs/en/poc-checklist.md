@@ -71,13 +71,21 @@ claim" in [verification status](verification-status.md).
       partial file appears, or nothing until `CompleteMultipartUpload`)
 - [ ] Confirm how a deletion on the origin side appears on the cache side
 - [ ] Confirm how an overwrite propagates
-- [x] Try `UploadPartCopy` with **a source inside the same access point** → **`NoSuchKey`**
-      ([measurement record](../ja/verification/s3ap-operations.md) (Japanese), 2026-08-19).
-      `CopyObject` given the identical `CopySource` succeeds in the same run, which is the control.
-      AWS documents same-AP copies as supported
-- [ ] Try `UploadPartCopy` with a source in a standard S3 bucket. **Whether `UploadPartCopy` is
-      supported at all is still undecided**, because no other source namespace copies successfully
-      on this endpoint
+- [x] Try `UploadPartCopy` with **a source inside the same access point** → the 2026-08-19
+      measurement returned **`NoSuchKey`**
+      ([measurement record](../ja/verification/s3ap-operations.md) (Japanese)).
+      `CopyObject` given the identical `CopySource` succeeded in the same run, which is the control.
+      **That result did not reproduce on 2026-11-24** (FSx-for-ONTAP-Adoption-Playbook
+      [record](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)
+      (Japanese); succeeded with 8 MiB and two parts). Read the 2026-08-19 result as that day's record,
+      not as a current limitation
+- [ ] Try `UploadPartCopy` with a source in a standard S3 bucket in your own environment.
+      [What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)
+      (announced 2026-11-22, checked 2026-11-24) announces copies between a bucket and an access point
+      and between access points, same Region only, with `SSE-FSX` and `FSX_ONTAP` as the only
+      encryption and storage class when the destination is an FSx for ONTAP volume. Objects larger than 8 MiB,
+      copies across accounts, and access points on FlexCache volumes appear in neither the
+      announcement nor the FSx-for-ONTAP-Adoption-Playbook measurement, and have not been checked
 
 Record results in the table in [verification status](verification-status.md). When writing a figure,
 always state the environment with it.
