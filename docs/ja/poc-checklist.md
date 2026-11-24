@@ -68,11 +68,18 @@ VPC ピアリング・サブミリ秒のネットワーク遅延で測ったも�
       （部分的なファイルが見えるか、`CompleteMultipartUpload` まで見えないか）
 - [ ] Origin 側で削除したときに Cache 側での見え方がどうなるかを確認する
 - [ ] 上書きしたときの反映を確認する
-- [x] `UploadPartCopy` を**同一アクセスポイント内のソース**で試す →
-      **`NoSuchKey`**（[検証記録](verification/s3ap-operations.md)、2026-08-19）。同一の `CopySource` を
-      与えた `CopyObject` は同一実行内で成功しており対照が取れている。公式は同一 AP 内で対応と記載
-- [ ] 標準 S3 バケットをソースにした `UploadPartCopy` を試す。**このエンドポイントでコピーが成立する
-      別のソース名前空間が無いため、`UploadPartCopy` そのものの対応可否は未判定のまま**
+- [x] `UploadPartCopy` を**同一アクセスポイント内のソース**で試す → 2026-08-19 の測定では
+      **`NoSuchKey`**（[検証記録](verification/s3ap-operations.md)）。同一の `CopySource` を
+      与えた `CopyObject` は同一実行内で成功しており対照が取れている。**この結果は 2026-11-24 の
+      再確認では再現しなかった**（FSx-for-ONTAP-Adoption-Playbook の[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)、
+      8 MiB・2 パートで成功）。2026-08-19 の結果は現在の制約ではなく、その日の記録として読む
+- [ ] 標準 S3 バケットをソースにした `UploadPartCopy` を、自環境で試す。
+      [What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)
+      （2026-11-22 告知、2026-11-24 確認）はバケットと Access Point の間、Access Point どうしのコピーを
+      告知しており、同一リージョンのみ、コピー先が FSx for ONTAP のボリュームのときは `SSE-FSX` と
+      `FSX_ONTAP` に限られる。8 MiB を超えるオブジェクト、アカウントをまたぐコピー、
+      FlexCache ボリューム上の Access Point は、告知にも FSx-for-ONTAP-Adoption-Playbook の実測にも
+      記載がなく、確かめていない
 
 記録先は[検証状況](verification-status.md)の表。数値を書くときは環境を必ず併記する。
 

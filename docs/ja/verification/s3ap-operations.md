@@ -15,6 +15,8 @@
 
 > **対応表の記載に関する補足**: 2026-10-08 時点の対応表は `Presign` を Supported と記載しており、presigned URL については測定と一致しています（[2026-10-08 時点の対応表の記載](#2026-10-08-時点の対応表の記載)）。
 
+> **2026-11-24 の再確認**: この記録の `UploadPartCopy` と別 Access Point 経由のコピーの結果は、2026-08-19 の測定日の結果です。2026-11-24 に FSx-for-ONTAP-Adoption-Playbook が再確認したところ、`UploadPartCopy` の `NoSuchKey` は再現せず、バケットと Access Point の間、Access Point どうしの `CopyObject` も成功しました（[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)の「バケットと別の Access Point の間のサーバー側のコピー」の節）。告知は [What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)（2026-11-22）です。以下の `UploadPartCopy` の節は、現在の制約ではなく、測定日の結果として読んでください。
+
 ## 検証環境
 
 | 項目 | 値 |
@@ -153,6 +155,8 @@ Expect: 100-continue
 
 ## UploadPartCopy
 
+> **2026-11-24 の再確認**: 以下は 2026-08-19 の測定日の結果です。2026-11-24 に FSx-for-ONTAP-Adoption-Playbook が再確認したところ、`NoSuchKey` は再現せず、`/` を含むキーをコピー元にした 2 パートの `UploadPartCopy` が成功しました（[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)）。このリポジトリでは再測していません。
+
 対応表が同一 AP 内・同一リージョンで対応としている `UploadPartCopy` は、同一 Access Point 内をソースにしても `NoSuchKey` を返しました。同じソースで `CopyObject` は成功します。
 
 ### 結果: 同一 Access Point 内をソースにしても返る `NoSuchKey`
@@ -183,7 +187,7 @@ Expect: 100-continue
 
 ### 別の Access Point をソースにしたときの両操作の拒否
 
-同一ボリュームに接続された別の Access Point 経由で同じオブジェクトを指した場合です。
+同一ボリュームに接続された別の Access Point 経由で同じオブジェクトを指した場合です。**この拒否は 2026-08-19 の測定日の結果です。** 2026-11-24 に FSx-for-ONTAP-Adoption-Playbook が、別のファイルシステムの Access Point の間の `CopyObject` を含め、Access Point どうしのコピーが成功することを確認しています（上の補足の記録）。同一ボリュームに接続された別 Access Point の組は再測していません。
 
 | 操作 | 結果 |
 |---|---|
@@ -191,7 +195,7 @@ Expect: 100-continue
 | `CopyObject`、ソースは同一ボリュームの別 Access Point | `InvalidArgument: Invalid copy source header` |
 
 対照の `HeadObject` はどちらの Access Point 経由でも成功しており、オブジェクトは見えています。
-設計ガイドが Cross-AP Copy を「機能として存在しない」に置いているのと整合します。
+測定日には、設計ガイドが Cross-AP Copy を「機能として存在しない」に置いていたのと整合していました。2026-11-24 の再確認を受け、設計ガイドからその行を外しています。
 
 ### この測定が答えていないこと
 
@@ -233,7 +237,9 @@ Expect: 100-continue
 測定の範囲（64 B、AWS 外のクライアント、並列度 1、ONTAP バージョン未特定）は変わりません。
 
 同じ日に見た `UploadPartCopy` の行（同一 Access Point 内・同一リージョンで対応）は変わっておらず、
-[UploadPartCopy](#uploadpartcopy) の測定との食い違いは残っています。
+[UploadPartCopy](#uploadpartcopy) の測定との食い違いは、2026-10-08 時点では残っていました。
+2026-11-24 の再確認（[概要](#概要)の補足）では、測定側の `NoSuchKey` が再現しませんでした。
+2026-11-24 に対応表を読み直してはいません。
 
 ## 関連ドキュメント
 

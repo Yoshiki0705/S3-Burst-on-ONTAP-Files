@@ -24,7 +24,7 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 | HeadObject | — |
 | DeleteObject | — |
 | MultipartUpload | CreateMultipartUpload / UploadPart / CompleteMultipartUpload |
-| CopyObject | 同一 AP 内・同一リージョンのみ。`x-amz-object-annotation-directive` ヘッダーは非対応（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)） |
+| CopyObject | Amazon S3 のバケットとの間、別の Access Point との間、同一 Access Point 内でサーバー側コピーできる。同一リージョンのみで、コピー先が FSx for ONTAP のボリュームのときは暗号化が `SSE-FSX`、ストレージクラスが `FSX_ONTAP` に限られる（[What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)、2026-11-22 告知、2026-11-24 確認）。FSx-for-ONTAP-Adoption-Playbook が 2026-11-24 に 8 MiB のオブジェクトで、バケットと Access Point の間、同一 Access Point 内、別のファイルシステムの Access Point の間の `CopyObject` を実測し、成功と SHA-256 の一致を記録している（[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)）。このリポジトリでは再測していない。その記録は 8 MiB を超えるオブジェクト、アカウントをまたぐコピー、FlexCache ボリューム上の Access Point に触れておらず、このリポジトリも確かめていない。`x-amz-object-annotation-directive` ヘッダーは非対応（[対応表](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)。この行のためには読み直していない） |
 
 ### 非対応（エラーが返る）
 
@@ -37,7 +37,7 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 
 | オペレーション | 条件 | このリポジトリでの状態 |
 |---|---|---|
-| UploadPartCopy | 対応表は同一 AP 内・同一リージョンのみ対応と記載 | **同一 AP 内をソースにして実測したところ `NoSuchKey` を返した**（[検証記録](../../verification/s3ap-operations.md)、2026-08-19）。**同一の `CopySource` を与えた `CopyObject` は同一実行内で成功しており**、対照が取れている。測定は対応表と逆向き。ただし**このエンドポイントでコピーが成立する別のソース名前空間が無いため、`UploadPartCopy` そのものが非対応なのかは判定できない**（別 AP 経由は `CopyObject` でも拒否される）。先の「同一 AP 内に無いソースで `404 NoSuchKey`」という 1 回の観測は、**別 AP では `InvalidArgument` になったため帰属が合わない** |
+| UploadPartCopy | `CopyObject` と同じ範囲（同一リージョンのみ。コピー先が FSx for ONTAP のボリュームのときは `SSE-FSX` と `FSX_ONTAP` に限る）で、バケットと Access Point の間、Access Point どうしのコピーに使える（[What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)、2026-11-22 告知、2026-11-24 確認） | **2026-11-24 に FSx-for-ONTAP-Adoption-Playbook が実測し、成功した**（ap-northeast-1、第 1 世代 `SINGLE_AZ_1`、ONTAP 9.19.1P4、8 MiB、`/` を含むキーをコピー元にした 2 パート、中身の SHA-256 が一致。[記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-point-constraints.md)の「バケットと別の Access Point の間のサーバー側のコピー」の節）。**このリポジトリでの再測はしていない。** 8 MiB を超えるオブジェクト、アカウントをまたぐコピー、FlexCache ボリューム上の Access Point は確かめていない。**2026-08-19 にこのリポジトリが同一 Access Point 内をソースにして測ったときは `NoSuchKey` だった**（[検証記録](../../verification/s3ap-operations.md)。同一の `CopySource` を与えた `CopyObject` は同一実行内で成功）。この結果は 2026-11-24 の再確認では再現しなかった。記録はその日の結果として残し、現在の制約としては扱わない |
 
 ### 機能として存在しない
 
@@ -49,7 +49,6 @@ FSx for ONTAP の S3 AP が対応するのは S3 API の一部である。Amazon
 | Object Lock / WORM | SnapLock Compliance / Enterprise |
 | S3 Select | Athena + Glue Data Catalog |
 | SSE-S3 / SSE-KMS | NAE / NVE（ONTAP ボリューム暗号化） |
-| Cross-AP Copy | DataSync / rsync |
 
 ### Presigned URL
 
