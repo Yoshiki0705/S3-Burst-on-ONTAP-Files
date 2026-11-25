@@ -2788,6 +2788,7 @@ What the tables show:
 - C was costed with all of A included, so it comes out higher than A: $28 to $283 a month more at 4 MiB and $561 to $6,918 at 64 KiB
 - At 64 KiB the order was A < C < B, because C puts only the working set into S3 Files. Copying everything in P4 makes C $13,043 a month, above B. At 4 MiB the order was B < A < C
 - This comparison covers capacity, performance and API charges only. A includes 128 MBps of throughput capacity; S3 Files throughput for B is not costed
+- A's SSD (10,322 GiB) uses the common baseline's 20% headroom, which is about 83% utilization. Sizing it to the user guide's recommendation (keep SSD tier utilization from staying above 80%, [Managing storage capacity](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-storage-capacity.html)) plus the up to 16% reserved for ONTAP overhead on the same page gives 12,800 GiB, which raises A's and C's monthly cost by $371.70 in every cell. The order from cheapest does not change at 64 KiB or at 4 MiB
 
 Monthly cost with a different capacity pool share for A (USD, other assumptions unchanged):
 
