@@ -34,7 +34,7 @@
 | 大きいオブジェクトを低頻度で扱い、利用側が NFS / SMB を要求する | 費用差は小さい | 選ぶ理由は費用ではなく、同期ジョブを持つかどうかになる |
 | 既に FSx for ONTAP がある | FSx for ONTAP S3 AP | 比較が増分になる。固定費は既存ワークロードが負っている |
 | 新規に FSx for ONTAP を建てる必要があり、データ量も要求も小さい | S3 バケット単独、または要件の再確認 | 月額下限を回収できる理由が要る |
-| 長期保持が中心で、読み出しが稀 | S3 の Glacier 系ストレージクラス | FSx for ONTAP に同等の取り出し課金モデルはない |
+| 長期保持が中心で、読み出しが稀 | FSx for ONTAP の容量プールに置いたまま、または S3 の Glacier 系ストレージクラス | 容量プールは S3 Standard と同じくらいの単価（Single-AZ $0.0238、S3 Standard の最初の 50 TB $0.025、いずれも / GB-月。ap-northeast-1、Price List API、2026-11-24 と 2026-11-25 取得）で、ファイルのパスとアクセス権が変わらない。単価をさらに下げたい場合や S3 Lifecycle、S3 Object Lock、イベント通知が要る場合は Glacier 系へ移す。階層化で SSD の料金が下がるのは、SSD の確保容量を小さくしたときだけ（[判断の節](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-server-side-copy-use-cases.md)） |
 | 配布側が必要とするのは全データではなく作業セット | FlexCache の Cache ボリューム | 疎なキャッシュなので、Origin の 1 割程度の SSD で足りる |
 | 利用側が AWS 上の Linux コンピュートで、マウントヘルパーを入れられる | S3 Files | FSx for ONTAP の固定費がかからない。大きいオブジェクトではとくに安い |
 | 利用側が構成を変えられない装置、SMB、または AWS 外 | FSx for ONTAP S3 AP + FlexCache | S3 Files は EC2 / Lambda / EKS / ECS の Linux 向けで、SMB を提供しない |
@@ -3136,7 +3136,7 @@ FinOps の対象は請求書だけではない。
 |---|---|
 | 平均オブジェクトサイズが大きく、リクエストが少ない | リクエスト単価の差が効かない。費用差は小さく、選ぶ根拠は運用面に移る |
 | 利用側が S3 API で足りる | FSx for ONTAP の固定費を負う理由がない |
-| 長期保持が中心で読み出しが稀 | Glacier 系の保存単価と取り出し課金のモデルのほうが合う |
+| 長期保持が中心で読み出しが稀 | Glacier 系の保存単価と取り出し課金のモデルのほうが合う場合がある。データが FSx for ONTAP にあるなら、まず容量プールで足りるかを確かめる |
 | データ量が小さい | 月額下限を回収できない |
 | S3 固有機能が要る | イベント通知、ライフサイクル、バージョニングは対象外 ([上限値](../limits/s3-access-point.md)) |
 | 配布側で S3 API が要る | この構成は提供しない ([代替案との比較](alternatives.md)) |

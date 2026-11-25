@@ -42,7 +42,7 @@ an estimate is not mistaken for a measurement.
 | Large objects handled infrequently, and the consumers require NFS or SMB | The cost difference is small | The reason to choose is not cost but whether you want to run a sync job |
 | FSx for ONTAP is already there | FSx for ONTAP S3 AP | The comparison becomes an increment. The floor is carried by the existing workload |
 | A new FSx for ONTAP file system is required, and both the data volume and the requirements are small | An S3 bucket alone, or revisit the requirement | You need a reason that recovers the monthly floor |
-| Mostly long-term retention, rarely read | The S3 Glacier storage classes | FSx for ONTAP has no equivalent retrieval-charge model |
+| Mostly long-term retention, rarely read | Leave it in the FSx for ONTAP capacity pool, or use the S3 Glacier storage classes | The capacity pool is priced close to S3 Standard (Single-AZ $0.0238, S3 Standard first 50 TB $0.025, both per GB-month; ap-northeast-1, Price List API, retrieved 2026-11-24 and 2026-11-25) and keeps file paths and access rights unchanged. Move to Glacier when you want a lower unit price still, or need S3 Lifecycle, S3 Object Lock or event notifications. Tiering lowers the SSD charge only if you also reduce the provisioned SSD capacity ([decision section, in Japanese](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-server-side-copy-use-cases.md)) |
 | What the distribution side needs is the working set, not all of the data | A FlexCache cache volume | The cache is sparse, so roughly a tenth of the origin in SSD is enough |
 | The consumers are Linux compute in AWS and the mount helper can be installed | S3 Files | No FSx for ONTAP floor. Cheaper still with large objects |
 | The consumers are equipment whose configuration cannot be changed, need SMB, or are outside AWS | FSx for ONTAP S3 AP + FlexCache | S3 Files targets Linux on EC2 / Lambda / EKS / ECS and does not offer SMB |
@@ -3167,7 +3167,7 @@ part does not appear on the invoice, and the invoice is not all that FinOps cove
 |---|---|
 | Large average object size, few requests | The difference in request rates does not bite. The cost difference is small and the basis for choosing moves to operations |
 | The S3 API is enough for the consumers | There is no reason to carry the FSx for ONTAP floor |
-| Mostly long-term retention, rarely read | The Glacier storage rate and retrieval charge model fits better |
+| Mostly long-term retention, rarely read | The Glacier storage rate and retrieval charge model can fit better. If the data is already in FSx for ONTAP, first check whether the capacity pool is enough |
 | The data volume is small | The monthly floor cannot be recovered |
 | S3-specific features are needed | Event notifications, lifecycle and versioning are out of scope ([limits](../limits/s3-access-point.md)) |
 | The S3 API is needed on the distribution side | This architecture does not offer it ([comparison with the alternatives](alternatives.md)) |
