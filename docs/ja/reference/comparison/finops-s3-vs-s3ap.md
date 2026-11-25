@@ -2696,6 +2696,22 @@ S3 Files が安く出るワークロードで、それでもこの構成を選�
 
 しきい値のほうも同じ構造を持つ。しきい値を上げれば小さくないファイルも低レイテンシで読めるが、その分が高性能ストレージの課金対象になる。この列の安さは、しきい値を超えるファイルが S3 のレイテンシで読まれることと引き換えである。
 
+### 既に FSx for ONTAP がある場合の増分
+
+この構成が対象とする状況では、利用側が NFS / SMB を要求するため FSx for ONTAP は既にある。そこに S3 の受け口を足すときの比較は、グリーンフィールドの「S3 か FSx for ONTAP か」ではなく「増分としてどちらが安いか」になる。
+
+前提は上の「車載 / IoT テレメトリ — 小オブジェクト高頻度」と同じ (3 億オブジェクト / 月、64 KiB)。SSD とスループットは既存ワークロードのために既に払っているものとして、増分だけを並べる。
+
+| 増分 | 内訳 | 月額 |
+|---|---|---|
+| S3 AP を足す | S3 AP 経由 PUT のみ | $324.00 |
+| S3 バケットと同期ジョブを足す | S3 保存 + S3 PUT + 同期の読み出し GET + DataSync 転送 | $1,865.73 |
+| 差 |  | **$1,541.73** |
+
+S3 AP はアクセスポイント自体に時間課金がないため、増分はリクエスト課金に集約される。同期ジョブ側の増分には、同じバイト列を 2 系統で持つ保存料金が含まれる。この差は容量が増えても縮まらない。
+
+<!-- finops-model:end -->
+
 ### 正本の位置で分けた 3 つのパターン — S3 Access Points、S3 Files、サーバー側コピー
 
 2026-11 から、S3 Access Points と汎用バケットの間をサーバー側コピー（`CopyObject` / `UploadPartCopy`）でつなげます（[What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)）。共通ベースラインの前提で、次の 3 つのパターンの月額と 3 年分（月額の 36 倍、単価は変わらない前提）を計算しました。単価は ap-northeast-1 の Price List API（2026-11-25 取得）で、共通ベースラインが使う 13 の単価はどれも同じ値でした。単価 × 数量の計算で、測定値でも請求額でもありません。
@@ -2771,22 +2787,6 @@ A の容量プールの割合を変えたときの月額です（USD、ほかの
 容量プールを 90% にすると、A の月額は 30% のときの 39〜44%（P6 / 64 KiB は 58%）になりました。4 MiB では、それでも B の方が小さいままでした。
 
 反映の待ちと属性の扱いの実測は、Hub の記録にあります（[S3 Access Points で書いたファイルを NFS で読むまで](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md)、[S3 Files のバケットと FSx for ONTAP のボリュームをサーバー側コピーでつなぐ](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md)）。
-
-### 既に FSx for ONTAP がある場合の増分
-
-この構成が対象とする状況では、利用側が NFS / SMB を要求するため FSx for ONTAP は既にある。そこに S3 の受け口を足すときの比較は、グリーンフィールドの「S3 か FSx for ONTAP か」ではなく「増分としてどちらが安いか」になる。
-
-前提は上の「車載 / IoT テレメトリ — 小オブジェクト高頻度」と同じ (3 億オブジェクト / 月、64 KiB)。SSD とスループットは既存ワークロードのために既に払っているものとして、増分だけを並べる。
-
-| 増分 | 内訳 | 月額 |
-|---|---|---|
-| S3 AP を足す | S3 AP 経由 PUT のみ | $324.00 |
-| S3 バケットと同期ジョブを足す | S3 保存 + S3 PUT + 同期の読み出し GET + DataSync 転送 | $1,865.73 |
-| 差 |  | **$1,541.73** |
-
-S3 AP はアクセスポイント自体に時間課金がないため、増分はリクエスト課金に集約される。同期ジョブ側の増分には、同じバイト列を 2 系統で持つ保存料金が含まれる。この差は容量が増えても縮まらない。
-
-<!-- finops-model:end -->
 
 ### 損益分岐の地図
 

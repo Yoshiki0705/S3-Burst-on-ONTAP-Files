@@ -2712,6 +2712,22 @@ Shortening it lowers the figure, but reading a file that has expired triggers an
 
 The threshold has the same structure. Raising it lets larger files be read at low latency, and what is raised becomes billable on high-performance storage. This column's low figure is paid for by above-threshold files being read at S3 latency.
 
+### The increment when FSx for ONTAP is already there
+
+In the situation this architecture is for, the consumers require NFS or SMB, so FSx for ONTAP is already there. Adding a way in over S3 is therefore not the greenfield question "S3 or FSx for ONTAP" but "which increment is cheaper".
+
+The assumptions are those of Vehicle / IoT telemetry — small objects, written often above (300 million objects a month at 64 KiB). SSD and throughput are taken as already paid for by the existing workload, so only the increment is shown.
+
+| Increment | Line item | Monthly |
+|---|---|---|
+| Add an S3 AP | PUT through the S3 AP, nothing else | $324.00 |
+| Add an S3 bucket and a sync job | S3 storage + S3 PUT + the sync job's GET + DataSync transfer | $1,865.73 |
+| Difference |  | **$1,541.73** |
+
+An S3 Access Point carries no hourly charge of its own, so its increment reduces to request charges. The sync job's increment includes storage for holding the same bytes in two places. That difference does not narrow as capacity grows.
+
+<!-- finops-model:end -->
+
 ### Three patterns split by where the source of truth sits — S3 Access Points, S3 Files and server-side copy
 
 Since 2026-11, server-side copy (`CopyObject` / `UploadPartCopy`) joins S3 Access Points and general purpose buckets ([What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)). Under the common baseline's assumptions, I computed the monthly cost and the 3-year total (36 times the monthly cost, constant prices) of the three patterns below. Prices come from the Price List API for ap-northeast-1 (retrieved 2026-11-25); all 13 prices the common baseline uses had the same values. This is price x quantity arithmetic, not a measurement and not a bill.
@@ -2787,22 +2803,6 @@ Monthly cost with a different capacity pool share for A (USD, other assumptions 
 With 90% on the capacity pool, A's monthly cost was 39 to 44% of the 30% case (58% for P6 / 64 KiB). At 4 MiB, B was still lower.
 
 The measured propagation waits and attribute handling are in the Hub's records ([S3 Access Points writes read over NFS versions](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md), [S3 Files and FSx for ONTAP joined by server-side copy](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md), both in Japanese).
-
-### The increment when FSx for ONTAP is already there
-
-In the situation this architecture is for, the consumers require NFS or SMB, so FSx for ONTAP is already there. Adding a way in over S3 is therefore not the greenfield question "S3 or FSx for ONTAP" but "which increment is cheaper".
-
-The assumptions are those of Vehicle / IoT telemetry — small objects, written often above (300 million objects a month at 64 KiB). SSD and throughput are taken as already paid for by the existing workload, so only the increment is shown.
-
-| Increment | Line item | Monthly |
-|---|---|---|
-| Add an S3 AP | PUT through the S3 AP, nothing else | $324.00 |
-| Add an S3 bucket and a sync job | S3 storage + S3 PUT + the sync job's GET + DataSync transfer | $1,865.73 |
-| Difference |  | **$1,541.73** |
-
-An S3 Access Point carries no hourly charge of its own, so its increment reduces to request charges. The sync job's increment includes storage for holding the same bytes in two places. That difference does not narrow as capacity grows.
-
-<!-- finops-model:end -->
 
 ### Break-even map for pattern P4
 
