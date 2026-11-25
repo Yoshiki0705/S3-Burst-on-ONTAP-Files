@@ -178,6 +178,30 @@ CSV の列は `プロトコル, マウント方法, p50, p90, max, n, 計測日`
 判断のフローチャートは[選び方](../reference/decision-trees/choosing-this-architecture.md)、
 代償の一覧は[代替案との比較](../reference/comparison/alternatives.md)にあります。
 
+### 2 つの正本をサーバー側コピーでつなぐ場合
+
+2026-11 から、S3 Access Points のサーバー側コピー（`CopyObject` / `UploadPartCopy`）で、
+汎用バケットと FSx for ONTAP のボリュームの Access Point の間を、クライアントを通さずに写せます
+（[What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)）。
+S3 Files のバケットと FSx for ONTAP のボリュームの両方に正本を持つ場合の測定は、
+[Hub の記録](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md)にあります。
+条件は 2026-11-25、ap-northeast-1、第 1 世代 `SINGLE_AZ_1`（128 MBps）、S3 Files は既定の同期設定、
+EC2 t3.large、NFSv4.2 です。
+
+| 向き | 測定対象 | サイズ | p50 | n |
+|---|---|---|---|---|
+| Access Point → バケット | `CopyObject` から S3 Files のマウントで読めるまで | 64 B | 1.516 秒 | 10 |
+| Access Point → バケット | 同上 | 8 MiB | 1.014 秒 | 10 |
+| S3 Files → バケット | S3 Files で書いてからバケットの `GetObject` で読めるまで | 64 B | 63.578 秒 | 5 |
+
+所有者とモードは既定では写りません。S3 Files 側は `root:root`、`0644`、FSx for ONTAP 側は
+Access Point のファイルシステムユーザー（`0:1`）と `0644` でした。コピーに S3 Files のメタデータ
+（`file-owner`、`file-group`、`file-permissions`）を `--metadata-directive REPLACE` で付けると、
+S3 Files 側は指定した所有者とモードになりました。
+
+この記録が測っていないのは、ディレクトリへの初回アクセスの直後、期限切れのファイル、
+大量のファイルの場合で、ここでは確かめたことにしていません。上の表は 1 環境の値です。
+
 ## 仕様ベースの値と出典
 
 **以下はすべて公開ドキュメントの記載で、この環境で確かめたものではありません。**
