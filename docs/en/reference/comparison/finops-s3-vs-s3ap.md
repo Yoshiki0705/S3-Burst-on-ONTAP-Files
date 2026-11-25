@@ -2712,6 +2712,82 @@ Shortening it lowers the figure, but reading a file that has expired triggers an
 
 The threshold has the same structure. Raising it lets larger files be read at low latency, and what is raised becomes billable on high-performance storage. This column's low figure is paid for by above-threshold files being read at S3 latency.
 
+### Three patterns split by where the source of truth sits — S3 Access Points, S3 Files and server-side copy
+
+Since 2026-11, server-side copy (`CopyObject` / `UploadPartCopy`) joins S3 Access Points and general purpose buckets ([What's New](https://aws.amazon.com/about-aws/whats-new/2026/11/s3-access-points-server-side-copy-fsx/)). Under the common baseline's assumptions, I computed the monthly cost and the 3-year total (36 times the monthly cost, constant prices) of the three patterns below. Prices come from the Price List API for ap-northeast-1 (retrieved 2026-11-25); all 13 prices the common baseline uses had the same values. This is price x quantity arithmetic, not a measurement and not a bill.
+
+| Pattern | Source of truth | Writes | Reads |
+|---|---|---|---|
+| A | FSx for ONTAP (generation 1 `SINGLE_AZ_1`, 128 MBps) | `PutObject` to S3 Access Points | NFS |
+| B | An S3 general purpose bucket | S3 `PutObject` | S3 Files |
+| C | Same as A | Same as A | The working set is copied to a bucket with `CopyObject` each month and read through S3 Files |
+
+Assumptions added to the common baseline:
+
+- A and C: capacity pool write requests counted as the write volume x the capacity pool share (30%) in 4 MiB units, x $0.0047 / 1,000
+- B and C: bucket versioning on, with a rule that expires old versions after 1 day
+- C: the copied share is the working-set ratio (5% for P1, 50% for P6, 10% otherwise). All S3 Files reads hit the copied working set. A's NFS read line items are kept (removing them lowers P4 / 64 KiB by $37 a month)
+- C: COPY at the destination bucket counted at $0.0047 / 1,000. The source access point side assumed to be in the same class as GET ($0.000029 / 1,000), plus capacity pool reads at the source. The actual class charged on the source side is not checked
+- No pattern includes the EC2 clients, same-AZ transfer, the initial full load, backups, snapshots or tax
+
+| Cell | A monthly | B monthly | C monthly | A 3 years | B 3 years | C 3 years |
+|---|---:|---:|---:|---:|---:|---:|
+| P1 / 64 KiB | $1,783 | $7,928 | $2,344 | $64,192 | $285,420 | $84,396 |
+| P1 / 4 MiB | $1,781 | $512 | $1,809 | $64,126 | $18,437 | $65,131 |
+| P4 / 64 KiB | $1,819 | $8,755 | $3,724 | $65,466 | $315,187 | $134,075 |
+| P4 / 4 MiB | $1,782 | $515 | $1,840 | $64,146 | $18,531 | $66,246 |
+| P5 / 64 KiB | $1,837 | $8,876 | $3,743 | $66,131 | $319,547 | $134,740 |
+| P5 / 4 MiB | $1,782 | $517 | $1,841 | $64,169 | $18,608 | $66,269 |
+| P6 / 64 KiB | $2,226 | $12,048 | $9,143 | $80,119 | $433,724 | $329,160 |
+| P6 / 4 MiB | $1,795 | $561 | $2,079 | $64,637 | $20,181 | $74,839 |
+| P8 / 64 KiB | $2,155 | $11,020 | $3,277 | $77,571 | $396,708 | $117,979 |
+| P8 / 4 MiB | $1,794 | $555 | $1,850 | $64,597 | $19,994 | $66,608 |
+
+Without the added assumptions, A and B match the ten cells of the 2026-10-16 post that used the common baseline ([speed and monthly cost of S3 Files](https://dev.to/aws-builders/i-measured-the-speed-and-monthly-cost-of-amazon-s3-files-which-lets-you-use-s3-as-files-and-how-1970)) to the cent. For P5, P6 and P8, which have writes, A is $0.4 to $7.4 a month higher and B $0.9 to $17.1 higher.
+
+The one-month breakdown for P4 (USD). The kinds are capacity (storage), performance (throughput capacity) and API (requests and S3 Files reads and writes).
+
+| Item | Kind | 64 KiB | 4 MiB |
+|---|---|---:|---:|
+| A: SSD | Capacity | 1,548.30 | 1,548.30 |
+| A: throughput capacity | Performance | 115.97 | 115.97 |
+| A: capacity pool | Capacity | 116.98 | 116.98 |
+| A: capacity pool read requests | API | 37.25 | 0.58 |
+| A total | | 1,818.50 | 1,781.83 |
+| B: S3 storage | Capacity | 512.00 | 512.00 |
+| B: S3 Files high-performance storage | Capacity | 7,372.80 | 0 |
+| B: S3 Files file data reads | API | 819.20 | 0 |
+| B: metadata reads and GET | API | 51.20 | 2.74 |
+| B total | | 8,755.20 | 514.74 |
+| C: A total | | 1,818.50 | 1,781.83 |
+| C: S3 storage of the copied 2 TiB and old versions | Capacity | 52.91 | 52.91 |
+| C: `CopyObject` requests (destination and source) | API | 158.68 | 2.48 |
+| C: S3 Files high-performance storage (copied part) | Capacity | 737.28 | 0 |
+| C: S3 Files import and reads, GET and metadata | API | 953.22 | 2.88 |
+| C: capacity pool reads at the source | API | 3.72 | 0.06 |
+| C total | | 3,724.30 | 1,840.16 |
+
+What the tables show:
+
+- C was costed with all of A included, so it comes out higher than A: $28 to $283 a month more at 4 MiB and $561 to $6,918 at 64 KiB
+- At 64 KiB the order was A < C < B, because C puts only the working set into S3 Files. Copying everything in P4 makes C $13,043 a month, above B. At 4 MiB the order was B < A < C
+- This comparison covers capacity, performance and API charges only. A includes 128 MBps of throughput capacity; S3 Files throughput for B is not costed
+
+Monthly cost with a different capacity pool share for A (USD, other assumptions unchanged):
+
+| Cell | B | A (30%) | A (80%) | A (90%) | C (30%) | C (90%) |
+|---|---:|---:|---:|---:|---:|---:|
+| P1 / 64 KiB | 7,928 | 1,783 | 875 | 694 | 2,344 | 1,259 |
+| P1 / 4 MiB | 512 | 1,781 | 870 | 688 | 1,809 | 716 |
+| P4 / 64 KiB | 8,755 | 1,818 | 970 | 800 | 3,724 | 2,713 |
+| P4 / 4 MiB | 515 | 1,782 | 872 | 690 | 1,840 | 748 |
+| P6 / 64 KiB | 12,048 | 2,226 | 1,451 | 1,296 | 9,143 | 8,251 |
+| P6 / 4 MiB | 561 | 1,795 | 899 | 719 | 2,079 | 1,003 |
+
+With 90% on the capacity pool, A's monthly cost was 39 to 44% of the 30% case (58% for P6 / 64 KiB). At 4 MiB, B was still lower.
+
+The measured propagation waits and attribute handling are in the Hub's records ([S3 Access Points writes read over NFS versions](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md), [S3 Files and FSx for ONTAP joined by server-side copy](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md), both in Japanese).
+
 ### The increment when FSx for ONTAP is already there
 
 In the situation this architecture is for, the consumers require NFS or SMB, so FSx for ONTAP is already there. Adding a way in over S3 is therefore not the greenfield question "S3 or FSx for ONTAP" but "which increment is cheaper".
