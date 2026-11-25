@@ -2734,7 +2734,7 @@ Since 2026-11, server-side copy (`CopyObject` / `UploadPartCopy`) joins S3 Acces
 
 | Pattern | Source of truth | Writes | Reads |
 |---|---|---|---|
-| A | FSx for ONTAP (generation 1 `SINGLE_AZ_1`, 128 MBps) | `PutObject` to S3 Access Points | NFS |
+| A | FSx for ONTAP (generation 1 `SINGLE_AZ_1`, 128 MBps) | `PutObject` to S3 Access Points | NFS or SMB (the cost model does not depend on the read protocol) |
 | B | An S3 general purpose bucket | S3 `PutObject` | S3 Files |
 | C | Same as A | Same as A | The working set is copied to a bucket with `CopyObject` each month and read through S3 Files |
 
@@ -2803,7 +2803,7 @@ Monthly cost with a different capacity pool share for A (USD, other assumptions 
 
 With 90% on the capacity pool, A's monthly cost was 39 to 44% of the 30% case (58% for P6 / 64 KiB). At 4 MiB, B was still lower.
 
-The measured propagation waits and attribute handling are in the Hub's records ([S3 Access Points writes read over NFS versions](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md), [S3 Files and FSx for ONTAP joined by server-side copy](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md), both in Japanese).
+The measured propagation waits and attribute handling are in the Hub's records ([S3 Access Points writes read over NFS and SMB](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md), [S3 Files and FSx for ONTAP joined by server-side copy](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md), both in Japanese).
 
 ### Break-even map for pattern P4
 
