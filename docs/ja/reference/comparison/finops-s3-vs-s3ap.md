@@ -2718,7 +2718,7 @@ S3 AP はアクセスポイント自体に時間課金がないため、増分�
 
 | パターン | 正本 | 書き込み | 読み取り |
 |---|---|---|---|
-| A | FSx for ONTAP（第 1 世代 `SINGLE_AZ_1`、128 MBps） | S3 Access Points への `PutObject` | NFS |
+| A | FSx for ONTAP（第 1 世代 `SINGLE_AZ_1`、128 MBps） | S3 Access Points への `PutObject` | NFS または SMB（費用の計算は読み取りのプロトコルで変わらない） |
 | B | S3 の汎用バケット | S3 の `PutObject` | S3 Files |
 | C | A と同じ | A と同じ | 作業セットを毎月 `CopyObject` でバケットへ写し、S3 Files で読む |
 
@@ -2787,7 +2787,7 @@ A の容量プールの割合を変えたときの月額です（USD、ほかの
 
 容量プールを 90% にすると、A の月額は 30% のときの 39〜44%（P6 / 64 KiB は 58%）になりました。4 MiB では、それでも B の方が小さいままでした。
 
-反映の待ちと属性の扱いの実測は、Hub の記録にあります（[S3 Access Points で書いたファイルを NFS で読むまで](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md)、[S3 Files のバケットと FSx for ONTAP のボリュームをサーバー側コピーでつなぐ](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md)）。
+反映の待ちと属性の扱いの実測は、Hub の記録にあります（[S3 Access Points で書いたファイルを NFS と SMB で読むまで](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-access-points-write-read-over-nfs-versions.md)、[S3 Files のバケットと FSx for ONTAP のボリュームをサーバー側コピーでつなぐ](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/data-utilization/notes/s3-files-and-access-points-bridged-by-copy.md)）。
 
 ### 損益分岐の地図
 
